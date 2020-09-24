@@ -1,0 +1,53 @@
+# FIXME/TODO (you should delete this file after reading / completing the tasks)
+
+A (maybe incomplete but hopefully useful) list of things to do after creating a
+new role based on the skeleton, especially before releasing anything:
+
+1. **Update author information** (and/or company and/or year) in
+   * [`LICENSE`](./LICENSE) → First line
+   * [`meta/main.yml`](./meta/main.yml) → `galaxy_info:` → `author`, `company`
+     and URLs if fitting
+   * The "[`README.md`: Author Information](./README.md#author-information)" section
+2. **Update requirements information** in the "[`README.md`: Requirements](./README.md#requirements)"
+   section and list any pre-requisites that may not be covered by Ansible
+   itself, e.g.:
+   * DNS names to configure, firewall ports to open
+   * [SELinux](https://en.wikipedia.org/wiki/Security-Enhanced_Linux)
+     * has to be disabled.
+     * is supported in "Permissive" mode only.
+     * is supported in "Enforcing" as well as in "Permissive" mode.
+3. **Update dependency information**:
+   * In the "[`README.md`: Dependencies](./README.md#dependencies)" section:
+     * A list of other roles hosted on Galaxy should go here
+     * Plus any details in regards to parameters that may need to be set for
+       other roles or variables that are used from other roles.
+   * [`meta/main.yml`](./meta/main.yml) -> `dependencies:`
+4. **Update compatibility information**:
+   * In the "[`README.md`: Compatibility](./README.md#compatibility)" section:
+     * maybe you want to mention the main platform / first class citizens.
+     * or if things where tested on container / VM / bare metal
+   * [`meta/main.yml`](./meta/main.yml) -> `platforms:`
+     * There is [a list of platforms](https://galaxy.ansible.com/api/v1/platforms/)
+     * The list is paginated. You can also search for e.g. Fedora by adding
+       `?name__icontains=fedora`.
+5. **Tests / [Molecule](https://molecule.readthedocs.io/en/latest/)**: delete the
+   whole `./molecule` directory if you do not want to provide tests at this point
+   in time or:
+   * [`molecule/default/molecule.yml`](./molecule/default/molecule.yml): Define `driver` and `platforms` for your tests
+   * [`molecule/default/tests/`](./molecule/default/tests/): Write test cases (Example: [`molecule/default/tests/test_default.py`](./molecule/default/tests/test_default.py))
+6. **Misc things**
+   * [`meta/main.yml`](./meta/main.yml): Remove unneeded, commented keys. See
+     the following for more information if you are unsure what they do or if
+     you even need more:
+     * <https://galaxy.ansible.com/docs/contributing/creating_role.html#role-metadata>
+     * <https://github.com/ansible/ansible/blob/devel/lib/ansible/playbook/role/metadata.py>
+     * <https://github.com/ansible/ansible/blob/devel/lib/ansible/cli/galaxy.py>
+   * You may want to add a section with useful weblinks to describe what the
+     role is managing or other useful resources:
+     ```markdown
+     ## Further reading
+
+     * [Official Example website](http://example.com/]
+     * [Wikipedia: Example](http://en.wikipedia.org/wiki/Example)
+     ```
+   * Add example playbook(s) to the "[`README.md`: Example Playbook](./README.md#example-playbook)" section

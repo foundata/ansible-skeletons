@@ -1,0 +1,22 @@
+# Tasks related to service management
+
+---
+
+- name: "Check if initialization task were executed"
+  fail:
+    msg: "Role \"{{ role_name }}\" was not properly initialized."
+  when: not {{ role_name }}_initialized
+
+
+#- name: "Create systemd service: example.service"
+#  template:
+#    src: "example.service.j2"
+#    dest: "/etc/systemd/system/example.service"
+#  notify: "restart_example"
+#
+#
+#- name: "Start and enable example.service"
+#  service:
+#    name: "example.service"
+#    state: "{{ '{{ ' + role_name + '_service_state }}' }}"
+#    enabled: true

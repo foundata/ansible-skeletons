@@ -1,0 +1,27 @@
+# List of tasks to be executed by the role
+
+---
+
+- name: "Include tasks to initialize the role"
+  include_tasks: "init.yml"
+  tags: "always"
+
+
+- name: "Include tasks to setup the managed software"
+  include_tasks: "setup.yml"
+  tags: "setup"
+
+
+- name: "Include tasks to configure the managed software"
+  include_tasks: "config.yml"
+  tags: "config"
+
+
+- name: "Include tasks to manage services / daemons"
+  include_tasks: "service.yml"
+  tags: "service"
+
+
+- name: "Include tasks to cleanup"
+  include_tasks: "cleanup.yml"
+  tags: "always"

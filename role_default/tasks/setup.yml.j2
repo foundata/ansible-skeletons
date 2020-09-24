@@ -1,0 +1,16 @@
+# Tasks related to setup (e.g. package installation, create users, ...)
+
+---
+
+- name: "Check if initialization task were executed"
+  fail:
+    msg: "Role \"{{ role_name }}\" was not properly initialized."
+  when: not {{ role_name }}_initialized
+
+
+# - name: "Install the latest version of Apache and MariaDB"
+#   package:
+#     state: "{{ '{{ ' + role_name + '_package_state }}' }}"
+#     name:
+#       - "httpd"
+#       - "mariadb-server"

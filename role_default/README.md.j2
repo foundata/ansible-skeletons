@@ -1,0 +1,73 @@
+# `{{ role_name }}`
+
+{{ description }}
+
+
+
+## Table of contents
+
+* [Requirements](#requirements)
+* [Role variables](#role-variables)
+* [Dependencies](#dependencies)
+* [Example playbook](#example-playbook)
+* [Supported tags](#supported-tags)
+* [Compatibility](#compatibility)
+* [License, copyright](#license-copyright)
+* [Author information](#author-information)
+
+
+
+## Requirements
+
+There are no special requirements not covered by Ansible itself.
+
+
+
+## Role variables
+
+See [`defaults/main.yml`](./defaults/main.yml) for all available role parameters and their description. [`vars/main.yml`](./vars/main.yml) contains variables you should not override (but their descrption might be interesting).
+
+Additionally, there are variables read from other roles and/or the global scope (e.g. host or group vars) as follows:
+
+* None right now.
+
+
+
+## Dependencies
+
+See `dependencies` in [`meta/main.yml`](./meta/main.yml).
+
+
+
+## Example playbook
+
+None right now.
+
+
+
+## Supported tags
+
+It might be useful and faster to only call parts of the role by using tags:
+
+* `setup`: Setup tasks like package installations (mostly one-time).
+* `config`: Creates / updates configuration files and related resources.
+* `service`: Creates / updates service related files and manages their state.
+* `always`: Preparation task at start as well as clean-up task during completion. May be called explicitly to force a cleanup (for example leftovers when there was an unexpected interruption).
+
+
+
+## Compatibility
+
+See `platforms` in [`meta/main.yml`](./meta/main.yml).
+
+
+
+## License, copyright
+
+[Apache License 2.0](http://www.apache.org/licenses/LICENSE-2.0). See [`LICENSE`](./LICENSE) and [`NOTICE`](./NOTICE) for details.
+
+
+
+## Author information
+
+This role was created by {{author}} and is based on an [Ansible skeleton](https://github.com/foundata/ansible-skeletons) by [Foundata](https://foundata.com/). If you like it, you might [buy them a coffee](https://buy-me-a.coffee/ansible-skeletons/).

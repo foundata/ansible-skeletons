@@ -1,0 +1,5 @@
+# do not ignore files used to keep empty directories
+!.gitkeep
+
+### Ansible ###
+*.retry

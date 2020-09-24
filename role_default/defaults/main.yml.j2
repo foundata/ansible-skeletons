@@ -1,0 +1,43 @@
+# Default values of the role.
+#
+# Easy to override (as they have a low precedence) and most commonly used to
+# enable a user to modify the role behavior. There should be a comment above
+# each value to explain its purpose.
+
+---
+
+# String. Controls if the managed resources shall be "present" or "absent".
+# Defaults to "present". Possible values:
+#
+# * "present": Needed components like software packages will be installed and
+#   configured.
+# * "absent": Modifications (if any) will be reverted as good as possible (e.g.
+#   removal of packages, created users, services, changed log settings, …).
+{{ role_name }}_state: "present"
+
+
+# Boolean. If set to true, any managed package gets upgraded on each Ansible
+# run when the package provider is able to find a newer version than the
+# present one. Defaults to false.
+{{ role_name }}_autoupgrade: false
+
+
+# String. Defines the status of service(s). Defaults to "enabled". Possible
+# values:
+#
+# * "enabled": Service is running and will start automatically at boot.
+# * "disabled": Service is stopped and will not start automatically at boot.
+# * "running": Service is running but will not start automatically at boot.
+#   You can use this to start a service on the first Ansible rather
+#   automatically at boot.
+# * "unmanaged": Service will not be started at boot time and Ansible does not
+#   care whether the service is running or not. Mostly useful when services
+#   are monitored and managed by another system than Ansible.
+#
+# The singular form ("service") is used for the sake of convenience. Of course,
+# the defined status affects all services if more than one is managed.
+{{ role_name }}_service_state: "enabled"
+
+
+# FIXME Description of a very important example parameter
+# {{ role_name }}_example_parameter_variable: true

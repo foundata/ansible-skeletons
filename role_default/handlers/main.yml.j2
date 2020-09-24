@@ -1,0 +1,23 @@
+# Handlers (usually trigged by "notify")
+
+---
+
+# none right now
+
+
+#- name: "restart_example"
+#  service:
+#    name: "example"
+#    state: "restarted"
+#
+#- name: "reload_example"
+#  systemd:
+#    name: "example"
+#    enabled: true
+#    daemon_reload: true
+#
+# Usage Example:
+#
+# - name: "Reconfigure exmaple service"
+#   [...]
+#   notify: "restart_example"

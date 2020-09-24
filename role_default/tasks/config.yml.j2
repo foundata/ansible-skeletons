@@ -1,0 +1,20 @@
+# Task to related to configuration (e.g. config file creation or adaption)
+
+---
+
+- name: "Check if initialization task were executed"
+  fail:
+    msg: "Role \"{{ role_name }}\" was not properly initialized."
+  when: not {{ role_name }}_initialized
+
+
+# these steps should configure the remote host/software
+# Eg. configuration files for services which change often
+
+# - name: "Copy NGINX configuration"
+#   template:
+#     src: "nginx.conf.j2"
+#     dest: "/etc/nginx/nginx.conf"
+#     owner: "root"
+#     group: "root"
+#   notify: "restart_nginx"

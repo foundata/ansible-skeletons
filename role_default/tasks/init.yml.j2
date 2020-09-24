@@ -1,0 +1,86 @@
+# Tasks related to internal role initialization and the Ansible environment
+
+---
+
+- name: "Include role meta data as \"{{ role_name }}_meta\""
+  include_vars:
+    file: "../meta/main.yml"
+    name: {{ role_name }}_meta
+
+
+- name: "Fail if minimum Ansible version requirement is not met"
+  fail:
+    msg: >
+      This role requires Ansible {{ "{{" }} {{ role_name }}_meta["galaxy_info"]["min_ansible_version"] {{ "}}" }}
+      or higher. You are currently running Ansible {{ "{{" }} ansible_version["full"] {{ "}}" }}.
+  when: ansible_version["full"] is version_compare({{ role_name }}_meta["galaxy_info"]["min_ansible_version"], "<")
+
+
+- name: "Inform if checking for supported platforms is not possible"
+  debug:
+    msg: "The list of supported platforms cannot be checked as it is either empty or distribution facts are missing."
+    verbosity: 1
+  when: ansible_distribution is not defined or
+        ansible_distribution_version is not defined or
+        ({{ role_name }}_meta["galaxy_info"]["platforms"] | length) < 1
+
+
+- name: "Warn on unsupported platforms / operating systems"
+  fail:
+    msg: >
+      {{ "{{" }} ansible_distribution {{ "}}" }} {{ "{{" }} ansible_distribution_version {{ "}}" }} is not in the list of
+      supported platforms from meta/main.yml: {{ "{{" }} {{ role_name }}_meta["galaxy_info"]["platforms"] {{ "}}" }}
+  ignore_errors: true
+  when: ({{ role_name }}_meta["galaxy_info"]["platforms"] | length) > 0 and
+        ({{ role_name }}_meta["galaxy_info"]["platforms"]
+         | selectattr("name", "match", "^"+ansible_distribution+"$") | map(attribute = "versions") | flatten
+         | select('match', '^('+ansible_distribution_version+'|all)$', ignorecase = true) | list | length) < 1
+
+
+- name: "Fail if required variables are not set"
+  fail:
+    msg: "Required variable \"{{ '{{' }} item['key'] {{ '}}' }}\" is not defined."
+  when: item['key'] not in vars
+  loop: "{{ '{{' }} {{ role_name }}_required_vars | dict2items {{ '}}' }}"
+  loop_control:
+    label: "{{ '{{' }} item['key'] {{ '}}' }}"
+
+
+- name: "Fail if required variables contain invalid values"
+  assert:
+    msg: "Required variable \"{{ '{{' }} item['key'] {{ '}}' }}\" contains an invalid value: \"{{ '{{' }} this {{ '}}' }}\""
+    quiet: true
+    that: "{{ '{{' }} item['value'] {{ '}}' }}"
+  vars:
+    this: "{{ '{{' }} lookup('vars', item['key']) {{ '}}' }}"
+  when: item["value"] | length
+  loop: "{{ '{{' }} {{ role_name }}_required_vars | dict2items {{ '}}' }}"
+  loop_control:
+    label: "{{ '{{' }} item['key'] {{ '}}' }}"
+
+
+- name: "Translate role state into package state"
+  set_fact:
+    {{ role_name }}_package_state: "{{ '{{' }} package_state_translation[{{ role_name }}_state] {{ '}}' }}"
+  vars:
+    package_state_translation:
+      present: "{{ '{%' }} if {{ role_name }}_autoupgrade {{ '%}' }}latest{{ '{%' }} else {{ '%}' }}present{{ '{%' }} endif {{ '%}' }}"
+      absent: "absent"
+
+
+- name: "Create a temporary working directory"
+  tempfile:
+    state: "directory"
+    suffix: "-{{ role_name }}"
+  register: {{ role_name }}_tempdir
+
+
+- name: "Display the temporary working directory's path"
+  debug:
+    var: {{ role_name }}_tempdir
+    verbosity: 2
+
+
+- name: "Set flag: role initialization complete"
+  set_fact:
+    {{ role_name }}_initialized: true
