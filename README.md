@@ -24,7 +24,7 @@ This repository contains different skeletons / blueprints to kickstart the creat
    ```sh
    ansible-galaxy role init --role-skeleton "./ansible-skeletons/role_default" "name_of_your_role"
    ```
-   * `name_of_your_role` has to follow [some rules](https://galaxy.ansible.com/docs/contributing/creating_role.html#role-names) and is should consist of `a-z`, `0-9` and `_` only.
+   * `name_of_your_role` has to follow [some rules](https://galaxy.ansible.com/docs/contributing/creating_role.html#role-names) and should consist of `a-z`, `0-9` and `_` only.
    * Adapt the `--role-skeleton` parameter value if you want to use another skeleton than `role_default`. You can find a description of the available ones below.
 3. Have a look at the created `./name_of_your_role/FIXME.md` to get further instructions.
 
@@ -40,9 +40,9 @@ The following lists gives an overview over the available skeletons. You can also
 
 A general purpose skeleton to create new Ansible Galaxy roles. Main features:
 
-* Init tasks to check the execution environment based on the role's meta data
-* Easy management of role parameters and belonging [`assert`](https://docs.ansible.com/ansible/latest/collections/ansible/builtin/assert_module.html) rules for validation (see `{{ role_name }}_required_vars` in [`role_default/vars/main.yml.j2`](./role_default/vars/main.yml.j2) for more information).
-* Separation of logical task groups
+* Init tasks to check the execution environment (e.g. minimum Ansible version, OS plattform support), based on the role's meta data.
+* Easy management of role parameters and belonging [`assert`](https://docs.ansible.com/ansible/latest/collections/ansible/builtin/assert_module.html) rules for validation (see `{{ role_name }}_required_vars` in [`role_default/vars/main.yml.j2`](./role_default/vars/main.yml.j2#L20) for more information).
+* Separation of logical task groups.
 
 
 
