@@ -40,23 +40,36 @@ The following lists gives an overview over the available skeletons. You can also
 
 A general purpose skeleton to create new Ansible Galaxy roles. Main features:
 
-* Init tasks to check the execution environment (e.g. minimum Ansible version, OS plattform support), based on the role's meta data.
+* Init tasks to check the execution environment (e.g. minimum Ansible version and supported operating systems), based on the role's meta data.
 * Easy management of role parameters and belonging [`assert`](https://docs.ansible.com/ansible/latest/collections/ansible/builtin/assert_module.html) rules for validation (see `{{ role_name }}_required_vars` in [`role_default/vars/main.yml.j2`](./role_default/vars/main.yml.j2#L20) for more information).
 * Separation of logical task groups.
 
 
+## Compatibility
 
-## Author information
+The skeletons should be compatible with `ansible-galaxy` from [`ansible-core` version](https://docs.ansible.com/ansible/latest/reference_appendices/release_and_maintenance.html#ansible-core-support-matrix) 2.9 and newer. It was tested with:
 
-This project was created and is maintained by:
+* `ansible-galaxy [core 2.14.8]`
+* `ansible-galaxy [core 2.9.13]`
 
-* [Andreas Haerter](https://andreashaerter.com/) ([Foundata](https://foundata.com/))
-* [Frederik Meissner](https://meissner.im/) ([Foundata](https://foundata.com/))
 
-If you like it, you might [buy us a coffee](https://buy-me-a.coffee/ansible-skeletons/).
+## Contributing
 
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md) if you want to get involved.
+
+This project's functionality is mature, so there might be little activity on the repository in the future. Don't get fooled by this, the project is under active maintenance and used on daily basis by the maintainers.
 
 
 ## License, Copyright
 
 [Apache License 2.0](http://www.apache.org/licenses/LICENSE-2.0) if not mentioned otherwise. See [`LICENSE`](./LICENSE) and [`NOTICE`](./NOTICE) for details.
+
+
+## Author information
+
+This project was created and is maintained by (alphabetical order):
+
+* [Andreas Haerter](https://andreashaerter.com/) ([foundata](https://foundata.com/))
+* [Frederik Meissner](https://meissner.im/) ([foundata](https://foundata.com/))
+
+If you like it, you might [buy us a coffee](https://buy-me-a.coffee/ansible-skeletons/).
