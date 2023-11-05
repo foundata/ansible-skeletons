@@ -1,27 +1,27 @@
-# List of tasks to be executed by the role
+# List of tasks executed by the role
 
 ---
 
-- name: "Include tasks to initialize the role"
-  include_tasks: "init.yml"
+- name: "Include role initialization tasks"
+  ansible.builtin.include_tasks: "init.yml"
   tags: "always"
 
 
-- name: "Include tasks to setup the managed software"
-  include_tasks: "setup.yml"
+- name: "Include setup tasks"
+  ansible.builtin.include_tasks: "setup.yml"
   tags: "setup"
 
 
-- name: "Include tasks to configure the managed software"
-  include_tasks: "config.yml"
+- name: "Include configuration tasks"
+  ansible.builtin.include_tasks: "config.yml"
   tags: "config"
 
 
-- name: "Include tasks to manage services / daemons"
-  include_tasks: "service.yml"
+- name: "Include service or daemon management tasks"
+  ansible.builtin.include_tasks: "service.yml"
   tags: "service"
 
 
-- name: "Include tasks to cleanup"
-  include_tasks: "cleanup.yml"
+- name: "Include cleanup tasks"
+  ansible.builtin.include_tasks: "cleanup.yml"
   tags: "always"

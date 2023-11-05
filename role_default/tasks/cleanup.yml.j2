@@ -1,14 +1,14 @@
-# Task to be executed when the role finished its work
+# Cleanup tasks (to be executed when the role finished its work)
 
 ---
 
 - name: "Check if initialization task were executed"
-  fail:
+  ansible.builtin.fail:
     msg: "Role \"{{ role_name }}\" was not properly initialized."
   when: not {{ role_name }}_initialized
 
 
 - name: "Clean-up: temporary working directory"
-  file:
+  ansible.builtin.file:
     path: "{{ '{{' }} {{ role_name }}_tempdir.path {{ '}}' }}"
     state: "absent"

@@ -3,13 +3,13 @@
 ---
 
 - name: "Include role meta data as \"{{ role_name }}_meta\""
-  include_vars:
+  ansible.builtin.include_vars:
     file: "../meta/main.yml"
     name: {{ role_name }}_meta
 
 
 - name: "Fail if minimum Ansible version requirement is not met"
-  fail:
+  ansible.builtin.fail:
     msg: >
       This role requires Ansible {{ "{{" }} {{ role_name }}_meta["galaxy_info"]["min_ansible_version"] {{ "}}" }}
       or higher. You are currently running Ansible {{ "{{" }} ansible_version["full"] {{ "}}" }}.
@@ -17,7 +17,7 @@
 
 
 - name: "Inform if checking for supported platforms is not possible"
-  debug:
+  ansible.builtin.debug:
     msg: "The list of supported platforms cannot be checked as it is either empty or distribution facts are missing."
     verbosity: 1
   when: ansible_distribution is not defined or
@@ -26,7 +26,7 @@
 
 
 - name: "Warn on unsupported platforms / operating systems"
-  fail:
+  ansible.builtin.fail:
     msg: >
       {{ "{{" }} ansible_distribution {{ "}}" }} {{ "{{" }} ansible_distribution_version {{ "}}" }} is not in the list of
       supported platforms from meta/main.yml: {{ "{{" }} {{ role_name }}_meta["galaxy_info"]["platforms"] {{ "}}" }}
@@ -38,7 +38,7 @@
 
 
 - name: "Fail if required variables are not set"
-  fail:
+  ansible.builtin.fail:
     msg: "Required variable \"{{ '{{' }} item['key'] {{ '}}' }}\" is not defined."
   when: item['key'] not in vars
   loop: "{{ '{{' }} {{ role_name }}_required_vars | dict2items {{ '}}' }}"
@@ -47,7 +47,7 @@
 
 
 - name: "Fail if required variables contain invalid values"
-  assert:
+  ansible.builtin.assert:
     msg: "Required variable \"{{ '{{' }} item['key'] {{ '}}' }}\" contains an invalid value: \"{{ '{{' }} this {{ '}}' }}\""
     quiet: true
     that: "{{ '{{' }} item['value'] {{ '}}' }}"
@@ -60,7 +60,7 @@
 
 
 - name: "Translate role state into package state"
-  set_fact:
+  ansible.builtin.set_fact:
     {{ role_name }}_package_state: "{{ '{{' }} package_state_translation[{{ role_name }}_state] {{ '}}' }}"
   vars:
     package_state_translation:
@@ -69,18 +69,18 @@
 
 
 - name: "Create a temporary working directory"
-  tempfile:
+  ansible.builtin.tempfile:
     state: "directory"
     suffix: "-{{ role_name }}"
   register: {{ role_name }}_tempdir
 
 
 - name: "Display the temporary working directory's path"
-  debug:
+  ansible.builtin.debug:
     var: {{ role_name }}_tempdir
     verbosity: 2
 
 
 - name: "Set flag: role initialization complete"
-  set_fact:
+  ansible.builtin.set_fact:
     {{ role_name }}_initialized: true

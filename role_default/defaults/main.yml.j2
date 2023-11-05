@@ -1,8 +1,8 @@
-# Default values of the role.
+# Default variables and values of this role.
 #
-# Easy to override (as they have a low precedence) and most commonly used to
-# enable a user to modify the role behavior. There should be a comment above
-# each value to explain its purpose.
+# These variables are easy to override (as they have a low precedence) and
+# usually enable users to modify the role's behavior. There should be a
+# comment above each variable to explain its purpose.
 
 ---
 
@@ -17,8 +17,8 @@
 
 
 # Boolean. If set to true, any managed package gets upgraded on each Ansible
-# run when the package provider is able to find a newer version than the
-# present one. Defaults to false.
+# run (e.g. when the package provider is able to find a newer version than
+# the present one). Defaults to false.
 {{ role_name }}_autoupgrade: false
 
 
