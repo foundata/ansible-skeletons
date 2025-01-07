@@ -76,6 +76,8 @@ This project is licensed under the GNU General Public License v3.0 or later (SPD
 The [`REUSE.toml`](REUSE.toml) file provides detailed licensing and copyright information in a human- and machine-readable format. This includes parts that may be subject to different licensing or usage terms, such as third-party components. The repository conforms to the [REUSE specification](https://reuse.software/spec/). You can use [`reuse spdx`](https://reuse.readthedocs.io/en/latest/readme.html#cli) to create a [SPDX software bill of materials (SBOM)](https://en.wikipedia.org/wiki/Software_Package_Data_Exchange).
 <!--REUSE-IgnoreEnd-->
 
+[![REUSE status](https://api.reuse.software/badge/github.com/foundata/ansible-skeletons)](https://api.reuse.software/info/github.com/foundata/ansible-skeletons)
+
 
 ## Author information
 
