@@ -1,16 +1,15 @@
 # FIXME/TODO (you should delete this file after reading / completing the tasks)
 
-A (maybe incomplete but hopefully useful) list of things to do after creating a
-new role based on the skeleton, especially before releasing anything:
+A (maybe incomplete but hopefully useful) list of things to do after creating a new role based on the skeleton, especially before releasing anything:
 
 1. **Update author information** (and/or company and/or year) in
-   * [`LICENSE`](./LICENSE) → First line
+   * [`REUSE.toml`](./REUSE.toml) → `SPDX-PackageDownloadLocation`, `SPDX-PackageSupplier` and `SPDX-FileCopyrightText`
    * [`meta/main.yml`](./meta/main.yml) → `galaxy_info:` → `author`, `company`
      and URLs if fitting
    * The "[`README.md`: Author Information](./README.md#author-information)" section
+   * The "[`README.md`: Licensing, copyright](./README.md#licensing-copyright)" section
 2. **Update requirements information** in the "[`README.md`: Requirements](./README.md#requirements)"
-   section and list any pre-requisites that may not be covered by Ansible
-   itself, e.g.:
+   section and list any pre-requisites that may not be covered by Ansible itself, e.g.:
    * DNS names to configure, firewall ports to open
    * [SELinux](https://en.wikipedia.org/wiki/Security-Enhanced_Linux)
      * has to be disabled.
