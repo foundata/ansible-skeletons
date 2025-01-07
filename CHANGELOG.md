@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet.
+- Use fully-qualified collection names (FQCN) everywhere
 - Note for developers: `master` branch was renamed to `main`.
 
 
