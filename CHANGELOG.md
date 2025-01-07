@@ -8,8 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- ⚠️ Changed license from Apache 2.0 to GPL-3.0-or-later
 - Use fully-qualified collection names (FQCN) everywhere
-- Note for developers: `master` branch was renamed to `main`.
+- ⚠️ Note for developers: `master` branch was renamed to `main`.
 
 
 ## [1.0.0] - 2020-09-24
