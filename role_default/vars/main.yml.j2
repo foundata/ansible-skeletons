@@ -6,26 +6,6 @@
 
 ---
 
-# Dictionary of mandatory variables (usually exposed as role parameters) and
-# expressions to validate possible values of the following form:
-#
-# * Each dictionary key is the name of a variable to check.
-# * Each value is a list of string expressions for value validation. These
-#   expressions get passed to the assert module
-#   (c.f. <https://docs.ansible.com/ansible/latest/modules/assert_module.html>).
-#   Inside an expression, the variable to check can be referenced with "this".
-#   Pass an empty list ("[]") to simply check if a variable is set at all.
-#
-# The task using this to check the variables is located in tasks/init.yml.
-{{ role_name }}_required_vars:
-  {{ role_name }}_initialized: []
-  {{ role_name }}_state:
-    - "this is in [ 'present', 'absent' ]"
-  {{ role_name }}_autoupgrade: []
-  {{ role_name }}_service_state:
-    - "this is in [ 'enabled', 'disabled', 'running', 'unmanaged' ]"
-
-
 # init internal flag used to check if tasks/init.yml was executed successfully
 {{ role_name }}_initialized: false
 

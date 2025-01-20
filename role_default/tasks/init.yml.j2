@@ -37,28 +37,6 @@
          | select('match', '^('+ansible_distribution_version+'|all)$', ignorecase = true) | list | length) < 1
 
 
-- name: "Fail if required variables are not set"
-  ansible.builtin.fail:
-    msg: "Required variable \"{{ '{{' }} item['key'] {{ '}}' }}\" is not defined."
-  when: item['key'] not in vars
-  loop: "{{ '{{' }} {{ role_name }}_required_vars | dict2items {{ '}}' }}"
-  loop_control:
-    label: "{{ '{{' }} item['key'] {{ '}}' }}"
-
-
-- name: "Fail if required variables contain invalid values"
-  ansible.builtin.assert:
-    msg: "Required variable \"{{ '{{' }} item['key'] {{ '}}' }}\" contains an invalid value: \"{{ '{{' }} this {{ '}}' }}\""
-    quiet: true
-    that: "{{ '{{' }} item['value'] {{ '}}' }}"
-  vars:
-    this: "{{ '{{' }} lookup('vars', item['key']) {{ '}}' }}"
-  when: item["value"] | length
-  loop: "{{ '{{' }} {{ role_name }}_required_vars | dict2items {{ '}}' }}"
-  loop_control:
-    label: "{{ '{{' }} item['key'] {{ '}}' }}"
-
-
 - name: "Translate role state into package state"
   ansible.builtin.set_fact:
     {{ role_name }}_package_state: "{{ '{{' }} package_state_translation[{{ role_name }}_state] {{ '}}' }}"

@@ -47,16 +47,16 @@ The following lists gives an overview over the available skeletons. You can also
 A general purpose skeleton to create new Ansible Galaxy roles. Main features:
 
 * Init tasks to check the execution environment (e.g. minimum Ansible version and supported operating systems), based on the role's meta data.
-* Easy management of role parameters and belonging [`assert`](https://docs.ansible.com/ansible/latest/collections/ansible/builtin/assert_module.html) rules for validation (see `{{ role_name }}_required_vars` in [`role_default/vars/main.yml.j2`](./role_default/vars/main.yml.j2#L20) for more information).
 * Separation of logical task groups.
 
 
 ## Compatibility
 
-The skeletons should be compatible with `ansible-galaxy` from [`ansible-core` version](https://docs.ansible.com/ansible/latest/reference_appendices/release_and_maintenance.html#ansible-core-support-matrix) 2.9 and newer. It was tested with:
+The skeletons should be compatible with `ansible-galaxy` from [`ansible-core` version](https://docs.ansible.com/ansible/latest/reference_appendices/release_and_maintenance.html#ansible-core-support-matrix) 2.11 and newer. It was tested with:
 
+* `ansible-galaxy [core 2.18.1]`
 * `ansible-galaxy [core 2.14.8]`
-* `ansible-galaxy [core 2.9.13]`
+
 
 
 ## Contributing
