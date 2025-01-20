@@ -394,6 +394,6 @@ $RECYCLE.BIN/
 
 # End of https://www.toptal.com/developers/gitignore/api/git,vim,linux,macos,windows,jetbrains+all,visualstudiocode,python,ansible
 
-### repository-specific files
-# do not ignore files used to keep empty directories
+### Repository-specific files
+# Files to keep empty directories
 !.gitkeep
