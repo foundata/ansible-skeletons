@@ -6,7 +6,7 @@
 
 ---
 
-# List of facts required by the role to function.
+# List of facts used by the role (gathered on a best-effort basis if needed).
 #
 # To identify which subset a fact belongs to during development, you can use
 # the following snippet:
@@ -15,10 +15,11 @@
 #     gather_subset:
 #       - '!min'
 #       - '<subset_name, see parameter doc for details>'
-__{{ role_name }}_required_facts:
-  # subset "distribution"
+__{{ role_name }}_used_facts:
+  # from subset "distribution"
   - "ansible_distribution"
   - "ansible_distribution_version"
+  - "os_family"
 
 
 # Override defaults of dependencies used by this role (if any).

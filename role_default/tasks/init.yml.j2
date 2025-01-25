@@ -2,12 +2,12 @@
 
 ---
 
-- name: "Gather required facts"
+- name: "Gather role-specific facts"
   ansible.builtin.setup:
     gather_subset:
       - "distribution"
   when:
-    - not ansible_facts.keys() | list | intersect(__{{ role_name }}_required_facts) == __{{ role_name }}_required_facts
+    - not ansible_facts.keys() | list | intersect(__{{ role_name }}_used_facts) == __{{ role_name }}_used_facts
 
 
 - name: "Include role meta data as \"{{ role_name }}_meta\""
@@ -52,8 +52,8 @@
 
 - name: "Map role state to package state"
   ansible.builtin.set_fact:
-    __{{ role_name }}_package_state: "{{ '{{' }} package_state_mapping[{{ role_name }}_state] {{ '}}' }}"
+    __{{ role_name }}_package_state: "{{ '{{' }} __package_state_mapping[{{ role_name }}_state] {{ '}}' }}"
   vars:
-    package_state_mapping:
+    __package_state_mapping:
       present: "{{ '{%' }} if {{ role_name }}_autoupgrade {{ '%}' }}latest{{ '{%' }} else {{ '%}' }}present{{ '{%' }} endif {{ '%}' }}"
       absent: "absent"
