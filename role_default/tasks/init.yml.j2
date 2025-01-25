@@ -37,12 +37,12 @@
       ({{ role_name }}_meta['galaxy_info']['platforms'] | length) < 1
 
 
-- name: "Warn when platform or OS is unsupported"
+- name: "Warn when platform is unsupported"
   ansible.builtin.fail:
     msg: >
       {{ '{{' }} ansible_distribution {{ '}}' }} {{ '{{' }} ansible_distribution_version {{ '}}' }} is not in the list of
       supported platforms from meta/main.yml: {{ '{{' }} {{ role_name }}_meta['galaxy_info']['platforms'] {{ '}}' }}
-  ignore_errors: true
+  ignore_errors: true # noqa: ignore-errors
   when:
     - ({{ role_name }}_meta['galaxy_info']['platforms'] | length) > 0
     - ({{ role_name }}_meta['galaxy_info']['platforms']
