@@ -19,8 +19,8 @@
 - name: "Check Ansible version requirement and fail if unmet"
   ansible.builtin.fail:
     msg: >
-      This role requires Ansible {{ "{{" }} {{ role_name }}_meta['galaxy_info']['min_ansible_version'] {{ "}}" }}
-      or higher. You are currently running Ansible {{ "{{" }} ansible_version['full'] {{ "}}" }}.
+      This role requires Ansible {{ '{{' }} {{ role_name }}_meta['galaxy_info']['min_ansible_version'] {{ '}}' }}
+      or higher. You are currently running Ansible {{ '{{' }} ansible_version['full'] {{ '}}' }} .
   when:
     - ansible_version['full'] is version_compare({{ role_name }}_meta['galaxy_info']['min_ansible_version'], "<")
 
@@ -40,8 +40,8 @@
 - name: "Warn when platform or OS is unsupported"
   ansible.builtin.fail:
     msg: >
-      {{ "{{" }} ansible_distribution {{ "}}" }} {{ "{{" }} ansible_distribution_version {{ "}}" }} is not in the list of
-      supported platforms from meta/main.yml: {{ "{{" }} {{ role_name }}_meta['galaxy_info']['platforms'] {{ "}}" }}
+      {{ '{{' }} ansible_distribution {{ '}}' }} {{ '{{' }} ansible_distribution_version {{ '}}' }} is not in the list of
+      supported platforms from meta/main.yml: {{ '{{' }} {{ role_name }}_meta['galaxy_info']['platforms'] {{ '}}' }}
   ignore_errors: true
   when:
     - ({{ role_name }}_meta['galaxy_info']['platforms'] | length) > 0
