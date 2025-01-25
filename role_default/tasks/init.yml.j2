@@ -57,8 +57,3 @@
   ansible.builtin.debug:
     var: {{ role_name }}_tempdir
     verbosity: 2
-
-
-- name: "Set flag: role initialization complete"
-  ansible.builtin.set_fact:
-    {{ role_name }}_initialized: true

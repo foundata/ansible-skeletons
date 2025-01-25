@@ -2,12 +2,6 @@
 
 ---
 
-- name: "Check if initialization task were executed"
-  ansible.builtin.fail:
-    msg: "Role \"{{ role_name }}\" was not properly initialized."
-  when: not {{ role_name }}_initialized
-
-
 #- name: "Create systemd service: example.service"
 #  ansible.builtin.template:
 #    src: "example.service.j2"

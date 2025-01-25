@@ -2,12 +2,6 @@
 
 ---
 
-- name: "Check if initialization task were executed"
-  ansible.builtin.fail:
-    msg: "Role \"{{ role_name }}\" was not properly initialized."
-  when: not {{ role_name }}_initialized
-
-
 # these steps should configure the remote host/software
 # Eg. configuration files for services which change often
 
