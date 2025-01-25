@@ -20,8 +20,3 @@
 - name: "Include service or daemon management tasks"
   ansible.builtin.include_tasks: "service.yml"
   tags: "service"
-
-
-- name: "Include cleanup tasks"
-  ansible.builtin.include_tasks: "cleanup.yml"
-  tags: "always"

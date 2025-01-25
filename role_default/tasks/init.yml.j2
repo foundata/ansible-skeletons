@@ -52,21 +52,8 @@
 
 - name: "Map role state to package state"
   ansible.builtin.set_fact:
-    {{ role_name }}_package_state: "{{ '{{' }} package_state_mapping[{{ role_name }}_state] {{ '}}' }}"
+    __{{ role_name }}_package_state: "{{ '{{' }} package_state_mapping[{{ role_name }}_state] {{ '}}' }}"
   vars:
     package_state_mapping:
       present: "{{ '{%' }} if {{ role_name }}_autoupgrade {{ '%}' }}latest{{ '{%' }} else {{ '%}' }}present{{ '{%' }} endif {{ '%}' }}"
       absent: "absent"
-
-
-- name: "Create temporary working directory"
-  ansible.builtin.tempfile:
-    state: "directory"
-    suffix: "-{{ role_name }}"
-  register: {{ role_name }}_tempdir
-
-
-- name: "Show path to temporary working directory"
-  ansible.builtin.debug:
-    var: {{ role_name }}_tempdir
-    verbosity: 2

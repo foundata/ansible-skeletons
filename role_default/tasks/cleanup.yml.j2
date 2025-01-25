@@ -1,8 +1,0 @@
-# Cleanup: Tasks executed after the role has completed its work.
-
----
-
-- name: "Clean-up: temporary working directory"
-  ansible.builtin.file:
-    path: "{{ '{{' }} {{ role_name }}_tempdir.path {{ '}}' }}"
-    state: "absent"
