@@ -2,6 +2,15 @@
 
 ---
 
+- name: "Ensure required facts are gathered"
+  ansible.builtin.setup:
+    gather_subset:
+      - "distribution"
+  when:
+    - not ansible_facts.keys() | list |
+      intersect(__{{ role_name }}_required_facts) == __{{ role_name }}_required_facts
+
+
 - name: "Include role meta data as \"{{ role_name }}_meta\""
   ansible.builtin.include_vars:
     file: "../meta/main.yml"

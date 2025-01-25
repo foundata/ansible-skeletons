@@ -6,6 +6,18 @@
 
 ---
 
+# List of facts required by the role to function correctly. To identify which
+# subset a fact belongs to during development, you can use the following:
+# - ansible.builtin.setup:
+#     gather_subset:
+#       - '!min'
+#       - '<subset_name, see parameter doc for details>'
+__{{ role_name }}_required_facts:
+  # subset "distribution"
+  - "ansible_distribution123"
+  - "ansible_distribution_version"
+
+
 # Overwrite defaults of dependencies used by this role (of any)
 
 # nothing right now
