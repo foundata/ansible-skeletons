@@ -1,14 +1,13 @@
-# Tasks related to internal role initialization and the Ansible environment
+# Initialization: Manage internal role setup and the Ansible environment.
 
 ---
 
-- name: "Ensure required facts are gathered"
+- name: "Gather required facts"
   ansible.builtin.setup:
     gather_subset:
       - "distribution"
   when:
-    - not ansible_facts.keys() | list |
-      intersect(__{{ role_name }}_required_facts) == __{{ role_name }}_required_facts
+    - not ansible_facts.keys() | list | intersect(__{{ role_name }}_required_facts) == __{{ role_name }}_required_facts
 
 
 - name: "Include role meta data as \"{{ role_name }}_meta\""
@@ -17,52 +16,57 @@
     name: {{ role_name }}_meta
 
 
-- name: "Fail if minimum Ansible version requirement is not met"
+- name: "Check Ansible version requirement and fail if unmet"
   ansible.builtin.fail:
     msg: >
-      This role requires Ansible {{ "{{" }} {{ role_name }}_meta["galaxy_info"]["min_ansible_version"] {{ "}}" }}
-      or higher. You are currently running Ansible {{ "{{" }} ansible_version["full"] {{ "}}" }}.
-  when: ansible_version["full"] is version_compare({{ role_name }}_meta["galaxy_info"]["min_ansible_version"], "<")
+      This role requires Ansible {{ "{{" }} {{ role_name }}_meta['galaxy_info']['min_ansible_version'] {{ "}}" }}
+      or higher. You are currently running Ansible {{ "{{" }} ansible_version['full'] {{ "}}" }}.
+  when:
+    - ansible_version['full'] is version_compare({{ role_name }}_meta['galaxy_info']['min_ansible_version'], "<")
 
 
-- name: "Inform if checking for supported platforms is not possible"
+- name: "Notify when platform support check is not possible"
   ansible.builtin.debug:
-    msg: "The list of supported platforms cannot be checked as it is either empty or distribution facts are missing."
+    msg: >
+      The list of supported platforms cannot be checked as it is either empty
+      or distribution facts are missing.
     verbosity: 1
-  when: ansible_distribution is not defined or
-        ansible_distribution_version is not defined or
-        ({{ role_name }}_meta["galaxy_info"]["platforms"] | length) < 1
+  when:
+    - ansible_distribution is not defined or
+      ansible_distribution_version is not defined or
+      ({{ role_name }}_meta['galaxy_info']['platforms'] | length) < 1
 
 
-- name: "Warn on unsupported platforms / operating systems"
+- name: "Warn when platform or OS is unsupported"
   ansible.builtin.fail:
     msg: >
       {{ "{{" }} ansible_distribution {{ "}}" }} {{ "{{" }} ansible_distribution_version {{ "}}" }} is not in the list of
-      supported platforms from meta/main.yml: {{ "{{" }} {{ role_name }}_meta["galaxy_info"]["platforms"] {{ "}}" }}
+      supported platforms from meta/main.yml: {{ "{{" }} {{ role_name }}_meta['galaxy_info']['platforms'] {{ "}}" }}
   ignore_errors: true
-  when: ({{ role_name }}_meta["galaxy_info"]["platforms"] | length) > 0 and
-        ({{ role_name }}_meta["galaxy_info"]["platforms"]
-         | selectattr("name", "match", "^"+ansible_distribution+"$") | map(attribute = "versions") | flatten
-         | select('match', '^('+ansible_distribution_version+'|all)$', ignorecase = true) | list | length) < 1
+  when:
+    - ({{ role_name }}_meta['galaxy_info']['platforms'] | length) > 0
+    - ({{ role_name }}_meta['galaxy_info']['platforms']
+       | selectattr('name', 'match', '^'+ansible_distribution+'$') | map(attribute = 'versions') | flatten
+       | select('match', '^('+ansible_distribution_version+'|all)$', ignorecase = true) | list | length) < 1
 
 
-- name: "Translate role state into package state"
+- name: "Map role state to package state"
   ansible.builtin.set_fact:
-    {{ role_name }}_package_state: "{{ '{{' }} package_state_translation[{{ role_name }}_state] {{ '}}' }}"
+    {{ role_name }}_package_state: "{{ '{{' }} package_state_mapping[{{ role_name }}_state] {{ '}}' }}"
   vars:
-    package_state_translation:
+    package_state_mapping:
       present: "{{ '{%' }} if {{ role_name }}_autoupgrade {{ '%}' }}latest{{ '{%' }} else {{ '%}' }}present{{ '{%' }} endif {{ '%}' }}"
       absent: "absent"
 
 
-- name: "Create a temporary working directory"
+- name: "Create temporary working directory"
   ansible.builtin.tempfile:
     state: "directory"
     suffix: "-{{ role_name }}"
   register: {{ role_name }}_tempdir
 
 
-- name: "Display the temporary working directory's path"
+- name: "Show path to temporary working directory"
   ansible.builtin.debug:
     var: {{ role_name }}_tempdir
     verbosity: 2

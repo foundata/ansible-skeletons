@@ -1,8 +1,8 @@
-# Setup tasks (e.g. package installation, create users, ...)
+# Setup: Manage resource installation/removal, such as packages, users, etc.
 
 ---
 
-# - name: "Install the latest version of Apache and MariaDB"
+# - name: "Install Apache and MariaDB"
 #   ansible.builtin.package:
 #     state: "{{ '{{ ' + role_name + '_package_state }}' }}"
 #     name:

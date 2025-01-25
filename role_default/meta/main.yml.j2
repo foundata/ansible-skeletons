@@ -5,8 +5,8 @@
 galaxy_info:
   role_name: "{{ role_name }}"
   description: "{{ description }}"
-  license: "GPL-3.0-or-later" # see https://spdx.org/licenses/ for valid IDs and syntax
-  galaxy_tags: [] # be sure to remove the "[]" if you add values to this list; single alphanumeric words, 20 tags max.
+  license: "GPL-3.0-or-later" # See https://spdx.org/licenses/ for valid IDs and syntax.
+  galaxy_tags: [] # Remove the "[]" when adding values to this list. Tags are single alphanumeric words, with a maximum of 20 tags.
 
   author: "{{ author }}"
   company: "{{ company }}"
@@ -14,16 +14,16 @@ galaxy_info:
   #repository_url: "{{ repository_url }}"
   #github_branch: "master"
   #documentation_url: "https://docs.example.com"
-  #issue_tracker_url: "https://example.com/issue/tracker" # only if the issue tracker is NOT beside the repository
+  #issue_tracker_url: "https://example.com/issue/tracker" # Use only if the issue tracker is separate from the repository.
   #homepage_url: "{{ homepage_url }}"
 
-  min_ansible_version: {{ min_ansible_version }}
+  min_ansible_version: "{{ min_ansible_version }}"
   #min_ansible_container_version:
-  allow_duplicates: false
-  platforms: [] # be sure to remove the "[]" if you add values to this list
+  #allow_duplicates: true
+  platforms: [] # Remove the "[]" when adding values to this list.
   #  - name: "Fedora"
   #    versions:
   #      - "all"
 
 
-dependencies: [] # be sure to remove the "[]" if you add values to this list
+dependencies: [] # Remove the "[]" when adding values to this list.

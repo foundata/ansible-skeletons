@@ -1,4 +1,4 @@
-# Handlers (usually triggered by "notify")
+# Handlers: Tasks that are triggered and run only when notified.
 
 ---
 
@@ -6,12 +6,12 @@
 
 
 #- name: "restart_example"
-#  service:
+#  ansible.builtin.service:
 #    name: "example"
 #    state: "restarted"
 #
 #- name: "reload_example"
-#  systemd:
+#  ansible.builtin.systemd:
 #    name: "example"
 #    enabled: true
 #    daemon_reload: true

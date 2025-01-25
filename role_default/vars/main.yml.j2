@@ -1,23 +1,26 @@
-# Internal role variables and values NOT meant to be overridden by a user.
+# Internal role variables and values that must NOT be overridden by the user.
 #
-# A variable in here usually overrides previous versions of that variable (if
-# any) as this file has a quite high precedence. There should be a comment above
-# each variable to explain its purpose.
+# Variables defined here usually override earlier definitions due to the high
+# precedence of this file. Each variable should have a concise comment above
+# it, describing its purpose and how it fits into the role's functionality.
 
 ---
 
-# List of facts required by the role to function correctly. To identify which
-# subset a fact belongs to during development, you can use the following:
+# List of facts required by the role to function.
+#
+# To identify which subset a fact belongs to during development, you can use
+# the following snippet:
+#
 # - ansible.builtin.setup:
 #     gather_subset:
 #       - '!min'
 #       - '<subset_name, see parameter doc for details>'
 __{{ role_name }}_required_facts:
   # subset "distribution"
-  - "ansible_distribution123"
+  - "ansible_distribution"
   - "ansible_distribution_version"
 
 
-# Overwrite defaults of dependencies used by this role (of any)
+# Override defaults of dependencies used by this role (if any).
 
 # nothing right now
