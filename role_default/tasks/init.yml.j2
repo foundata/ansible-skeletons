@@ -10,19 +10,19 @@
     - not ansible_facts.keys() | list | intersect(__{{ role_name }}_used_facts) == __{{ role_name }}_used_facts
 
 
-- name: "init | Include role meta data as \"{{ role_name }}_meta\""
+- name: "init | Include role meta data"
   ansible.builtin.include_vars:
     file: "../meta/main.yml"
-    name: {{ role_name }}_meta
+    name: __{{ role_name }}_meta
 
 
 - name: "init | Check Ansible version requirement and fail if unmet"
   ansible.builtin.fail:
     msg: >
-      This role requires Ansible {{ '{{' }} {{ role_name }}_meta['galaxy_info']['min_ansible_version'] {{ '}}' }}
+      This role requires Ansible {{ '{{' }} __{{ role_name }}_meta['galaxy_info']['min_ansible_version'] {{ '}}' }}
       or higher. You are currently running Ansible {{ '{{' }} ansible_version['full'] {{ '}}' }} .
   when:
-    - ansible_version['full'] is version_compare({{ role_name }}_meta['galaxy_info']['min_ansible_version'], "<")
+    - ansible_version['full'] is version_compare(__{{ role_name }}_meta['galaxy_info']['min_ansible_version'], "<")
 
 
 - name: "init | Notify when platform support check is not possible"
@@ -34,18 +34,18 @@
   when:
     - ansible_facts['distribution'] is not defined or
       ansible_facts['distribution_version'] is not defined or
-      ({{ role_name }}_meta['galaxy_info']['platforms'] | length) < 1
+      (__{{ role_name }}_meta['galaxy_info']['platforms'] | length) < 1
 
 
 - name: "init | Warn when platform is unsupported"
   ansible.builtin.fail:
     msg: >
       {{ '{{' }} ansible_distribution {{ '}}' }} {{ '{{' }} ansible_facts['distribution_version'] {{ '}}' }} is not in the list of
-      supported platforms from meta/main.yml: {{ '{{' }} {{ role_name }}_meta['galaxy_info']['platforms'] {{ '}}' }}
+      supported platforms from meta/main.yml: {{ '{{' }} __{{ role_name }}_meta['galaxy_info']['platforms'] {{ '}}' }}
   ignore_errors: true # noqa: ignore-errors
   when:
-    - ({{ role_name }}_meta['galaxy_info']['platforms'] | length) > 0
-    - ({{ role_name }}_meta['galaxy_info']['platforms']
+    - (__{{ role_name }}_meta['galaxy_info']['platforms'] | length) > 0
+    - (__{{ role_name }}_meta['galaxy_info']['platforms']
        | selectattr('name', 'match', '^'+ansible_distribution+'$') | map(attribute = 'versions') | flatten
        | select('match', '^('+ansible_facts['distribution_version']+'|all)$', ignorecase = true) | list | length) < 1
 
