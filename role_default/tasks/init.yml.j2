@@ -32,22 +32,40 @@
       or distribution facts are missing.
     verbosity: 1
   when:
-    - ansible_distribution is not defined or
-      ansible_distribution_version is not defined or
+    - ansible_facts['distribution'] is not defined or
+      ansible_facts['distribution_version'] is not defined or
       ({{ role_name }}_meta['galaxy_info']['platforms'] | length) < 1
 
 
 - name: "Warn when platform is unsupported"
   ansible.builtin.fail:
     msg: >
-      {{ '{{' }} ansible_distribution {{ '}}' }} {{ '{{' }} ansible_distribution_version {{ '}}' }} is not in the list of
+      {{ '{{' }} ansible_distribution {{ '}}' }} {{ '{{' }} ansible_facts['distribution_version'] {{ '}}' }} is not in the list of
       supported platforms from meta/main.yml: {{ '{{' }} {{ role_name }}_meta['galaxy_info']['platforms'] {{ '}}' }}
   ignore_errors: true # noqa: ignore-errors
   when:
     - ({{ role_name }}_meta['galaxy_info']['platforms'] | length) > 0
     - ({{ role_name }}_meta['galaxy_info']['platforms']
        | selectattr('name', 'match', '^'+ansible_distribution+'$') | map(attribute = 'versions') | flatten
-       | select('match', '^('+ansible_distribution_version+'|all)$', ignorecase = true) | list | length) < 1
+       | select('match', '^('+ansible_facts['distribution_version']+'|all)$', ignorecase = true) | list | length) < 1
+
+
+- name: "Set platform-specific variable files to include"
+  ansible.builtin.set_fact:
+    __{{ role_name }}_platform_vars_file_list:
+      - "{{ '{{' }} ansible_facts['os_family'] {{ '}}' }}.yml"
+      - "{{ '{{' }} ansible_facts['distribution'] {{ '}}' }}.yml"
+      - "{{ '{{' }} ansible_facts['distribution'] {{ '}}' }}_{{ '{{' }} ansible_facts['distribution_major_version'] {{ '}}' }}.yml"
+      - "{{ '{{' }} ansible_facts['distribution'] {{ '}}' }}_{{ '{{' }} ansible_facts['distribution_version'] {{ '}}' }}.yml"
+
+
+- name: "Include platform specific-variables (if any)"
+  ansible.builtin.include_vars: "{{ '{{' }} __{{ role_name }}_vars_file {{ '}}' }}"
+  loop: "{{ '{{' }} __{{ role_name }}_platform_vars_file_list | unique | list {{ '}}' }}"
+  vars:
+    __{{ role_name }}_vars_file: "{{ '{{' }} role_path {{ '}}' }}/vars/{{ '{{' }} item {{ '}}' }}"
+  when:
+    - __{{ role_name }}_vars_file is file
 
 
 - name: "Map role state to package state"
