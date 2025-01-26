@@ -1,15 +1,15 @@
-# Services and daemons: Manage, configure, or create them.
+# Services and daemons: Manage their state, configure, or create them.
 
 ---
 
-#- name: "Create systemd service: example.service"
+#- name: "service | Create systemd service: example.service"
 #  ansible.builtin.template:
 #    src: "example.service.j2"
 #    dest: "/etc/systemd/system/example.service"
 #  notify: "restart_example"
 #
 #
-#- name: "Start and enable example.service"
+#- name: "service | Start and enable example.service"
 #  ansible.builtin.service:
 #    name: "example.service"
 #    state: "{{ '{{ ' + role_name + '_service_state }}' }}"

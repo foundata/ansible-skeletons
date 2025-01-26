@@ -2,7 +2,7 @@
 
 ---
 
-- name: "Gather role-specific facts"
+- name: "init | Gather role-specific facts"
   ansible.builtin.setup:
     gather_subset:
       - "distribution"
@@ -10,13 +10,13 @@
     - not ansible_facts.keys() | list | intersect(__{{ role_name }}_used_facts) == __{{ role_name }}_used_facts
 
 
-- name: "Include role meta data as \"{{ role_name }}_meta\""
+- name: "init | Include role meta data as \"{{ role_name }}_meta\""
   ansible.builtin.include_vars:
     file: "../meta/main.yml"
     name: {{ role_name }}_meta
 
 
-- name: "Check Ansible version requirement and fail if unmet"
+- name: "init | Check Ansible version requirement and fail if unmet"
   ansible.builtin.fail:
     msg: >
       This role requires Ansible {{ '{{' }} {{ role_name }}_meta['galaxy_info']['min_ansible_version'] {{ '}}' }}
@@ -25,7 +25,7 @@
     - ansible_version['full'] is version_compare({{ role_name }}_meta['galaxy_info']['min_ansible_version'], "<")
 
 
-- name: "Notify when platform support check is not possible"
+- name: "init | Notify when platform support check is not possible"
   ansible.builtin.debug:
     msg: >
       The list of supported platforms cannot be checked as it is either empty
@@ -37,7 +37,7 @@
       ({{ role_name }}_meta['galaxy_info']['platforms'] | length) < 1
 
 
-- name: "Warn when platform is unsupported"
+- name: "init | Warn when platform is unsupported"
   ansible.builtin.fail:
     msg: >
       {{ '{{' }} ansible_distribution {{ '}}' }} {{ '{{' }} ansible_facts['distribution_version'] {{ '}}' }} is not in the list of
@@ -50,7 +50,7 @@
        | select('match', '^('+ansible_facts['distribution_version']+'|all)$', ignorecase = true) | list | length) < 1
 
 
-- name: "Set platform-specific variable files to include"
+- name: "init | Set platform-specific variable files to include"
   ansible.builtin.set_fact:
     __{{ role_name }}_platform_vars_file_list:
       - "{{ '{{' }} ansible_facts['os_family'] {{ '}}' }}.yml"
@@ -59,7 +59,7 @@
       - "{{ '{{' }} ansible_facts['distribution'] {{ '}}' }}_{{ '{{' }} ansible_facts['distribution_version'] {{ '}}' }}.yml"
 
 
-- name: "Include platform specific-variables (if any)"
+- name: "init | Include platform specific-variables (if any)"
   ansible.builtin.include_vars: "{{ '{{' }} __{{ role_name }}_vars_file {{ '}}' }}"
   loop: "{{ '{{' }} __{{ role_name }}_platform_vars_file_list | unique | list {{ '}}' }}"
   vars:
@@ -68,7 +68,7 @@
     - __{{ role_name }}_vars_file is file
 
 
-- name: "Map role state to package state"
+- name: "init | Map role state to package state"
   ansible.builtin.set_fact:
     __{{ role_name }}_package_state: "{{ '{{' }} __package_state_mapping[{{ role_name }}_state] {{ '}}' }}"
   vars:

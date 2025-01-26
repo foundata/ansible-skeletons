@@ -2,7 +2,7 @@
 
 ---
 
-- name: "Include role initialization tasks"
+- name: "main | Include role initialization tasks"
   ansible.builtin.include_tasks:
     file: "init.yml"
     apply:
@@ -14,7 +14,7 @@
     - "{{ role_name }}_always"
 
 
-- name: "Include setup tasks"
+- name: "main | Include setup tasks"
   ansible.builtin.include_tasks:
     file: "setup.yml"
     apply:
@@ -24,7 +24,7 @@
     - "{{ role_name }}_setup"
 
 
-- name: "Include configuration tasks"
+- name: "main | Include configuration tasks"
   ansible.builtin.include_tasks:
     file: "config.yml"
     apply:
@@ -34,7 +34,7 @@
     - "{{ role_name }}_config"
 
 
-- name: "Include service or daemon management tasks"
+- name: "main | Include service or daemon management tasks"
   ansible.builtin.include_tasks:
     file: "service.yml"
     apply:
