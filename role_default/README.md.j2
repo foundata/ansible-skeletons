@@ -3,66 +3,68 @@
 {{ description }}
 
 
+## Table of contents<a id="toc"></a>
 
-## Table of contents
-
-* [Requirements](#requirements)
-* [Role variables](#role-variables)
-* [Dependencies](#dependencies)
-* [Example playbook](#example-playbook)
-* [Supported tags](#supported-tags)
-* [Compatibility](#compatibility)
-* [License, copyright](#license-copyright)
-* [Author information](#author-information)
-
+- [Requirements](#requirements)
+- [Role variables](#variables)
+- [Dependencies](#dependencies)
+- [Examples](#examples)
+- [Supported tags](#tags)
+- [Compatibility](#compatibility)
+- [Licensing, copyright](#licensing-copyright)
+- [Author information](#author-information)
 
 
-## Requirements
+
+## Requirements<a id="requirements"></a>
 
 There are no special requirements not covered by Ansible itself.
 
 
 
-## Role variables
+## Role variables<a id="variables"></a>
 
-See [`defaults/main.yml`](./defaults/main.yml) for all available role parameters and their description. [`vars/main.yml`](./vars/main.yml) contains variables you should not override (but their descrption might be interesting).
+See [`defaults/main.yml`](./defaults/main.yml) for all available role parameters and their description. [`vars/main.yml`](./vars/main.yml) contains internal variables you should not override (but their description might be interesting).
 
-Additionally, there are variables read from other roles and/or the global scope (e.g. host or group vars) as follows:
+Additionally, there are variables read from other roles and/or the global scope (for example, host or group vars) as follows:
 
-* None right now.
+- None right now.
 
 
 
-## Dependencies
+## Dependencies<a id="dependencies"></a>
 
 See `dependencies` in [`meta/main.yml`](./meta/main.yml).
 
 
 
-## Example playbook
+## Example playbooks <a id="examples"></a>
 
 None right now.
 
 
 
-## Supported tags
+## Supported tags<a id="tags"></a>
 
 It might be useful and faster to only call parts of the role by using tags:
 
-* `setup`: Setup tasks like package installations (mostly one-time).
-* `config`: Creates / updates configuration files and related resources.
-* `service`: Creates / updates service related files and manages their state.
-* `always`: Preparation task at start as well as clean-up task during completion. May be called explicitly to force a cleanup (for example leftovers when there was an unexpected interruption).
+- `{{ role_name }}_setup`: Manage basic resources, such as packages or service users.
+- `{{ role_name }}_config`: Manage settings, such as adapting or creating configuration files.
+- `{{ role_name }}_service`: Manage services and daemons, such as running states and service boot configurations.
+
+There are also tags usually not meant to be called directly but listed for the sake of completeness** and edge cases:
+
+- `{{ role_name }}_always`, `always`: Tasks needed by the role itself for internal role setup and the Ansible environment.
 
 
 
-## Compatibility
+## Compatibility<a id="compatibility"></a>
 
-See `platforms` in [`meta/main.yml`](./meta/main.yml).
+See `min_ansible_version` and `platforms` in [`meta/main.yml`](./meta/main.yml).
 
 
 
-## Licensing, copyright
+## Licensing, copyright<a id="licensing-copyright"></a>
 
 <!--REUSE-IgnoreStart-->
 Copyright (c) YYYY {{ company }}, {{ author }}
@@ -74,6 +76,6 @@ The [`REUSE.toml`](REUSE.toml) file provides detailed licensing and copyright in
 
 
 
-## Author information
+## Author information<a id="author-information"></a>
 
 This role was created by {{ author }} and is based on an [Ansible skeleton](https://github.com/foundata/ansible-skeletons) by [foundata](https://foundata.com/). If you like it, you might [buy them a coffee](https://buy-me-a.coffee/ansible-skeletons/).

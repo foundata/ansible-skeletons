@@ -3,20 +3,42 @@
 ---
 
 - name: "Include role initialization tasks"
-  ansible.builtin.include_tasks: "init.yml"
-  tags: "always"
+  ansible.builtin.include_tasks:
+    file: "init.yml"
+    apply:
+      tags:
+        - "always"
+        - "{{ role_name }}_always"
+  tags:
+    - "always"
+    - "{{ role_name }}_always"
 
 
 - name: "Include setup tasks"
-  ansible.builtin.include_tasks: "setup.yml"
-  tags: "setup"
+  ansible.builtin.include_tasks:
+    file: "setup.yml"
+    apply:
+      tags:
+        - "{{ role_name }}_setup"
+  tags:
+    - "{{ role_name }}_setup"
 
 
 - name: "Include configuration tasks"
-  ansible.builtin.include_tasks: "config.yml"
-  tags: "config"
+  ansible.builtin.include_tasks:
+    file: "config.yml"
+    apply:
+      tags:
+        - "{{ role_name }}_config"
+  tags:
+    - "{{ role_name }}_config"
 
 
 - name: "Include service or daemon management tasks"
-  ansible.builtin.include_tasks: "service.yml"
-  tags: "service"
+  ansible.builtin.include_tasks:
+    file: "service.yml"
+    apply:
+      tags:
+        - "{{ role_name }}_service"
+  tags:
+    - "{{ role_name }}_service"
