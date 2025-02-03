@@ -2,9 +2,9 @@
 
 ---
 
-- name: "main | Include role initialization tasks"
+- name: "Main | Include role initialization tasks"
   ansible.builtin.include_tasks:
-    file: "init.yml"
+    file: "{{ '{{' }} role_path {{ '}}' }}/tasks/init.yml"
     apply:
       tags:
         - "always"
@@ -14,31 +14,55 @@
     - "{{ role_name }}_always"
 
 
-- name: "main | Include setup tasks"
+- name: "Main | Include setup tasks: default first, then best platform match (if any)"
   ansible.builtin.include_tasks:
-    file: "setup.yml"
+    file: "{{ '{{' }} __{{ role_name }}_task_file {{ '}}' }}"
     apply:
       tags:
         - "{{ role_name }}_setup"
+  loop: "{{ '{{' }} ['default.yml'] + __{{ role_name }}_platform_filenames_most_specific_first {{ '}}' }}"
+  loop_control:
+    index_var: "__{{ role_name }}_loop_index"
+  vars:
+    __{{ role_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/setup/{{ '{{' }} item {{ '}}' }}"
+  when:
+    - __{{ role_name }}_task_file is file
+    - __{{ role_name }}_loop_index <= 1
   tags:
     - "{{ role_name }}_setup"
 
 
-- name: "main | Include configuration tasks"
+- name: "Main | Include configuration tasks: default first, then best platform match (if any)"
   ansible.builtin.include_tasks:
-    file: "config.yml"
+    file: "{{ '{{' }} __{{ role_name }}_task_file {{ '}}' }}"
     apply:
       tags:
         - "{{ role_name }}_config"
+  loop: "{{ '{{' }} ['default.yml'] + __{{ role_name }}_platform_filenames_most_specific_first {{ '}}' }}"
+  loop_control:
+    index_var: "__{{ role_name }}_loop_index"
+  vars:
+    __{{ role_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/config/{{ '{{' }} item {{ '}}' }}"
+  when:
+    - __{{ role_name }}_task_file is file
+    - __{{ role_name }}_loop_index <= 1
   tags:
     - "{{ role_name }}_config"
 
 
-- name: "main | Include service or daemon management tasks"
+- name: "Main | Include service or daemon management tasks: default first, then best platform match (if any)"
   ansible.builtin.include_tasks:
-    file: "service.yml"
+    file: "{{ '{{' }} __{{ role_name }}_task_file {{ '}}' }}"
     apply:
       tags:
         - "{{ role_name }}_service"
+  loop: "{{ '{{' }} ['default.yml'] + __{{ role_name }}_platform_filenames_most_specific_first {{ '}}' }}"
+  loop_control:
+    index_var: "__{{ role_name }}_loop_index"
+  vars:
+    __{{ role_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/service/{{ '{{' }} item {{ '}}' }}"
+  when:
+    - __{{ role_name }}_task_file is file
+    - __{{ role_name }}_loop_index <= 1
   tags:
     - "{{ role_name }}_service"

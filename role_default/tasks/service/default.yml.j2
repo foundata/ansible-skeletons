@@ -2,14 +2,14 @@
 
 ---
 
-#- name: "service | Create systemd service: example.service"
+#- name: "Service | Create systemd service: example.service"
 #  ansible.builtin.template:
 #    src: "example.service.j2"
 #    dest: "/etc/systemd/system/example.service"
 #  notify: "restart_example"
 #
 #
-#- name: "service | Start and enable example.service"
+#- name: "Service | Default | Start and enable example.service"
 #  ansible.builtin.service:
 #    name: "example.service"
 #    state: "{{ '{{ ' + role_name + '_service_state }}' }}"
