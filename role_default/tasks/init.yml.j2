@@ -50,7 +50,7 @@
        | select('match', '^('+ansible_facts['distribution_version']+'|all)$', ignorecase = true) | list | length) < 1
 
 
-- name: "Init | Set platform-specific file name list, from most to to least specific (raw)"
+- name: "Init | Set platform-specific filename list (most to least specific; raw with possible duplicates)"
   ansible.builtin.set_fact:
     __{{ role_name }}_platform_filenames_raw:
       - "{{ '{{' }} ansible_facts['distribution'] {{ '}}' }}_{{ '{{' }} ansible_facts['distribution_version'] {{ '}}' }}.yml"
@@ -59,12 +59,12 @@
       - "{{ '{{' }} ansible_facts['os_family'] {{ '}}' }}.yml"
 
 
-- name: "Init | Set platform-specific file name list, from most to least specific (best match single action)"
+- name: "Init | Set unique platform-specific filename list (most to least specific)"
   ansible.builtin.set_fact:
     __{{ role_name }}_platform_filenames_most_specific_first: "{{ '{{' }} (__{{ role_name }}_platform_filenames_raw | ansible.builtin.unique | default([])) {{ '}}' }}"
 
 
-- name: "Init | Set platform-specific file name list, from least to most least specific (best match overwrites)"
+- name: "Init | Set unique platform-specific filename list (least to most specific)"
   ansible.builtin.set_fact:
     __{{ role_name }}_platform_filenames_most_specific_last: "{{ '{{' }} __{{ role_name }}_platform_filenames_most_specific_first | reverse {{ '}}' }}"
 
