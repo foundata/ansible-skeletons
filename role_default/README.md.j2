@@ -40,8 +40,20 @@ See `dependencies` in [`meta/main.yml`](./meta/main.yml).
 
 ## Example playbooks <a id="examples"></a>
 
-None right now.
+```yaml
+---
 
+- name: "Initialize the {{ role_name }} role"
+  hosts: localhost
+  gather_facts: false
+  tasks:
+
+    - name: "Trigger invocation of the {{ role_name }} role"
+      ansible.builtin.include_role:
+        name: "{{ role_name }}"
+      vars:
+        {{ role_name }}_autoupgrade: true
+```
 
 
 ## Supported tags<a id="tags"></a>
