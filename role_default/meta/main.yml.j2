@@ -12,18 +12,20 @@ galaxy_info:
   company: "{{ company }}"
 
   #repository_url: "{{ repository_url }}"
-  #github_branch: "master"
-  #documentation_url: "https://docs.example.com"
-  #issue_tracker_url: "https://example.com/issue/tracker" # Use only if the issue tracker is separate from the repository.
+  #github_branch: "main"
+  #documentation_url: "{{ documentation_url }}"
+  #issue_tracker_url: "{{ issue_tracker_url }}" # Use only if the issue tracker is separate from the repository.
   #homepage_url: "{{ homepage_url }}"
 
   min_ansible_version: "{{ min_ansible_version }}"
   #min_ansible_container_version:
   #allow_duplicates: true
-  platforms: [] # Remove the "[]" when adding values to this list.
+  platforms:
+    [] # Remove the "[]" when adding values to this list.
   #  - name: "Fedora"
   #    versions:
   #      - "all"
 
 
-dependencies: [] # Remove the "[]" when adding values to this list.
+dependencies:
+  [] # Remove the "[]" when adding values to this list.

@@ -29,9 +29,21 @@ They follow several guidelines and best practices:
 2. Call `ansible-galaxy` and provide the path to the skeleton to use as well as a role name:
    ```sh
    ansible-galaxy role init --role-skeleton "./ansible-skeletons/role_default" "name_of_your_role"
+
+   ansible-galaxy role init \
+      --role-skeleton "./ansible-skeletons/role_default" \
+      --extra-var "author='FIXME ${USER}'" \
+      --extra-var "company='FIXME your org'" \
+      --extra-var "repository_url='https://FIXME.example.com/repo/'" \
+      --extra-var "issue_tracker_url='https://FIXME.example.com/repo/issues/'" \
+      --extra-var "homepage_url='https://FIXME.example.com'" \
+      --extra-var "min_ansible_version='2.16'" \
+      "name_of_your_role"
+
    ```
    * `name_of_your_role` has to follow [some rules](https://galaxy.ansible.com/docs/contributing/creating_role.html#role-names) and should consist of `a-z`, `0-9` and `_` only.
    * Adapt the `--role-skeleton` parameter value if you want to use another skeleton than `role_default`. You can find a description of the available ones below.
+   * Adapt the `--extra-var` lines as needed.
 3. Have a look at the created `./name_of_your_role/FIXME.md` to get further instructions.
 
 

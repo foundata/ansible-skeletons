@@ -2,19 +2,20 @@
 
 A (maybe incomplete but hopefully useful) list of things to do after creating a new role based on the skeleton, especially before releasing anything:
 
-1. **Update author information** (and/or company and/or year) in
+1. **Check and update author information** (and/or company and/or year) in
    * [`REUSE.toml`](./REUSE.toml) → `SPDX-PackageDownloadLocation`, `SPDX-PackageSupplier` and `SPDX-FileCopyrightText`
    * [`meta/main.yml`](./meta/main.yml) → `galaxy_info:` → `author`, `company`
      and URLs if fitting
    * The "[`README.md`: Author Information](./README.md#author-information)" section
    * The "[`README.md`: Licensing, copyright](./README.md#licensing-copyright)" section
-2. **Update requirements information** in the "[`README.md`: Requirements](./README.md#requirements)"
-   section and list any pre-requisites that may not be covered by Ansible itself, e.g.:
-   * DNS names to configure, firewall ports to open
-   * [SELinux](https://en.wikipedia.org/wiki/Security-Enhanced_Linux)
-     * has to be disabled.
-     * is supported in "Permissive" mode only.
-     * is supported in "Enforcing" as well as in "Permissive" mode.
+2. **Update requirements information**
+   * In the "[`README.md`: Requirements](./README.md#requirements)" section, and list any pre-requisites that may not be covered by Ansible itself, e.g.:
+     * DNS names to configure, firewall ports to open
+     * [SELinux](https://en.wikipedia.org/wiki/Security-Enhanced_Linux)
+       * has to be disabled.
+       * is supported in "Permissive" mode only.
+       * is supported in "Enforcing" as well as in "Permissive" mode.
+   * In the `[requirements.txt]`(./requirements.txt): Additionally needed python packages (if any)
 3. **Update dependency information**:
    * In the "[`README.md`: Dependencies](./README.md#dependencies)" section:
      * A list of other roles hosted on Galaxy should go here
@@ -50,3 +51,4 @@ A (maybe incomplete but hopefully useful) list of things to do after creating a 
      * [Wikipedia: Example](http://en.wikipedia.org/wiki/Example)
      ```
    * Add example playbook(s) to the "[`README.md`: Example Playbook](./README.md#example-playbook)" section
+7. **Search for FIXME** in all files (e.g. via `grep FIXME -r`)
