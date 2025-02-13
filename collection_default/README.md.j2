@@ -1,0 +1,60 @@
+# Test {{ collection_name }} Collection
+
+This repository contains the `{{ namespace }}.{{ collection_name }}` Ansible Collection.
+
+
+## Requirements<a id="requirements"></a>
+
+There are no special requirements not covered by Ansible itself.
+
+
+## Dependencies<a id="dependencies"></a>
+
+See `dependencies` in [`galaxy.yml`](./galaxy.yml).
+
+
+
+## Using this collection
+
+```bash
+ansible-galaxy collection install {{ namespace }}.{{ collection_name }}
+```
+
+You can also include it in a `requirements.yml` file and install it via `ansible-galaxy collection install -r requirements.yml` using the format:
+
+```yaml
+collections:
+  - name: {{ namespace }}.{{ collection_name }}
+```
+
+To upgrade the collection to the latest available version, run the following command:
+
+```bash
+ansible-galaxy collection install {{ namespace }}.{{ collection_name }} --upgrade
+```
+
+You can also install a specific version of the collection, for example, if you need to downgrade when something is broken in the latest version (please report an issue in this repository). Use the following syntax where `X.Y.Z` can be any [available version](https://galaxy.ansible.com/{{ namespace }}/{{ collection_name }}):
+
+```bash
+ansible-galaxy collection install {{ namespace }}.{{ collection_name }}:==X.Y.Z
+```
+
+See [Ansible Using collections](https://docs.ansible.com/ansible/latest/user_guide/collections_using.html) for more details.
+
+
+
+## Licensing, copyright<a id="licensing-copyright"></a>
+
+<!--REUSE-IgnoreStart-->
+Copyright (c) YYYY {{ company }},{% for author in authors %} {{ author }}{% endfor %}
+
+This project is licensed under the GNU General Public License v3.0 or later (SPDX-License-Identifier: `GPL-3.0-or-later`), see [`LICENSES/GPL-3.0-or-later.txt`](LICENSES/GPL-3.0-or-later.txt) for the full text.
+
+The [`REUSE.toml`](REUSE.toml) file provides detailed licensing and copyright information in a human- and machine-readable format. This includes parts that may be subject to different licensing or usage terms, such as third-party components. The repository conforms to the [REUSE specification](https://reuse.software/spec/). You can use [`reuse spdx`](https://reuse.readthedocs.io/en/latest/readme.html#cli) to create a [SPDX software bill of materials (SBOM)](https://en.wikipedia.org/wiki/Software_Package_Data_Exchange).
+<!--REUSE-IgnoreEnd-->
+
+
+
+## Author information<a id="author-information"></a>
+
+This collection was created by {% for author in authors %}{{ author }} {% endfor %}and is based on an [Ansible skeleton](https://github.com/foundata/ansible-skeletons) by [foundata](https://foundata.com/). If you like it, you might [buy them a coffee](https://buy-me-a.coffee/ansible-skeletons/).
