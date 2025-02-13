@@ -1,0 +1,38 @@
+# Collection meta data for Galaxy (needed to to build a collection artifact)
+
+---
+
+### Required
+
+namespace: "{{ namespace }}"
+name: "{{ collection_name }}"
+version: "{{ version }}"
+readme: "{{ readme }}"
+authors:
+{% for author in authors %}
+  - "{{ author }}"
+{% endfor %}
+
+### Optional
+
+license_file: "REUSE.toml"
+dependencies:
+  # note: "*" selects the latest version available
+  "ansible.utils": "*"
+
+description: "{{ description }}"
+tags:
+  [] # Remove the "[]" when adding values to this list.
+
+
+repository: "{{ repository }}"
+#issues: "{{ issues }}" # Use only if the issue tracker is separate from the repository.
+homepage: "{{ homepage }}"
+#documentation: "{{ documentation }}"
+
+# List of file glob-like patterns to filter files or directories that should
+# not be included in the build artifact. Some directories and files like
+# 'galaxy.yml', '*.pyc', '*.retry', and '.git' are always filtered.
+build_ignore:
+  - ".gitignore"
+  - "changelogs/.plugin-cache.yaml"
