@@ -23,6 +23,22 @@ __{{ role_name }}_used_facts:
   - "os_family"
 
 
+# List of platforms this role supports and was designed for.
+#
+# A warning will be issued if the list contains values and the role is executed
+# on an unknown (not listed) platform, but execution will continue. Example:
+#
+#  - name: "Fedora" # a value from ansible_facts['distribution']
+#    versions:
+#      - "all" # a value from ansible_facts['distribution_version'] or "all"
+#  - name: "Ubuntu"
+#    versions:
+#      - "22.04"
+#      - "24.04"
+__{{ role_name }}_supported_platforms:
+  [] # Remove the "[]" when adding values to this list.
+
+
 # Override defaults of dependencies used by this role (if any).
 
 # nothing right now

@@ -34,20 +34,20 @@
   when:
     - ansible_facts['distribution'] is not defined or
       ansible_facts['distribution_version'] is not defined or
-      (__{{ role_name }}_meta['galaxy_info']['platforms'] | length) < 1
+      (__{{ role_name }}_supported_platforms | length) < 1
 
 
 - name: "Init | Warn when platform is unsupported"
   ansible.builtin.fail:
     msg: >
-      {{ '{{' }} ansible_distribution {{ '}}' }} {{ '{{' }} ansible_facts['distribution_version'] {{ '}}' }} is not in the list of
-      supported platforms from meta/main.yml: {{ '{{' }} __{{ role_name }}_meta['galaxy_info']['platforms'] {{ '}}' }}
+      {{ '{{' }} ansible_facts['distribution'] {{ '}}' }} {{ '{{' }} ansible_facts['distribution_version'] {{ '}}' }} is not in the list of
+      supported platforms from vars/main.yml: {{ '{{' }} __{{ role_name }}_supported_platforms {{ '}}' }}
   ignore_errors: true # noqa: ignore-errors
   when:
-    - (__{{ role_name }}_meta['galaxy_info']['platforms'] | length) > 0
-    - (__{{ role_name }}_meta['galaxy_info']['platforms']
-       | selectattr('name', 'match', '^'+ansible_distribution+'$') | map(attribute = 'versions') | flatten
-       | select('match', '^('+ansible_facts['distribution_version']+'|all)$', ignorecase = true) | list | length) < 1
+    - (__{{ role_name }}_supported_platforms | length) > 0
+    - (__{{ role_name }}_supported_platforms
+       | selectattr('name', 'match', '^' ~ ansible_facts['distribution'] ~ '$') | map(attribute = 'versions') | flatten
+       | select('match', '^(' ~ ansible_facts['distribution_version'] ~ '|all)$', ignorecase = true) | list | length) < 1
 
 
 - name: "Init | Set platform-specific filename list (most to least specific; raw with possible duplicates)"

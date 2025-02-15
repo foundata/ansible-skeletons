@@ -32,7 +32,7 @@ new role based on the skeleton, especially before releasing anything:
    * In the "[`README.md`: Compatibility](./README.md#compatibility)" section:
      * Maybe you want to mention the main platform/first-class citizens.
      * Or if things were tested on container/VM/bare metal
-   * [`meta/main.yml`](./meta/main.yml) → `platforms:`
+   * [`vars/main.yml`](./vars/main.yml) → `__{{ role_name }}_supported_platforms:`
      * Sadly, [there is no complete list of platforms anymore](https://github.com/foundata/ansible-skeletons/issues/4).
        But the [module_utils source code](https://github.com/ansible/ansible/blob/devel/lib/ansible/module_utils/facts/system/distribution.py)
        might give you some hints.
