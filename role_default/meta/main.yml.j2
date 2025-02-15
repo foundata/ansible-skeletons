@@ -6,26 +6,26 @@ galaxy_info:
   role_name: "{{ role_name }}"
   description: "{{ description }}"
   license: "GPL-3.0-or-later" # See https://spdx.org/licenses/ for valid IDs and syntax.
-  galaxy_tags: [] # Remove the "[]" when adding values to this list. Tags are single alphanumeric words, with a maximum of 20 tags.
-
   author: "{{ author }}"
   company: "{{ company }}"
 
-  #repository_url: "{{ repository_url }}"
-  #github_branch: "main"
-  #documentation_url: "{{ documentation_url }}"
-  #issue_tracker_url: "{{ issue_tracker_url }}" # Use only if the issue tracker is separate from the repository.
-  #homepage_url: "{{ homepage_url }}"
-
+  standalone: true # This role not part of a collection (ansible-lint)
   min_ansible_version: "{{ min_ansible_version }}"
   #min_ansible_container_version:
-  #allow_duplicates: true
   platforms:
     [] # Remove the "[]" when adding values to this list.
   #  - name: "Fedora"
   #    versions:
   #      - "all"
 
+  #repository_url: "{{ repository_url }}"
+  #github_branch: "main"
+  #documentation_url: "{{ documentation_url }}"
+  #issue_tracker_url: "{{ issue_tracker_url }}" # Use only if the issue tracker is separate from the repository.
+  #homepage_url: "{{ homepage_url }}"
+  galaxy_tags:
+    [] # Remove the "[]" when adding values to this list. Tags are single alphanumeric words, with a maximum of 20 tags.
 
+# Roles that this role requires to be installed.
 dependencies:
   [] # Remove the "[]" when adding values to this list.
