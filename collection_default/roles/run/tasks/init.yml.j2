@@ -1,0 +1,88 @@
+# Initialization: Manage internal role setup and the Ansible environment.
+
+---
+
+- name: "Init | Gather role-specific facts"
+  ansible.builtin.setup:
+    gather_subset:
+      - "distribution"
+  when:
+    - not ansible_facts.keys() | list | intersect(__run_{{ collection_name }}_used_facts) == __run_{{ collection_name }}_used_facts
+
+
+- name: "Init | Include role meta data"
+  ansible.builtin.include_vars:
+    file: "../meta/main.yml"
+    name: "__run_{{ collection_name }}_meta"
+
+
+- name: "Init | Check Ansible version requirement and fail if unmet"
+  ansible.builtin.fail:
+    msg: >
+      This role requires Ansible {{ '{{' }} __run_{{ collection_name }}_meta['galaxy_info']['min_ansible_version'] {{ '}}' }}
+      or higher. You are currently running Ansible {{ '{{' }} ansible_version['full'] {{ '}}' }} .
+  when:
+    - ansible_version['full'] is version_compare(__run_{{ collection_name }}_meta['galaxy_info']['min_ansible_version'], "<")
+
+
+- name: "Init | Notify when platform support check is not possible"
+  ansible.builtin.debug:
+    msg: >
+      The list of supported platforms cannot be checked as it is either empty
+      or distribution facts are missing.
+    verbosity: 1
+  when:
+    - ansible_facts['distribution'] is not defined or
+      ansible_facts['distribution_version'] is not defined or
+      (__run_{{ collection_name }}_meta['galaxy_info']['platforms'] | length) < 1
+
+
+- name: "Init | Warn when platform is unsupported"
+  ansible.builtin.fail:
+    msg: >
+      {{ '{{' }} ansible_facts['distribution'] {{ '}}' }} {{ '{{' }} ansible_facts['distribution_version'] {{ '}}' }} is not in the list of
+      supported platforms from vars/main.yml: {{ '{{' }} __run_{{ collection_name }}_supported_platforms {{ '}}' }}
+  ignore_errors: true # noqa: ignore-errors
+  when:
+    - (__run_{{ collection_name }}_supported_platforms | length) > 0
+    - (__run_{{ collection_name }}_supported_platforms
+       | selectattr('name', 'match', '^' ~ ansible_facts['distribution'] ~ '$') | map(attribute = 'versions') | flatten
+       | select('match', '^(' ~ ansible_facts['distribution_version'] ~ '|all)$', ignorecase = true) | list | length) < 1
+
+
+- name: "Init | Set platform-specific filename list (most to least specific; raw with possible duplicates)"
+  ansible.builtin.set_fact:
+    __run_{{ collection_name }}_platform_filenames_raw:
+      - "{{ '{{' }} ansible_facts['distribution'].replace(' ', '_') | lower {{ '}}' }}_{{ '{{' }} ansible_facts['distribution_version'].replace(' ', '_') | lower {{ '}}' }}.yml"
+      - "{{ '{{' }} ansible_facts['distribution'].replace(' ', '_') | lower {{ '}}' }}_{{ '{{' }} ansible_facts['distribution_major_version'].replace(' ', '_') | lower {{ '}}' }}.yml"
+      - "{{ '{{' }} ansible_facts['distribution'].replace(' ', '_') | lower {{ '}}' }}.yml"
+      - "{{ '{{' }} ansible_facts['os_family'].replace(' ', '_') | lower {{ '}}' }}.yml"
+
+
+- name: "Init | Set unique platform-specific filename list (most to least specific)"
+  ansible.builtin.set_fact:
+    __run_{{ collection_name }}_platform_filenames_most_specific_first: "{{ '{{' }} (__run_{{ collection_name }}_platform_filenames_raw | ansible.builtin.unique | default([])) {{ '}}' }}"
+
+
+- name: "Init | Set unique platform-specific filename list (least to most specific)"
+  ansible.builtin.set_fact:
+    __run_{{ collection_name }}_platform_filenames_most_specific_last: "{{ '{{' }} __run_{{ collection_name }}_platform_filenames_most_specific_first | reverse {{ '}}' }}"
+
+
+- name: "Init | Include platform-specific variables (if any), overwrite values with more specific ones"
+  ansible.builtin.include_vars:
+    file: "{{ '{{' }} __run_{{ collection_name }}_vars_file {{ '}}' }}"
+  loop: "{{ '{{' }} __run_{{ collection_name }}_platform_filenames_most_specific_last {{ '}}' }}"
+  vars:
+    __run_{{ collection_name }}_vars_file: "{{ '{{' }} role_path {{ '}}' }}/vars/{{ '{{' }} item {{ '}}' }}"
+  when:
+    - __run_{{ collection_name }}_vars_file is file
+
+
+- name: "Init | Map role parameters to package state"
+  ansible.builtin.set_fact:
+    __run_{{ collection_name }}_package_state: "{{ '{{' }} __package_state_mapping[run_{{ collection_name }}_state] {{ '}}' }}"
+  vars:
+    __package_state_mapping:
+      present: "{{ '{%' }} if run_{{ collection_name }}_autoupgrade {{ '%}' }}latest{{ '{%' }} else {{ '%}' }}present{{ '{%' }} endif {{ '%}' }}"
+      absent: "absent"

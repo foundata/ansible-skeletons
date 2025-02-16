@@ -1,0 +1,34 @@
+# Role argument validation.
+#
+# See defaults/main.yml for details on each variable. For more information on
+# the argument_specs.yml format, refer to the official Ansible documentation:
+# https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_reuse_roles.html#role-argument-validation
+
+---
+
+argument_specs:
+
+  # {{ namespace }}.{{ collection_name }}/roles/run/tasks/main.yml entry point
+  main:
+    short_description: "Main entry point for the {{ namespace }}.{{ collection_name }}.run role"
+    options:
+
+      run_{{ collection_name }}_state:
+        type: "str"
+        required: false
+        choices:
+          - "present"
+          - "absent"
+
+      run_{{ collection_name }}_service_state:
+        type: "str"
+        required: false
+        choices:
+          - "enabled"
+          - "disabled"
+          - "running"
+          - "unmanaged"
+
+      run_{{ collection_name }}_autoupgrade:
+        type: "bool"
+        required: false

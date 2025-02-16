@@ -1,11 +1,24 @@
-# Test {{ collection_name }} Collection
+# Ansible Collection: `{{ namespace }}.{{ collection_name }}`
 
 This repository contains the `{{ namespace }}.{{ collection_name }}` Ansible Collection.
 
 
-## Requirements<a id="requirements"></a>
 
-There are no special requirements not covered by Ansible itself.
+## Table of contents<a id="toc"></a>
+
+- [Included content](#content)
+- [Dependencies](#dependencies)
+- [Licensing, copyright](#licensing-copyright)
+- [Author information](#author-information)
+
+
+
+## Included content<a id="content"></a>
+
+### Role: `{{ namespace }}.{{ collection_name }}.run`
+
+See the [role's `README.md`](./roles/run/README.md) for more information.
+
 
 
 ## Dependencies<a id="dependencies"></a>
@@ -14,39 +27,10 @@ See `dependencies` in [`galaxy.yml`](./galaxy.yml).
 
 
 
-## Using this collection
-
-```bash
-ansible-galaxy collection install {{ namespace }}.{{ collection_name }}
-```
-
-You can also include it in a `requirements.yml` file and install it via `ansible-galaxy collection install -r requirements.yml` using the format:
-
-```yaml
-collections:
-  - name: {{ namespace }}.{{ collection_name }}
-```
-
-To upgrade the collection to the latest available version, run the following command:
-
-```bash
-ansible-galaxy collection install {{ namespace }}.{{ collection_name }} --upgrade
-```
-
-You can also install a specific version of the collection, for example, if you need to downgrade when something is broken in the latest version (please report an issue in this repository). Use the following syntax where `X.Y.Z` can be any [available version](https://galaxy.ansible.com/{{ namespace }}/{{ collection_name }}):
-
-```bash
-ansible-galaxy collection install {{ namespace }}.{{ collection_name }}:==X.Y.Z
-```
-
-See [Ansible Using collections](https://docs.ansible.com/ansible/latest/user_guide/collections_using.html) for more details.
-
-
-
 ## Licensing, copyright<a id="licensing-copyright"></a>
 
 <!--REUSE-IgnoreStart-->
-Copyright (c) YYYY {{ company }},{% for author in authors %} {{ author }}{% endfor %}
+Copyright (c) FIXME YYYY {{ company }}, {{ authors | join(", ") }}
 
 This project is licensed under the GNU General Public License v3.0 or later (SPDX-License-Identifier: `GPL-3.0-or-later`), see [`LICENSES/GPL-3.0-or-later.txt`](LICENSES/GPL-3.0-or-later.txt) for the full text.
 
@@ -57,4 +41,4 @@ The [`REUSE.toml`](REUSE.toml) file provides detailed licensing and copyright in
 
 ## Author information<a id="author-information"></a>
 
-This collection was created by {% for author in authors %}{{ author }} {% endfor %}and is based on an [Ansible skeleton](https://github.com/foundata/ansible-skeletons) by [foundata](https://foundata.com/). If you like it, you might [buy them a coffee](https://buy-me-a.coffee/ansible-skeletons/).
+This collection was created by {{ authors | join(", ") }} and is based on an [Ansible skeleton](https://github.com/foundata/ansible-skeletons) by [foundata](https://foundata.com/). If you like it, you might [buy them a coffee](https://buy-me-a.coffee/ansible-skeletons/).

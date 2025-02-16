@@ -1,0 +1,46 @@
+# FIXME/TODO (you should delete this file after reading/completing the tasks)
+
+A (maybe incomplete but hopefully useful) list of things to do after creating a
+new collection based on the skeleton, especially before releasing anything:
+
+1. **Check licensing information and metadata**
+   * [`REUSE.toml`](./REUSE.toml) → Especially `SPDX-PackageDownloadLocation`,
+     `SPDX-PackageSupplier`, and `SPDX-FileCopyrightText`
+   * [`meta/main.yml`](./meta/main.yml) in general.
+   * The "[`README.md`: Licensing, copyright](./README.md#licensing-copyright)" section
+   * The "[`README.md`: Author Information](./README.md#author-information)" section
+
+2. **Check requirements information**
+   * In the "[`roles/run/README.md`: External requirements](./roles/run/README.md#requirements)" section, list
+     any prerequisites that may not be covered by Ansible itself, e.g.:
+     * DNS names to configure, firewall ports to open
+     * [SELinux](https://en.wikipedia.org/wiki/Security-Enhanced_Linux)
+       * has to be disabled.
+       * is supported in "Permissive" mode only.
+       * is supported in "Enforcing" as well as in "Permissive" mode.
+   * In [`requirements.txt`](./requirements.txt): Additionally needed Python
+     packages (if any). You may delete the file if no additional packages are
+     needed.
+
+3. **Check dependency information**
+   * [`galaxy.yml`](./galaxy.yml) → `dependencies:`
+   * In the "[`README.md`: Dependencies](./README.md#dependencies)" section:
+     * A list of other collections hosted on Galaxy should go here
+     * Plus any details regarding parameters that may need to be set for other
+       collections or variables that are used from other collections or roles.
+   * [`roles/run/meta/main.yml`](./roles/run/meta/main.yml) → `dependencies:`
+   * In the "[`roles/run/README.md`: Dependencies](./roles/run/README.md#dependencies)" section:
+     * A list of other roles hosted on Galaxy should go here
+     * Plus any details regarding parameters that may need to be set for other
+       roles or variables that are used from other collections or roles.
+
+4. **Check compatibility information**
+   * In the "[`roles/run/README.md`: Compatibility](./roles/run/README.md#compatibility)" section:
+     * Maybe you want to mention the main platform/first-class citizens.
+     * Or if things were tested on container/VM/bare metal
+   * [`roles/run/vars/main.yml`](./roles/run/vars/main.yml) → `__run_{{ collection_name }}_supported_platforms:`
+     * Sadly, [there is no complete list of platforms anymore](https://github.com/foundata/ansible-skeletons/issues/4).
+       But the [module_utils source code](https://github.com/ansible/ansible/blob/devel/lib/ansible/module_utils/facts/system/distribution.py)
+       might give you some hints.
+
+5. **Search for FIXME** in all files (e.g., via `grep "FIXME" -r ./`).

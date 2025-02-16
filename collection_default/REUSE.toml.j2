@@ -1,7 +1,7 @@
 version = 1
 SPDX-PackageName = "{{ namespace }}.{{ collection_name }}"
 SPDX-PackageDownloadLocation = "{{ repository }}"
-SPDX-PackageSupplier = "{{ company }}{% for author in authors %}, {{ author }}{% endfor %}"
+SPDX-PackageSupplier = "{{ company }}, {{ authors | join(", ") }}"
 SPDX-PackageComment = """
 This project may include calls to Application Programming Interfaces
 ("API calls"), as well as their respective specifications and code that
@@ -16,5 +16,5 @@ supersede any terms of these additional agreements.
 [[annotations]]
 path = "**"
 precedence = "closest"
-SPDX-FileCopyrightText = "{{ company }}{% for author in authors %}, {{ author }}{% endfor %}"
+SPDX-FileCopyrightText = "{{ company }}, {{ authors | join(", ") }}"
 SPDX-License-Identifier = "GPL-3.0-or-later"

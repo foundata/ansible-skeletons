@@ -1,0 +1,22 @@
+# Role meta data
+
+---
+
+galaxy_info:
+  description: "{{ namespace }}.{{ collection_name }} run role"
+  license: "GPL-3.0-or-later" # See https://spdx.org/licenses/ for valid IDs and syntax.
+  author: "{{ authors | join(", ") }}"
+  company: "{{ company }}"
+
+  standalone: false # This role is part of a collection (useful hint for ansible-lint)
+  min_ansible_version: "{{ min_ansible_version }}"
+  platforms:
+    [] # Remove the "[]" when adding values to this list.
+  #  - name: "Fedora"
+  #    versions:
+  #      - "all"
+
+
+# Roles that this role requires to be installed.
+dependencies:
+  [] # Remove the "[]" when adding values to this list.

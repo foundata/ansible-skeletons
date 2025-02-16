@@ -1,0 +1,68 @@
+# Main entry point for the role.
+
+---
+
+- name: "Main | Include role initialization tasks"
+  ansible.builtin.include_tasks:
+    file: "{{ '{{' }} role_path {{ '}}' }}/tasks/init.yml"
+    apply:
+      tags:
+        - "always"
+        - "run_{{ collection_name }}_always"
+  tags:
+    - "always"
+    - "run_{{ collection_name }}_always"
+
+
+- name: "Main | Include setup tasks: default first, then best platform match (if any)"
+  ansible.builtin.include_tasks:
+    file: "{{ '{{' }} __run_{{ collection_name }}_task_file {{ '}}' }}"
+    apply:
+      tags:
+        - "run_{{ collection_name }}_setup"
+  loop: "{{ '{{' }} ['default.yml'] + __run_{{ collection_name }}_platform_filenames_most_specific_first {{ '}}' }}"
+  loop_control:
+    index_var: "__run_{{ collection_name }}_loop_index"
+  vars:
+    __run_{{ collection_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/setup/{{ '{{' }} item {{ '}}' }}"
+  when:
+    - __run_{{ collection_name }}_task_file is file
+    - __run_{{ collection_name }}_loop_index <= 1
+  tags:
+    - "run_{{ collection_name }}_setup"
+
+
+- name: "Main | Include configuration tasks: default first, then best platform match (if any)"
+  ansible.builtin.include_tasks:
+    file: "{{ '{{' }} __run_{{ collection_name }}_task_file {{ '}}' }}"
+    apply:
+      tags:
+        - "run_{{ collection_name }}_config"
+  loop: "{{ '{{' }} ['default.yml'] + __run_{{ collection_name }}_platform_filenames_most_specific_first {{ '}}' }}"
+  loop_control:
+    index_var: "__run_{{ collection_name }}_loop_index"
+  vars:
+    __run_{{ collection_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/config/{{ '{{' }} item {{ '}}' }}"
+  when:
+    - __run_{{ collection_name }}_task_file is file
+    - __run_{{ collection_name }}_loop_index <= 1
+  tags:
+    - "run_{{ collection_name }}_config"
+
+
+- name: "Main | Include service or daemon management tasks: default first, then best platform match (if any)"
+  ansible.builtin.include_tasks:
+    file: "{{ '{{' }} __run_{{ collection_name }}_task_file {{ '}}' }}"
+    apply:
+      tags:
+        - "run_{{ collection_name }}_service"
+  loop: "{{ '{{' }} ['default.yml'] + __run_{{ collection_name }}_platform_filenames_most_specific_first {{ '}}' }}"
+  loop_control:
+    index_var: "__run_{{ collection_name }}_loop_index"
+  vars:
+    __run_{{ collection_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/service/{{ '{{' }} item {{ '}}' }}"
+  when:
+    - __run_{{ collection_name }}_task_file is file
+    - __run_{{ collection_name }}_loop_index <= 1
+  tags:
+    - "run_{{ collection_name }}_service"

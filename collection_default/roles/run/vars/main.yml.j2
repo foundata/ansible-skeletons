@@ -1,0 +1,44 @@
+# Internal role variables and values that must NOT be overridden by the user.
+#
+# Variables defined here usually override earlier definitions due to the high
+# precedence of this file. Each variable should have a concise comment above
+# it, describing its purpose and how it fits into the role's functionality.
+
+---
+
+# List of facts used by the role (gathered on a best-effort basis if needed).
+#
+# To identify which subset a fact belongs to during development, you can use
+# the following snippet:
+#
+# - ansible.builtin.setup:
+#     gather_subset:
+#       - '!min'
+#       - '<subset_name, see parameter doc for details>'
+__run_{{ collection_name }}_used_facts:
+  # from subset "distribution"
+  - "distribution"
+  - "distribution_major_version"
+  - "distribution_version"
+  - "os_family"
+
+
+# List of platforms this role supports and was designed for.
+#
+# A warning will be issued if the list contains values and the role is executed
+# on an unknown (not listed) platform, but execution will continue. Example:
+#
+# - name: "Fedora" # a value from ansible_facts['distribution']
+#   versions:
+#     - "all" # a value from ansible_facts['distribution_version'] or "all"
+# - name: "Ubuntu"
+#   versions:
+#     - "22.04"
+#     - "24.04"
+__run_{{ collection_name }}_supported_platforms:
+  [] # Remove the "[]" when adding values to this list.
+
+
+# Override defaults of dependencies used by this role (if any).
+
+# nothing right now

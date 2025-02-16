@@ -1,0 +1,23 @@
+# Handlers: Tasks that are triggered and run only when notified.
+
+---
+
+# none right now
+
+
+#- name: "restart_example"
+#  ansible.builtin.service:
+#    name: "example"
+#    state: "restarted"
+#
+#- name: "reload_example"
+#  ansible.builtin.systemd:
+#    name: "example"
+#    enabled: true
+#    daemon_reload: true
+#
+# Usage Example:
+#
+# - name: "Reconfigure example service"
+#   [...]
+#   notify: "restart_example"

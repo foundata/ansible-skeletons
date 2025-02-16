@@ -1,0 +1,23 @@
+# Collection requirements when building Ansible Execution Environments
+# https://ansible.readthedocs.io/projects/builder/en/latest/definition/
+# https://ansible.readthedocs.io/projects/builder/en/stable/collection_metadata/
+
+---
+
+version: 3
+
+dependencies:
+  ansible_core:
+    package_pip: "ansible-core"
+  ansible_runner:
+    package_pip: "ansible-runner"
+  galaxy:
+    dependencies:
+      []
+
+images:
+  base_image:
+    name: "docker.io/redhat/ubi9:latest"
+
+# FIXME Delete the file if you do not take care / support Ansible Execution
+#       Environments with your collection.

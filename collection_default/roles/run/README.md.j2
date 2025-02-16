@@ -1,0 +1,74 @@
+# Ansible role: `{{ namespace }}.{{ collection_name }}.run`
+
+The `{{ namespace }}.{{ collection_name }}.run` Ansible role (part if the `{{ namespace }}.{{ collection_name }}` Ansible collection).
+
+
+
+## Table of contents<a id="toc"></a>
+
+- [Role variables](#variables)
+- [Example playbooks, using this role](#examples)
+- [Supported tags](#tags)
+- [Dependencies](#dependencies)
+- [Compatibility](#compatibility)
+- [External requirements](#requirements)
+
+
+
+## Role variables<a id="variables"></a>
+
+See [`defaults/main.yml`](./defaults/main.yml) for all available role parameters and their description. [`vars/main.yml`](./vars/main.yml) contains internal variables you should not override (but their description might be interesting).
+
+Additionally, there are variables read from other roles and/or the global scope (for example, host or group vars) as follows:
+
+- None right now.
+
+
+
+## Example playbooks, using this role<a id="examples"></a>
+
+```yaml
+---
+
+- name: "Initialize the {{ namespace }}.{{ collection_name }}.run role"
+  hosts: localhost
+  gather_facts: false
+  tasks:
+
+    - name: "Trigger invocation of the {{ namespace }}.{{ collection_name }}.run role"
+      ansible.builtin.include_role:
+        name: "{{ namespace }}.{{ collection_name }}.run"
+      vars:
+        run_{{ collection_name }}_autoupgrade: true
+```
+
+
+## Supported tags<a id="tags"></a>
+
+It might be useful and faster to only call parts of the role by using tags:
+
+- `run_{{ collection_name }}_setup`: Manage basic resources, such as packages or service users.
+- `run_{{ collection_name }}_config`: Manage settings, such as adapting or creating configuration files.
+- `run_{{ collection_name }}_service`: Manage services and daemons, such as running states and service boot configurations.
+
+There are also tags usually not meant to be called directly but listed for the sake of completeness** and edge cases:
+
+- `run_{{ collection_name }}_always`, `always`: Tasks needed by the role itself for internal role setup and the Ansible environment.
+
+
+
+## Dependencies<a id="dependencies"></a>
+
+See `dependencies` in [`meta/main.yml`](./meta/main.yml).
+
+
+
+## Compatibility<a id="compatibility"></a>
+
+See `min_ansible_version` in [`meta/main.yml`](./meta/main.yml) and `__run_{{ collection_name }}_supported_platforms` in [`vars/main.yml`](./vars/main.yml).
+
+
+
+## External requirements<a id="requirements"></a>
+
+There are no special requirements not covered by Ansible itself.

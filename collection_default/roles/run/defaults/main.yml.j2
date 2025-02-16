@@ -1,0 +1,46 @@
+# Default variables and values for this role.
+#
+# These variables are designed to be easily overridden (as they have a low
+# precedence) and typically allow users to customize the role's behavior.
+# Each variable should have a clear comment above it, describing its purpose
+# and how it fits into the role's functionality.
+
+---
+
+# String. Determines whether the managed resources should be "present" or
+# "absent". Defaults to "present". Possible values:
+#
+# - "present": Ensures that required components, such as software packages,
+#   are installed and configured.
+# - "absent": Reverts changes as much as possible, such as removing packages,
+#   deleting created users, stopping services, restoring modified settings, …
+run_{{ collection_name }}_state: "present"
+
+
+# Boolean. If set to true, all managed packages will be upgraded during each
+# Ansible run (e.g., when the package provider detects a newer version than
+# the currently installed one). Defaults to false.
+run_{{ collection_name }}_autoupgrade: false
+
+
+# String. Defines the status of the service(s). Defaults to "enabled".
+# Possible values:
+#
+# - "enabled": Service is running and will start automatically at boot.
+# - "disabled": Service is stopped and will not start automatically at boot.
+# - "running": Service is running but will not start automatically at boot.
+#   This can be used to start a service on the first Ansible run without
+#   enabling it for boot.
+# - "unmanaged": Service will not start at boot, and Ansible will not
+#   manage its running state. This is primarily useful when services are
+#   monitored and managed by systems other than Ansible.
+#
+# The singular form ("service") is used for simplicity. However, the defined
+# status applies to all services if multiple are being managed by this role.
+run_{{ collection_name }}_service_state: "enabled"
+
+
+# FIXME Description of a very important example parameter. Do not forget to
+#       update meta/argument_specs.yml if you add new parameters.
+#
+# run_{{ collection_name }}_example_parameter_variable: true
