@@ -50,7 +50,7 @@ They follow several guidelines and best practices:
       --extra-var "min_ansible_version='2.16.0'" \
       "name_of_your_role"
    ```
-   * `name_of_your_[collection|namespace|role]` has to follow [some rules](https://docs.ansible.com/ansible/latest/dev_guide/developing_collections_creating.html#naming-your-collection) and should consist of `a-z`, `0-9` and `_` only.
+   * `name_of_your_[collection|namespace|role]` has to follow [some](https://docs.ansible.com/ansible/latest/dev_guide/developing_collections_structure.html#roles-directory) [rules](https://docs.ansible.com/ansible/latest/dev_guide/developing_collections_creating.html#naming-your-collection) and should consist of `a-z`, `0-9` and `_` only.
    * Adapt the `--[collection|role]-skeleton` parameter value if you want to use another skeleton than `[collection|role_]default`. You can find a description of the available skeletons below.
    * Adapt the `--extra-var` lines as needed.
 3. Have a look at the created `./name_of_your_role/FIXME.md` to get further instructions.
