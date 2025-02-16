@@ -7,11 +7,11 @@ new role based on the skeleton, especially before releasing anything:
    * [`REUSE.toml`](./REUSE.toml) → Especially `SPDX-PackageDownloadLocation`,
      `SPDX-PackageSupplier`, and `SPDX-FileCopyrightText`
    * [`meta/main.yml`](./meta/main.yml) in general.
-   * The "[`README.md`: Author Information](./README.md#author-information)" section
    * The "[`README.md`: Licensing, copyright](./README.md#licensing-copyright)" section
+   * The "[`README.md`: Author Information](./README.md#author-information)" section
 
 2. **Check requirements information**
-   * In the "[`README.md`: Requirements](./README.md#requirements)" section, list
+   * In the "[`README.md`: External requirements](./README.md#requirements)" section, list
      any prerequisites that may not be covered by Ansible itself, e.g.:
      * DNS names to configure, firewall ports to open
      * [SELinux](https://en.wikipedia.org/wiki/Security-Enhanced_Linux)
@@ -19,7 +19,8 @@ new role based on the skeleton, especially before releasing anything:
        * is supported in "Permissive" mode only.
        * is supported in "Enforcing" as well as in "Permissive" mode.
    * In [`requirements.txt`](./requirements.txt): Additionally needed Python
-     packages (if any)
+     packages (if any). You may delete the file if no additional packages are
+     needed.
 
 3. **Check dependency information**
    * In the "[`README.md`: Dependencies](./README.md#dependencies)" section:

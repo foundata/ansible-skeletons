@@ -1,25 +1,19 @@
-# `{{ role_name }}`
+# Ansible role: `{{ role_name }}`
 
-{{ description }}
+This repository contains the `{{ role_name }}` Ansible role.
 
 
 
 ## Table of contents<a id="toc"></a>
 
-- [Requirements](#requirements)
 - [Role variables](#variables)
-- [Dependencies](#dependencies)
-- [Examples](#examples)
+- [Example playbooks, using this role](#examples)
 - [Supported tags](#tags)
+- [Dependencies](#dependencies)
 - [Compatibility](#compatibility)
+- [External requirements](#requirements)
 - [Licensing, copyright](#licensing-copyright)
 - [Author information](#author-information)
-
-
-
-## Requirements<a id="requirements"></a>
-
-There are no special requirements not covered by Ansible itself.
 
 
 
@@ -33,13 +27,7 @@ Additionally, there are variables read from other roles and/or the global scope 
 
 
 
-## Dependencies<a id="dependencies"></a>
-
-See `dependencies` in [`meta/main.yml`](./meta/main.yml).
-
-
-
-## Example playbooks <a id="examples"></a>
+## Example playbooks, using this role<a id="examples"></a>
 
 ```yaml
 ---
@@ -57,6 +45,7 @@ See `dependencies` in [`meta/main.yml`](./meta/main.yml).
 ```
 
 
+
 ## Supported tags<a id="tags"></a>
 
 It might be useful and faster to only call parts of the role by using tags:
@@ -71,9 +60,21 @@ There are also tags usually not meant to be called directly but listed for the s
 
 
 
+## Dependencies<a id="dependencies"></a>
+
+See `dependencies` in [`meta/main.yml`](./meta/main.yml).
+
+
+
 ## Compatibility<a id="compatibility"></a>
 
-See `min_ansible_version` and `platforms` in [`meta/main.yml`](./meta/main.yml).
+See `min_ansible_version` in [`meta/main.yml`](./meta/main.yml) and `__{{ role_name }}_supported_platforms` in [`vars/main.yml`](./vars/main.yml).
+
+
+
+## External requirements<a id="requirements"></a>
+
+There are no special requirements not covered by Ansible itself.
 
 
 
