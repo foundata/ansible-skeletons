@@ -1,0 +1,1 @@
+This file gets updated by [`antsibull-changelog`](https://ansible.readthedocs.io/projects/antsibull-changelog/changelogs/). Do not edit this manually! See [`changelogs/config.yaml`](./changelogs/config.yaml) for its configuration.
