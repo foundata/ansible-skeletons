@@ -1,100 +1,131 @@
 # Ansible (Galaxy) Skeletons
 
-This repository contains different skeletons / blueprints to kickstart the creation of new [roles](https://docs.ansible.com/ansible/latest/user_guide/playbooks_reuse_roles.html) and [collections](https://docs.ansible.com/ansible/devel/dev_guide/developing_collections.html).
+The repository provides various skeletons and blueprints to streamline the creation of new [roles](https://docs.ansible.com/ansible/latest/user_guide/playbooks_reuse_roles.html) and [collections](https://docs.ansible.com/ansible/devel/dev_guide/developing_collections.html).
 
-They follow several guidelines and best practices:
+These skeletons follow several guidelines and best practices:
 
 * [foundata: Ansible style guide](https://github.com/foundata/guidelines/blob/master/ansible-style-guide.md)
-* [Red Hat's Coding Style Good Practices for Ansible](https://github.com/redhat-cop/automation-good-practices/blob/main/coding_style/README.adoc#ansible-guidelines) and
+* [Red Hat's Coding Style Good Practices for Ansible](https://github.com/redhat-cop/automation-good-practices/blob/main/coding_style/README.adoc#ansible-guidelines)
 * [Best Practices of the Ansible User guide](https://docs.ansible.com/ansible/latest/user_guide/playbooks_best_practices.html)
 
 
 
-## Table of contents
+## Table of contents<a id="toc"></a>
 
-* [Usage](#usage)
-* [Description of provided skeletons](#description-of-provided-skeletons)
-  * [`role_default`](#role_default)
-* [Author information](#author-information)
-* [License, Copyright](#license-copyright)
+- [How to use the Ansible skeletons](#usage)
+- [Description of provided skeletons](#content)
+  - [`collection_default`](#collection_default)
+  - [`role_default`](#role_default)
+- [Compatibility](#compatibility)
+- [Contributing](#contributing)
+- [Licensing, copyright](#licensing-copyright)
+- [Author information](#author-information)
 
 
 
-## Usage
+## How to use the Ansible skeletons<a id="usage"></a>
 
-1. Clone this repository:
-   ```sh
-   git clone https://github.com/foundata/ansible-skeletons.git
+1. **Clone this repository and check out the latest release:**
+   ```bash
+   # Get the version number of the latest release
+   version="$(curl -s -L https://api.github.com/repos/foundata/ansible-skeletons/releases/latest | jq -r '.tag_name' | sed -e 's/^v//g')"
+   printf '%s\n' "${version}"
+
+   # Clone and check out the latest release (you can switch versions anytime using "git checkout vX.Y.Z")
+   git clone https://github.com/foundata/ansible-skeletons.git -b "v${version}"
    ```
-2. Call `ansible-galaxy` and provide the path to the skeleton to use as well as some variables values (galaxy will use defaults otherwise) and a role name:
-   ```sh
-   # create a new collection
+2. **Use `ansible-galaxy` to initialize a new collection or stand-alone role**. Provide the path to the desired skeleton, along with any necessary variable values (or let `ansible-galaxy` use default values), and specify a name for your new resource. Examples:
+   ```bash
+   # Ensure ansible-galaxy is available and navigate to the cloned repository from step one
+   ansible-galaxy --version
+   cd ./path/to/ansible-skeletons
+
+   # Create a new collection called "namespace.new_collection" based on the "collection_default" skeleton
+   # Syntax: ansible-galaxy collection init --collection-skeleton <path> <extra variables> <name of the new collection including namespace>
    ansible-galaxy collection init \
-      --collection-skeleton "./ansible-skeletons/collection_default" \
+      --collection-skeleton "./collection_default" \
       --extra-var '{"authors": ["FIXME User <user@example.com>"]}' \
-      --extra-var "company='FIXME your org'" \
+      --extra-var "company='FIXME your organization'" \
       --extra-var "repository='https://FIXME.example.com/repo/'" \
       --extra-var "issues='https://FIXME.example.com/repo/issues/'" \
       --extra-var "homepage='https://FIXME.example.com'" \
       --extra-var "min_ansible_version='2.16.0'" \
-      "name_of_your_namespace.name_of_your_collection"
+      "namespace.new_collection"
 
-   # create a new role
+   # Create a new stand-alone role called "new_role" based on the "role_default" skeleton
+   # Syntax: ansible-galaxy role init --collection-skeleton <path> <extra variables> <name of the new role>
    ansible-galaxy role init \
-      --role-skeleton "./ansible-skeletons/role_default" \
+      --role-skeleton "./role_default" \
       --extra-var "author='FIXME User <user@example.com>'" \
-      --extra-var "company='FIXME your org'" \
+      --extra-var "company='FIXME your organization'" \
       --extra-var "repository_url='https://FIXME.example.com/repo/'" \
       --extra-var "issue_tracker_url='https://FIXME.example.com/repo/issues/'" \
       --extra-var "homepage_url='https://FIXME.example.com'" \
       --extra-var "min_ansible_version='2.16.0'" \
-      "name_of_your_role"
+      "new_role"
    ```
-   * `name_of_your_[collection|namespace|role]` has to follow [some](https://docs.ansible.com/ansible/latest/dev_guide/developing_collections_structure.html#roles-directory) [rules](https://docs.ansible.com/ansible/latest/dev_guide/developing_collections_creating.html#naming-your-collection) and should consist of `a-z`, `0-9` and `_` only.
-   * Adapt the `--[collection|role]-skeleton` parameter value if you want to use another skeleton than `[collection|role_]default`. You can find a description of the available skeletons below.
-   * Adapt the `--extra-var` lines as needed.
-3. Have a look at the created `./name_of_your_role/FIXME.md` to get further instructions.
+   Additional Notes:
+     - Names of namespaces, collections or roles must follow [some](https://docs.ansible.com/ansible/latest/dev_guide/developing_collections_structure.html#roles-directory) [rules](https://docs.ansible.com/ansible/latest/dev_guide/developing_collections_creating.html#naming-your-collection) and should consist of `a-z`, `0-9` and `_` only.
+     - Adapt the directory name of the `--[collection|role]-skeleton` parameter value if you want to use another skeleton than `[collection|role_]default`. You can find a description of the available skeletons below.
+3. Each created collection or stand-alone role includes a `FIXME.md` file in its root directory with further instructions about what to change to your needs.
 
 
 
-## Description of provided skeletons
+## Description of provided skeletons<a id="content"></a>
 
-The following lists gives an overview over the available skeletons. You can also have a look into the sub-directories of this repository to look at their code (even though the source might be partially hard to read. There is [Jinja](https://palletsprojects.com/p/jinja/) code which will be processed by `ansible-galaxy role init` to get the final files).
-
-
-### `collection_default`
-
-A general purpose skeleton to create new Ansible collections. Main features:
-
-* Init tasks to check the execution environment (e.g. minimum Ansible version and supported operating systems), based on the role's meta data.
-* Separation of logical task groups.
+The following list provides an overview of the available skeletons. You can also explore the subdirectories of this repository to examine their code. However, keep in mind that some parts may be difficult to read, as they contain [Jinja](https://palletsprojects.com/p/jinja/) code. This Jinja code is processed by `ansible-galaxy [collection|role]` with it's templating to generate the final files.
 
 
-### `role_default`
+### `collection_default`<a id="collection_default"></a>
 
-A general purpose skeleton to create new Ansible roles. Main features:
+A general purpose skeleton to create new Ansible collection for [package and ship](https://redhat-cop.github.io/automation-good-practices/#_package_roles_in_an_ansible_collection_to_simplify_distribution_and_consumption) a `run`-role. Main features:
 
-* Init tasks to check the execution environment (e.g. minimum Ansible version and supported operating systems), based on the role's meta data.
-* Separation of logical task groups.
+* Init tasks to check the environment and usage:
+  * Role argument validation
+  * Check for minimum Ansible version and supported operating systems / platform.
+  * Automatic gathering of role-specific facts (useful with `gather_facts: false`)
+  * Automatic search and include for [platform-specific variables](https://redhat-cop.github.io/automation-good-practices/#_platform_specific_variables).
+* Separation of logical task groups, automatic include for[ platform-specific tasks](https://redhat-cop.github.io/automation-good-practices/#_platform_specific_tasks).
+* Passes `ansible-lint --profile production --strict`.
+* [`antsibull-changelog`](https://ansible.readthedocs.io/projects/antsibull-changelog/changelogs/) support.
 
 
-## Compatibility
 
-The skeletons should be compatible with `ansible-galaxy` from [`ansible-core` version](https://docs.ansible.com/ansible/latest/reference_appendices/release_and_maintenance.html#ansible-core-support-matrix) 2.11 and newer. It was tested with:
+### `role_default`<a id="role_default"></a>
 
+A general purpose skeleton to create new Ansible stand-alone role. Main features:
+
+* Init tasks to check the environment and usage:
+  * Role argument validation
+  * Check for minimum Ansible version and supported operating systems / platform.
+  * Automatic gathering of role-specific facts (useful with `gather_facts: false`)
+  * Automatic search and include for [platform-specific variables](https://redhat-cop.github.io/automation-good-practices/#_platform_specific_variables).
+* Separation of logical task groups, automatic include for [platform-specific tasks](https://redhat-cop.github.io/automation-good-practices/#_platform_specific_tasks).
+* Passes `ansible-lint --profile production --strict`.
+
+
+
+## Compatibility<a id="compatibility"></a>
+
+The skeletons are designed to be compatible with all [supported](https://docs.ansible.com/ansible/latest/reference_appendices/release_and_maintenance.html#ansible-core-support-matrix) versions of `ansible-galaxy` and `ansible` that are not end-of-life and still receive patches. While older versions should also work as long as Ansible Core is >= v2.16, we no might not explicitly test them.
+
+The skeletons were explicitly tested with `ansible-galaxy` from the following `ansible` versions (descending order):
+
+* `ansible-galaxy [core 2.18.2]`
 * `ansible-galaxy [core 2.18.1]`
-* `ansible-galaxy [core 2.14.8]`
+* `ansible-galaxy [core 2.16.4]`
 
 
 
-## Contributing
+## Contributing<a id="contributing"></a>
 
 See [`CONTRIBUTING.md`](./CONTRIBUTING.md) if you want to get involved.
 
 This project's functionality is mature, so there might be little activity on the repository in the future. Don't get fooled by this, the project is under active maintenance and used on daily basis by the maintainers.
 
 
-## Licensing, copyright
+
+## Licensing, copyright<a id="licensing-copyright"></a>
 
 <!--REUSE-IgnoreStart-->
 Copyright (c) 2020, 2023-2025 foundata GmbH (https://foundata.com)
@@ -107,7 +138,8 @@ The [`REUSE.toml`](REUSE.toml) file provides detailed licensing and copyright in
 [![REUSE status](https://api.reuse.software/badge/github.com/foundata/ansible-skeletons)](https://api.reuse.software/info/github.com/foundata/ansible-skeletons)
 
 
-## Author information
+
+## Author information<a id="author-information"></a>
 
 This project was created and is maintained by the following [foundata](https://foundata.com/) employees (alphabetical order):
 
