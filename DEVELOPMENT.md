@@ -69,7 +69,7 @@ Nothing special or automated yet. Therefore just some hints for manual testing:
 # - Runs a dummy playbook to instantiate the dummy resources
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
-# SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+# SPDX-FileCopyrightText: foundata GmbH (https://foundata.com)
 ################################################################################
 
 
