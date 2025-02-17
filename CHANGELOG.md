@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- collection_default: .gitignore: Moved file into the correct directory, added `antsibull-changelog` entries.
+- collection_default: .gitignore: Moved file into the correct directory, added `antsibull-changelog`. (33613eb)
 
 
 ## [2.0.0] - 2025-02-17
