@@ -8,7 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet.
+### Changed
+
+- collection_default: Changed `antsibull-changelog` config to RST
+
+### Fixed
+
+- collection_default: .gitignore: Moved file into the correct directory, added `antsibull-changelog` entries.
 
 
 ## [2.0.0] - 2025-02-17

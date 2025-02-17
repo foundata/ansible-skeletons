@@ -397,3 +397,6 @@ $RECYCLE.BIN/
 ### Repository-specific files
 # Files to keep empty directories
 !.gitkeep
+
+# antsibull-changelog metadata cache for modules and plugins
+changelogs/.plugin-cache.yaml
