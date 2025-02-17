@@ -1,6 +1,6 @@
 # Ansible (Galaxy) Skeletons
 
-The repository provides various skeletons and blueprints to streamline the creation of new [roles](https://docs.ansible.com/ansible/latest/user_guide/playbooks_reuse_roles.html) and [collections](https://docs.ansible.com/ansible/devel/dev_guide/developing_collections.html).
+The repository provides various skeletons and blueprints to help with the creation of new [roles](https://docs.ansible.com/ansible/latest/user_guide/playbooks_reuse_roles.html) and [collections](https://docs.ansible.com/ansible/devel/dev_guide/developing_collections.html).
 
 These skeletons follow several guidelines and best practices:
 
@@ -34,7 +34,8 @@ These skeletons follow several guidelines and best practices:
    # Clone and check out the latest release (you can switch versions anytime using "git checkout vX.Y.Z")
    git clone https://github.com/foundata/ansible-skeletons.git -b "v${version}"
    ```
-2. **Use `ansible-galaxy` to initialize a new collection or stand-alone role**. Provide the path to the desired skeleton, along with any necessary variable values (or let `ansible-galaxy` use default values), and specify a name for your new resource. Examples:
+   <br>
+2. **Use `ansible-galaxy` to initialize a new collection or stand-alone role**. Provide the path to the desired skeleton, along with any necessary variable values (or let `ansible-galaxy` use default values), and specify a name for your new resource.<br>Examples:
    ```bash
    # Ensure ansible-galaxy is available and navigate to the cloned repository from step one
    ansible-galaxy --version
@@ -67,7 +68,7 @@ These skeletons follow several guidelines and best practices:
    Additional Notes:
      - Names of namespaces, collections or roles must follow [some](https://docs.ansible.com/ansible/latest/dev_guide/developing_collections_structure.html#roles-directory) [rules](https://docs.ansible.com/ansible/latest/dev_guide/developing_collections_creating.html#naming-your-collection) and should consist of `a-z`, `0-9` and `_` only.
      - Adapt the directory name of the `--[collection|role]-skeleton` parameter value if you want to use another skeleton than `[collection|role_]default`. You can find a description of the available skeletons below.
-3. Each created collection or stand-alone role includes a `FIXME.md` file in its root directory with further instructions about what to change to your needs.
+3. Each created collection or stand-alone role includes a **`FIXME.md` file in its root directory** with further instructions about what to change to your needs.
 
 
 
