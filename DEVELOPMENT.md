@@ -12,7 +12,6 @@ Nothing special or automated yet. Therefore just some hints for manual testing:
 * Create resources with your skeleton for a simple program and test if everything works out conceptually as expected.
 
 
-
 ## Releases
 
 1. Do proper [Testing](#testing). Continue only if everything is fine.
@@ -20,14 +19,19 @@ Nothing special or automated yet. Therefore just some hints for manual testing:
 3. Update the [`CHANGELOG.md`](./CHANGELOG.md). Insert a section for the new release. Do not forget the comparison link at the end of the file.
 4. If everything is fine: commit the changes, tag the release and push:
    ```console
-   git tag v<version> <commit> -m "version <version>"
-   git show v<version>
+   version="<FIXME version>"
+   git add "./CHANGELOG.md"
+   git commit -m "Release preparations: v${version}"
+
+   git tag "v${version}" <commit-id> -m "version ${version}"
+   git show "v${version}"
+
    git push origin main --follow-tags
    ```
    If something minor went wrong (like missing `CHANGELOG.md` update), delete the tag and start over:
    ```console
-   git tag -d v<version>                 # delete the old tag locally
-   git push origin :refs/tags/v<version> # delete the old tag remotely
+   git tag -d "v${version}" # delete the old tag locally
+   git push origin ":refs/tags/v${version}" # delete the old tag remotely
    ```
    This is *only* possible if there was no [GitHub release](https://github.com/foundata/ansible-skeletons/releases/). Use a new patch version number otherwise.
 5. Use [GitHub's release feature](https://github.com/foundata/ansible-skeletons/releases/new), select the tag you pushed and create a new release:
@@ -195,6 +199,13 @@ fi
 readonly ansible_collection_namespace="foundata"
 readonly ansible_collection_name="foobar"
 readonly ansible_role_name="foobar"
+readonly ansible_extravar_author_default="FIXME ${USER}"
+readonly ansible_extravar_authors_default='["FIXME User <user@example.com>"]' # JSON list
+readonly ansible_extravar_company_default="FIXME your org"
+readonly ansible_extravar_repository_default="https://FIXME.example.com/repo/"
+readonly ansible_extravar_issues_default="https://FIXME.example.com/repo/issues/"
+readonly ansible_extravar_homepage_default="https://FIXME.example.com"
+readonly ansible_extravar_min_ansible_version_default="2.16.0"
 
 
 ################################################################################
@@ -310,10 +321,11 @@ printf "%s\n" "$(cat <<-DELIM
 # Debug hint: ansible-config dump --only-changed -t all
 
 [defaults]
-home = ${path_working_dir}
+home = ${path_working_dir}/.ansible
+
 ## Dependencies
 # - install collections into [current dir]/dependencies/ansible_collections/namespace/collection_name
-# - install roles into [current dir]/dependencies/roles/namespace.rolename
+# - install roles into [current dir]/dependencies/roles/role_name
 collections_path = ${path_working_dir}/dependencies/collections
 roles_path = ${path_working_dir}/dependencies/roles
 
@@ -412,12 +424,12 @@ cd "${path_working_dir}/dependencies/collections/ansible_collections/"
 set -x
 ansible-galaxy collection init \
   --collection-skeleton "${source_dir_path}/collection_default" \
-  --extra-var '{"authors": ["FIXME User <user@example.com>","222"]}' \
-  --extra-var "company='FIXME your org'" \
-  --extra-var "repository='https://FIXME.example.com/repo/'" \
-  --extra-var "issues='https://FIXME.example.com/repo/issues/'" \
-  --extra-var "homepage='https://FIXME.example.com'" \
-  --extra-var "min_ansible_version='2.16.0'" \
+  --extra-var "{"authors": ${ansible_extravar_authors_default}}" \
+  --extra-var "company='${ansible_extravar_company_default}'" \
+  --extra-var "repository='${ansible_extravar_repository_default}'" \
+  --extra-var "issues='${ansible_extravar_issues_default}'" \
+  --extra-var "homepage='${ansible_extravar_homepage_default}'" \
+  --extra-var "min_ansible_version='${ansible_extravar_min_ansible_version_default}'" \
   --force \
   "${ansible_collection_namespace}.${ansible_collection_name}"
 set +x
@@ -432,11 +444,11 @@ cd "${path_working_dir}/dependencies/roles"
 set -x
 ansible-galaxy role init \
   --role-skeleton "${source_dir_path}/role_default" \
-  --extra-var "author='FIXME ${USER}'" \
-  --extra-var "company='FIXME your org'" \
-  --extra-var "repository_url='https://FIXME.example.com/repo/'" \
-  --extra-var "issue_tracker_url='https://FIXME.example.com/repo/issues/'" \
-  --extra-var "homepage_url='https://FIXME.example.com'" \
+  --extra-var "author='${ansible_extravar_author_default}'" \
+  --extra-var "company='${ansible_extravar_company_default}'" \
+  --extra-var "repository_url='${ansible_extravar_repository_default}'" \
+  --extra-var "issue_tracker_url='${ansible_extravar_issues_default}'" \
+  --extra-var "homepage_url='${ansible_extravar_homepage_default}'" \
   --extra-var "min_ansible_version='2.16.0'" \
   --force \
   "${ansible_role_name}"
@@ -447,8 +459,11 @@ set +x
 printf '\n\n\n\n############################################################################\n'
 printf '# %s: Linting the collection.\n' "$(basename "${0}")"
 printf '############################################################################\n'
+# Note: yaml[comments] is skipped as there are #comments without additional space,
+#       which are related to FIXMEs and should be easy to remove without requiring
+#       indentation adjustments afterwards.
 set -x
-ansible-lint --profile production --strict --skip-list use-loop,yaml[comments] \
+ansible-lint --profile production --strict --skip-list yaml[comments] \
   "${path_working_dir}/dependencies/collections/ansible_collections/${ansible_collection_namespace}/${ansible_collection_name}"
 set +x
 
@@ -468,8 +483,11 @@ fi
 printf '\n\n\n\n############################################################################\n'
 printf '# %s: Linting the stand-alone role.\n' "$(basename "${0}")"
 printf '############################################################################\n'
+# Note: yaml[comments] is skipped as there are #comments without additional space,
+#       which are related to FIXMEs and should be easy to remove without requiring
+#       indentation adjustments afterwards.
 set -x
-ansible-lint --profile production --strict --skip-list use-loop,yaml[comments] \
+ansible-lint --profile production --strict --skip-list yaml[comments] \
   "${path_working_dir}/dependencies/roles/${ansible_role_name}"
 set +x
 
@@ -499,6 +517,10 @@ then
     printf '%s: Opening working dir in GNOME Nautilus.\n' "$(basename "${0}")"
     nautilus "${path_working_dir}" > /dev/null 2>&1 &
 fi
+
+
+# misc cleanup tasks (best effort)
+rm -rf "${path_working_dir}/dependencies/roles/.ansible"
 
 exit 0
 ```
