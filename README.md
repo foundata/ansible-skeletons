@@ -47,10 +47,12 @@ These skeletons follow several guidelines and best practices:
       --collection-skeleton "./collection_default" \
       --extra-var '{"authors": ["FIXME User <user@example.com>"]}' \
       --extra-var "company='FIXME your organization'" \
+      --extra-var "description='Manage FIXME.'" \
       --extra-var "repository='https://FIXME.example.com/repo/'" \
       --extra-var "issues='https://FIXME.example.com/repo/issues/'" \
       --extra-var "homepage='https://FIXME.example.com'" \
       --extra-var "min_ansible_version='2.16.0'" \
+      --extra-var "version='0.1.0'" \
       "namespace.new_collection"
 
    # Create a new stand-alone role called "new_role" based on the "role_default" skeleton
@@ -59,6 +61,7 @@ These skeletons follow several guidelines and best practices:
       --role-skeleton "./role_default" \
       --extra-var "author='FIXME User <user@example.com>'" \
       --extra-var "company='FIXME your organization'" \
+      --extra-var "description='Manage FIXME.'" \
       --extra-var "repository_url='https://FIXME.example.com/repo/'" \
       --extra-var "issue_tracker_url='https://FIXME.example.com/repo/issues/'" \
       --extra-var "homepage_url='https://FIXME.example.com'" \

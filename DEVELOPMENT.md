@@ -202,6 +202,8 @@ readonly ansible_role_name="foobar"
 readonly ansible_extravar_author_default="FIXME ${USER}"
 readonly ansible_extravar_authors_default='["FIXME User <user@example.com>"]' # JSON list
 readonly ansible_extravar_company_default="FIXME your org"
+readonly ansible_extravar_desciption_collection_default="Ansible collection to manage foobar"
+readonly ansible_extravar_desciption_role_default="Ansible role to manage foobar"
 readonly ansible_extravar_repository_default="https://FIXME.example.com/repo/"
 readonly ansible_extravar_issues_default="https://FIXME.example.com/repo/issues/"
 readonly ansible_extravar_homepage_default="https://FIXME.example.com"
@@ -426,6 +428,7 @@ ansible-galaxy collection init \
   --collection-skeleton "${source_dir_path}/collection_default" \
   --extra-var "{"authors": ${ansible_extravar_authors_default}}" \
   --extra-var "company='${ansible_extravar_company_default}'" \
+  --extra-var "description='${ansible_extravar_desciption_collection_default}'" \
   --extra-var "repository='${ansible_extravar_repository_default}'" \
   --extra-var "issues='${ansible_extravar_issues_default}'" \
   --extra-var "homepage='${ansible_extravar_homepage_default}'" \
@@ -446,6 +449,7 @@ ansible-galaxy role init \
   --role-skeleton "${source_dir_path}/role_default" \
   --extra-var "author='${ansible_extravar_author_default}'" \
   --extra-var "company='${ansible_extravar_company_default}'" \
+  --extra-var "description='${ansible_extravar_desciption_role_default}'" \
   --extra-var "repository_url='${ansible_extravar_repository_default}'" \
   --extra-var "issue_tracker_url='${ansible_extravar_issues_default}'" \
   --extra-var "homepage_url='${ansible_extravar_homepage_default}'" \
