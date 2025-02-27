@@ -35,8 +35,39 @@ __{{ role_name }}_used_facts:
 #   versions:
 #     - "22.04"
 #     - "24.04"
+# - name: "RedHat"
+#   versions:
+#     - "all"
+# - name: "CentOS"
+#   versions:
+#     - "all"
+# - name: "Debian"
+#   versions:
+#     - "all"
 __{{ role_name }}_supported_platforms:
   [] # No special compatibility information defined yet. Remove the "[]" when adding  values to this list.
+
+
+# List of package names to be installed when {{ role_name }}_state is
+# set to "present".
+__{{ role_name }}_packages_install:
+  [] # Remove the "[]" when adding values to this list.
+
+
+# List of package names to be uninstalled when {{ role_name }}_state is
+# set to "absent". This variable is useful when __{{ role_name }}_packages_install
+# contains packages that are required for the managed software to function but
+# should not be removed during uninstallation, as doing so could break other
+# software. This is usually the case if there are common dependencies like
+# "curl" or "openssl" which typically should remain installed even after
+# uninstalling the software managed by this role.
+__{{ role_name }}_packages_uninstall: "{{ '{{ ' + role_name  + '_packages_install }}' }}"
+
+
+# List of package names to be removed unconditionally before installation
+# (e.g., to prevent conflicts or resolve incompatibilities).
+__{{ role_name }}_packages_removal:
+  [] # Remove the "[]" when adding values to this list.
 
 
 # Override defaults of dependencies used by this role (if any).

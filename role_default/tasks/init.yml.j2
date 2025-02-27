@@ -77,12 +77,3 @@
     __{{ role_name }}_vars_file: "{{ '{{' }} role_path {{ '}}' }}/vars/{{ '{{' }} item {{ '}}' }}"
   when:
     - __{{ role_name }}_vars_file is file
-
-
-- name: "Init | Map role parameters to package state"
-  ansible.builtin.set_fact:
-    __{{ role_name }}_package_state: "{{ '{{' }} __package_state_mapping[{{ role_name }}_state] {{ '}}' }}"
-  vars:
-    __package_state_mapping:
-      present: "{{ '{%' }} if {{ role_name }}_autoupgrade {{ '%}' }}latest{{ '{%' }} else {{ '%}' }}present{{ '{%' }} endif {{ '%}' }}"
-      absent: "absent"
