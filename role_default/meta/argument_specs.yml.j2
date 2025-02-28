@@ -20,6 +20,10 @@ argument_specs:
           - "present"
           - "absent"
 
+      {{ role_name }}_autoupgrade:
+        type: "bool"
+        required: false
+
       {{ role_name }}_service_state:
         type: "str"
         required: false
@@ -28,7 +32,3 @@ argument_specs:
           - "disabled"
           - "running"
           - "unmanaged"
-
-      {{ role_name }}_autoupgrade:
-        type: "bool"
-        required: false

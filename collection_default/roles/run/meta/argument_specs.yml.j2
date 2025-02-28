@@ -20,6 +20,10 @@ argument_specs:
           - "present"
           - "absent"
 
+      run_{{ collection_name }}_autoupgrade:
+        type: "bool"
+        required: false
+
       run_{{ collection_name }}_service_state:
         type: "str"
         required: false
@@ -28,7 +32,3 @@ argument_specs:
           - "disabled"
           - "running"
           - "unmanaged"
-
-      run_{{ collection_name }}_autoupgrade:
-        type: "bool"
-        required: false
