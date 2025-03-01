@@ -27,6 +27,8 @@ Additionally, there are variables read from other roles and/or the global scope 
 
 ## Example playbooks, using this role<a id="examples"></a>
 
+Installation with automatic upgrade:
+
 ```yaml
 ---
 
@@ -41,6 +43,24 @@ Additionally, there are variables read from other roles and/or the global scope 
       vars:
         run_{{ collection_name }}_autoupgrade: true
 ```
+
+Uninstall:
+
+```yaml
+---
+
+- name: "Initialize the {{ namespace }}.{{ collection_name }}.run role"
+  hosts: localhost
+  gather_facts: false
+  tasks:
+
+    - name: "Trigger invocation of the {{ namespace }}.{{ collection_name }}.run role"
+      ansible.builtin.include_role:
+        name: "{{ namespace }}.{{ collection_name }}.run"
+      vars:
+        run_{{ collection_name }}_state: "absent"
+```
+
 
 
 ## Supported tags<a id="tags"></a>

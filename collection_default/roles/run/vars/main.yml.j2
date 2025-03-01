@@ -48,13 +48,13 @@ __run_{{ collection_name }}_supported_platforms:
   [] # Remove the "[]" when adding values to this list.
 
 
-# List of package names to be installed when __run_{{ collection_name }}_state is
+# List of package names to be installed when run_{{ collection_name }}_state is
 # set to "present".
 __run_{{ collection_name }}_packages_install:
   [] # Remove the "[]" when adding values to this list.
 
 
-# List of package names to be uninstalled when __run_{{ collection_name }}_state is
+# List of package names to be uninstalled when run_{{ collection_name }}_state is
 # set to "absent". This variable is useful when __run_{{ collection_name }}_packages_install
 # contains packages that are required for the managed software to function but
 # should not be removed during uninstallation, as doing so could break other
