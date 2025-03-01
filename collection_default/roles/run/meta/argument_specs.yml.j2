@@ -15,18 +15,18 @@ argument_specs:
 
       run_{{ collection_name }}_state:
         type: "str"
-        required: false
+        required: true
         choices:
           - "present"
           - "absent"
 
       run_{{ collection_name }}_autoupgrade:
         type: "bool"
-        required: false
+        required: true
 
       run_{{ collection_name }}_service_state:
         type: "str"
-        required: false
+        required: true
         choices:
           - "enabled"
           - "disabled"

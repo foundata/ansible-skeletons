@@ -10,7 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- collection_default: Changed `antsibull-changelog` config to RST
+- collection_default, role_default: Setup tasks are now split into separate "install" and "uninstall" subdirs. Managing installation and removal in separate files simplifies handling in real-world scenarios compared to implementing optional removal logic within the installation context.
+- collection_default: Changed `antsibull-changelog` config to RST.
 
 ### Fixed
 

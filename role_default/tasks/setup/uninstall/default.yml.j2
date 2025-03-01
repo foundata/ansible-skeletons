@@ -1,0 +1,11 @@
+# Setup: Manage basic resource removal, such as packages or service users.
+
+---
+
+- name: "Setup | Uninstall | Remove packages"
+  ansible.builtin.package:
+    name: "{{ '{{ ' + role_name + '_packages_uninstall }}' }}"
+    state: "absent"
+  when:
+    - __{{ role_name }}_packages_uninstall is defined
+    - (__{{ role_name }}_packages_uninstall | length) > 1

@@ -15,18 +15,18 @@ argument_specs:
 
       {{ role_name }}_state:
         type: "str"
-        required: false
+        required: true
         choices:
           - "present"
           - "absent"
 
       {{ role_name }}_autoupgrade:
         type: "bool"
-        required: false
+        required: true
 
       {{ role_name }}_service_state:
         type: "str"
-        required: false
+        required: true
         choices:
           - "enabled"
           - "disabled"

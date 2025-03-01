@@ -14,7 +14,7 @@
     - "run_{{ collection_name }}_always"
 
 
-- name: "Main | Include setup tasks: default first, then best platform match (if any)"
+- name: "Main | Include setup tasks (install): default first, then best platform match (if any)"
   ansible.builtin.include_tasks:
     file: "{{ '{{' }} __run_{{ collection_name }}_task_file {{ '}}' }}"
     apply:
@@ -24,8 +24,9 @@
   loop_control:
     index_var: "__run_{{ collection_name }}_loop_index"
   vars:
-    __run_{{ collection_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/setup/{{ '{{' }} item {{ '}}' }}"
+    __run_{{ collection_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/setup/install/{{ '{{' }} item {{ '}}' }}"
   when:
+    - run_{{ collection_name }}_state == 'present'
     - __run_{{ collection_name }}_task_file is file
     - __run_{{ collection_name }}_loop_index <= 1
   tags:
@@ -44,6 +45,7 @@
   vars:
     __run_{{ collection_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/config/{{ '{{' }} item {{ '}}' }}"
   when:
+    - run_{{ collection_name }}_state == 'present'
     - __run_{{ collection_name }}_task_file is file
     - __run_{{ collection_name }}_loop_index <= 1
   tags:
@@ -62,7 +64,27 @@
   vars:
     __run_{{ collection_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/service/{{ '{{' }} item {{ '}}' }}"
   when:
+    - run_{{ collection_name }}_state == 'present'
     - __run_{{ collection_name }}_task_file is file
     - __run_{{ collection_name }}_loop_index <= 1
   tags:
     - "run_{{ collection_name }}_service"
+
+
+- name: "Main | Include setup tasks (uninstall): default first, then best platform match (if any)"
+  ansible.builtin.include_tasks:
+    file: "{{ '{{' }} __run_{{ collection_name }}_task_file {{ '}}' }}"
+    apply:
+      tags:
+        - "run_{{ collection_name }}_setup"
+  loop: "{{ '{{' }} ['default.yml'] + __run_{{ collection_name }}_platform_filenames_most_specific_first {{ '}}' }}"
+  loop_control:
+    index_var: "__run_{{ collection_name }}_loop_index"
+  vars:
+    __run_{{ collection_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/setup/uninstall/{{ '{{' }} item {{ '}}' }}"
+  when:
+    - run_{{ collection_name }}_state == 'absent'
+    - __run_{{ collection_name }}_task_file is file
+    - __run_{{ collection_name }}_loop_index <= 1
+  tags:
+    - "run_{{ collection_name }}_setup"

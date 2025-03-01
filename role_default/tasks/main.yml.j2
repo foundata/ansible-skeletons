@@ -14,7 +14,7 @@
     - "{{ role_name }}_always"
 
 
-- name: "Main | Include setup tasks: default first, then best platform match (if any)"
+- name: "Main | Include setup tasks (install): default first, then best platform match (if any)"
   ansible.builtin.include_tasks:
     file: "{{ '{{' }} __{{ role_name }}_task_file {{ '}}' }}"
     apply:
@@ -24,8 +24,9 @@
   loop_control:
     index_var: "__{{ role_name }}_loop_index"
   vars:
-    __{{ role_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/setup/{{ '{{' }} item {{ '}}' }}"
+    __{{ role_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/setup/install/{{ '{{' }} item {{ '}}' }}"
   when:
+    - {{ role_name }}_state == 'present'
     - __{{ role_name }}_task_file is file
     - __{{ role_name }}_loop_index <= 1
   tags:
@@ -44,6 +45,7 @@
   vars:
     __{{ role_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/config/{{ '{{' }} item {{ '}}' }}"
   when:
+    - {{ role_name }}_state == 'present'
     - __{{ role_name }}_task_file is file
     - __{{ role_name }}_loop_index <= 1
   tags:
@@ -62,7 +64,27 @@
   vars:
     __{{ role_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/service/{{ '{{' }} item {{ '}}' }}"
   when:
+    - {{ role_name }}_state == 'present'
     - __{{ role_name }}_task_file is file
     - __{{ role_name }}_loop_index <= 1
   tags:
     - "{{ role_name }}_service"
+
+
+- name: "Main | Include setup tasks (uninstall): default first, then best platform match (if any)"
+  ansible.builtin.include_tasks:
+    file: "{{ '{{' }} __{{ role_name }}_task_file {{ '}}' }}"
+    apply:
+      tags:
+        - "{{ role_name }}_setup"
+  loop: "{{ '{{' }} ['default.yml'] + __{{ role_name }}_platform_filenames_most_specific_first {{ '}}' }}"
+  loop_control:
+    index_var: "__{{ role_name }}_loop_index"
+  vars:
+    __{{ role_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/setup/uninstall/{{ '{{' }} item {{ '}}' }}"
+  when:
+    - {{ role_name }}_state == 'absent'
+    - __{{ role_name }}_task_file is file
+    - __{{ role_name }}_loop_index <= 1
+  tags:
+    - "{{ role_name }}_setup"
