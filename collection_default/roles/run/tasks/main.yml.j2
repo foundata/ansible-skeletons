@@ -23,8 +23,9 @@
   loop: "{{ '{{' }} ['default.yml'] + __run_{{ collection_name }}_platform_filenames_most_specific_first {{ '}}' }}"
   loop_control:
     index_var: "__run_{{ collection_name }}_loop_index"
+    loop_var: "__run_{{ collection_name }}_loop_item"
   vars:
-    __run_{{ collection_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/setup/install/{{ '{{' }} item {{ '}}' }}"
+    __run_{{ collection_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/setup/install/{{ '{{' }} __run_{{ collection_name }}_loop_item {{ '}}' }}"
   when:
     - run_{{ collection_name }}_state == 'present'
     - __run_{{ collection_name }}_task_file is file
@@ -42,8 +43,9 @@
   loop: "{{ '{{' }} ['default.yml'] + __run_{{ collection_name }}_platform_filenames_most_specific_first {{ '}}' }}"
   loop_control:
     index_var: "__run_{{ collection_name }}_loop_index"
+    loop_var: "__run_{{ collection_name }}_loop_item"
   vars:
-    __run_{{ collection_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/config/{{ '{{' }} item {{ '}}' }}"
+    __run_{{ collection_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/config/{{ '{{' }} __run_{{ collection_name }}_loop_item {{ '}}' }}"
   when:
     - run_{{ collection_name }}_state == 'present'
     - __run_{{ collection_name }}_task_file is file
@@ -61,8 +63,9 @@
   loop: "{{ '{{' }} ['default.yml'] + __run_{{ collection_name }}_platform_filenames_most_specific_first {{ '}}' }}"
   loop_control:
     index_var: "__run_{{ collection_name }}_loop_index"
+    loop_var: "__run_{{ collection_name }}_loop_item"
   vars:
-    __run_{{ collection_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/service/{{ '{{' }} item {{ '}}' }}"
+    __run_{{ collection_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/service/{{ '{{' }} __run_{{ collection_name }}_loop_item {{ '}}' }}"
   when:
     - run_{{ collection_name }}_state == 'present'
     - __run_{{ collection_name }}_task_file is file
@@ -80,8 +83,9 @@
   loop: "{{ '{{' }} ['default.yml'] + __run_{{ collection_name }}_platform_filenames_most_specific_first {{ '}}' }}"
   loop_control:
     index_var: "__run_{{ collection_name }}_loop_index"
+    loop_var: "__run_{{ collection_name }}_loop_item"
   vars:
-    __run_{{ collection_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/setup/uninstall/{{ '{{' }} item {{ '}}' }}"
+    __run_{{ collection_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/setup/uninstall/{{ '{{' }} __run_{{ collection_name }}_loop_item {{ '}}' }}"
   when:
     - run_{{ collection_name }}_state == 'absent'
     - __run_{{ collection_name }}_task_file is file
