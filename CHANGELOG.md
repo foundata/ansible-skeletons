@@ -8,13 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Nothing worth mentioning right now.
+
+
+## [2.1.0] - 2025-03-02
+
 ### Changed
 
-- collection_default, role_default: Setup tasks are now split into separate "install" and "uninstall" subdirs. Managing installation and removal in separate files simplifies handling in real-world scenarios compared to implementing optional removal logic within the installation context.
-- collection_default: Changed `antsibull-changelog` config to RST.
+- collection_default, role_default: Setup tasks are now split into separate `install` and `uninstall` sub-directories. Managing installation and removal in separate files simplifies handling in real-world scenarios compared to implementing optional removal logic within the installation context. (5bf9580)
+- collection_default: Changed `antsibull-changelog` config to RST. (ec7fe76)
 
 ### Fixed
 
+- collection_default, role_default: Use dedicated loop var in main entry point to prevent "variable 'item' is already in use" warnings. (5d13ea1)
 - collection_default: .gitignore: Moved file into the correct directory, added `antsibull-changelog`. (33613eb)
 
 
@@ -47,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All functionality and files, `role_default`
 
 
-[unreleased]: https://github.com/foundata/ansible-skeletons/compare/v2.0.0...HEAD
+[unreleased]: https://github.com/foundata/ansible-skeletons/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.1.0
 [2.0.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.0.0
 [1.0.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v1.0.0
