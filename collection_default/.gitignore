@@ -395,7 +395,10 @@ $RECYCLE.BIN/
 # End of https://www.toptal.com/developers/gitignore/api/git,vim,linux,macos,windows,jetbrains+all,visualstudiocode,python,ansible
 
 ### Repository-specific files
-# Files to keep empty directories
+# Prevent accidental inclusion of ANSIBLE_HOME directory
+.ansible/*
+
+# Files to keep empty directories in Git
 !.gitkeep
 
 # antsibull-changelog metadata cache for modules and plugins
