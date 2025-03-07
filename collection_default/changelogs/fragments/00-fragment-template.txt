@@ -1,7 +1,8 @@
 ---
 
-# You can copy this file into a `.yaml` file.
-# (This file uses `.txt` to prevent automatic parsing by antsibull-changelog.)
+# You can copy its contents into a .yaml file with a unique filename (a number
+# of an issue or pull/merge request is usually a good filename prefix; this
+# file uses the .txt extension to prevent parsing by antsibull-changelog).
 #
 # Simply remove any sections that are not applicable to your changelog fragment.
 #
