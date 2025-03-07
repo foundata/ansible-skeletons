@@ -1,4 +1,86 @@
-# Configuration file for antsibull-changelog (Ansible Changelog Tool)
-# https://ansible.readthedocs.io/projects/antsibull-changelog/changelog.yaml-format/
+# Content file for antsibull-changelog (Ansible Changelog Tool). It is used to
+# generate the CHANGELOG.rst in the project's root directory. The following
+# should give you a quick start with the tool:
+#
+#
+# On formatting and content:
+#
+# - While it is possible to add content here directly, this is usually done
+#   via .yaml files in changelogs/fragments/. Each file there can contain
+#   content for
+#
+#     breaking_changes:
+#     major_changes:
+#     minor_changes:
+#     deprecated_features:
+#     removed_features
+#     security_fixes:
+#     bugfixes:
+#
+#   You do not have to take care about these fragments order or how to split
+#   or merge them, but the filename has to be unique. Using the tool this way,
+#   it is easily possible to put the changelog fragments together with the real
+#   changes when doing a Change or Pull Request. It is common to use its number
+#   as file prefix. A good example for this workflow is Ansible itself:
+#   https://github.com/ansible/ansible/tree/devel/changelogs/fragments
+#
+# - The file format here itself is YAML, the content of the values usually
+#   reStructuredText (not Markdown).
+#
+# - Do not bother with formatting this file manually. Several commands,
+#   including "antisbull release", will do a reformat run and also remove
+#   comments like this one.
+#
+# - Make sure that the order of a listed change is not relevant for the content
+#   itself as the order of list items might be changed automatically.
+#
+#
+# Tool usage hints (make sure you are in the project's root directory):
+#
+# - Linting and formatting:
+#
+#     antsibull-changelog lint # linting files in ./changelogs/fragments/
+#     antsibull-changelog lint-changelog-yaml ./changelogs/changelog.yaml
+#     antisbull-changelog reformat # rewrites this file
+#
+# - Add a release section and update changelog.yaml (this file):
+#
+#     antisbull release --version X.Y.Z
+#     antisbull release --version X.Y.Z --date "$(date +'%Y-%m-%d')"
+#
+#   This command includes all data from ./changelogs/fragments/ which is not
+#   already mentioned in the changelog. It will also scan metadata for all
+#   modules and plugins of your collection, and mention all modules and plugins
+#   with version_added equal to this version as new modules/plugins.
+#
+# - (Re)generate the CHANGELOG.rst in the project's root based on the current
+#   changelog.yaml (this file) data:
+#
+#     antisbull generate
+#
+#
+# Refer to the following resources for more in-dept information:
+#
+# - Developing Collection Changelogs: https://docs.ansible.com/ansible/latest/dev_guide/developing_collections_changelogs.html
+# - Creating Changelog Fragments: https://docs.ansible.com/ansible/latest/community/development_process.html#creating-changelog-fragments
+# - Antsibull Changelog Documentation: https://ansible.readthedocs.io/projects/antsibull-changelog/changelogs/
+# - Antsibull Changelog YAML Format: https://ansible.readthedocs.io/projects/antsibull-changelog/changelog.yaml-format/
+#
+
 ---
 
+ancestor: null # Set to null or the last version that used a different changelog mechanism than changelog.yml.
+releases:
+
+  1.0.0: # X.Y.Z, follow semantic versioning: https://semver.org/spec/v2.0.0.html
+    release_date: "YYYY-MM-DD"
+    changes:
+      release_summary: |
+        This section is a string (not a list), optional but recommended.
+
+        Example template sentences:
+
+        - Initial release adding all files and functionality. Have fun!
+        - Major release supporting the latest features of Foo version X. There are breaking changes, so please review the changelog carefully.
+        - Small feature release with minor improvements.
+        - Maintenance release with bug fixes and internal optimizations.
