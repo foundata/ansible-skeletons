@@ -28,7 +28,7 @@
 #   reStructuredText (not Markdown).
 #
 # - Do not bother with formatting this file manually. Several commands,
-#   including "antisbull release", will do a reformat run and also remove
+#   including "antsibull release", will do a reformat run and also remove
 #   comments like this one.
 #
 # - Make sure that the order of a listed change is not relevant for the content
@@ -41,12 +41,12 @@
 #
 #     antsibull-changelog lint # linting files in ./changelogs/fragments/
 #     antsibull-changelog lint-changelog-yaml ./changelogs/changelog.yaml
-#     antisbull-changelog reformat # rewrites this file
+#     antsibull-changelog reformat # rewrites this file
 #
 # - Add a release section and update changelog.yaml (this file):
 #
-#     antisbull release --version X.Y.Z
-#     antisbull release --version X.Y.Z --date "$(date +'%Y-%m-%d')"
+#     antsibull release --version X.Y.Z
+#     antsibull release --version X.Y.Z --date "$(date +'%Y-%m-%d')"
 #
 #   This command includes all data from ./changelogs/fragments/ which is not
 #   already mentioned in the changelog. It will also scan metadata for all
@@ -56,7 +56,7 @@
 # - (Re)generate the CHANGELOG.rst in the project's root based on the current
 #   changelog.yaml (this file) data:
 #
-#     antisbull generate
+#     antsibull generate
 #
 #
 # Refer to the following resources for more in-dept information:
