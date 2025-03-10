@@ -20,16 +20,16 @@
     apply:
       tags:
         - "{{ role_name }}_setup"
-  loop: "{{ '{{' }} ['default.yml'] + __{{ role_name }}_platform_filenames_most_specific_first {{ '}}' }}"
-  loop_control:
-    index_var: "__{{ role_name }}_loop_index"
-    loop_var: "__{{ role_name }}_loop_item"
   vars:
     __{{ role_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/setup/install/{{ '{{' }} __{{ role_name }}_loop_item {{ '}}' }}"
   when:
     - {{ role_name }}_state == 'present'
     - __{{ role_name }}_task_file is file
     - __{{ role_name }}_loop_index <= 1
+  loop: "{{ '{{' }} ['default.yml'] + __{{ role_name }}_platform_filenames_most_specific_first {{ '}}' }}"
+  loop_control:
+    index_var: "__{{ role_name }}_loop_index"
+    loop_var: "__{{ role_name }}_loop_item"
   tags:
     - "{{ role_name }}_setup"
 
@@ -40,16 +40,16 @@
     apply:
       tags:
         - "{{ role_name }}_config"
-  loop: "{{ '{{' }} ['default.yml'] + __{{ role_name }}_platform_filenames_most_specific_first {{ '}}' }}"
-  loop_control:
-    index_var: "__{{ role_name }}_loop_index"
-    loop_var: "__{{ role_name }}_loop_item"
   vars:
     __{{ role_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/config/{{ '{{' }} __{{ role_name }}_loop_item {{ '}}' }}"
   when:
     - {{ role_name }}_state == 'present'
     - __{{ role_name }}_task_file is file
     - __{{ role_name }}_loop_index <= 1
+  loop: "{{ '{{' }} ['default.yml'] + __{{ role_name }}_platform_filenames_most_specific_first {{ '}}' }}"
+  loop_control:
+    index_var: "__{{ role_name }}_loop_index"
+    loop_var: "__{{ role_name }}_loop_item"
   tags:
     - "{{ role_name }}_config"
 
@@ -60,16 +60,16 @@
     apply:
       tags:
         - "{{ role_name }}_service"
-  loop: "{{ '{{' }} ['default.yml'] + __{{ role_name }}_platform_filenames_most_specific_first {{ '}}' }}"
-  loop_control:
-    index_var: "__{{ role_name }}_loop_index"
-    loop_var: "__{{ role_name }}_loop_item"
   vars:
     __{{ role_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/service/{{ '{{' }} __{{ role_name }}_loop_item {{ '}}' }}"
   when:
     - {{ role_name }}_state == 'present'
     - __{{ role_name }}_task_file is file
     - __{{ role_name }}_loop_index <= 1
+  loop: "{{ '{{' }} ['default.yml'] + __{{ role_name }}_platform_filenames_most_specific_first {{ '}}' }}"
+  loop_control:
+    index_var: "__{{ role_name }}_loop_index"
+    loop_var: "__{{ role_name }}_loop_item"
   tags:
     - "{{ role_name }}_service"
 
@@ -80,15 +80,15 @@
     apply:
       tags:
         - "{{ role_name }}_setup"
-  loop: "{{ '{{' }} ['default.yml'] + __{{ role_name }}_platform_filenames_most_specific_first {{ '}}' }}"
-  loop_control:
-    index_var: "__{{ role_name }}_loop_index"
-    loop_var: "__{{ role_name }}_loop_item"
   vars:
     __{{ role_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/setup/uninstall/{{ '{{' }} __{{ role_name }}_loop_item {{ '}}' }}"
   when:
     - {{ role_name }}_state == 'absent'
     - __{{ role_name }}_task_file is file
     - __{{ role_name }}_loop_index <= 1
+  loop: "{{ '{{' }} ['default.yml'] + __{{ role_name }}_platform_filenames_most_specific_first {{ '}}' }}"
+  loop_control:
+    index_var: "__{{ role_name }}_loop_index"
+    loop_var: "__{{ role_name }}_loop_item"
   tags:
     - "{{ role_name }}_setup"

@@ -42,12 +42,12 @@
     msg: >
       {{ '{{' }} ansible_facts['distribution'] {{ '}}' }} {{ '{{' }} ansible_facts['distribution_version'] {{ '}}' }} is not in the list of
       supported platforms from vars/main.yml: {{ '{{' }} __{{ role_name }}_supported_platforms {{ '}}' }}
-  ignore_errors: true # noqa: ignore-errors
   when:
     - (__{{ role_name }}_supported_platforms | length) > 0
     - (__{{ role_name }}_supported_platforms
        | selectattr('name', 'match', '^' ~ ansible_facts['distribution'] ~ '$') | map(attribute = 'versions') | flatten
        | select('match', '^(' ~ ansible_facts['distribution_version'] ~ '|all)$', ignorecase = true) | list | length) < 1
+  ignore_errors: true # noqa: ignore-errors
 
 
 - name: "Init | Set platform-specific filename list (most to least specific; raw with possible duplicates)"
@@ -72,8 +72,8 @@
 - name: "Init | Include platform-specific variables (if any), overwrite values with more specific ones"
   ansible.builtin.include_vars:
     file: "{{ '{{' }} __{{ role_name }}_vars_file {{ '}}' }}"
-  loop: "{{ '{{' }} __{{ role_name }}_platform_filenames_most_specific_last {{ '}}' }}"
   vars:
     __{{ role_name }}_vars_file: "{{ '{{' }} role_path {{ '}}' }}/vars/{{ '{{' }} item {{ '}}' }}"
   when:
     - __{{ role_name }}_vars_file is file
+  loop: "{{ '{{' }} __{{ role_name }}_platform_filenames_most_specific_last {{ '}}' }}"
