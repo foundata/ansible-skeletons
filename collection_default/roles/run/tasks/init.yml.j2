@@ -32,21 +32,26 @@
       or distribution facts are missing.
     verbosity: 1
   when:
-    - ansible_facts['distribution'] is not defined or
+    - ansible_facts['os_family'] is not defined or
+      ansible_facts['distribution'] is not defined or
       ansible_facts['distribution_version'] is not defined or
+      ansible_facts['distribution_major_version'] is not defined or
       (__run_{{ collection_name }}_supported_platforms | length) < 1
 
 
 - name: "Init | Warn when platform is unsupported"
   ansible.builtin.fail:
     msg: >
-      {{ '{{' }} ansible_facts['distribution'] {{ '}}' }} {{ '{{' }} ansible_facts['distribution_version'] {{ '}}' }} is not in the list of
-      supported platforms from vars/main.yml: {{ '{{' }} __run_{{ collection_name }}_supported_platforms {{ '}}' }}
+      Neither {{ '{{' }} ansible_facts['distribution'] {{ '}}' }} (distribution) nor {{ '{{' }} ansible_facts['os_family'] {{ '}}' }} (os_family)
+      with versions '{{ '{{' }} ansible_facts['distribution_major_version'] {{ '}}' }}', '{{ '{{' }} ansible_facts['distribution_version'] {{ '}}' }}',
+      or 'all' is in the list of supported platforms from vars/main.yml: {{ '{{' }} __run_{{ collection_name }}_supported_platforms {{ '}}' }}
   when:
     - (__run_{{ collection_name }}_supported_platforms | length) > 0
     - (__run_{{ collection_name }}_supported_platforms
-       | selectattr('name', 'match', '^' ~ ansible_facts['distribution'] ~ '$') | map(attribute = 'versions') | flatten
-       | select('match', '^(' ~ ansible_facts['distribution_version'] ~ '|all)$', ignorecase = true) | list | length) < 1
+       | selectattr('name', 'match', '^(' ~ ansible_facts['distribution'] ~ '|' ~ ansible_facts['os_family'] ~ ')$', ignorecase=true)
+       | map(attribute='versions') | flatten
+       | select('match', '^(' ~ ansible_facts['distribution_major_version'] ~ '|' ~ ansible_facts['distribution_version'] ~ '|all)$', ignorecase=true)
+       | list | length) < 1
   ignore_errors: true # noqa: ignore-errors
 
 
