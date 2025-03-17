@@ -34,7 +34,7 @@
   when:
     - ansible_facts['distribution'] is not defined or
       ansible_facts['distribution_version'] is not defined or
-      (__run_{{ collection_name }}_meta['galaxy_info']['platforms'] | length) < 1
+      (__run_{{ collection_name }}_supported_platforms | length) < 1
 
 
 - name: "Init | Warn when platform is unsupported"
