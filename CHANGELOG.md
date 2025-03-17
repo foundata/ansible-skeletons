@@ -8,7 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning right now.
+### Changed
+
+- collection_default: Init task: Improve check of supported platforms from `vars/main.yml`, support listing a `os_family` value. (ca0d4c1)
+- role_default: Init task: Improve check of supported platforms from `vars/main.yml`, support listing a `os_family` value. (ca0d4c1)
+
+### Fixed
+
+- collection_default: Fix `run_run_` typo in check for package state `latest`. (624cdb5)
+- collection_default: Fix left-over usage of role meta data `platforms` key. (228b3a3)
 
 
 ## [2.1.0] - 2025-03-02
