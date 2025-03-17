@@ -28,9 +28,9 @@ __run_{{ collection_name }}_used_facts:
 # A warning will be issued if the list contains values and the role is executed
 # on an unknown (not listed) platform, but execution will continue. Example:
 #
-# - name: "Fedora" # a value from ansible_facts['distribution']
-#   versions:
-#     - "all" # a value from ansible_facts['distribution_version'] or "all"
+# - name: "Fedora" # A ansible_facts value ('distribution' or 'os_family')
+#   versions: # A ansible_facts value ('distribution_major_version' or
+#     - "all" # 'distribution_version') or "all"
 # - name: "Ubuntu"
 #   versions:
 #     - "22.04"
