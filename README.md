@@ -92,6 +92,7 @@ A general purpose skeleton to create new Ansible collection for [package and shi
 * Separation of logical task groups, automatic include for[ platform-specific tasks](https://redhat-cop.github.io/automation-good-practices/#_platform_specific_tasks).
 * Passes `ansible-lint --profile production --strict`.
 * [`antsibull-changelog`](https://ansible.readthedocs.io/projects/antsibull-changelog/changelogs/) support.
+* [Molecule](https://ansible.readthedocs.io/projects/molecule/) support with a default scenario using [Podman](https://podman.io/docs/installation) and several [integration test targets](https://github.com/orgs/foundata/repositories?q=oci-*-itt).
 
 
 
@@ -106,6 +107,7 @@ A general purpose skeleton to create new Ansible stand-alone role. Main features
   * Automatic search and include for [platform-specific variables](https://redhat-cop.github.io/automation-good-practices/#_platform_specific_variables).
 * Separation of logical task groups, automatic include for [platform-specific tasks](https://redhat-cop.github.io/automation-good-practices/#_platform_specific_tasks).
 * Passes `ansible-lint --profile production --strict`.
+* [Molecule](https://ansible.readthedocs.io/projects/molecule/) support with a default scenario using [Podman](https://podman.io/docs/installation) and several [integration test targets](https://github.com/orgs/foundata/repositories?q=oci-*-itt).
 
 
 
@@ -115,6 +117,7 @@ The skeletons are designed to be compatible with all [supported](https://docs.an
 
 The skeletons were explicitly tested with `ansible-galaxy` from the following `ansible` versions (descending order):
 
+* `ansible-galaxy [core 2.18.3]`
 * `ansible-galaxy [core 2.18.2]`
 * `ansible-galaxy [core 2.18.1]`
 

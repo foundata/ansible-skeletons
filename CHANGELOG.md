@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Nothing worth mentioning right now.
+
+
+## [2.2.0] - 2025-04-05
+
+### Added
+
+- collection_default: [Molecule](https://ansible.readthedocs.io/projects/molecule/) support with a default scenario using [Podman](https://podman.io/docs/installation) and several [integration test targets](https://github.com/orgs/foundata/repositories?q=oci-*-itt). (4c8a01c, #3)
+- role_default: [Molecule](https://ansible.readthedocs.io/projects/molecule/) support with a default scenario using [Podman](https://podman.io/docs/installation) and several [integration test targets](https://github.com/orgs/foundata/repositories?q=oci-*-itt). (f57cd625, #3)
+
 ### Changed
 
 - collection_default: Init task: Improve check of supported platforms from `vars/main.yml`, support listing a `os_family` value. (ca0d4c1)
@@ -61,7 +71,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All functionality and files, `role_default`
 
 
-[unreleased]: https://github.com/foundata/ansible-skeletons/compare/v2.1.0...HEAD
+[unreleased]: https://github.com/foundata/ansible-skeletons/compare/v2.2.0...HEAD
+[2.2.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.2.0
 [2.1.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.1.0
 [2.0.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.0.0
 [1.0.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v1.0.0
