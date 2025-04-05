@@ -417,7 +417,7 @@ mkdir -p "${path_working_dir}/dependencies/roles"
 
 # create the resources
 printf '\n\n\n\n############################################################################\n'
-printf '# %s: Creating a new role based on\n' "$(basename "${0}")"
+printf '# %s: Creating a new collection based on\n' "$(basename "${0}")"
 printf '# %s:   %s\n' "$(basename "${0}")" "${source_dir_path}/collection_default"
 printf '# %s: in\n' "$(basename "${0}")"
 printf '# %s:   %s\n' "$(basename "${0}")" "${path_working_dir}/dependencies/collections/ansible_collections/${ansible_collection_namespace}/${ansible_collection_name}"
@@ -457,6 +457,19 @@ ansible-galaxy role init \
   --force \
   "${ansible_role_name}"
 set +x
+
+
+# install dependencies needed for linting an executing the created resources
+printf '%s: Installing or upgrading needed Ansible collections and roles via ansible-galaxy.\n' "$(basename "${0}")"
+cd "${path_working_dir}"
+for req_file in $(find "${path_working_dir}" -name "requirements.yml" -type f)
+do
+  printf '%s: Installing from %s.\n' "$(basename "${0}")" "${req_file}"
+  set +x
+  ansible-galaxy role install -r "${req_file}" # --requirements-file is not available for role install, using short option name
+  ansible-galaxy collection install --requirements-file "${req_file}"
+  set -x
+done
 
 
 # linting
