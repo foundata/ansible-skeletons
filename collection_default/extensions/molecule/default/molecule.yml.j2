@@ -1,0 +1,121 @@
+# Configuration for the Ansible Molecule "default" scenario.
+#
+# See the official documentation for details on this file and all settings:
+# https://ansible.readthedocs.io/projects/molecule/configuration/
+#
+# This scenario uses Podman to create and manage a container based testing
+# environment. Ensure Podman is installed on your system to use it:
+# https://podman.io/docs/installation.
+#
+# Podman is an alternative to Docker, offering improved security and better
+# systemd integration. Additionally, it is typically easier to install, as
+# most distributions provide a fully-features package it in their default
+# repositories.
+
+---
+
+driver:
+  name: "default"
+  options:
+    managed: false
+    login_cmd_template: "podman exec -it {instance} bash"
+    ansible_connection_options:
+      ansible_connection: "podman"
+
+
+# Target platforms for testing
+platforms:
+  # Using foundata Integration Test Target (ITT) images which aim to replicate a
+  # "VM-like" testing environment and provide a fully functional systemd.
+
+  # Debian 12 (Bookworm)
+  - name: "molecule-debian12"
+    image: "quay.io/foundata/debian12-itt:latest"
+    systemd: true
+  # Debian 11 (Bullseye)
+  - name: "molecule-debian11"
+    image: "quay.io/foundata/debian11-itt:latest"
+    systemd: true
+
+  # Ubuntu 24.04 LTS (Noble Numbat)
+  - name: "molecule-ubuntu2404"
+    image: "quay.io/foundata/ubuntu2404-itt:latest"
+    systemd: true
+  # Ubuntu 22.04 LTS (Jammy Jellyfish)
+  - name: "molecule-ubuntu2204"
+    image: "quay.io/foundata/ubuntu2204-itt:latest"
+    systemd: true
+
+  # AlmaLinux 9 (best effort RHEL 9 (Red Hat Enterprise Linux))
+  - name: "molecule-almalinux9"
+    image: "quay.io/foundata/almalinux9-itt:latest"
+    systemd: true
+  # AlmaLinux 8 (best effort RHEL 8 (Red Hat Enterprise Linux))
+  # Currently not supported by us and therefore not tested.
+
+  # CentOS Stream 10
+  - name: "molecule-centosstream10"
+    image: "quay.io/foundata/centosstream10-itt:latest"
+    systemd: true
+  # CentOS Stream 9
+  - name: "molecule-centosstream9"
+    image: "quay.io/foundata/centosstream9-itt:latest"
+    systemd: true
+
+  # Fedora 41
+  - name: "molecule-fedora41"
+    image: "quay.io/foundata/fedora41-itt:latest"
+    systemd: true
+  # Fedora 40
+  - name: "molecule-fedora40"
+    image: "quay.io/foundata/fedora40-itt:latest"
+    systemd: true
+
+  # openSUSE Leap 15.6
+  - name: "molecule-opensuseleap156"
+    image: "quay.io/foundata/opensuseleap156-itt:latest"
+    systemd: true
+  # openSUSE Leap 15.5
+  # Currently not supported by us and therefore not tested.
+
+
+# Ansible dependencies (collections, roles) of this Molecule scenario
+dependency:
+  name: "galaxy"
+  enabled: true
+  options:
+    requirements-file: "requirements.yml"
+    ignore-certs: false
+    ignore-errors: false
+
+
+# Configuration parameters for Ansible to provision test infrastructure and
+# enable Molecule to execute test scenarios against the provisioned environment.
+# See the following for more information:
+# https://ansible.readthedocs.io/projects/molecule/configuration/#provisioner
+# https://ansible.readthedocs.io/projects/molecule/configuration/#molecule.interpolation.Interpolator.interpolate
+provisioner:
+  name: "ansible"
+  config_options:
+    defaults:
+      # If the roles of this collection are not found by Molecule, try to run
+      # molecule with an adjusted MOLECULE_GLOB environment variable. This is
+      # usually easier and safer than setting
+      #   roles_path: ".."
+      #   collections_path: "../.."
+      # here. See molecule/README.md#faq-role-path-detection for details.
+      verbosity: ${ANSIBLE_VERBOSITY:-0} # noqa
+      display_args_to_stdout: ${ANSIBLE_DISPLAY_ARGS_TO_STDOUT:-false} # noqa
+      # set forks >= number of test platforms for better performance
+      forks: ${ANSIBLE_FORKS:-12} # noqa
+  playbooks:
+    create: "../resources/playbooks/create-podman.yml"
+    prepare: "../resources/playbooks/prepare.yml"
+    converge: "../resources/playbooks/converge.yml"
+    verify: "../resources/playbooks/verify.yml"
+    destroy: "../resources/playbooks/destroy-podman.yml"
+
+
+verifier:
+  name: "ansible"
+  enabled: false
