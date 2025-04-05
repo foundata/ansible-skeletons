@@ -73,7 +73,7 @@ ancestor: null # Set to null or the last version that used a different changelog
 releases:
 
   1.0.0: # X.Y.Z, follow semantic versioning: https://semver.org/spec/v2.0.0.html
-    release_date: "YYYY-MM-DD"
+    release_date: "{{ '%Y-%m-%d' | strftime }}" # YYYY-MM-DD
     changes:
       release_summary: |
         This section is a string (not a list), optional but recommended.
