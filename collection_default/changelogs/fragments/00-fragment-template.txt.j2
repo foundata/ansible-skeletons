@@ -1,0 +1,71 @@
+---
+
+# You can copy its contents into a .yaml file with a unique filename. A common
+# convention is to prefix the filename with the number of an issue or pull/merge
+# request. This file uses the .txt extension to prevent antsibull-changelog from
+# parsing it.
+#
+# Remove any sections that are not applicable to your changelog fragment.
+#
+# For more information, see the official documentation on
+# "Creating Changelog Fragments":
+# https://docs.ansible.com/ansible/latest/community/development_process.html#creating-changelog-fragments
+#
+# The file format is YAML, but the content of the values is typically written
+# in reStructuredText (not Markdown).
+
+breaking_changes:
+  - This section should only appear in major releases (MAJOR.0.0), according to semantic versioning.
+  - It should include notes and `Links <https://example.com/>`__ to help existing users migrate.
+  - Examples follow.
+  - Dropped support for Ansible Core 2.15. Please update to at least Ansible Core 2.16 or continue using a previous version of this collection.
+  - The ``foo_api`` module no longer accepts the ``password_plain`` option. Use ``password_secure`` instead. If you previously supplied passwords via ``password_plain``, consider changing them.
+  - |
+    This is a multiline string using YAML's block scalar syntax.
+    It makes "quoting" 'easier'.
+
+major_changes:
+  - This section should only appear in major (MAJOR.0.0) (but are also technically allowed in minor (MAJOR.MINOR.0) releases), according to semantic versioning.
+  - It should describe high-level changes or new features.
+  - Examples follow.
+  - Added support for a new ``acme_dns`` module, allowing DNS-based certificate challenges with additional providers.
+  - The ``http_request`` module now supports custom headers and authentication tokens.
+
+minor_changes:
+  - This section can appear in all major (MAJOR.MINOR.PATCH) or minor (MAJOR.MINOR.0) releases, but not in patch (MAJOR.MINOR.PATCH) releases.
+  - A typical minor change includes adding a new module, plugin, or option.
+  - Examples follow.
+  - ``foo`` - The module can now perform additional operations based on user-defined parameters.
+  - ``baz lookup`` - Now supports retrieving data from Baz databases.
+  - Optimized task execution performance by reducing unnecessary API calls.
+
+deprecated_features:
+  - This section should list features planned for removal in future major (MAJOR.0.0) releases.
+  - Examples follow.
+  - ``foo`` - The ``bar`` option has been deprecated. Use the ``username`` option instead.
+  - ``send_request`` - The ``quic`` option has been deprecated. Use the ``protocol`` option instead.
+
+removed_features:
+  - This section can appear in major (MAJOR.0.0) or minor (MAJOR.MINOR.0) releases.
+  - Typically used when the change is non-breaking from the collection's perspective (e.g. backend removal).
+  - Examples follow.
+  - ``foo`` - The ``baz`` option has been removed. The feature it controlled is no longer supported on target platforms.
+
+security_fixes:
+  - This section can appear in all releases.
+  - Examples follow.
+  - ``foo_api`` - The module unintentionally exposed passwords in plaintext to multiple servers when using the ``password_plain`` option.
+
+bugfixes:
+  - This section can appear in all releases.
+  - Examples follow.
+  - ``post`` - The module incorrectly sent PUT requests instead of POST requests.
+  - ``get`` - The module no longer crashes when receiving invalid JSON data.
+
+known_issues:
+  - This section should describe known issues that are acknowledged but will not be fixed at this time.
+
+trivial:
+  - This section will not be shown in the final changelog.
+  - Useful when a changelog fragment is required for every pull request, even for minor or internal changes.
+  - Intended for changes that do not affect user-facing functionality, such as updates to tests or internal refactoring.
