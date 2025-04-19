@@ -9,8 +9,10 @@
 #  notify: "restart_example"
 #
 #
-#- name: "Service | Default | Start and enable example.service"
+#- name: "Service | Default | Ensure example.service state"
 #  ansible.builtin.service:
 #    name: "example.service"
-#    state: "{{ '{{ ' + role_name + '_service_state }}' }}"
-#    enabled: true
+#    state: "{{ '{{' }} 'started' if {{ role_name + '_service_state' }} in ['enabled', 'running'] else 'stopped' if {{ role_name + '_service_state' }} == 'disabled' {{ '}}' }}"
+#    enabled: "{{ '{{' }} true if {{ role_name + '_service_state' }} == 'enabled' else false if {{ role_name + '_service_state' }} in ['disabled', 'running'] {{ '}}' }}"
+#  when:
+#    - {{ role_name + '_service_state' }} != 'unmanaged'
