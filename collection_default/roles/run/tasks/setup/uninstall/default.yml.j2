@@ -4,8 +4,8 @@
 
 - name: "Setup | Uninstall | Remove packages"
   ansible.builtin.package:
-    name: "{{ '{{ run_' + collection_name + '_packages_uninstall }}' }}"
+    name: "{{ '{{ __run_' + collection_name + '_packages_uninstall }}' }}"
     state: "absent"
   when:
     - __run_{{ collection_name }}_packages_uninstall is defined
-    - (__run_{{ collection_name }}_packages_uninstall | length) > 1
+    - (__run_{{ collection_name }}_packages_uninstall | length) > 0

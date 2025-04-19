@@ -4,17 +4,17 @@
 
 - name: "Setup | Install | Default | Remove unwanted packages (e.g., to prevent conflicts or resolve incompatibilities)"
   ansible.builtin.package:
-    name: "{{ '{{ ' + role_name + '_packages_removal }}' }}"
+    name: "{{ '{{ __' + role_name + '_packages_removal }}' }}"
     state: "absent"
   when:
-    - __{{ role_name }}__packages_removal is defined
-    - (__{{ role_name }}__packages_removal | length) > 1
+    - __{{ role_name }}_packages_removal is defined
+    - (__{{ role_name }}_packages_removal | length) > 0
 
 
 - name: "Setup | Install | Default | Install or upgrade packages"
   ansible.builtin.package:
-    name: "{{ '{{ ' + role_name + '_packages_install }}' }}"
-    state: "{{ '{%' }} 'latest' if run_{{ role_name }}_autoupgrade else 'present' {{ '%}' }}"
+    name: "{{ '{{ __' + role_name + '_packages_install }}' }}"
+    state: "{{ '{{' }} 'latest' if run_{{ role_name }}_autoupgrade else 'present' {{ '}}' }}"
   when:
     - __{{ role_name }}_packages_install is defined
-    - (__{{ role_name }}_packages_install | length) > 1
+    - (__{{ role_name }}_packages_install | length) > 0
