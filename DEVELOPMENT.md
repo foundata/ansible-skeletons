@@ -23,7 +23,7 @@ Nothing special or automated yet. Therefore just some hints for manual testing:
    git add "./CHANGELOG.md"
    git commit -m "Release preparations: v${version}"
 
-   git tag "v${version}" <commit-id> -m "version ${version}"
+   git tag "v${version}" "$(git rev-parse --verify HEAD)" -m "version ${version}"
    git show "v${version}"
 
    git push origin main --follow-tags

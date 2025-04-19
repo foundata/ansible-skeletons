@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Nothing worth mentioning right now.
 
 
+## [2.2.1] - 2025-04-19
+
+### Fixed
+
+- collection_default, role_default: Fix off-by-one and templating errors in setup task examples (e077d6f)
+
+
 ## [2.2.0] - 2025-04-05
 
 ### Added
@@ -71,7 +78,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All functionality and files, `role_default`
 
 
-[unreleased]: https://github.com/foundata/ansible-skeletons/compare/v2.2.0...HEAD
+[unreleased]: https://github.com/foundata/ansible-skeletons/compare/v2.2.1...HEAD
+[2.2.1]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.2.1
 [2.2.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.2.0
 [2.1.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.1.0
 [2.0.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.0.0
