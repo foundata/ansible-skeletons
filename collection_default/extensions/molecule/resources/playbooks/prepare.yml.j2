@@ -37,7 +37,7 @@
       ansible.builtin.include_tasks:
         file: "{{ '{{' }} __testing_prepare_loop_item {{ '}}' }}"
       when:
-        - __testing_prepare_loop_item is file
+        - (playbook_dir ~ '/' ~ __testing_prepare_loop_item) is file
       loop:
         - "../tasks/prepare/all.yml"
         - "../tasks/prepare/{{ '{{' }} inventory_hostname {{ '}}' }}.yml"
