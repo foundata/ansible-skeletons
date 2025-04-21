@@ -8,7 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning right now.
+### Fixed
+
+- collection_default, role_default: Molecule: correct path resolution for prepare tasks includes (31ba386)
+
 
 
 ## [2.2.1] - 2025-04-19
