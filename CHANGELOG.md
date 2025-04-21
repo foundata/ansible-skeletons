@@ -8,17 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- collection_default, role_default: Add Fedora 42 support, remove EOL Fedora 40 from roles and tests.
+
+
 ### Fixed
 
-- collection_default, role_default: Molecule: correct path resolution for prepare tasks includes (31ba386)
-
+- collection_default, role_default: Molecule: correct path resolution for prepare tasks includes. (31ba386)
 
 
 ## [2.2.1] - 2025-04-19
 
 ### Fixed
 
-- collection_default, role_default: Fix off-by-one and templating errors in setup task examples (e077d6f)
+- collection_default, role_default: Fix off-by-one and templating errors in setup task examples. (e077d6f)
 
 
 ## [2.2.0] - 2025-04-05
