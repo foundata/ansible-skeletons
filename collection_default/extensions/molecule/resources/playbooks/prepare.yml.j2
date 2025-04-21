@@ -33,18 +33,6 @@
           ansible_facts['os_family'] is not defined
 
 
-    - name: "Molecule | Prepare | Include additional tasks from ../tasks/prepare"
-      ansible.builtin.include_tasks:
-        file: "{{ '{{' }} __testing_prepare_loop_item {{ '}}' }}"
-      when:
-        - (playbook_dir ~ '/' ~ __testing_prepare_loop_item) is file
-      loop:
-        - "../tasks/prepare/all.yml"
-        - "../tasks/prepare/{{ '{{' }} inventory_hostname {{ '}}' }}.yml"
-      loop_control:
-        loop_var: "__testing_prepare_loop_item"
-
-
     # Container cleanup task like "rm -rf /var/lib/apt/lists/*" change the mtime
     # of the directory, causing ansible.builtin.apt installs to fail due to
     # missing cache, even with "cache_valid_time: 1800" or "update_cache: true".
@@ -56,3 +44,15 @@
         - ansible_facts is defined
         - ansible_facts['os_family'] is defined
         - (ansible_facts['os_family'] | lower) == 'debian'
+
+
+    - name: "Molecule | Prepare | Include additional tasks from ../tasks/prepare"
+      ansible.builtin.include_tasks:
+        file: "{{ '{{' }} __testing_prepare_loop_item {{ '}}' }}"
+      when:
+        - (playbook_dir ~ '/' ~ __testing_prepare_loop_item) is file
+      loop:
+        - "../tasks/prepare/all.yml"
+        - "../tasks/prepare/{{ '{{' }} inventory_hostname {{ '}}' }}.yml"
+      loop_control:
+        loop_var: "__testing_prepare_loop_item"
