@@ -14,7 +14,7 @@
     - "{{ role_name }}_always"
 
 
-- name: "Main | Include setup tasks (install): default first, then best platform match (if any)"
+- name: "Main | Include setup tasks (install): best platform matches (if any), then default"
   ansible.builtin.include_tasks:
     file: "{{ '{{' }} __{{ role_name }}_task_file {{ '}}' }}"
     apply:
@@ -25,16 +25,14 @@
   when:
     - {{ role_name }}_state == 'present'
     - __{{ role_name }}_task_file is file
-    - __{{ role_name }}_loop_index <= 1
-  loop: "{{ '{{' }} ['default.yml'] + __{{ role_name }}_platform_filenames_most_specific_first {{ '}}' }}"
+  loop: "{{ '{{' }} __{{ role_name }}_platform_filenames_most_specific_first + ['default.yml'] {{ '}}' }}"
   loop_control:
-    index_var: "__{{ role_name }}_loop_index"
     loop_var: "__{{ role_name }}_loop_item"
   tags:
     - "{{ role_name }}_setup"
 
 
-- name: "Main | Include configuration tasks: default first, then best platform match (if any)"
+- name: "Main | Include configuration tasks: best platform matches (if any), then default"
   ansible.builtin.include_tasks:
     file: "{{ '{{' }} __{{ role_name }}_task_file {{ '}}' }}"
     apply:
@@ -45,16 +43,14 @@
   when:
     - {{ role_name }}_state == 'present'
     - __{{ role_name }}_task_file is file
-    - __{{ role_name }}_loop_index <= 1
-  loop: "{{ '{{' }} ['default.yml'] + __{{ role_name }}_platform_filenames_most_specific_first {{ '}}' }}"
+  loop: "{{ '{{' }} __{{ role_name }}_platform_filenames_most_specific_first + ['default.yml'] {{ '}}' }}"
   loop_control:
-    index_var: "__{{ role_name }}_loop_index"
     loop_var: "__{{ role_name }}_loop_item"
   tags:
     - "{{ role_name }}_config"
 
 
-- name: "Main | Include service or daemon management tasks: default first, then best platform match (if any)"
+- name: "Main | Include service or daemon management tasks: best platform matches (if any), then default"
   ansible.builtin.include_tasks:
     file: "{{ '{{' }} __{{ role_name }}_task_file {{ '}}' }}"
     apply:
@@ -65,16 +61,14 @@
   when:
     - {{ role_name }}_state == 'present'
     - __{{ role_name }}_task_file is file
-    - __{{ role_name }}_loop_index <= 1
-  loop: "{{ '{{' }} ['default.yml'] + __{{ role_name }}_platform_filenames_most_specific_first {{ '}}' }}"
+  loop: "{{ '{{' }} __{{ role_name }}_platform_filenames_most_specific_first + ['default.yml'] {{ '}}' }}"
   loop_control:
-    index_var: "__{{ role_name }}_loop_index"
     loop_var: "__{{ role_name }}_loop_item"
   tags:
     - "{{ role_name }}_service"
 
 
-- name: "Main | Include setup tasks (uninstall): default first, then best platform match (if any)"
+- name: "Main | Include setup tasks (uninstall): best platform matches (if any), then default"
   ansible.builtin.include_tasks:
     file: "{{ '{{' }} __{{ role_name }}_task_file {{ '}}' }}"
     apply:
@@ -85,10 +79,8 @@
   when:
     - {{ role_name }}_state == 'absent'
     - __{{ role_name }}_task_file is file
-    - __{{ role_name }}_loop_index <= 1
-  loop: "{{ '{{' }} ['default.yml'] + __{{ role_name }}_platform_filenames_most_specific_first {{ '}}' }}"
+  loop: "{{ '{{' }} __{{ role_name }}_platform_filenames_most_specific_first + ['default.yml'] {{ '}}' }}"
   loop_control:
-    index_var: "__{{ role_name }}_loop_index"
     loop_var: "__{{ role_name }}_loop_item"
   tags:
     - "{{ role_name }}_setup"

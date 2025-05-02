@@ -14,7 +14,7 @@
     - "run_{{ collection_name }}_always"
 
 
-- name: "Main | Include setup tasks (install): default first, then best platform match (if any)"
+- name: "Main | Include setup tasks (install): best platform matches (if any), then default"
   ansible.builtin.include_tasks:
     file: "{{ '{{' }} __run_{{ collection_name }}_task_file {{ '}}' }}"
     apply:
@@ -25,16 +25,14 @@
   when:
     - run_{{ collection_name }}_state == 'present'
     - __run_{{ collection_name }}_task_file is file
-    - __run_{{ collection_name }}_loop_index <= 1
-  loop: "{{ '{{' }} ['default.yml'] + __run_{{ collection_name }}_platform_filenames_most_specific_first {{ '}}' }}"
+  loop: "{{ '{{' }} __run_{{ collection_name }}_platform_filenames_most_specific_first + ['default.yml'] {{ '}}' }}"
   loop_control:
-    index_var: "__run_{{ collection_name }}_loop_index"
     loop_var: "__run_{{ collection_name }}_loop_item"
   tags:
     - "run_{{ collection_name }}_setup"
 
 
-- name: "Main | Include configuration tasks: default first, then best platform match (if any)"
+- name: "Main | Include configuration tasks: best platform matches (if any), then default"
   ansible.builtin.include_tasks:
     file: "{{ '{{' }} __run_{{ collection_name }}_task_file {{ '}}' }}"
     apply:
@@ -45,16 +43,14 @@
   when:
     - run_{{ collection_name }}_state == 'present'
     - __run_{{ collection_name }}_task_file is file
-    - __run_{{ collection_name }}_loop_index <= 1
-  loop: "{{ '{{' }} ['default.yml'] + __run_{{ collection_name }}_platform_filenames_most_specific_first {{ '}}' }}"
+  loop: "{{ '{{' }} __run_{{ collection_name }}_platform_filenames_most_specific_first + ['default.yml'] {{ '}}' }}"
   loop_control:
-    index_var: "__run_{{ collection_name }}_loop_index"
     loop_var: "__run_{{ collection_name }}_loop_item"
   tags:
     - "run_{{ collection_name }}_config"
 
 
-- name: "Main | Include service or daemon management tasks: default first, then best platform match (if any)"
+- name: "Main | Include service or daemon management tasks: best platform matches (if any), then default"
   ansible.builtin.include_tasks:
     file: "{{ '{{' }} __run_{{ collection_name }}_task_file {{ '}}' }}"
     apply:
@@ -65,16 +61,14 @@
   when:
     - run_{{ collection_name }}_state == 'present'
     - __run_{{ collection_name }}_task_file is file
-    - __run_{{ collection_name }}_loop_index <= 1
-  loop: "{{ '{{' }} ['default.yml'] + __run_{{ collection_name }}_platform_filenames_most_specific_first {{ '}}' }}"
+  loop: "{{ '{{' }} __run_{{ collection_name }}_platform_filenames_most_specific_first + ['default.yml'] {{ '}}' }}"
   loop_control:
-    index_var: "__run_{{ collection_name }}_loop_index"
     loop_var: "__run_{{ collection_name }}_loop_item"
   tags:
     - "run_{{ collection_name }}_service"
 
 
-- name: "Main | Include setup tasks (uninstall): default first, then best platform match (if any)"
+- name: "Main | Include setup tasks (uninstall): best platform matches (if any), then default"
   ansible.builtin.include_tasks:
     file: "{{ '{{' }} __run_{{ collection_name }}_task_file {{ '}}' }}"
     apply:
@@ -85,10 +79,8 @@
   when:
     - run_{{ collection_name }}_state == 'absent'
     - __run_{{ collection_name }}_task_file is file
-    - __run_{{ collection_name }}_loop_index <= 1
-  loop: "{{ '{{' }} ['default.yml'] + __run_{{ collection_name }}_platform_filenames_most_specific_first {{ '}}' }}"
+  loop: "{{ '{{' }} __run_{{ collection_name }}_platform_filenames_most_specific_first + ['default.yml'] {{ '}}' }}"
   loop_control:
-    index_var: "__run_{{ collection_name }}_loop_index"
     loop_var: "__run_{{ collection_name }}_loop_item"
   tags:
     - "run_{{ collection_name }}_setup"
