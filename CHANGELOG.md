@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Nothing worth mentioning right now.
 
 
+## [2.3.0] - 2025-05-02
+
+### Changed
+
+- collection_default, role_default: Reverse task inclusion of main role entry point order for better platform handling. (f2a3202)
+
+
+### Fixed
+
+- collection_default, role_default: Fix a bug that prevented inclusion of more than two specific task files in the sequence in main role entry point. (f2a3202)
+
+
 ## [2.2.2] - 2025-04-21
 
 ### Changed
@@ -90,7 +102,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All functionality and files, `role_default`
 
 
-[unreleased]: https://github.com/foundata/ansible-skeletons/compare/v2.2.2...HEAD
+[unreleased]: https://github.com/foundata/ansible-skeletons/compare/v2.3.0...HEAD
+[2.3.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.3.0
 [2.2.2]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.2.2
 [2.2.1]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.2.1
 [2.2.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.2.0
