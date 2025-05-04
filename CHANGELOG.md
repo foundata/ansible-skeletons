@@ -8,7 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- collection_default: Exclude "extensions/molecule" from build artifacts. (645604b)
+### Added
+
+- collection_default, role_default: Add generic task to remove unwanted files and directories (5980d70)
+
+
+### Changed
+
+- collection_default, role_default: Exclude "extensions/molecule" from build artifacts. (645604b)
 
 
 ## [2.3.0] - 2025-05-02
