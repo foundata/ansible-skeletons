@@ -9,7 +9,7 @@
 #  notify: "restart_example"
 #
 #
-#- name: "Service | Default | Ensure example.service state"
+#- name: "Service | Default | Ensure service state: example.service"
 #  ansible.builtin.service:
 #    name: "example.service"
 #    state: "{{ '{{' }} 'started' if {{ 'run_' + collection_name + '_service_state' }} in ['enabled', 'running'] else 'stopped' if {{ 'run_' + collection_name + '_service_state' }} == 'disabled' {{ '}}' }}"
