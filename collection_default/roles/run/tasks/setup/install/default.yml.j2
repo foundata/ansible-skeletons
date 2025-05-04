@@ -18,3 +18,13 @@
   when:
     - __run_{{ collection_name }}_packages_install is defined
     - (__run_{{ collection_name }}_packages_install | length) > 0
+
+
+- name: "Setup | Install | Default | Remove unwanted files and directories (e.g., to prevent conflicts or resolve incompatibilities)"
+  ansible.builtin.file:
+    path: "{{ '{{' }} item {{ '}}' }}"
+    state: "absent"
+  when:
+    - __run_{{ collection_name }}_paths_removal is defined
+    - (__run_{{ collection_name }}_paths_removal | length) > 0
+  loop: "{{ '{{ __run_' + collection_name + '_paths_removal }}' }}"

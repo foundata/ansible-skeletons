@@ -67,6 +67,14 @@ __run_{{ collection_name }}_packages_removal:
   [] # Remove the "[]" when adding values to this list.
 
 
-# Override defaults of dependencies used by this role (if any).
+# List of paths of files and directories to be removed unconditionally after
+# installation. This is useful for removing default configuration resources
+# that would otherwise create confusion or conflict with custom configurations
+# managed by this role.
+__run_{{ collection_name }}_paths_removal:
+  [] # Remove the "[]" when adding values to this list.
+
+
+### Override defaults of dependencies used by this role (if any).
 
 # nothing right now
