@@ -46,12 +46,14 @@ platforms:
     image: "quay.io/foundata/ubuntu2204-itt:latest"
     systemd: true
 
+  # AlmaLinux 10 (best effort RHEL 10 (Red Hat Enterprise Linux))
+  - name: "molecule-almalinux10"
+    image: "quay.io/foundata/almalinux10-itt:latest"
+    systemd: true
   # AlmaLinux 9 (best effort RHEL 9 (Red Hat Enterprise Linux))
   - name: "molecule-almalinux9"
     image: "quay.io/foundata/almalinux9-itt:latest"
     systemd: true
-  # AlmaLinux 8 (best effort RHEL 8 (Red Hat Enterprise Linux))
-  # Currently not supported by us and therefore not tested.
 
   # CentOS Stream 10
   - name: "molecule-centosstream10"
