@@ -1,6 +1,7 @@
 # Ansible (Galaxy) Skeletons
 
-The repository provides various skeletons and blueprints to help with the creation of new [roles](https://docs.ansible.com/ansible/latest/user_guide/playbooks_reuse_roles.html) and [collections](https://docs.ansible.com/ansible/devel/dev_guide/developing_collections.html).
+
+**Ansible blueprints for `ansible-galaxy role|collection init`.** The **Ansible Skeletons** project provides ready-made, opinionated templates for new Ansible [roles](https://docs.ansible.com/ansible/latest/user_guide/playbooks_reuse_roles.html) and [collections](https://docs.ansible.com/ansible/devel/dev_guide/developing_collections.html), so you can start projects with a clean structure and proven best practices from day one. That means faster bootstrapping, fewer style debates, and a smoother path for contributors. Focus on automation logic instead of boilerplate.
 
 These skeletons follow several guidelines and best practices:
 
@@ -9,9 +10,10 @@ These skeletons follow several guidelines and best practices:
 * [Best Practices of the Ansible User guide](https://docs.ansible.com/ansible/latest/user_guide/playbooks_best_practices.html)
 
 
-
 ## Table of contents<a id="toc"></a>
 
+- [Features](#features)
+- [Examples](#examples)
 - [How to use the Ansible skeletons](#usage)
 - [Description of provided skeletons](#content)
   - [`collection_default`](#collection_default)
@@ -21,6 +23,30 @@ These skeletons follow several guidelines and best practices:
 - [Licensing, copyright](#licensing-copyright)
 - [Author information](#author-information)
 
+
+## Features<a id="features"></a>
+
+Main features:
+
+* **Sensible defaults** – prefilled metadata, version checks, and directory structures.
+* **Linting and testing built-in** – ready for [`ansible-lint`](https://ansible.readthedocs.io/projects/lint/) and [Molecule](https://ansible.readthedocs.io/projects/molecule/)
+* **Platform-aware design** – clear separation for OS-specific variables and tasks.
+* **Changelog tooling** – conventions and helpers for transparent release notes.
+
+
+## Examples<a id="examples"></a>
+
+A small excerpt of collections created with these skeletons can be found in the following list:
+
+* `foundata.acmesh`:
+  * GitHub: https://github.com/foundata/ansible-collection-acmesh
+  * Galaxy: https://galaxy.ansible.com/ui/repo/published/foundata/acmesh/
+* `foundata.sshd`:
+  * GitHub: https://github.com/foundata/ansible-collection-sshd
+  * Galaxy: https://galaxy.ansible.com/ui/repo/published/foundata/sshd/
+* `foundata.postfix`:
+  * GitHub: https://github.com/foundata/ansible-collection-postfix
+  * Galaxy: https://galaxy.ansible.com/ui/repo/published/foundata/postfix/
 
 
 ## How to use the Ansible skeletons<a id="usage"></a>
@@ -117,6 +143,8 @@ The skeletons are designed to be compatible with all [supported](https://docs.an
 
 The skeletons were explicitly tested with `ansible-galaxy` from the following `ansible` versions (descending order):
 
+* `ansible-galaxy [core 2.18.8]`
+* `ansible-galaxy [core 2.18.4]`
 * `ansible-galaxy [core 2.18.3]`
 * `ansible-galaxy [core 2.18.2]`
 * `ansible-galaxy [core 2.18.1]`
@@ -155,5 +183,6 @@ This project was created and is maintained by the following [foundata](https://f
 
 * [Andreas Haerter](https://andreashaerter.com/) ([foundata](https://foundata.com/))
 * [Frederik Meissner](https://meissner.im/) ([foundata](https://foundata.com/))
+* [Jürgen Mayer-Haerter](https://datensal.at/) ([foundata](https://foundata.com/))
 
 If you like it, you might [buy us a coffee](https://buy-me-a.coffee/ansible-skeletons/).
