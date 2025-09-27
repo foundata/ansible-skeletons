@@ -1,26 +1,45 @@
 # Ansible (Galaxy) Skeletons
 
+**Opinionated blueprints for `ansible-galaxy role|collection init`**
 
-**Ansible blueprints for `ansible-galaxy role|collection init`.** The **Ansible Skeletons** project provides ready-made, opinionated templates for new Ansible [roles](https://docs.ansible.com/ansible/latest/user_guide/playbooks_reuse_roles.html) and [collections](https://docs.ansible.com/ansible/devel/dev_guide/developing_collections.html), so you can start projects with a clean structure and proven best practices from day one. That means faster bootstrapping, fewer style debates, and a smoother path for contributors. Focus on automation logic instead of boilerplate.
+Ansible Skeletons help you start new [roles](https://docs.ansible.com/ansible/latest/user_guide/playbooks_reuse_roles.html) and [collections](https://docs.ansible.com/ansible/devel/dev_guide/developing_collections.html) with a clean, consistent, and proven structure. Focus immediately on logic instead of boilerplate.
 
-These skeletons follow several guidelines and best practices:
+All skeletons follow several guidelines and best practices:
 
 * [foundata: Ansible style guide](https://github.com/foundata/guidelines/blob/master/ansible-style-guide.md)
 * [Red Hat's Coding Style Good Practices for Ansible](https://github.com/redhat-cop/automation-good-practices/blob/main/coding_style/README.adoc#ansible-guidelines)
 * [Best Practices of the Ansible User guide](https://docs.ansible.com/ansible/latest/user_guide/playbooks_best_practices.html)
 
 
+<div align="center" id="project-readme-header">
+<br>
+<br>
+
+<img src="./assets/images/logos/ansible-skeletons.svg" alt="Logo: Ansible (Galaxy) Skeletons" height="128" />
+
+<br>
+<br>
+
+**⭐ Found this useful? Support open-source and star this project:**
+
+[![GitHub repository](https://img.shields.io/github/stars/foundata/ansible-skeletons.svg)](https://github.com/foundata/ansible-skeletons)
+
+<br>
+</div>
+
+
 ## Table of contents<a id="toc"></a>
 
 - [Features](#features)
 - [Examples](#examples)
-- [How to use the Ansible skeletons](#usage)
+- [Usage](#usage)
 - [Description of provided skeletons](#content)
   - [`collection_default`](#collection_default)
   - [`role_default`](#role_default)
 - [Compatibility](#compatibility)
 - [Contributing](#contributing)
 - [Licensing, copyright](#licensing-copyright)
+  - [Trademarks](#trademarks)
 - [Author information](#author-information)
 
 
@@ -28,15 +47,16 @@ These skeletons follow several guidelines and best practices:
 
 Main features:
 
-* **Sensible defaults** – prefilled metadata, version checks, and directory structures.
+* **Sensible defaults** – metadata, version checks, and directory structures already configured.
 * **Linting and testing built-in** – ready for [`ansible-lint`](https://ansible.readthedocs.io/projects/lint/) and [Molecule](https://ansible.readthedocs.io/projects/molecule/)
 * **Platform-aware design** – clear separation for OS-specific variables and tasks.
 * **Changelog tooling** – conventions and helpers for transparent release notes.
+* **Reproducible structure** - faster bootstrapping, fewer style debates. Focus on automation logic instead of boilerplate.
 
 
 ## Examples<a id="examples"></a>
 
-A small excerpt of collections created with these skeletons can be found in the following list:
+Some collections built using these skeletons:
 
 * `foundata.acmesh`:
   * GitHub: https://github.com/foundata/ansible-collection-acmesh
@@ -48,8 +68,10 @@ A small excerpt of collections created with these skeletons can be found in the 
   * GitHub: https://github.com/foundata/ansible-collection-postfix
   * Galaxy: https://galaxy.ansible.com/ui/repo/published/foundata/postfix/
 
+Check their project structures for inspiration and reference.
 
-## How to use the Ansible skeletons<a id="usage"></a>
+
+## Usage<a id="usage"></a>
 
 1. **Clone this repository and check out the latest release:**
    ```bash
@@ -101,7 +123,7 @@ A small excerpt of collections created with these skeletons can be found in the 
 
 
 
-## Description of provided skeletons<a id="content"></a>
+## Provided skeletons<a id="content"></a>
 
 The following list provides an overview of the available skeletons. You can also explore the subdirectories of this repository to examine their code. However, keep in mind that some parts may be difficult to read, as they contain [Jinja](https://palletsprojects.com/p/jinja/) code. This Jinja code is processed by `ansible-galaxy [collection|role]` with it's templating to generate the final files.
 
@@ -139,15 +161,19 @@ A general purpose skeleton to create new Ansible stand-alone role. Main features
 
 ## Compatibility<a id="compatibility"></a>
 
-The skeletons are designed to be compatible with all [supported](https://docs.ansible.com/ansible/latest/reference_appendices/release_and_maintenance.html#ansible-core-support-matrix) versions of `ansible-galaxy` and `ansible` that are not end-of-life and still receive patches. While older versions should also work as long as `ansible-core` is >= v2.16, we no might not explicitly test them.
+The skeletons are compatible with all [supported](https://docs.ansible.com/ansible/latest/reference_appendices/release_and_maintenance.html#ansible-core-support-matrix) versions of `ansible-galaxy` and `ansible` that are not end-of-life and still receive patches. While older versions should also work as long as `ansible-core` is >= v2.16, we no might not explicitly test them.
 
 The skeletons were explicitly tested with `ansible-galaxy` from the following `ansible` versions (descending order):
 
-* `ansible-galaxy [core 2.18.8]`
-* `ansible-galaxy [core 2.18.4]`
-* `ansible-galaxy [core 2.18.3]`
-* `ansible-galaxy [core 2.18.2]`
-* `ansible-galaxy [core 2.18.1]`
+* `ansible-galaxy 2.19`
+  * `ansible-galaxy [core 2.19.2]`
+* `ansible-galaxy 2.18`
+  * `ansible-galaxy [core 2.18.9]`
+  * `ansible-galaxy [core 2.18.8]`
+  * `ansible-galaxy [core 2.18.4]`
+  * `ansible-galaxy [core 2.18.3]`
+  * `ansible-galaxy [core 2.18.2]`
+  * `ansible-galaxy [core 2.18.1]`
 
 The following versions are known to be problematic:
 
@@ -168,21 +194,22 @@ This project's functionality is mature, so there might be little activity on the
 <!--REUSE-IgnoreStart-->
 Copyright (c) 2020, 2023-2025 foundata GmbH (https://foundata.com)
 
-This project is licensed under the GNU General Public License v3.0 or later (SPDX-License-Identifier: `GPL-3.0-or-later`), see [`LICENSES/GPL-3.0-or-later.txt`](LICENSES/GPL-3.0-or-later.txt) for the full text.
+This project is licensed under the GNU General Public License v3.0 or later (SPDX-License-Identifier: `GPL-3.0-or-later`), see [`LICENSES/GPL-3.0-or-later.txt`](./LICENSES/GPL-3.0-or-later.txt) for the full text.
 
-The [`REUSE.toml`](REUSE.toml) file provides detailed licensing and copyright information in a human- and machine-readable format. This includes parts that may be subject to different licensing or usage terms, such as third-party components. The repository conforms to the [REUSE specification](https://reuse.software/spec/). You can use [`reuse spdx`](https://reuse.readthedocs.io/en/latest/readme.html#cli) to create a [SPDX software bill of materials (SBOM)](https://en.wikipedia.org/wiki/Software_Package_Data_Exchange).
+The [`REUSE.toml`](./REUSE.toml) file provides detailed licensing and copyright information in a human- and machine-readable format. This includes parts that may be subject to different licensing or usage terms, such as third-party components. The repository conforms to the [REUSE specification](https://reuse.software/spec/). You can use [`reuse spdx`](https://reuse.readthedocs.io/en/latest/readme.html#cli) to create a [SPDX software bill of materials (SBOM)](https://en.wikipedia.org/wiki/Software_Package_Data_Exchange).
 <!--REUSE-IgnoreEnd-->
 
 [![REUSE status](https://api.reuse.software/badge/github.com/foundata/ansible-skeletons)](https://api.reuse.software/info/github.com/foundata/ansible-skeletons)
 
 
+### Trademarks<a id="trademarks"></a>
+
+* Red Hat® is a trademark of Red Hat, Inc., registered in the US and other countries.
+* Ansible® is a trademark of Red Hat, Inc., registered in the US and other countries.
+
 
 ## Author information<a id="author-information"></a>
 
-This project was created and is maintained by the following [foundata](https://foundata.com/) employees (alphabetical order):
+This project was created and is maintained by [foundata](https://foundata.com/). If you like it, you might [buy us a coffee](https://buy-me-a.coffee/ansible-skeletons/).
 
-* [Andreas Haerter](https://andreashaerter.com/) ([foundata](https://foundata.com/))
-* [Frederik Meissner](https://meissner.im/) ([foundata](https://foundata.com/))
-* [Jürgen Mayer-Haerter](https://datensal.at/) ([foundata](https://foundata.com/))
-
-If you like it, you might [buy us a coffee](https://buy-me-a.coffee/ansible-skeletons/).
+The Ansible Skeletons project is *not* associated with [Red Hat](https://www.redhat.com/) nor the [Ansible project](https://ansible.com/).
