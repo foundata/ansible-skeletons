@@ -1,10 +1,8 @@
 # Ansible (Galaxy) Skeletons
 
-<!-- HUGO IGNORE START -->
 **Opinionated blueprints for `ansible-galaxy role|collection init`**
 
 Ansible Skeletons help you start new [roles](https://docs.ansible.com/ansible/latest/user_guide/playbooks_reuse_roles.html) and [collections](https://docs.ansible.com/ansible/devel/dev_guide/developing_collections.html) with a clean, consistent, and proven structure. Focus immediately on logic instead of boilerplate.
-<!-- HUGO IGNORE END -->
 
 All skeletons follow several guidelines and best practices:
 
@@ -12,7 +10,7 @@ All skeletons follow several guidelines and best practices:
 * [Red Hat's Coding Style Good Practices for Ansible](https://github.com/redhat-cop/automation-good-practices/blob/main/coding_style/README.adoc#ansible-guidelines)
 * [Best Practices of the Ansible User guide](https://docs.ansible.com/ansible/latest/user_guide/playbooks_best_practices.html)
 
-<!-- HUGO IGNORE START -->
+
 <div align="center" id="project-readme-header">
 <br>
 <br>
@@ -43,7 +41,7 @@ All skeletons follow several guidelines and best practices:
 - [Licensing, copyright](#licensing-copyright)
   - [Trademarks](#trademarks)
 - [Author information](#author-information)
-<!-- HUGO IGNORE END -->
+
 
 ## Features<a id="features"></a>
 
