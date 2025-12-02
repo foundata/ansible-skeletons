@@ -31,7 +31,7 @@ Additional requirements:
 1. [Podman](https://podman.io/docs/installation).
 2. The Molecule [plugin](https://github.com/ansible-community/molecule-plugins) `podman`:
    ```bash
-   pip install molecule[podman]
+   pip install 'molecule[podman]'
    ```
 
 
