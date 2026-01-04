@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- collection_default, role_default: Add openSUSE Leap 16.0 support, remove EOL openSUSE Leap 15.6 from roles and tests.
 - collection_default, role_default: Add Debian 13 (Trixie) support, remove EOL Debian 11 (Bullseye) from roles and tests.
 - collection_default, role_default: Add Fedora 43 support, remove EOL Fedora 41 from roles and tests.
 - collection_default, role_default: Exclude "extensions/molecule" from build artifacts. (645604b)
