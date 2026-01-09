@@ -21,6 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - collection_default, role_default: Exclude "extensions/molecule" from build artifacts. (645604b)
 
 
+### Fixed
+
+- collection_default, role_default: Fix a bug that the task "Init | Gather role-specific facts" did not process the specific facts listed to be gathered in the main variables file.
+
+
 ## [2.3.0] - 2025-05-02
 
 ### Changed
