@@ -192,7 +192,7 @@ This project's functionality is mature, so there might be little activity on the
 ## Licensing, copyright<a id="licensing-copyright"></a>
 
 <!--REUSE-IgnoreStart-->
-Copyright (c) 2020, 2023-2025 foundata GmbH (https://foundata.com)
+Copyright (c) 2020, 2023-2026 [foundata GmbH](https://foundata.com/) (https://foundata.com)
 
 This project is licensed under the GNU General Public License v3.0 or later (SPDX-License-Identifier: `GPL-3.0-or-later`), see [`LICENSES/GPL-3.0-or-later.txt`](./LICENSES/GPL-3.0-or-later.txt) for the full text.
 
@@ -210,6 +210,6 @@ The [`REUSE.toml`](./REUSE.toml) file provides detailed licensing and copyright 
 
 ## Author information<a id="author-information"></a>
 
-This project was created and is maintained by [foundata](https://foundata.com/). If you like it, you might [buy us a coffee](https://buy-me-a.coffee/ansible-skeletons/).
+This [project](https://foundata.com/en/projects/) was created and is maintained by [foundata](https://foundata.com/). If you like it, you might [buy us a coffee](https://buy-me-a.coffee/ansible-skeletons/).
 
 The Ansible Skeletons project is *not* associated with [Red Hat](https://www.redhat.com/) nor the [Ansible project](https://ansible.com/).

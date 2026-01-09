@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- collection_default, role_default: Fix a bug that the task "Init | Gather role-specific facts" did not process the specific facts listed to be gathered in the main variables file.
+- collection_default, role_default: Fix a bug that the task "Init | Gather role-specific facts" did not process the specific facts listed to be gathered in the main variables file. (84de375)
 
 
 ## [2.3.0] - 2025-05-02
