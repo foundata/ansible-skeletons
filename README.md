@@ -161,10 +161,12 @@ A general purpose skeleton to create new Ansible stand-alone role. Main features
 
 ## Compatibility<a id="compatibility"></a>
 
-The skeletons are compatible with all [supported](https://docs.ansible.com/ansible/latest/reference_appendices/release_and_maintenance.html#ansible-core-support-matrix) versions of `ansible-galaxy` and `ansible` that are not end-of-life and still receive patches. While older versions should also work as long as `ansible-core` is >= v2.16, we no might not explicitly test them.
+The skeletons are compatible with all [supported versions](https://docs.ansible.com/ansible/latest/reference_appendices/release_and_maintenance.html#ansible-core-support-matrix) of `ansible-galaxy` and `ansible` that are not end-of-life and still receive patches. While older versions should also work as long as `ansible-core` is >= v2.16, we no might not explicitly test them.
 
 The skeletons were explicitly tested with `ansible-galaxy` from the following `ansible` versions (descending order):
 
+* `ansible-galaxy 2.20`
+  * `ansible-galaxy [core 2.20.0]`
 * `ansible-galaxy 2.19`
   * `ansible-galaxy [core 2.19.2]`
 * `ansible-galaxy 2.18`
