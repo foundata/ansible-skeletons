@@ -1,0 +1,221 @@
+# Build the Ansible artifact (role or collection) and an Execution Environment image.
+# This playbook supports both collections and roles, detecting the artifact type
+# automatically based on the presence of galaxy.yml (collection) or meta/main.yml (role).
+
+# Collection specific tasks
+- name: "Molecule | Converge | Build collection artifact"
+  when:
+    - __testing_state['project_type'] == "collection"
+  block:
+
+    - name: "Molecule | Converge | Build Ansible collection artifact"
+      # The command or shell module is used intentionally: Ansible provides no
+      # dedicated module to perform this operation.
+      ansible.builtin.command:
+        argv:
+          - "ansible-galaxy"
+          - "collection"
+          - "build"
+          - "--force"
+          - "--output-path"
+          - "{{ '{{' }} __testing_state['build_dir_path'] {{ '}}' }}"
+        chdir: "{{ '{{' }} __testing_state['project_dir_path'] {{ '}}' }}"
+      changed_when:
+        - true
+
+
+    - name: "Molecule | Converge | Find collection artifact"
+      ansible.builtin.find:
+        paths: "{{ '{{' }} __testing_state['build_dir_path'] {{ '}}' }}"
+        patterns: "*.tar.gz"
+      register: __testing_artifact_find
+
+
+    - name: "Molecule | Converge | Fail if no collection artifact found"
+      ansible.builtin.fail:
+        msg: "No collection artifact found in {{ '{{' }} __testing_state['build_dir_path'] {{ '}}' }}"
+      when:
+        - __testing_artifact_find['files'] | length == 0
+
+
+    - name: "Molecule | Converge | Set artifact filename and path"
+      ansible.builtin.include_tasks:
+        file: "../tasks/state_update.yml"
+      vars:
+        __testing_state_update:
+          artifact_fsname: >-
+            {{ '{{' }}
+              (__testing_artifact_find['files'][0]['path'] | basename | trim)
+            {{ '}}' }}
+          artifact_path: >-
+            {{ '{{' }}
+              (__testing_artifact_find['files'][0]['path'] |trim)
+            {{ '}}' }}
+
+
+    - name: "Molecule | Converge | Create execution-environment.yml for collection"
+      ansible.builtin.copy:
+        dest: "{{ '{{' }} __testing_state['build_dir_path'] {{ '}}' }}/execution-environment.yml"
+        mode: "u=rw,g=r,o=r" # 0644
+        content: |
+          ---
+          version: 3
+
+          images:
+            base_image:
+              name: "quay.io/fedora/fedora-minimal:latest"
+
+          additional_build_steps:
+            prepend_base:
+              - 'RUN $PKGMGR -y -q install python3-devel'
+
+          additional_build_files:
+            # copy artifact from host into the artifacts/ directory inside the container
+            - src: "{{ '{{' }} __testing_state['artifact_path'] {{ '}}' }}"
+              dest: "artifacts"
+
+          # See official documentation for available sub-keys:
+          # https://ansible.readthedocs.io/projects/builder/en/stable/definition/#dependencies
+          dependencies:
+            ansible_runner:
+              package_pip: "ansible-runner"
+
+            ansible_core:
+              package_pip: "ansible-core"
+
+            galaxy:
+              collections:
+                # install the artifact copied from the host
+                - name: "artifacts/{{ '{{' }} __testing_state['artifact_fsname'] {{ '}}' }}"
+                  type: "file"
+
+            python:
+              - "ansible-lint"
+
+            system:
+              - "python"
+              - "python3-devel"
+              - "less" # needed for "ansible-doc --list --type role"
+
+          options:
+            package_manager_path: "/usr/bin/dnf5"
+
+
+# Role specific tasks
+- name: "Molecule | Converge | Build role artifact"
+  when:
+    - __testing_state['project_type'] == "role"
+  block:
+
+    # Ansible-galaxy has no "role build" equivalent to "collection build". They
+    # have to be copied manually.
+    - name: "Molecule | Converge | Set artifact filename and path"
+      ansible.builtin.include_tasks:
+        file: "../tasks/state_update.yml"
+      vars:
+        __testing_state_update:
+          artifact_fsname: >-
+            {{ '{{' }}
+              (__testing_state['artifact_ansible_name'] | trim)
+            {{ '}}' }}
+          artifact_path: >-
+            {{ '{{' }}
+              ((__testing_state['build_dir_path'] ~ '/roles/' ~ __testing_state['artifact_ansible_name']) | trim)
+            {{ '}}' }}
+
+
+    - name: "Molecule | Converge | Create role directory in build directory"
+      ansible.builtin.file:
+        path: "{{ '{{' }} __testing_state['artifact_path'] {{ '}}' }}"
+        state: "directory"
+        mode: "u=rwx,g=rx,o=rx" # 0755
+
+
+    - name: "Molecule | Converge | Copy role to build directory"
+      ansible.builtin.copy:
+        src: "{{ '{{' }} __testing_state['project_dir_path'] {{ '}}' }}"
+        dest: "{{ '{{' }} __testing_state['artifact_path'] {{ '}}' }}"
+        mode: "preserve" # FIXME does this make sense here?
+
+
+    - name: "Molecule | Converge | Create execution-environment.yml for role"
+      ansible.builtin.copy:
+        dest: "{{ '{{' }} __testing_state['build_dir_path'] {{ '}}' }}/execution-environment.yml"
+        mode: "u=rw,g=r,o=r" # 0644
+        content: |
+          ---
+          version: 3
+
+          images:
+            base_image:
+              name: "quay.io/fedora/fedora-minimal:latest"
+
+          additional_build_steps:
+            prepend_base:
+              - 'RUN $PKGMGR -y -q install python3-devel'
+            append_final:
+              # Copy role to standard Ansible roles path
+              # https://docs.ansible.com/projects/ansible/latest/reference_appendices/config.html#default-roles-path
+              - 'COPY _build/roles /usr/share/ansible/roles'
+
+          additional_build_files:
+            # Copy the roles directory to the build context
+            - src: "{{ '{{' }} __testing_state['artifact_path'] | dirname | trim {{ '}}' }}"
+              dest: "roles"
+
+          # See official documentation for available sub-keys:
+          # https://ansible.readthedocs.io/projects/builder/en/stable/definition/#dependencies
+          dependencies:
+            ansible_runner:
+              package_pip: "ansible-runner"
+
+            ansible_core:
+              package_pip: "ansible-core"
+
+            python:
+              - "ansible-lint"
+
+            system:
+              - "python"
+              - "python3-devel"
+              - "less" # needed for "ansible-doc --list --type role"
+
+          options:
+            package_manager_path: "/usr/bin/dnf5"
+
+
+- name: "Molecule | Converge | Build Execution Environment (EE) image"
+  # The command or shell module is used intentionally: Ansible provides no
+  # dedicated module to perform this operation.
+  ansible.builtin.command:
+    argv:
+      - "ansible-builder"
+      - "build"
+      - "--tag"
+      - "{{ '{{' }} __testing_state['ee_image_name'] {{ '}}' }}:{{ '{{' }} __testing_state['ee_image_tag'] {{ '}}' }}"
+      - "--container-runtime"
+      - "{{ '{{' }} podman_executable {{ '}}' }}"
+      - "--file"
+      - "execution-environment.yml"
+      - "--prune-images"
+      - "--verbosity"
+      - "{{ '{{' }} ansible_verbosity | default(3) {{ '}}' }}"
+    chdir: "{{ '{{' }} __testing_state['build_dir_path'] {{ '}}' }}"
+  changed_when:
+    - true
+  register: __testing_ee_build_result
+  ignore_errors: true
+
+
+- name: "Molecule | Converge | Show build output on failure"
+  ansible.builtin.debug:
+    var: __testing_ee_build_result
+  when:
+    - __testing_ee_build_result is failed
+
+
+- name: "Molecule | Converge | Fail if Execution Environment (EE) build failed"
+  ansible.builtin.fail:
+    msg: "Execution Environment (EE) build failed. See output above for details."
+  when:
+    - __testing_ee_build_result is failed

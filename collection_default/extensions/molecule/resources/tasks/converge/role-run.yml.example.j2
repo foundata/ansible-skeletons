@@ -1,6 +1,0 @@
-
-- name: "Molecule | Converge | Include the {{ namespace }}.{{ collection_name }}.run role"
-  ansible.builtin.include_role:
-    name: "{{ namespace }}.{{ collection_name }}.run"
-  vars:
-    run_{{ collection_name }}_state: "present"

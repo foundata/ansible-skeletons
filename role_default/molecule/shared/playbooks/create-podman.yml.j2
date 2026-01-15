@@ -1,0 +1,302 @@
+# Molecule create playbook. Creates the testing infrastructure and stores data
+# in instance-config.
+#
+# This playbook is only compatible with scenarios using a "driver:" that
+# invokes Podman in molecule.yml.
+#
+# This playbook was heavily inspired by the following resources:
+# https://github.com/ansible-community/molecule-plugins/blob/main/src/molecule_plugins/podman/playbooks/create.yml
+# https://ansible.readthedocs.io/projects/molecule/examples/podman/
+
+---
+
+- name: "Molecule | Create (Podman) | Create testing infrastructure on localhost"
+  hosts: "localhost"
+  connection: "local"
+  gather_facts: false
+  no_log: "{{ '{{' }} molecule_no_log | default(false) {{ '}}' }}"
+  vars:
+    podman_executable: "{{ '{{' }} lookup('env','MOLECULE_PODMAN_EXECUTABLE') | default('podman', true) {{ '}}' }}"
+    # Init variable to create an inventory containing the molecule target hosts
+    molecule_inventory:
+      all:
+        hosts: {}
+        children:
+          molecule:
+            hosts: {}
+          molecule_linux:
+            hosts: {}
+          molecule_windows: # Placeholder - Windows containers are not supported (github.com/containers/podman/issues/11809)
+            hosts: {}
+  pre_tasks:
+
+    - name: "Molecule | Create (Podman) | Restore __testing_state (if any) from YAML file from localhost"
+      ansible.builtin.set_fact:
+        __testing_state: >-
+          {{ '{{' }}
+            lookup('file', molecule_ephemeral_directory ~ '/__testing_state_' ~ (inventory_hostname | hash('md5')) ~ '.yml', errors='ignore')
+            | default('{}')
+            | from_yaml
+            | default({})
+          {{ '}}' }}
+      when:
+        - (__testing_state is not defined) or (__testing_state is not mapping)
+
+
+  tasks:
+
+    - name: "Molecule | Create (Podman) | Log into container registry"
+      containers.podman.podman_login:
+        executable: "{{ '{{' }} podman_executable {{ '}}' }}"
+        registry: "{{ '{{' }} item['registry']['url'] {{ '}}' }}"
+        username: "{{ '{{' }} item['registry']['credentials']['username'] {{ '}}' }}"
+        password: "{{ '{{' }} item['registry']['credentials']['password'] | default(omit) {{ '}}' }}"
+        tlsverify: "{{ '{{' }} item['registry']['tls_verify'] | default(true) {{ '}}' }}"
+        certdir: "{{ '{{' }} item['certdir'] | default(omit) {{ '}}' }}"
+      loop: "{{ '{{' }} molecule_yml['platforms'] {{ '}}' }}"
+      loop_control:
+        label: >-
+          "{{ '{{' }} item['name'] }} registry username:
+           {{ '{{' }} item['registry']['credentials']['username'] | default('None specified') {{ '}}' }}"
+      when:
+        - item['registry'] is defined
+        - item['registry']['url'] is defined
+        - item['registry']['url'] | length > 0
+        - item['registry']['credentials'] is defined
+        - item['registry']['credentials']['username'] is defined
+      changed_when:
+        - false
+
+
+    - name: "Molecule | Create (Podman) | Create containers running tests on target platforms"
+      containers.podman.podman_container:
+        name: "{{ '{{' }} item['name'] {{ '}}' }}"
+        state: "started"
+        image: "{{ '{{' }} item['image'] {{ '}}' }}"
+        # Use specific entry-points like /usr/sbin/init for seamless rootless systemd
+        # operation (Podman GitHub issue #7287), best effort detection if a user does
+        # not specify a command.
+        command: >-
+          {{ '{%-' }} if (item['systemd'] | default(false)) and not (item['command'] | default(false)) {{ '-%}' }}
+            {{ '{%-' }} if (item['image'] | default('') | lower | regex_search('debian|ubuntu')) or
+                   (item['name'] | default('') | lower | regex_search('debian|ubuntu')) {{ '-%}' }}
+              /lib/systemd/systemd
+            {{ '{%-' }} else {{ '-%}' }}
+              /usr/sbin/init
+            {{ '{%-' }} endif {{ '-%}' }}
+          {{ '{%-' }} else {{ '-%}' }}
+            {{ '{{' }} item['command'] if ((item['command'] | default(false)) and item['command'] != false) else 'sleep 1d' {{ '}}' }}
+          {{ '{%-' }} endif {{ '-%}' }}
+        cap_add: "{{ '{{' }} item['cap_add'] | default(omit) {{ '}}' }}"
+        cap_drop: "{{ '{{' }} item['cap_drop'] | default(omit) {{ '}}' }}"
+        executable: "{{ '{{' }} podman_executable {{ '}}' }}"
+        log_driver: "{{ '{{' }} item['log_driver'] | default('journald') {{ '}}' }}"
+        privileged: "{{ '{{' }} item['privileged'] | default(omit) {{ '}}' }}"
+        systemd: "{{ '{{' }} item['systemd'] | default(omit) {{ '}}' }}"
+        volumes: "{{ '{{' }} item['volumes'] | default(omit) {{ '}}' }}"
+      loop: "{{ '{{' }} molecule_yml['platforms'] {{ '}}' }}"
+      register: __testing_createcontainer_result
+
+
+    - name: "Molecule | Create (Podman) | Print container info"
+      ansible.builtin.debug:
+        msg: "{{ '{{' }} __testing_createcontainer_result['results'] {{ '}}' }}"
+        verbosity: 3
+      when:
+        - __testing_createcontainer_result is defined
+        - __testing_createcontainer_result['results'] is defined
+
+
+    - name: "Molecule | Create (Podman) | Identify failed containers "
+      ansible.builtin.set_fact:
+        __testing_failed_containers: >-
+          {{ '{{' }}
+            __testing_createcontainer_result['results']
+            | selectattr('container.State.Running', 'defined')
+            | selectattr('container.State.Running', 'equalto', false)
+            | list
+            +
+            __testing_createcontainer_result['results']
+            | selectattr('container.State.ExitCode', 'defined')
+            | selectattr('container.State.ExitCode', 'ne', 0)
+            | list
+          {{ '}}' }}
+      when:
+        - __testing_createcontainer_result is defined
+        - __testing_createcontainer_result['results'] is defined
+
+
+    - name: "Molecule | Create (Podman) | Handle container failures (if any)"
+      when: __testing_failed_containers | default([]) | length > 0
+      block:
+
+        - name: "Molecule | Create (Podman) | Print failed container info"
+          ansible.builtin.debug:
+            msg: "{{ '{{' }} __testing_failed_containers {{ '}}' }}"
+          when:
+            # Skip if already displayed by previous debug tasks with "verbosity: 3"
+            - (ansible_verbosity is defined) and ansible_verbosity < 3
+
+
+        - name: "Molecule | Create (Podman) | Print failed container's non-zero exit codes"
+          ansible.builtin.debug:
+            msg: "{{ '{{' }} __fail_item['container']['Name'] {{ '}}' }}: {{ '{{' }} __fail_item['container']['State']['ExitCode'] {{ '}}' }}"
+          when:
+            - __fail_item['container'] is defined
+            - __fail_item['container']['State'] is defined
+            - __fail_item['container']['State']['ExitCode'] is defined
+            - (__fail_item['container']['State']['ExitCode']) != 0
+          loop: "{{ '{{' }} __testing_failed_containers {{ '}}' }}"
+          loop_control:
+            loop_var: "__fail_item"
+            label: "{{ '{{' }} __fail_item['container']['Name'] {{ '}}' }}"
+
+
+        - name: "Molecule | Create (Podman) | Print the failed container's non-running states"
+          ansible.builtin.debug:
+            msg: "{{ '{{' }} __fail_item['container']['Name'] {{ '}}' }}: {{ '{{' }} __fail_item['container']['State']['Status'] {{ '}}' }}"
+          when:
+            - __fail_item['container'] is defined
+            - __fail_item['container']['State'] is defined
+            - __fail_item['container']['State']['Status'] is defined
+            - __fail_item['container']['State']['Running'] is defined
+            - not __fail_item['container']['State']['Running']
+          loop: "{{ '{{' }} __testing_failed_containers {{ '}}' }}"
+          loop_control:
+            loop_var: "__fail_item"
+            label: "{{ '{{' }} __fail_item['container']['Name'] {{ '}}' }}"
+
+
+        - name: "Molecule | Create (Podman) | Show cleanup hints"
+          ansible.builtin.debug:
+            # split() to improve readability for humans
+            msg: "{{ '{{' }} __testing_failcleanhint_msg.split('\n') {{ '}}' }}"
+          vars:
+            __testing_failcleanhint_msg: |-
+              Container creation failed. You can manually remove the container(s) with:
+              {{ '{%' }} for container in molecule_yml['platforms'] {{ '%}' }}
+              {{ '{{' }} podman_executable {{ '}}' }} container stop '{{ '{{' }} container['name'] {{ '}}' }}'
+              {{ '{{' }} podman_executable {{ '}}' }} container rm --ignore '{{ '{{' }} container['name'] {{ '}}' }}'
+
+              {{ '{%' }} endfor {{ '%}' }}
+              This might help resolve issues if the container is in a stuck state.
+          when:
+            - molecule_yml is defined
+            - molecule_yml['platforms'] is defined
+
+
+        - name: "Molecule | Create (Podman) | Throw error"
+          ansible.builtin.fail:
+            msg: >
+              Error during setup of the testing infrastructure with Podman. At least
+              one container is not in state 'Running' or returned a non-zero exit code.
+
+
+    # Conditionally assign platforms to 'molecule_linux' or 'molecule_windows'
+    # based on image/name detection.
+    # Windows containers are not supported by Podman (GH issues #11809).
+    # This logic is included for completeness and potential future support.
+    #
+    # Example usage in molecule.yml, "platforms":
+    #   - name: "molecule-fedora43" # Auto-detected as Linux (default)
+    #     image: "quay.io/foundata/fedora43-itt:latest"
+    #   - name: "molecule-windows2022" # Auto-detected as Windows (by name)
+    #     image: "mcr.microsoft.com/windows/servercore:ltsc2022"
+    #   - name: "molecule-custom"
+    #     image: "custom-image:latest"
+    #     os_family: "windows"  # or "linux", explicit override
+    - name: "Molecule | Create (Podman) | Create inventory data, add container to groups"
+      ansible.builtin.set_fact:
+        molecule_inventory: >
+          {{ '{{' }} molecule_inventory | combine(__testing_inventory_partial_yaml | from_yaml, recursive=true) {{ '}}' }}
+      vars:
+        __testing_inventory_is_windows: >
+          {{ '{{' }}
+            ((item['image'] | default('') | lower is search('windows')) or
+             (item['name'] | default('') | lower is search('windows')) or
+             (item['os_family'] | default('') | lower == 'windows')) | bool
+          {{ '}}' }}
+        __testing_inventory_os_group: >-
+          {{ '{{' }} 'molecule_windows' if (__testing_inventory_is_windows | bool) else 'molecule_linux' {{ '}}' }}
+        __testing_inventory_partial_yaml: |
+          all:
+            children:
+              molecule:
+                hosts:
+                  "{{ '{{' }} item['name'] {{ '}}' }}":
+                    ansible_connection: "containers.podman.podman"
+              {{ '{{' }} __testing_inventory_os_group {{ '}}' }}:
+                hosts:
+                  "{{ '{{' }} item['name'] {{ '}}' }}":
+                    ansible_connection: "containers.podman.podman"
+      loop: "{{ '{{' }} molecule_yml['platforms'] {{ '}}' }}"
+      loop_control:
+        label: "{{ '{{' }} item['name'] {{ '}}' }}"
+
+
+    - name: "Molecule | Create (Podman) | Store inventory data as Molecule inventory file"
+      ansible.builtin.copy:
+        content: |
+          {{ '{{' }} molecule_inventory | to_yaml {{ '}}' }}
+        dest: "{{ '{{' }} molecule_ephemeral_directory }}/inventory/molecule_inventory.yml"
+        mode: "u=rw,g=,o=" # 0600
+
+
+    - name: "Molecule | Create (Podman) | Ensure new instances exist in inventory"
+      ansible.builtin.meta: "refresh_inventory"
+
+
+    - name: "Molecule | Create (Podman) | Print inventory groups"
+      ansible.builtin.debug:
+        msg: |
+          groups: {{ '{{' }} groups {{ '}}' }}
+        verbosity: 1
+
+
+    - name: "Molecule | Create (Podman) | Set <scenario>/tasks/create directory path"
+      ansible.builtin.set_fact:
+        __testing_create_taskdir: >-
+          {{ '{{' }}
+            (lookup('env', 'MOLECULE_SCENARIO_DIRECTORY') | regex_replace('/$', ''))
+            ~ '/tasks/create'
+          {{ '}}' }}
+
+
+    - name: "Molecule | Create (Podman) | Check if <scenario>/tasks/create directory exists on localhost"
+      delegate_to: "localhost"
+      ansible.builtin.stat:
+        path: "{{ '{{' }} __testing_create_taskdir {{ '}}' }}"
+      run_once: true # noqa: run-once[task]
+      register: __testing_create_taskdir_stat
+
+
+    - name: "Molecule | Create (Podman) | Include additional tasks from <scenario>/tasks/create"
+      ansible.builtin.include_tasks:
+        file: "{{ '{{' }} __testing_create_loop_item {{ '}}' }}"
+      when:
+        - __testing_create_loop_item is file
+      loop: >-
+        {{ '{{' }}
+          lookup('fileglob', __testing_create_taskdir ~ '/*.yml', wantlist=True) | sort
+          if (__testing_create_taskdir_stat['stat']['exists'] | default(false))
+          else []
+        {{ '}}' }}
+      loop_control:
+        label: "{{ '{{' }} __testing_create_loop_item {{ '}}' }}"
+        index_var: "__testing_create_loop_index"
+        loop_var: "__testing_create_loop_item"
+
+
+  post_tasks:
+
+    - name: "Molecule | Create (Podman) | Persist __testing_state (if any) to YAML file on localhost"
+      # Although this task is delegated to localhost, the play itself targets
+      # "hosts: molecule", so inventory_hostname is available.
+      delegate_to: "localhost"
+      ansible.builtin.copy:
+        content: "{{ '{{' }} __testing_state | to_nice_yaml {{ '}}' }}"
+        dest: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/__testing_state_{{ '{{' }} (inventory_hostname | hash('md5')) {{ '}}' }}.yml"
+        mode: "u=rw,g=r,o=r" # 0644
+      when:
+        - __testing_state is defined
+        - __testing_state is mapping

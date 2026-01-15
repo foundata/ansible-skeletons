@@ -1,0 +1,25 @@
+# Persist and manage data between Molecule stages. Merge __testing_state_update
+# into __testing_state. Example:
+#
+#   - name: "Store multiple values into the __testing_state variable"
+#     ansible.builtin.include_tasks:
+#       file: "../tasks/state_update.yml"
+#     vars:
+#       __testing_state_update:
+#         artifact: "foo.bar" # accessible via __testing_state['artifact']
+#         artifacts:          # accessible via __testing_state['artifacts']
+#           - "one"
+#           - "two"
+#         some_flag: true     # accessible via __testing_state['some_flag']
+
+- name: "Molecule | State | Merge __testing_state_update into __testing_state"
+  ansible.builtin.set_fact:
+    __testing_state: >-
+      {{ '{{' }}
+        __testing_state
+        | default({})
+        | combine(__testing_state_update, recursive=True)
+      {{ '}}' }}
+  when:
+    - __testing_state_update is defined
+    - __testing_state_update is mapping

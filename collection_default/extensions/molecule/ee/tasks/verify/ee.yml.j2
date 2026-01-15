@@ -1,0 +1,138 @@
+# Verify that the Ansible artifact (role or collection) is properly installed in
+# the Execution Environment image.
+
+- name: "Molecule | Verify | Start throwaway verification container"
+  containers.podman.podman_container:
+    name: "{{ '{{' }} __testing_state['ee_container_name'] {{ '}}' }}"
+    state: "started"
+    image: "{{ '{{' }} __testing_state['ee_image_name'] {{ '}}' }}"
+    command:
+      - "sleep"
+      - "infinity"
+    detach: true
+    executable: "{{ '{{' }} podman_executable {{ '}}' }}"
+
+
+# Collection verification
+- name: "Molecule | Verify | Confirm that the collection is properly installed in the EE image"
+  when:
+    - __testing_state['project_type'] == "collection"
+  block:
+
+    - name: "Molecule | Verify | List collections in EE"
+      containers.podman.podman_container_exec:
+        name: "{{ '{{' }} __testing_state['ee_container_name'] {{ '}}' }}"
+        argv:
+          - "ansible-galaxy"
+          - "collection"
+          - "list"
+        executable: "{{ '{{' }} podman_executable {{ '}}' }}"
+      register: __testing_collection_list
+      changed_when:
+        - false
+
+
+    - name: "Molecule | Verify | Print collection list"
+      ansible.builtin.debug:
+        var: __testing_collection_list['stdout_lines']
+        verbosity: 1
+
+
+    - name: "Molecule | Verify | Assert collection is present"
+      ansible.builtin.assert:
+        that:
+          - "__testing_state['artifact_ansible_name'] in (__testing_collection_list['stdout'] | default(''))"
+        fail_msg: "Collection {{ '{{' }} __testing_state['artifact_ansible_name'] {{ '}}' }} not found in Execution Environment"
+        success_msg: "Collection {{ '{{' }} __testing_state['artifact_ansible_name'] {{ '}}' }} successfully installed in Execution Environment"
+
+
+    - name: "Molecule | Verify | Verify collection is usable (list its roles)"
+      containers.podman.podman_container_exec:
+        name: "{{ '{{' }} __testing_state['ee_container_name'] {{ '}}' }}"
+        argv:
+          - "ansible-doc"
+          - "--list"
+          - "--type"
+          - "role"
+          - "{{ '{{' }} __testing_state['artifact_ansible_name'] {{ '}}' }}"
+        executable: "{{ '{{' }} podman_executable {{ '}}' }}"
+      register: __testing_role_list
+      changed_when:
+        - false
+
+
+    - name: "Molecule | Verify | Print available roles"
+      ansible.builtin.debug:
+        var: __testing_role_list['stdout_lines']
+        verbosity: 1
+
+
+# Role verification
+- name: "Molecule | Verify | Confirm that the role is properly installed in the EE image"
+  when:
+    - __testing_state['project_type'] == "role"
+  block:
+
+    - name: "Molecule | Verify | List roles in EE"
+      containers.podman.podman_container_exec:
+        name: "{{ '{{' }} __testing_state['ee_container_name'] {{ '}}' }}"
+        argv:
+          - "ls"
+          - "-la"
+          - "/usr/share/ansible/roles"
+        executable: "{{ '{{' }} podman_executable {{ '}}' }}"
+      register: __testing_role_list
+      changed_when:
+        - false
+
+
+    - name: "Molecule | Verify | Print role directory listing"
+      ansible.builtin.debug:
+        var: __testing_role_list['stdout_lines']
+        verbosity: 1
+
+
+    - name: "Molecule | Verify | Check role directory exists"
+      containers.podman.podman_container_exec:
+        name: "{{ '{{' }} __testing_state['ee_container_name'] {{ '}}' }}"
+        argv:
+          - "test"
+          - "-d"
+          - "/usr/share/ansible/roles/{{ '{{' }} __testing_state['artifact_fsname'] {{ '}}' }}"
+        executable: "{{ '{{' }} podman_executable {{ '}}' }}"
+      register: __testing_role_exists
+      changed_when:
+        - false
+      failed_when:
+        - false
+
+
+    - name: "Molecule | Verify | Assert role is present"
+      ansible.builtin.assert:
+        that:
+          - __testing_role_exists is success
+        fail_msg: "Role {{ '{{' }} __testing_state['artifact_fsname'] {{ '}}' }} not found in Execution Environment at /usr/share/ansible/roles/{{ '{{' }} __testing_state['artifact_fsname'] {{ '}}' }}"
+        success_msg: "Role {{ '{{' }} __testing_state['artifact_fsname'] {{ '}}' }} successfully installed in Execution Environment"
+
+
+    - name: "Molecule | Verify | Verify role has required structure (tasks/main.yml)"
+      containers.podman.podman_container_exec:
+        name: "{{ '{{' }} __testing_state['ee_container_name'] {{ '}}' }}"
+        argv:
+          - "test"
+          - "-f"
+          - "/usr/share/ansible/roles/{{ '{{' }} __testing_state['artifact_fsname'] {{ '}}' }}/tasks/main.yml"
+        executable: "{{ '{{' }} podman_executable {{ '}}' }}"
+      register: __testing_role_tasks
+      changed_when:
+        - false
+      failed_when:
+        - false
+
+
+    - name: "Molecule | Verify | Assert role has tasks/main.yml"
+      ansible.builtin.assert:
+        that:
+          - __testing_role_tasks is success
+        fail_msg: "Role {{ '{{' }} __testing_state['artifact_fsname'] {{ '}}' }} is missing tasks/main.yml"
+        success_msg: "Role {{ '{{' }} __testing_state['artifact_fsname'] {{ '}}' }} has valid structure"

@@ -1,0 +1,184 @@
+# Molecule prepare playbook. Sets up required system state before converge. It
+# runs after instance creation and only once for the duration of the instances
+# life. Optional but useful for isolating preparation steps to performance and
+# clarity of the converge step.
+
+---
+
+- name: "Molecule | Prepare"
+  hosts: "molecule"
+  # gather_facts fails if Python is not installed on the target hosts. While
+  # test targets are expected to have Python installed, this allows running
+  # Molecule with virtually any container image before prepare (where Python
+  # could be installed, e.g. with ansible.builtin.raw).
+  gather_facts: false
+  no_log: "{{ '{{' }} molecule_no_log | default(false) {{ '}}' }}"
+  pre_tasks:
+
+    - name: "Molecule | Prepare | Basic self-checks for the testing infrastructure"
+      run_once: true # noqa: run-once[task]
+      block:
+
+        - name: "Molecule | Prepare | Fail if MOLECULE_SCENARIO_DIRECTORY is not set or empty"
+          ansible.builtin.fail:
+            msg: "MOLECULE_SCENARIO_DIRECTORY env var is not set or empty"
+          when:
+            - (lookup('env', 'MOLECULE_SCENARIO_DIRECTORY') | trim) | length == 0
+
+
+        - name: "Molecule | Prepare | Assert inventory groups existence on localhost"
+          delegate_to: "localhost"
+          ansible.builtin.assert:
+            that:
+              - "'molecule' in groups"
+              - "'molecule_linux' in groups"
+              - "'molecule_windows' in groups"
+            fail_msg: |
+              At least one molecule group was not found inside inventory groups: {{ '{{' }} groups {{ '}}' }}
+
+
+        - name: "Molecule | Prepare | Get basic information from 'molecule_linux' targets"
+          delegate_to: "{{ '{{' }} item {{ '}}' }}"
+          # ansible.builtin.raw is used intentionally instead of ansible.builtin.command,
+          # as it does not require a Python interpreter on the target. This allows
+          # to run the command against nearly any image prior to the "prepare" stage.
+          ansible.builtin.raw: |-
+            /bin/grep "PRETTY" /etc/os-release; /bin/uname -r;
+          args:
+            executable: "/bin/bash"
+          changed_when:
+            - false
+          failed_when:
+            - false
+          loop: "{{ '{{' }} groups['molecule_linux'] {{ '}}' }}"
+          loop_control:
+            label: "{{ '{{' }} item {{ '}}' }}"
+          register: __testing_basicinfo_result
+
+
+        - name: "Molecule | Prepare | Display basic information of 'molecule_linux' targets on localhost"
+          delegate_to: "localhost"
+          ansible.builtin.debug:
+            # Using split for more readable output format
+            msg: "{{ '{{' }} __testing_basicinfo_result_msg.split('\n') {{ '}}' }}"
+            verbosity: 1
+          vars:
+            __testing_basicinfo_result_msg: |-
+              {{ '{%' }} for result in __testing_basicinfo_result['results'] {{ '%}' }}
+              Host: {{ '{{' }} result['item'] {{ '}}' }} - {{ '{{' }} result['stdout_lines'] | default(['No output']) | join(', ') {{ '}}' }}
+              {{ '{%' }} endfor {{ '%}' }}
+          when:
+            - __testing_basicinfo_result is defined
+            - __testing_basicinfo_result['results'] is defined
+            - __testing_basicinfo_result['results'] | length > 0
+
+
+        - name: "Molecule | Prepare | Print all molecule_ variables on localhost"
+          delegate_to: "localhost"
+          ansible.builtin.debug:
+            # split() to improve readability for humans
+            msg: "{{ '{{' }} __testing_moleculevars_msg.split('\n') {{ '}}' }}"
+            verbosity: 3
+          vars:
+            __testing_moleculevars_msg: |-
+              {{ '{%' }} for key, value in hostvars[inventory_hostname].items() {{ '%}' }}
+              {{ '{%' }}   if key is string and key.startswith('molecule_') {{ '%}' }}
+              {{ '{{' }}     key {{ '}}' }} = {{ '{{' }} value | to_nice_json {{ '}}' }}
+              {{ '{%' }}   endif {{ '%}' }}
+              {{ '{%' }} endfor {{ '%}' }}
+          when:
+            - hostvars is defined
+            - inventory_hostname in hostvars
+
+
+    - name: "Molecule | Prepare | Restore __testing_state (if any) from YAML file from localhost"
+      # Although this task is delegated to localhost, the play itself targets
+      # "hosts: molecule", so the resulting fact is stored on the current
+      # inventory host. This is why inventory_hostname is available and must be
+      # used to load the correct per-host state file.
+      delegate_to: "localhost"
+      ansible.builtin.set_fact:
+        __testing_state: >-
+          {{ '{{' }}
+            lookup('file', molecule_ephemeral_directory ~ '/__testing_state_' ~ (inventory_hostname | hash('md5')) ~ '.yml', errors='ignore')
+            | default('{}')
+            | from_yaml
+            | default({})
+          {{ '}}' }}
+      when:
+        - (__testing_state is not defined) or (__testing_state is not mapping)
+
+
+  tasks:
+
+    # This prevents testing whether the project to test itself verifies the
+    # availability of these facts but it avoids fragile workarounds (like
+    # parsing container names) if additional platform specific preparations are.
+    - name: "Molecule | Prepare | Gather playbook-specific facts"
+      ansible.builtin.setup:
+        gather_subset:
+          - "distribution"
+      when:
+        - ansible_facts['distribution'] is not defined or
+          ansible_facts['os_family'] is not defined
+
+
+    # Container cleanup task like "rm -rf /var/lib/apt/lists/*" change the mtime
+    # of the directory, causing ansible.builtin.apt installs to fail due to
+    # missing cache, even with "cache_valid_time: 1800" or "update_cache: true".
+    # More information: https://github.com/ansible/ansible/issues/79206
+    - name: "Molecule | Prepare | Update apt cache (issue #79206 workaround)"
+      ansible.builtin.apt:
+        update_cache: true
+      when:
+        - ansible_facts is defined
+        - ansible_facts['os_family'] is defined
+        - (ansible_facts['os_family'] | lower) == 'debian'
+
+
+    - name: "Molecule | Prepare | Set <scenario>/tasks/prepare directory path"
+      ansible.builtin.set_fact:
+        __testing_prepare_taskdir: >-
+          {{ '{{' }}
+            (lookup('env', 'MOLECULE_SCENARIO_DIRECTORY') | regex_replace('/$', ''))
+            ~ '/tasks/prepare'
+          {{ '}}' }}
+
+
+    - name: "Molecule | Prepare | Check if <scenario>/tasks/prepare directory exists on localhost"
+      delegate_to: "localhost"
+      ansible.builtin.stat:
+        path: "{{ '{{' }} __testing_prepare_taskdir {{ '}}' }}"
+      run_once: true # noqa: run-once[task]
+      register: __testing_prepare_taskdir_stat
+
+
+    - name: "Molecule | Prepare | Include additional tasks from <scenario>/tasks/prepare"
+      ansible.builtin.include_tasks:
+        file: "{{ '{{' }} __testing_prepare_loop_item {{ '}}' }}"
+      when:
+        - __testing_prepare_taskdir_stat is defined
+        - __testing_prepare_taskdir_stat['stat']['exists']
+        - __testing_prepare_loop_item is file
+      loop:
+        - "{{ '{{' }} __testing_prepare_taskdir {{ '}}' }}/all.yml"
+        - "{{ '{{' }} __testing_prepare_taskdir {{ '}}' }}/{{ '{{' }} inventory_hostname {{ '}}' }}.yml"
+      loop_control:
+        label: "{{ '{{' }} __testing_prepare_loop_item {{ '}}' }}"
+        index_var: "__testing_prepare_loop_index"
+        loop_var: "__testing_prepare_loop_item"
+
+
+  post_tasks:
+
+    - name: "Molecule | Prepare | Persist __testing_state (if any) to YAML file on localhost"
+      # Although this task is delegated to localhost, the play itself targets
+      # "hosts: molecule", so inventory_hostname is available.
+      delegate_to: "localhost"
+      ansible.builtin.copy:
+        content: "{{ '{{' }} __testing_state | to_nice_yaml {{ '}}' }}"
+        dest: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/__testing_state_{{ '{{' }} (inventory_hostname | hash('md5')) {{ '}}' }}.yml"
+        mode: "u=rw,g=r,o=r" # 0644
+      when:
+        - __testing_state is defined
+        - __testing_state is mapping

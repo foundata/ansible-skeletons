@@ -1,0 +1,78 @@
+# Molecule create playbook. Creates the testing infrastructure and stores data
+# in instance-config.
+
+---
+
+- name: "Molecule | Create"
+  hosts: "molecule"
+  gather_facts: false
+  no_log: "{{ '{{' }} molecule_no_log | default(false) {{ '}}' }}"
+  pre_tasks:
+
+    - name: "Molecule | Create | Restore __testing_state (if any) from YAML file from localhost"
+      # Although this task is delegated to localhost, the play itself targets
+      # "hosts: molecule", so the resulting fact is stored on the current
+      # inventory host. This is why inventory_hostname is available and must be
+      # used to load the correct per-host state file.
+      delegate_to: "localhost"
+      ansible.builtin.set_fact:
+        __testing_state: >-
+          {{ '{{' }}
+            lookup('file', molecule_ephemeral_directory ~ '/__testing_state_' ~ (inventory_hostname | hash('md5')) ~ '.yml', errors='ignore')
+            | default('{}')
+            | from_yaml
+            | default({})
+          {{ '}}' }}
+      when:
+        - (__testing_state is not defined) or (__testing_state is not mapping)
+
+
+  tasks:
+
+    - name: "Molecule | Create | Set <scenario>/tasks/create directory path"
+      ansible.builtin.set_fact:
+        __testing_create_taskdir: >-
+          {{ '{{' }}
+            (lookup('env', 'MOLECULE_SCENARIO_DIRECTORY') | regex_replace('/$', ''))
+            ~ '/tasks/create'
+          {{ '}}' }}
+
+
+    - name: "Molecule | Create | Check if <scenario>/tasks/create directory exists on localhost"
+      delegate_to: "localhost"
+      ansible.builtin.stat:
+        path: "{{ '{{' }} __testing_create_taskdir {{ '}}' }}"
+      run_once: true # noqa: run-once[task]
+      register: __testing_create_taskdir_stat
+
+
+    - name: "Molecule | Create | Include additional tasks from <scenario>/tasks/create"
+      ansible.builtin.include_tasks:
+        file: "{{ '{{' }} __testing_create_loop_item {{ '}}' }}"
+      when:
+        - __testing_create_loop_item is file
+      loop: >-
+        {{ '{{' }}
+          lookup('fileglob', __testing_create_taskdir ~ '/*.yml', wantlist=True) | sort
+          if (__testing_create_taskdir_stat['stat']['exists'] | default(false))
+          else []
+        {{ '}}' }}
+      loop_control:
+        label: "{{ '{{' }} __testing_create_loop_item {{ '}}' }}"
+        index_var: "__testing_create_loop_index"
+        loop_var: "__testing_create_loop_item"
+
+
+  post_tasks:
+
+    - name: "Molecule | Create | Persist __testing_state (if any) to YAML file on localhost"
+      # Although this task is delegated to localhost, the play itself targets
+      # "hosts: molecule", so inventory_hostname is available.
+      delegate_to: "localhost"
+      ansible.builtin.copy:
+        content: "{{ '{{' }} __testing_state | to_nice_yaml {{ '}}' }}"
+        dest: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/__testing_state_{{ '{{' }} (inventory_hostname | hash('md5')) {{ '}}' }}.yml"
+        mode: "u=rw,g=r,o=r" # 0644
+      when:
+        - __testing_state is defined
+        - __testing_state is mapping

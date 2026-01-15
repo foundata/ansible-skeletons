@@ -1,0 +1,29 @@
+# Prepare prerequisites for building the Execution Environment image
+
+- name: "Molecule | Prepare (localhost) | Check for required tools"
+  # The command or shell module is used intentionally: Ansible provides no
+  # dedicated module to perform this operation.
+  ansible.builtin.command:
+    argv:
+      - "/usr/bin/which"
+      - "{{ '{{' }} item {{ '}}' }}"
+  loop:
+    - "ansible-builder"
+    - "{{ '{{' }} podman_executable {{ '}}' }}"
+  register: __testing_required_tools_check
+  changed_when:
+    - false
+  failed_when:
+    - false
+
+
+- name: "Molecule | Prepare (localhost) | Fail if required tools are missing"
+  ansible.builtin.fail:
+    msg: |
+      Required tool '{{ '{{' }} item {{ '}}' }}' is not installed or not in PATH.
+      Please install it before running this scenario.
+  loop: "{{ '{{' }}  __testing_required_tools_check['results'] {{ '}}' }}"
+  loop_control:
+    label: "{{ '{{' }} item['item'] {{ '}}' }}"
+  when:
+    - item is failed

@@ -1,0 +1,68 @@
+
+- name: "Molecule | Destroy (EE) | Container"
+  when:
+    - __testing_state['ee_container_name'] is defined
+    - __testing_state['ee_container_name'] | length > 0
+  block:
+
+    - name: "Molecule | Destroy | Stop verification container on localhost (best effort)"
+      delegate_to: "localhost"
+      containers.podman.podman_container:
+        name: "{{ '{{' }} __testing_state['ee_container_name'] {{ '}}' }}"
+        state: "stopped"
+        executable: "{{ '{{' }} podman_executable {{ '}}' }}"
+      failed_when:
+        - false
+
+
+    - name: "Molecule | Destroy | Remove verification container"
+      containers.podman.podman_container:
+        name: "{{ '{{' }} __testing_state['ee_container_name'] {{ '}}' }}"
+        state: "absent"
+        delete_volumes: true
+        executable: "{{ '{{' }} podman_executable {{ '}}' }}"
+        force_delete: true
+        rmi: false
+
+
+- name: "Molecule | Destroy (EE) | Remove images"
+  when:
+    - __testing_state['ee_image_name'] is defined
+    - __testing_state['ee_image_name'] | length > 0
+  block:
+
+    - name: "Molecule | Destroy | Remove EE image"
+      containers.podman.podman_image:
+        name: "{{ '{{' }} __testing_state['ee_image_name'] {{ '}}' }}"
+        state: "absent"
+        executable: "{{ '{{' }} podman_executable {{ '}}' }}"
+        force: true
+
+
+    - name: "Molecule | Destroy (EE) | Find dangling images"
+      # The command or shell module is used intentionally:
+      # The containers.podman.podman_image_info module provides not *easy* way
+      # to get all dangling images.
+      ansible.builtin.command:
+        argv:
+          - "{{ '{{' }} podman_executable {{ '}}' }}"
+          - "images"
+          - "--filter"
+          - "dangling=true"
+          - "--quiet"
+      failed_when:
+        - false
+      register: __testing_dangling_images
+
+
+    - name: "Molecule | Destroy (EE) | Remove dangling images (if any)"
+      containers.podman.podman_image:
+        name: "{{ '{{' }} item {{ '}}' }}"
+        state: "absent"
+        executable: "{{ '{{' }} podman_executable {{ '}}' }}"
+        force: true
+      loop: "{{ '{{' }} __testing_dangling_images['stdout_lines'] | default([]) {{ '}}' }}"
+      when:
+        - (__testing_dangling_images['stdout_lines'] | default([])) | length > 0
+      failed_when:
+        - false

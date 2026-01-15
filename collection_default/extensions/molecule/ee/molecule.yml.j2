@@ -1,4 +1,7 @@
-# Configuration for the Ansible Molecule "default" scenario.
+# Configuration for the Ansible Molecule "ee" (Execution-environment) scenario.
+#
+# This scenario tests that the artifact can be included in an Ansible Execution
+# Environment (EE) built with ansible-builder.
 #
 # See the official documentation for details on this file and all settings:
 # https://ansible.readthedocs.io/projects/molecule/configuration/
@@ -18,67 +21,31 @@ driver:
   name: "default"
   options:
     managed: false
-    login_cmd_template: "podman exec -it {instance} bash"
-    ansible_connection_options:
-      ansible_connection: "podman"
 
 
 # Target platforms for testing
 platforms:
-  # Using foundata Integration Test Target (ITT) images which aim to replicate a
-  # "VM-like" testing environment and provide a fully functional systemd.
+  # No target platforms needed - we test on localhost by building an EE image
+  - name: "localhost"
 
-  # Debian 13 (Trixie)
-  - name: "molecule-debian13"
-    image: "quay.io/foundata/debian13-itt:latest"
-    systemd: true
-  # Debian 12 (Bookworm)
-  - name: "molecule-debian12"
-    image: "quay.io/foundata/debian12-itt:latest"
-    systemd: true
 
-  # Ubuntu 24.04 LTS (Noble Numbat)
-  - name: "molecule-ubuntu2404"
-    image: "quay.io/foundata/ubuntu2404-itt:latest"
-    systemd: true
-  # Ubuntu 22.04 LTS (Jammy Jellyfish)
-  - name: "molecule-ubuntu2204"
-    image: "quay.io/foundata/ubuntu2204-itt:latest"
-    systemd: true
-
-  # AlmaLinux 10 (best effort RHEL 10 (Red Hat Enterprise Linux))
-  - name: "molecule-almalinux10"
-    image: "quay.io/foundata/almalinux10-itt:latest"
-    systemd: true
-  # AlmaLinux 9 (best effort RHEL 9 (Red Hat Enterprise Linux))
-  - name: "molecule-almalinux9"
-    image: "quay.io/foundata/almalinux9-itt:latest"
-    systemd: true
-
-  # CentOS Stream 10
-  - name: "molecule-centosstream10"
-    image: "quay.io/foundata/centosstream10-itt:latest"
-    systemd: true
-  # CentOS Stream 9
-  - name: "molecule-centosstream9"
-    image: "quay.io/foundata/centosstream9-itt:latest"
-    systemd: true
-
-  # Fedora 43
-  - name: "molecule-fedora43"
-    image: "quay.io/foundata/fedora43-itt:latest"
-    systemd: true
-  # Fedora 42
-  - name: "molecule-fedora42"
-    image: "quay.io/foundata/fedora42-itt:latest"
-    systemd: true
-
-  # openSUSE Leap 16.0
-  - name: "molecule-opensuseleap160"
-    image: "quay.io/foundata/opensuseleap160-itt:latest"
-    systemd: true
-  # openSUSE Leap 15.6
-  # Currently not supported by us and therefore not tested.
+# Scenario execution order
+# Idempotence is excluded because EE builds are inherently non-idempotent
+# (building always creates new artifacts)
+scenario:
+  test_sequence:
+    - dependency
+    - cleanup
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - converge
+    # - idempotence  # Excluded: EE builds are not idempotent
+    - side_effect
+    - verify
+    - cleanup
+    - destroy
 
 
 # Ansible dependencies (collections, roles) of this Molecule scenario
@@ -114,21 +81,15 @@ provisioner:
       # set forks >= number of test platforms for better performance
       forks: ${ANSIBLE_FORKS:-12} # noqa
   playbooks:
-    create: "../shared/playbooks/create-podman.yml"
+    create: "../shared/playbooks/create.yml"
     prepare: "../shared/playbooks/prepare.yml"
     converge: "../shared/playbooks/converge.yml"
     side_effect: "../shared/playbooks/side_effect.yml"
     verify: "../shared/playbooks/verify.yml"
     cleanup: "../shared/playbooks/cleanup.yml"
-    destroy: "../shared/playbooks/destroy-podman.yml"
+    destroy: "../shared/playbooks/destroy.yml"
 
 
 verifier:
   name: "ansible"
   enabled: true
-
-
-# Skip role name validation against Ansible Galaxy standards. This prevents
-# development friction when working without a Galaxy account.
-# https://ansible.readthedocs.io/projects/molecule/configuration/#role-name-check
-role_name_check: 1

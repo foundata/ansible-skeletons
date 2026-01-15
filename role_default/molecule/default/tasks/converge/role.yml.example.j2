@@ -1,0 +1,7 @@
+# Execute the role against all driver-created instances.
+
+- name: "Molecule | Converge | Include the {{ role_name }} role"
+  ansible.builtin.include_role:
+    name: "{{ role_name }}"
+  vars:
+    {{ role_name }}_state: "present"

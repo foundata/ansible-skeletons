@@ -86,7 +86,7 @@ dependency:
   name: "galaxy"
   enabled: true
   options:
-    requirements-file: "requirements.yml"
+    requirements-file: "${MOLECULE_SCENARIO_DIRECTORY}/requirements.yml"
     ignore-certs: false
     ignore-errors: false
 
@@ -98,6 +98,9 @@ dependency:
 # https://ansible.readthedocs.io/projects/molecule/configuration/#molecule.interpolation.Interpolator.interpolate
 provisioner:
   name: "ansible"
+  inventory:
+    links:
+      hosts: "inventory/hosts.yml"
   config_options:
     defaults:
       # If the roles of this collection are not found by Molecule, try to run
@@ -111,11 +114,13 @@ provisioner:
       # set forks >= number of test platforms for better performance
       forks: ${ANSIBLE_FORKS:-12} # noqa
   playbooks:
-    create: "../resources/playbooks/create-podman.yml"
-    prepare: "../resources/playbooks/prepare.yml"
-    converge: "../resources/playbooks/converge.yml"
-    verify: "../resources/playbooks/verify.yml"
-    destroy: "../resources/playbooks/destroy-podman.yml"
+    create: "../shared/playbooks/create-podman.yml"
+    prepare: "../shared/playbooks/prepare.yml"
+    converge: "../shared/playbooks/converge.yml"
+    side_effect: "../shared/playbooks/side_effect.yml"
+    verify: "../shared/playbooks/verify.yml"
+    cleanup: "../shared/playbooks/cleanup.yml"
+    destroy: "../shared/playbooks/destroy-podman.yml"
 
 
 verifier:

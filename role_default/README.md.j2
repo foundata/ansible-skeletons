@@ -6,24 +6,14 @@ This repository contains the `{{ role_name }}` Ansible role.
 
 ## Table of contents<a id="toc"></a>
 
-- [Role variables](#variables)
 - [Example playbooks, using this role](#examples)
 - [Supported tags](#tags)
+- [Role variables](#variables)
 - [Dependencies](#dependencies)
 - [Compatibility](#compatibility)
 - [External requirements](#requirements)
 - [Licensing, copyright](#licensing-copyright)
 - [Author information](#author-information)
-
-
-
-## Role variables<a id="variables"></a>
-
-See [`defaults/main.yml`](./defaults/main.yml) for all available role parameters and their description. [`vars/main.yml`](./vars/main.yml) contains internal variables you should not override (but their description might be interesting).
-
-Additionally, there are variables read from other roles and/or the global scope (for example, host or group vars) as follows:
-
-- None right now.
 
 
 
@@ -76,6 +66,16 @@ It might be useful and faster to only call parts of the role by using tags:
 There are also tags usually not meant to be called directly but listed for the sake of completeness** and edge cases:
 
 - `{{ role_name }}_always`, `always`: Tasks needed by the role itself for internal role setup and the Ansible environment.
+
+
+
+## Role variables<a id="variables"></a>
+
+See [`defaults/main.yml`](./defaults/main.yml) for all available role parameters and their description. [`vars/main.yml`](./vars/main.yml) contains internal variables you should not override (but their description might be interesting).
+
+Additionally, there are variables read from other roles and/or the global scope (for example, host or group vars) as follows:
+
+- None right now.
 
 
 

@@ -1,0 +1,123 @@
+# Molecule destroy playbook. Destroys the testing infrastructure and removes
+# data from instance-config.
+#
+# This playbook is only compatible with scenarios using a "driver:" that
+# invokes Podman in molecule.yml.
+
+---
+
+- name: "Molecule | Destroy (Podman)"
+  hosts: "molecule"
+  gather_facts: false
+  no_log: "{{ '{{' }} molecule_no_log | default(false) {{ '}}' }}"
+  vars:
+    podman_executable: "{{ '{{' }} lookup('env','MOLECULE_PODMAN_EXECUTABLE') | default('podman', true) {{ '}}' }}"
+  pre_tasks:
+
+    - name: "Molecule | Destroy (Podman) | Restore __testing_state (if any) from YAML file from localhost"
+      # Although this task is delegated to localhost, the play itself targets
+      # "hosts: molecule", so the resulting fact is stored on the current
+      # inventory host. This is why inventory_hostname is available and must be
+      # used to load the correct per-host state file.
+      delegate_to: "localhost"
+      ansible.builtin.set_fact:
+        __testing_state: >-
+          {{ '{{' }}
+            lookup('file', molecule_ephemeral_directory ~ '/__testing_state_' ~ (inventory_hostname | hash('md5')) ~ '.yml', errors='ignore')
+            | default('{}')
+            | from_yaml
+            | default({})
+          {{ '}}' }}
+      when:
+        - (__testing_state is not defined) or (__testing_state is not mapping)
+      # "cleanup" and "destroy" phases must tolerate missing containers
+      failed_when: false
+      ignore_errors: true
+      ignore_unreachable: true
+
+
+  tasks:
+
+    # Tasks delegated to run locally (delegate_to or local_action), but iterate
+    # remotely-defined inventory items (as "hosts: molecule" == needed data source
+    # for at least inventory_hostname).
+    - name: "Molecule | Destroy (Podman) | Stop container on localhost (best effort)"
+      delegate_to: "localhost"
+      containers.podman.podman_container:
+        name: "{{ '{{' }} inventory_hostname {{ '}}' }}"
+        state: "stopped"
+        executable: "{{ '{{' }} podman_executable {{ '}}' }}"
+      failed_when:
+        - false
+
+
+    - name: "Molecule | Destroy (Podman) | Remove container on localhost"
+      delegate_to: "localhost"
+      containers.podman.podman_container:
+        name: "{{ '{{' }} inventory_hostname {{ '}}' }}"
+        state: "absent"
+        delete_volumes: true
+        executable: "{{ '{{' }} podman_executable {{ '}}' }}"
+        force_delete: true
+
+
+    - name: "Molecule | Destroy (Podman) | Set <scenario>/tasks/destroy directory path"
+      ansible.builtin.set_fact:
+        __testing_destroy_taskdir: >-
+          {{ '{{' }}
+            (lookup('env', 'MOLECULE_SCENARIO_DIRECTORY') | regex_replace('/$', ''))
+            ~ '/tasks/destroy'
+          {{ '}}' }}
+
+
+    - name: "Molecule | Destroy (Podman) | Check if <scenario>/tasks/destroy directory exists on localhost"
+      delegate_to: "localhost"
+      ansible.builtin.stat:
+        path: "{{ '{{' }} __testing_destroy_taskdir {{ '}}' }}"
+      run_once: true # noqa: run-once[task]
+      register: __testing_destroy_taskdir_stat
+
+
+    - name: "Molecule | Destroy (Podman) | Include additional tasks from <scenario>/tasks/destroy"
+      ansible.builtin.include_tasks:
+        file: "{{ '{{' }} __testing_destroy_loop_item {{ '}}' }}"
+      when:
+        - __testing_destroy_loop_item is file
+      loop: >-
+        {{ '{{' }}
+          lookup('fileglob', __testing_destroy_taskdir ~ '/*.yml', wantlist=True) | sort
+          if (__testing_destroy_taskdir_stat['stat']['exists'] | default(false))
+          else []
+        {{ '}}' }}
+      loop_control:
+        label: "{{ '{{' }} __testing_destroy_loop_item {{ '}}' }}"
+        index_var: "__testing_destroy_loop_index"
+        loop_var: "__testing_destroy_loop_item"
+
+
+    - name: "Molecule | Destroy (Podman) | Delete __testing_state YAML file (best effort) on localhost"
+      delegate_to: "localhost"
+      ansible.builtin.file:
+        path: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/__testing_state_{{ '{{' }} (inventory_hostname | hash('md5')) {{ '}}' }}.yml"
+        state: "absent"
+      # "cleanup" and "destroy" phases must tolerate missing containers
+      failed_when: false
+      ignore_errors: true
+      ignore_unreachable: true
+
+
+
+# The following play runs on localhost only as the tasks do not require
+# target-related data like inventory_hostname. Therefore, there is no need to
+# specify "hosts: molecule" with delegate_to or local_action. Running the play
+# directly on localhost saves time and results in less noisy output.
+- name: "Molecule | Destroy (Podman) | Additional cleanup tasks on localhost"
+  hosts: "localhost"
+  gather_facts: false
+  no_log: "{{ '{{' }} molecule_no_log | default(false) {{ '}}' }}"
+  tasks:
+
+    - name: "Molecule | Destroy (Podman) | Remove dynamic inventory file"
+      ansible.builtin.file:
+        path: "{{ '{{' }} molecule_ephemeral_directory }}/inventory/molecule_inventory.yml"
+        state: "absent"

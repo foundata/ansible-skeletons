@@ -1,0 +1,135 @@
+# Prepare metadata, files and directories
+
+- name: "Molecule | Prepare (all) | Init data used across stages"
+  ansible.builtin.include_tasks:
+    file: "../tasks/state_update.yml"
+  vars:
+    __testing_state_update:
+      project_type: ""
+      project_dir_path: "{{ '{{' }} lookup('env', 'MOLECULE_PROJECT_DIRECTORY') {{ '}}' }}"
+      build_dir_path: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/ee-build"
+      artifact_ansible_name: "" # technical name like foo.bar
+      artifact_path: "" # full absolute path to the built artifact (file if collection, dir if role)
+      artifact_fsname: "" # name n the filesystem like foo.bar-1.0.0.tar.gz (collection) or dirname like foobar (role)
+      ee_image_name: "molecule-ee-test"
+      ee_image_tag: "latest"
+      ee_container_name: "molecule-verify-ee"
+
+
+- name: "Molecule | Prepare (all) | Check for galaxy.yml (collection indicator)"
+  ansible.builtin.stat:
+    path: "{{ '{{' }} __testing_state['project_dir_path'] {{ '}}' }}/galaxy.yml"
+  register: __testing_galaxyyml_stat
+
+
+- name: "Molecule | Prepare (all) | Check for meta/main.yml (role indicator)"
+  ansible.builtin.stat:
+    path: "{{ '{{' }} __testing_state['project_dir_path'] {{ '}}' }}/meta/main.yml"
+  register: __testing_rolemeta_stat
+
+
+- name: "Molecule | Prepare (all) | Determine project type"
+  ansible.builtin.include_tasks:
+    file: "../tasks/state_update.yml"
+  vars:
+    __testing_state_update:
+      project_type: >-
+        {{ '{%-' }}  if (__testing_state['project_type'] is defined) and ((__testing_state['project_type'] | length) > 0)  {{ '-%}' }}
+          {{ '{{' }} __testing_state['project_type'] {{ '}}' }}
+        {{ '{%-' }}  elif __testing_galaxyyml_stat['stat']['exists'] {{ '-%}' }}
+          collection
+        {{ '{%-' }}  elif __testing_rolemeta_stat['stat']['exists'] {{ '-%}' }}
+          role
+        {{ '{%-' }}  else {{ '-%}' }}
+          unknown
+        {{ '{%-' }}  endif {{ '-%}' }}
+
+
+- name: "Molecule | Prepare (all) | Fail if project type cannot be determined"
+  ansible.builtin.fail:
+    msg: >
+      Cannot determine project type. Expected either galaxy.yml (collection) or
+      meta/main.yml (role) in {{ '{{' }} __testing_state['project_dir_path']  {{ '}}' }}.
+  when:
+    - __testing_state['project_type'] == "unknown"
+
+
+- name: "Molecule | Prepare (all) | Display detected project type"
+  ansible.builtin.debug:
+    msg: "Detected project type: {{ '{{' }} __testing_state['project_type'] {{ '}}' }}"
+
+
+# Collection
+- name: "Molecule | Prepare (all) | Collection meta data"
+  when:
+    - __testing_state['project_type'] == "collection"
+  block:
+
+    - name: "Molecule | Prepare (all) | Read collection metadata (galaxy.yml)"
+      ansible.builtin.slurp:
+        src: "{{ '{{' }} __testing_state['project_dir_path'] {{ '}}' }}/galaxy.yml"
+      register: __testing_artifact_meta_raw
+
+
+    - name: "Molecule | Prepare (all) | Parse collection metadata"
+      ansible.builtin.set_fact:
+        __testing_artifact_meta: >-
+          {{ '{{' }}
+            __testing_artifact_meta_raw['content']
+            | b64decode
+            | from_yaml
+          {{ '}}' }}
+
+
+    - name: "Molecule | Prepare (all) | Extract collection namespace and name, set collection FQCN"
+      ansible.builtin.include_tasks:
+        file: "../tasks/state_update.yml"
+      vars:
+        __testing_state_update:
+          artifact_ansible_name: >-
+            {{ '{{' }}
+              __testing_artifact_meta['namespace']
+            {{ '}}' }}.{{ '{{' }}
+              __testing_artifact_meta['name']
+            {{ '}}' }}
+
+
+# Role
+- name: "Molecule | Prepare (all) | Role meta data"
+  when:
+    - __testing_state['project_type'] == "role"
+  block:
+
+    - name: "Molecule | Prepare (all) | Read role metadata (meta/main.yml)"
+      ansible.builtin.slurp:
+        src: "{{ '{{' }} __testing_state['project_dir_path'] {{ '}}' }}/meta/main.yml"
+      register: __testing_artifact_meta_raw
+
+
+    - name: "Molecule | Prepare (all) | Parse role metadata"
+      ansible.builtin.set_fact:
+        __testing_artifact_meta: >-
+          {{ '{{' }}
+            __testing_artifact_meta_raw['content']
+            | b64decode
+            | from_yaml
+          {{ '}}' }}
+
+
+    - name: "Molecule | Prepare (all) | Extract role name from metadata or directory"
+      ansible.builtin.include_tasks:
+        file: "../tasks/state_update.yml"
+      vars:
+        __testing_state_update:
+          # Prefer galaxy_info role_name, fall back to directory name
+          artifact_ansible_name: >-
+            {{ '{{' }}
+              __testing_artifact_meta['galaxy_info']['role_name']
+              | default(__testing_state['project_dir_path'])
+              | basename
+            {{ '}}' }}
+
+
+- name: "Molecule | Prepare (all) | Display artifact name"
+  ansible.builtin.debug:
+    msg: "Artifact name: {{ '{{' }} __testing_state['artifact_ansible_name'] {{ '}}' }}"
