@@ -49,16 +49,23 @@
             {{ '}}' }}
           artifact_path: >-
             {{ '{{' }}
-              (__testing_artifact_find['files'][0]['path'] |trim)
+              (__testing_artifact_find['files'][0]['path'] | trim)
             {{ '}}' }}
 
 
-    - name: "Molecule | Converge | Create execution-environment.yml for collection"
+    - name: "Molecule | Converge | Write Execution Environment definition for EE test builds with collection"
       ansible.builtin.copy:
-        dest: "{{ '{{' }} __testing_state['build_dir_path'] {{ '}}' }}/execution-environment.yml"
+        dest: "{{ '{{' }} __testing_state['build_dir_path'] {{ '}}' }}/molecule-ee-test.yml"
         mode: "u=rw,g=r,o=r" # 0644
         content: |
+          # Build definition for the Molecule EE image.
+          #
+          # During the build, ansible-builder also introspects any installed
+          # collection for a "meta/execution-environment.yml" and pull in extra
+          # Python/system dependencies from there.
+
           ---
+
           version: 3
 
           images:
@@ -138,12 +145,15 @@
         mode: "preserve" # FIXME does this make sense here?
 
 
-    - name: "Molecule | Converge | Create execution-environment.yml for role"
+    - name: "Molecule | Converge | Write Execution Environment definition for EE test builds with role"
       ansible.builtin.copy:
-        dest: "{{ '{{' }} __testing_state['build_dir_path'] {{ '}}' }}/execution-environment.yml"
+        dest: "{{ '{{' }} __testing_state['build_dir_path'] {{ '}}' }}/molecule-ee-test.yml"
         mode: "u=rw,g=r,o=r" # 0644
         content: |
+          # Build definition for the Molecule EE image
+
           ---
+
           version: 3
 
           images:
@@ -196,10 +206,10 @@
       - "--container-runtime"
       - "{{ '{{' }} podman_executable {{ '}}' }}"
       - "--file"
-      - "execution-environment.yml"
+      - "molecule-ee-test.yml"
       - "--prune-images"
       - "--verbosity"
-      - "{{ '{{' }} ansible_verbosity | default(3) {{ '}}' }}"
+      - "{{ '{{' }} ansible_verbosity if (ansible_verbosity | default(0)) >= 3 else 3 {{ '}}' }}" # >=3 is needed for build introspection output
     chdir: "{{ '{{' }} __testing_state['build_dir_path'] {{ '}}' }}"
   changed_when:
     - true
@@ -207,15 +217,21 @@
   ignore_errors: true
 
 
-- name: "Molecule | Converge | Show build output on failure"
-  ansible.builtin.debug:
-    var: __testing_ee_build_result
-  when:
-    - __testing_ee_build_result is failed
-
-
 - name: "Molecule | Converge | Fail if Execution Environment (EE) build failed"
   ansible.builtin.fail:
-    msg: "Execution Environment (EE) build failed. See output above for details."
+    msg: |
+      Execution Environment (EE) build failed.
+
+      A common cause is dependency introspection from a collection's
+      meta/execution-environment.yml file, which can inject additional
+      system or Python dependencies into the build. If the build fails,
+      always inspect the collection metadata as well:
+      {{ '{{' }} __testing_state['artifact_path'] {{ '}}' }}/meta/execution-environment.yml
+
+      STDOUT:
+      {{ '{{' }} __testing_ee_build_result['stdout'] | default('') {{ '}}' }}
+
+      STDERR:
+      {{ '{{' }} __testing_ee_build_result['stderr'] | default('') {{ '}}' }}
   when:
     - __testing_ee_build_result is failed
