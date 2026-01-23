@@ -61,8 +61,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- collection_default: [Molecule](https://ansible.readthedocs.io/projects/molecule/) support with a default scenario using [Podman](https://podman.io/docs/installation) and several [integration test targets](https://github.com/orgs/foundata/repositories?q=oci-*-itt). (4c8a01c, #3)
-- role_default: [Molecule](https://ansible.readthedocs.io/projects/molecule/) support with a default scenario using [Podman](https://podman.io/docs/installation) and several [integration test targets](https://github.com/orgs/foundata/repositories?q=oci-*-itt). (f57cd625, #3)
+- collection_default: [Molecule](https://docs.ansible.com/projects/molecule/) support with a default scenario using [Podman](https://podman.io/docs/installation) and several [integration test targets](https://github.com/orgs/foundata/repositories?q=oci-*-itt). (4c8a01c, #3)
+- role_default: [Molecule](https://docs.ansible.com/projects/molecule/) support with a default scenario using [Podman](https://podman.io/docs/installation) and several [integration test targets](https://github.com/orgs/foundata/repositories?q=oci-*-itt). (f57cd625, #3)
 
 ### Changed
 

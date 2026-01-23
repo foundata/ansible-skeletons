@@ -1,6 +1,6 @@
 # Ansible Molecule: Testing this collection
 
-This directory provides resources for testing the collection and its resources with [Molecule](https://ansible.readthedocs.io/projects/molecule/).
+This directory provides resources for testing the collection and its resources with [Molecule](https://docs.ansible.com/projects/molecule/).
 
 
 
@@ -24,7 +24,7 @@ This directory provides resources for testing the collection and its resources w
 
 ## Requirements<a id="requirements"></a>
 
-See the official documentation on how to [install Molecule](https://ansible.readthedocs.io/projects/molecule/installation/#pip).
+See the official documentation on how to [install Molecule](https://docs.ansible.com/projects/molecule/installation/#pip).
 
 
 

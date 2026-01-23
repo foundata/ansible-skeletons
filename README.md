@@ -48,7 +48,7 @@ All skeletons follow several guidelines and best practices:
 Main features:
 
 * **Sensible defaults** – metadata, version checks, and directory structures already configured.
-* **Linting and testing built-in** – ready for [`ansible-lint`](https://ansible.readthedocs.io/projects/lint/) and [Molecule](https://ansible.readthedocs.io/projects/molecule/)
+* **Linting and testing built-in** – ready for [`ansible-lint`](https://docs.ansible.com/projects/lint/) and [Molecule](https://docs.ansible.com/projects/molecule/)
 * **Platform-aware design** – clear separation for OS-specific variables and tasks.
 * **Changelog tooling** – conventions and helpers for transparent release notes.
 * **Reproducible structure** - faster bootstrapping, fewer style debates. Focus on automation logic instead of boilerplate.
@@ -139,8 +139,8 @@ A general purpose skeleton to create new Ansible collection for [package and shi
   * Automatic search and include for [platform-specific variables](https://redhat-cop.github.io/automation-good-practices/#_platform_specific_variables).
 * Separation of logical task groups, automatic include for[ platform-specific tasks](https://redhat-cop.github.io/automation-good-practices/#_platform_specific_tasks).
 * Passes `ansible-lint --profile production --strict`.
-* [`antsibull-changelog`](https://ansible.readthedocs.io/projects/antsibull-changelog/changelogs/) support.
-* [Molecule](https://ansible.readthedocs.io/projects/molecule/) support with a default scenario using [Podman](https://podman.io/docs/installation) and several [integration test targets](https://github.com/orgs/foundata/repositories?q=oci-*-itt).
+* [`antsibull-changelog`](https://docs.ansible.com/projects/antsibull-changelog/changelogs/) support.
+* [Molecule](https://docs.ansible.com/projects/molecule/) support with a default scenario using [Podman](https://podman.io/docs/installation) and several [integration test targets](https://github.com/orgs/foundata/repositories?q=oci-*-itt).
 
 
 
@@ -155,7 +155,7 @@ A general purpose skeleton to create new Ansible stand-alone role. Main features
   * Automatic search and include for [platform-specific variables](https://redhat-cop.github.io/automation-good-practices/#_platform_specific_variables).
 * Separation of logical task groups, automatic include for [platform-specific tasks](https://redhat-cop.github.io/automation-good-practices/#_platform_specific_tasks).
 * Passes `ansible-lint --profile production --strict`.
-* [Molecule](https://ansible.readthedocs.io/projects/molecule/) support with a default scenario using [Podman](https://podman.io/docs/installation) and several [integration test targets](https://github.com/orgs/foundata/repositories?q=oci-*-itt).
+* [Molecule](https://docs.ansible.com/projects/molecule/) support with a default scenario using [Podman](https://podman.io/docs/installation) and several [integration test targets](https://github.com/orgs/foundata/repositories?q=oci-*-itt).
 
 
 
