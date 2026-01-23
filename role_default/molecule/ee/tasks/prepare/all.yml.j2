@@ -76,7 +76,7 @@
         __testing_artifact_meta: >-
           {{ '{{' }}
             __testing_artifact_meta_raw['content']
-            | b64decode
+            | ansible.builtin.b64decode
             | ansible.builtin.from_yaml
           {{ '}}' }}
 
@@ -111,7 +111,7 @@
         __testing_artifact_meta: >-
           {{ '{{' }}
             __testing_artifact_meta_raw['content']
-            | b64decode
+            | ansible.builtin.b64decode
             | ansible.builtin.from_yaml
           {{ '}}' }}
 
