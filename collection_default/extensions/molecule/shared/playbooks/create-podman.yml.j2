@@ -112,13 +112,13 @@
         __testing_failed_containers: >-
           {{ '{{' }}
             __testing_createcontainer_result['results']
-            | selectattr('container.State.Running', 'defined')
-            | selectattr('container.State.Running', 'equalto', false)
+            | ansible.builtin.selectattr('container.State.Running', 'defined')
+            | ansible.builtin.selectattr('container.State.Running', 'equalto', false)
             | ansible.builtin.list
             +
             __testing_createcontainer_result['results']
-            | selectattr('container.State.ExitCode', 'defined')
-            | selectattr('container.State.ExitCode', 'ne', 0)
+            | ansible.builtin.selectattr('container.State.ExitCode', 'defined')
+            | ansible.builtin.selectattr('container.State.ExitCode', 'ne', 0)
             | ansible.builtin.list
           {{ '}}' }}
       when:
