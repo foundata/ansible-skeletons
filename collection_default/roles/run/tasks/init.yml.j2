@@ -48,7 +48,7 @@
     - (__run_{{ collection_name }}_supported_platforms | ansible.builtin.length) > 0
     - (__run_{{ collection_name }}_supported_platforms
        | selectattr('name', 'match', '^(' ~ ansible_facts['distribution'] ~ '|' ~ ansible_facts['os_family'] ~ ')$', ignorecase=true)
-       | ansible.builtin.map(attribute='versions') | flatten
+       | ansible.builtin.map(attribute='versions') | ansible.builtin.flatten
        | select('match', '^(' ~ ansible_facts['distribution_major_version'] ~ '|' ~ ansible_facts['distribution_version'] ~ '|all)$', ignorecase=true)
        | ansible.builtin.list | ansible.builtin.length) < 1
   ignore_errors: true # noqa: ignore-errors
