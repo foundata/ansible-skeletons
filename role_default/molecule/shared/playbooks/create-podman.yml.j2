@@ -214,10 +214,10 @@
           {{ '{{' }}
             ((item['image'] | default('') | ansible.builtin.lower is search('windows')) or
              (item['name'] | default('') | ansible.builtin.lower is search('windows')) or
-             (item['os_family'] | default('') | ansible.builtin.lower == 'windows')) | bool
+             (item['os_family'] | default('') | ansible.builtin.lower == 'windows')) | ansible.builtin.bool
           {{ '}}' }}
         __testing_inventory_os_group: >-
-          {{ '{{' }} 'molecule_windows' if (__testing_inventory_is_windows | bool) else 'molecule_linux' {{ '}}' }}
+          {{ '{{' }} 'molecule_windows' if (__testing_inventory_is_windows | ansible.builtin.bool) else 'molecule_linux' {{ '}}' }}
         __testing_inventory_partial_yaml: |
           all:
             children:
