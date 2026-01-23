@@ -8,7 +8,7 @@
     state: "absent"
   when:
     - __run_{{ collection_name }}_packages_removal is defined
-    - (__run_{{ collection_name }}_packages_removal | length) > 0
+    - (__run_{{ collection_name }}_packages_removal | ansible.builtin.length) > 0
 
 
 - name: "Setup | Install | Default | Install or upgrade packages"
@@ -17,7 +17,7 @@
     state: "{{ '{{' }} 'latest' if run_{{ collection_name }}_autoupgrade else 'present' {{ '}}' }}"
   when:
     - __run_{{ collection_name }}_packages_install is defined
-    - (__run_{{ collection_name }}_packages_install | length) > 0
+    - (__run_{{ collection_name }}_packages_install | ansible.builtin.length) > 0
 
 
 - name: "Setup | Install | Default | Remove unwanted files and directories (e.g., to prevent conflicts or resolve incompatibilities)"
@@ -26,5 +26,5 @@
     state: "absent"
   when:
     - __run_{{ collection_name }}_paths_removal is defined
-    - (__run_{{ collection_name }}_paths_removal | length) > 0
+    - (__run_{{ collection_name }}_paths_removal | ansible.builtin.length) > 0
   loop: "{{ '{{ __run_' + collection_name + '_paths_removal }}' }}"

@@ -34,7 +34,7 @@
   vars:
     __testing_state_update:
       project_type: >-
-        {{ '{%-' }}  if (__testing_state['project_type'] is defined) and ((__testing_state['project_type'] | length) > 0)  {{ '-%}' }}
+        {{ '{%-' }}  if (__testing_state['project_type'] is defined) and ((__testing_state['project_type'] | ansible.builtin.length) > 0)  {{ '-%}' }}
           {{ '{{' }} __testing_state['project_type'] {{ '}}' }}
         {{ '{%-' }}  elif __testing_galaxyyml_stat['stat']['exists'] {{ '-%}' }}
           collection

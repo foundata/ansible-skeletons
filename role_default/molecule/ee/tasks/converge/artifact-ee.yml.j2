@@ -35,7 +35,7 @@
       ansible.builtin.fail:
         msg: "No collection artifact found in {{ '{{' }} __testing_state['build_dir_path'] {{ '}}' }}"
       when:
-        - __testing_artifact_find['files'] | length == 0
+        - __testing_artifact_find['files'] | ansible.builtin.length == 0
 
 
     - name: "Molecule | Converge | Set artifact filename and path"

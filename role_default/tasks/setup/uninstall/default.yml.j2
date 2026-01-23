@@ -8,4 +8,4 @@
     state: "absent"
   when:
     - __{{ role_name }}_packages_uninstall is defined
-    - (__{{ role_name }}_packages_uninstall | length) > 0
+    - (__{{ role_name }}_packages_uninstall | ansible.builtin.length) > 0

@@ -61,7 +61,7 @@
       when:
         - item['registry'] is defined
         - item['registry']['url'] is defined
-        - item['registry']['url'] | length > 0
+        - item['registry']['url'] | ansible.builtin.length > 0
         - item['registry']['credentials'] is defined
         - item['registry']['credentials']['username'] is defined
       changed_when:
@@ -127,7 +127,7 @@
 
 
     - name: "Molecule | Create (Podman) | Handle container failures (if any)"
-      when: __testing_failed_containers | default([]) | length > 0
+      when: __testing_failed_containers | default([]) | ansible.builtin.length > 0
       block:
 
         - name: "Molecule | Create (Podman) | Print failed container info"

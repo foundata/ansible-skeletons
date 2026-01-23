@@ -3,7 +3,7 @@
 - name: "Molecule | Destroy (EE) | Container"
   when:
     - __testing_state['ee_container_name'] is defined
-    - __testing_state['ee_container_name'] | length > 0
+    - __testing_state['ee_container_name'] | ansible.builtin.length > 0
   block:
 
     - name: "Molecule | Destroy | Stop verification container on localhost (best effort)"
@@ -29,7 +29,7 @@
 - name: "Molecule | Destroy (EE) | Remove images"
   when:
     - __testing_state['ee_image_name'] is defined
-    - __testing_state['ee_image_name'] | length > 0
+    - __testing_state['ee_image_name'] | ansible.builtin.length > 0
   block:
 
     - name: "Molecule | Destroy | Remove EE image"
@@ -66,6 +66,6 @@
         force: true
       loop: "{{ '{{' }} __testing_dangling_images['stdout_lines'] | default([]) {{ '}}' }}"
       when:
-        - (__testing_dangling_images['stdout_lines'] | default([])) | length > 0
+        - (__testing_dangling_images['stdout_lines'] | default([])) | ansible.builtin.length > 0
       failed_when:
         - false
