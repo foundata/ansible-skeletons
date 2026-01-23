@@ -18,7 +18,7 @@
       {{ '{{' }}
         __testing_state
         | default({})
-        | combine(__testing_state_update, recursive=True)
+        | ansible.builtin.combine(__testing_state_update, recursive=True)
       {{ '}}' }}
   when:
     - __testing_state_update is defined
