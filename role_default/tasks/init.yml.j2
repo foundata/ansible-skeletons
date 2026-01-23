@@ -79,5 +79,5 @@
   vars:
     __{{ role_name }}_vars_file: "{{ '{{' }} role_path {{ '}}' }}/vars/{{ '{{' }} item {{ '}}' }}"
   when:
-    - __{{ role_name }}_vars_file is file
+    - __{{ role_name }}_vars_file is ansible.builtin.file
   loop: "{{ '{{' }} __{{ role_name }}_platform_filenames_most_specific_last {{ '}}' }}"

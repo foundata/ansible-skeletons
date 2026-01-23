@@ -159,7 +159,7 @@
       when:
         - __testing_prepare_taskdir_stat is defined
         - __testing_prepare_taskdir_stat['stat']['exists']
-        - __testing_prepare_loop_item is file
+        - __testing_prepare_loop_item is ansible.builtin.file
       loop:
         - "{{ '{{' }} __testing_prepare_taskdir {{ '}}' }}/all.yml"
         - "{{ '{{' }} __testing_prepare_taskdir {{ '}}' }}/{{ '{{' }} inventory_hostname {{ '}}' }}.yml"

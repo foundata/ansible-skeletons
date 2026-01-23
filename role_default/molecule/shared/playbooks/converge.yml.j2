@@ -53,7 +53,7 @@
       ansible.builtin.include_tasks:
         file: "{{ '{{' }} __testing_converge_loop_item {{ '}}' }}"
       when:
-        - __testing_converge_loop_item is file
+        - __testing_converge_loop_item is ansible.builtin.file
       loop: >-
         {{ '{{' }}
           lookup('fileglob', __testing_converge_taskdir ~ '/*.yml', wantlist=True) | ansible.builtin.sort

@@ -61,7 +61,7 @@
       ansible.builtin.include_tasks:
         file: "{{ '{{' }} __testing_verify_loop_item {{ '}}' }}"
       when:
-        - __testing_verify_loop_item is file
+        - __testing_verify_loop_item is ansible.builtin.file
       loop: >-
         {{ '{{' }}
           lookup('fileglob', __testing_verify_taskdir ~ '/*.yml', wantlist=True) | ansible.builtin.sort

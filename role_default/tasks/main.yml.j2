@@ -24,7 +24,7 @@
     __{{ role_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/setup/install/{{ '{{' }} __{{ role_name }}_loop_item {{ '}}' }}"
   when:
     - {{ role_name }}_state == 'present'
-    - __{{ role_name }}_task_file is file
+    - __{{ role_name }}_task_file is ansible.builtin.file
   loop: "{{ '{{' }} __{{ role_name }}_platform_filenames_most_specific_first + ['default.yml'] {{ '}}' }}"
   loop_control:
     loop_var: "__{{ role_name }}_loop_item"
@@ -42,7 +42,7 @@
     __{{ role_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/config/{{ '{{' }} __{{ role_name }}_loop_item {{ '}}' }}"
   when:
     - {{ role_name }}_state == 'present'
-    - __{{ role_name }}_task_file is file
+    - __{{ role_name }}_task_file is ansible.builtin.file
   loop: "{{ '{{' }} __{{ role_name }}_platform_filenames_most_specific_first + ['default.yml'] {{ '}}' }}"
   loop_control:
     loop_var: "__{{ role_name }}_loop_item"
@@ -60,7 +60,7 @@
     __{{ role_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/service/{{ '{{' }} __{{ role_name }}_loop_item {{ '}}' }}"
   when:
     - {{ role_name }}_state == 'present'
-    - __{{ role_name }}_task_file is file
+    - __{{ role_name }}_task_file is ansible.builtin.file
   loop: "{{ '{{' }} __{{ role_name }}_platform_filenames_most_specific_first + ['default.yml'] {{ '}}' }}"
   loop_control:
     loop_var: "__{{ role_name }}_loop_item"
@@ -78,7 +78,7 @@
     __{{ role_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/setup/uninstall/{{ '{{' }} __{{ role_name }}_loop_item {{ '}}' }}"
   when:
     - {{ role_name }}_state == 'absent'
-    - __{{ role_name }}_task_file is file
+    - __{{ role_name }}_task_file is ansible.builtin.file
   loop: "{{ '{{' }} __{{ role_name }}_platform_filenames_most_specific_first + ['default.yml'] {{ '}}' }}"
   loop_control:
     loop_var: "__{{ role_name }}_loop_item"

@@ -24,7 +24,7 @@
     __run_{{ collection_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/setup/install/{{ '{{' }} __run_{{ collection_name }}_loop_item {{ '}}' }}"
   when:
     - run_{{ collection_name }}_state == 'present'
-    - __run_{{ collection_name }}_task_file is file
+    - __run_{{ collection_name }}_task_file is ansible.builtin.file
   loop: "{{ '{{' }} __run_{{ collection_name }}_platform_filenames_most_specific_first + ['default.yml'] {{ '}}' }}"
   loop_control:
     loop_var: "__run_{{ collection_name }}_loop_item"
@@ -42,7 +42,7 @@
     __run_{{ collection_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/config/{{ '{{' }} __run_{{ collection_name }}_loop_item {{ '}}' }}"
   when:
     - run_{{ collection_name }}_state == 'present'
-    - __run_{{ collection_name }}_task_file is file
+    - __run_{{ collection_name }}_task_file is ansible.builtin.file
   loop: "{{ '{{' }} __run_{{ collection_name }}_platform_filenames_most_specific_first + ['default.yml'] {{ '}}' }}"
   loop_control:
     loop_var: "__run_{{ collection_name }}_loop_item"
@@ -60,7 +60,7 @@
     __run_{{ collection_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/service/{{ '{{' }} __run_{{ collection_name }}_loop_item {{ '}}' }}"
   when:
     - run_{{ collection_name }}_state == 'present'
-    - __run_{{ collection_name }}_task_file is file
+    - __run_{{ collection_name }}_task_file is ansible.builtin.file
   loop: "{{ '{{' }} __run_{{ collection_name }}_platform_filenames_most_specific_first + ['default.yml'] {{ '}}' }}"
   loop_control:
     loop_var: "__run_{{ collection_name }}_loop_item"
@@ -78,7 +78,7 @@
     __run_{{ collection_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/setup/uninstall/{{ '{{' }} __run_{{ collection_name }}_loop_item {{ '}}' }}"
   when:
     - run_{{ collection_name }}_state == 'absent'
-    - __run_{{ collection_name }}_task_file is file
+    - __run_{{ collection_name }}_task_file is ansible.builtin.file
   loop: "{{ '{{' }} __run_{{ collection_name }}_platform_filenames_most_specific_first + ['default.yml'] {{ '}}' }}"
   loop_control:
     loop_var: "__run_{{ collection_name }}_loop_item"
