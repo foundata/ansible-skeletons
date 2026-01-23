@@ -45,7 +45,7 @@
         __testing_state_update:
           artifact_fsname: >-
             {{ '{{' }}
-              (__testing_artifact_find['files'][0]['path'] | basename | ansible.builtin.trim)
+              (__testing_artifact_find['files'][0]['path'] | ansible.builtin.basename | ansible.builtin.trim)
             {{ '}}' }}
           artifact_path: >-
             {{ '{{' }}
