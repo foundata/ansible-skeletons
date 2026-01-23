@@ -36,7 +36,7 @@
           {{ '{{' }}
             lookup('file', molecule_ephemeral_directory ~ '/__testing_state_' ~ (inventory_hostname | hash('md5')) ~ '.yml', errors='ignore')
             | default('{}')
-            | from_yaml
+            | ansible.builtin.from_yaml
             | default({})
           {{ '}}' }}
       when:
@@ -208,7 +208,7 @@
     - name: "Molecule | Create (Podman) | Create inventory data, add container to groups"
       ansible.builtin.set_fact:
         molecule_inventory: >
-          {{ '{{' }} molecule_inventory | combine(__testing_inventory_partial_yaml | from_yaml, recursive=true) {{ '}}' }}
+          {{ '{{' }} molecule_inventory | combine(__testing_inventory_partial_yaml | ansible.builtin.from_yaml, recursive=true) {{ '}}' }}
       vars:
         __testing_inventory_is_windows: >
           {{ '{{' }}

@@ -25,7 +25,7 @@
           {{ '{{' }}
             lookup('file', molecule_ephemeral_directory ~ '/__testing_state_' ~ (inventory_hostname | hash('md5')) ~ '.yml', errors='ignore')
             | default('{}')
-            | from_yaml
+            | ansible.builtin.from_yaml
             | default({})
           {{ '}}' }}
       when:
