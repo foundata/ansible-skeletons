@@ -78,8 +78,8 @@
         # not specify a command.
         command: >-
           {{ '{%-' }} if (item['systemd'] | ansible.builtin.default(false)) and not (item['command'] | ansible.builtin.default(false)) {{ '-%}' }}
-            {{ '{%-' }} if (item['image'] | ansible.builtin.default('') | ansible.builtin.lower | regex_search('debian|ubuntu')) or
-                   (item['name'] | ansible.builtin.default('') | ansible.builtin.lower | regex_search('debian|ubuntu')) {{ '-%}' }}
+            {{ '{%-' }} if (item['image'] | ansible.builtin.default('') | ansible.builtin.lower | ansible.builtin.regex_search('debian|ubuntu')) or
+                   (item['name'] | ansible.builtin.default('') | ansible.builtin.lower | ansible.builtin.regex_search('debian|ubuntu')) {{ '-%}' }}
               /lib/systemd/systemd
             {{ '{%-' }} else {{ '-%}' }}
               /usr/sbin/init
@@ -257,7 +257,7 @@
       ansible.builtin.set_fact:
         __testing_create_taskdir: >-
           {{ '{{' }}
-            (lookup('env', 'MOLECULE_SCENARIO_DIRECTORY') | regex_replace('/$', ''))
+            (lookup('env', 'MOLECULE_SCENARIO_DIRECTORY') | ansible.builtin.regex_replace('/$', ''))
             ~ '/tasks/create'
           {{ '}}' }}
 

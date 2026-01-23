@@ -65,7 +65,7 @@
       ansible.builtin.set_fact:
         __testing_destroy_taskdir: >-
           {{ '{{' }}
-            (lookup('env', 'MOLECULE_SCENARIO_DIRECTORY') | regex_replace('/$', ''))
+            (lookup('env', 'MOLECULE_SCENARIO_DIRECTORY') | ansible.builtin.regex_replace('/$', ''))
             ~ '/tasks/destroy'
           {{ '}}' }}
 
