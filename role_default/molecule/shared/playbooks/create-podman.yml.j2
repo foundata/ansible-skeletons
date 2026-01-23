@@ -237,7 +237,7 @@
     - name: "Molecule | Create (Podman) | Store inventory data as Molecule inventory file"
       ansible.builtin.copy:
         content: |
-          {{ '{{' }} molecule_inventory | to_yaml {{ '}}' }}
+          {{ '{{' }} molecule_inventory | ansible.builtin.to_nice_yaml {{ '}}' }}
         dest: "{{ '{{' }} molecule_ephemeral_directory }}/inventory/molecule_inventory.yml"
         mode: "u=rw,g=,o=" # 0600
 
