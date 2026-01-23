@@ -26,4 +26,4 @@
   loop_control:
     label: "{{ '{{' }} item['item'] {{ '}}' }}"
   when:
-    - item is failed
+    - item is ansible.builtin.failed

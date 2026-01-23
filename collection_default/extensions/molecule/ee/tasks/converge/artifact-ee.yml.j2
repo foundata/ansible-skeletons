@@ -234,4 +234,4 @@
       STDERR:
       {{ '{{' }} __testing_ee_build_result['stderr'] | ansible.builtin.default('') {{ '}}' }}
   when:
-    - __testing_ee_build_result is failed
+    - __testing_ee_build_result is ansible.builtin.failed
