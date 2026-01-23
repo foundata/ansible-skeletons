@@ -1,23 +1,22 @@
-# Collection requirements when building Ansible Execution Environments
-# https://ansible.readthedocs.io/projects/builder/en/latest/definition/
-# https://ansible.readthedocs.io/projects/builder/en/stable/collection_metadata/
+# Execution Environment (EE) dependencies for the {{ collection_name }} collection
 
 ---
+
+# FIXME Delete the file if you do not take care / support Ansible Execution
+#       Environments with your collection.
+#
+#       Helpful links:
+#       https://docs.ansible.com/projects/builder/en/latest/definition/
+#       https://docs.ansible.com/projects/builder/en/stable/collection_metadata/
+#       https://docs.ansible.com/projects/ansible/latest/galaxy/user_guide.html#installing-roles-and-collections-from-the-same-requirements-yml-file
 
 version: 3
 
 dependencies:
-  ansible_core:
-    package_pip: "ansible-core"
-  ansible_runner:
-    package_pip: "ansible-runner"
   galaxy:
-    dependencies:
-      []
+    collections: {}
+    roles: {}
 
-images:
-  base_image:
-    name: "docker.io/redhat/ubi9:latest"
+  python: []
 
-# FIXME Delete the file if you do not take care / support Ansible Execution
-#       Environments with your collection.
+  system: []
