@@ -133,7 +133,7 @@
       when:
         - ansible_facts is defined
         - ansible_facts['os_family'] is defined
-        - (ansible_facts['os_family'] | lower) == 'debian'
+        - (ansible_facts['os_family'] | ansible.builtin.lower) == 'debian'
 
 
     - name: "Molecule | Prepare | Set <scenario>/tasks/prepare directory path"

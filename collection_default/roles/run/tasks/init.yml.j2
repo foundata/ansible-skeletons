@@ -57,10 +57,10 @@
 - name: "Init | Set platform-specific filename list (most to least specific; raw with possible duplicates)"
   ansible.builtin.set_fact:
     __run_{{ collection_name }}_platform_filenames_raw:
-      - "{{ '{{' }} ansible_facts['distribution'].replace(' ', '_') | lower {{ '}}' }}_{{ '{{' }} ansible_facts['distribution_version'].replace(' ', '_') | lower {{ '}}' }}.yml"
-      - "{{ '{{' }} ansible_facts['distribution'].replace(' ', '_') | lower {{ '}}' }}_{{ '{{' }} ansible_facts['distribution_major_version'].replace(' ', '_') | lower {{ '}}' }}.yml"
-      - "{{ '{{' }} ansible_facts['distribution'].replace(' ', '_') | lower {{ '}}' }}.yml"
-      - "{{ '{{' }} ansible_facts['os_family'].replace(' ', '_') | lower {{ '}}' }}.yml"
+      - "{{ '{{' }} ansible_facts['distribution'].replace(' ', '_') | ansible.builtin.lower {{ '}}' }}_{{ '{{' }} ansible_facts['distribution_version'].replace(' ', '_') | ansible.builtin.lower {{ '}}' }}.yml"
+      - "{{ '{{' }} ansible_facts['distribution'].replace(' ', '_') | ansible.builtin.lower {{ '}}' }}_{{ '{{' }} ansible_facts['distribution_major_version'].replace(' ', '_') | ansible.builtin.lower {{ '}}' }}.yml"
+      - "{{ '{{' }} ansible_facts['distribution'].replace(' ', '_') | ansible.builtin.lower {{ '}}' }}.yml"
+      - "{{ '{{' }} ansible_facts['os_family'].replace(' ', '_') | ansible.builtin.lower {{ '}}' }}.yml"
 
 
 - name: "Init | Set unique platform-specific filename list (most to least specific)"

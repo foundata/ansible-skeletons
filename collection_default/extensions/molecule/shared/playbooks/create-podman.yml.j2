@@ -78,8 +78,8 @@
         # not specify a command.
         command: >-
           {{ '{%-' }} if (item['systemd'] | default(false)) and not (item['command'] | default(false)) {{ '-%}' }}
-            {{ '{%-' }} if (item['image'] | default('') | lower | regex_search('debian|ubuntu')) or
-                   (item['name'] | default('') | lower | regex_search('debian|ubuntu')) {{ '-%}' }}
+            {{ '{%-' }} if (item['image'] | default('') | ansible.builtin.lower | regex_search('debian|ubuntu')) or
+                   (item['name'] | default('') | ansible.builtin.lower | regex_search('debian|ubuntu')) {{ '-%}' }}
               /lib/systemd/systemd
             {{ '{%-' }} else {{ '-%}' }}
               /usr/sbin/init
@@ -212,9 +212,9 @@
       vars:
         __testing_inventory_is_windows: >
           {{ '{{' }}
-            ((item['image'] | default('') | lower is search('windows')) or
-             (item['name'] | default('') | lower is search('windows')) or
-             (item['os_family'] | default('') | lower == 'windows')) | bool
+            ((item['image'] | default('') | ansible.builtin.lower is search('windows')) or
+             (item['name'] | default('') | ansible.builtin.lower is search('windows')) or
+             (item['os_family'] | default('') | ansible.builtin.lower == 'windows')) | bool
           {{ '}}' }}
         __testing_inventory_os_group: >-
           {{ '{{' }} 'molecule_windows' if (__testing_inventory_is_windows | bool) else 'molecule_linux' {{ '}}' }}
