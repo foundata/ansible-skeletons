@@ -45,11 +45,11 @@
         __testing_state_update:
           artifact_fsname: >-
             {{ '{{' }}
-              (__testing_artifact_find['files'][0]['path'] | basename | trim)
+              (__testing_artifact_find['files'][0]['path'] | basename | ansible.builtin.trim)
             {{ '}}' }}
           artifact_path: >-
             {{ '{{' }}
-              (__testing_artifact_find['files'][0]['path'] | trim)
+              (__testing_artifact_find['files'][0]['path'] | ansible.builtin.trim)
             {{ '}}' }}
 
 
@@ -123,11 +123,11 @@
         __testing_state_update:
           artifact_fsname: >-
             {{ '{{' }}
-              (__testing_state['artifact_ansible_name'] | trim)
+              (__testing_state['artifact_ansible_name'] | ansible.builtin.trim)
             {{ '}}' }}
           artifact_path: >-
             {{ '{{' }}
-              ((__testing_state['build_dir_path'] ~ '/roles/' ~ __testing_state['artifact_ansible_name']) | trim)
+              ((__testing_state['build_dir_path'] ~ '/roles/' ~ __testing_state['artifact_ansible_name']) | ansible.builtin.trim)
             {{ '}}' }}
 
 
@@ -170,7 +170,7 @@
 
           additional_build_files:
             # Copy the roles directory to the build context
-            - src: "{{ '{{' }} __testing_state['artifact_path'] | dirname | trim {{ '}}' }}"
+            - src: "{{ '{{' }} __testing_state['artifact_path'] | dirname | ansible.builtin.trim {{ '}}' }}"
               dest: "roles"
 
           # See official documentation for available sub-keys:

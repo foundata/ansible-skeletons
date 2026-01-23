@@ -23,7 +23,7 @@
           ansible.builtin.fail:
             msg: "MOLECULE_SCENARIO_DIRECTORY env var is not set or empty"
           when:
-            - (lookup('env', 'MOLECULE_SCENARIO_DIRECTORY') | trim) | length == 0
+            - (lookup('env', 'MOLECULE_SCENARIO_DIRECTORY') | ansible.builtin.trim) | length == 0
 
 
         - name: "Molecule | Prepare | Assert inventory groups existence on localhost"
