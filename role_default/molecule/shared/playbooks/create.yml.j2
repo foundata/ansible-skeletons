@@ -53,7 +53,7 @@
         - __testing_create_loop_item is file
       loop: >-
         {{ '{{' }}
-          lookup('fileglob', __testing_create_taskdir ~ '/*.yml', wantlist=True) | sort
+          lookup('fileglob', __testing_create_taskdir ~ '/*.yml', wantlist=True) | ansible.builtin.sort
           if (__testing_create_taskdir_stat['stat']['exists'] | default(false))
           else []
         {{ '}}' }}

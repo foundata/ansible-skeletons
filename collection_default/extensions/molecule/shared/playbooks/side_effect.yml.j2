@@ -58,7 +58,7 @@
         - __testing_side_effect_loop_item is file
       loop: >-
         {{ '{{' }}
-          lookup('fileglob', __testing_side_effect_taskdir ~ '/*.yml', wantlist=True) | sort
+          lookup('fileglob', __testing_side_effect_taskdir ~ '/*.yml', wantlist=True) | ansible.builtin.sort
           if (__testing_side_effect_taskdir_stat['stat']['exists'] | default(false))
           else []
         {{ '}}' }}
