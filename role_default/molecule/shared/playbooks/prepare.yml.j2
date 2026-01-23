@@ -82,7 +82,7 @@
           vars:
             __testing_moleculevars_msg: |-
               {{ '{%' }} for key, value in hostvars[inventory_hostname].items() {{ '%}' }}
-              {{ '{%' }}   if key is string and key.startswith('molecule_') {{ '%}' }}
+              {{ '{%' }}   if key is ansible.builtin.string and key.startswith('molecule_') {{ '%}' }}
               {{ '{{' }}     key {{ '}}' }} = {{ '{{' }} value | to_nice_json {{ '}}' }}
               {{ '{%' }}   endif {{ '%}' }}
               {{ '{%' }} endfor {{ '%}' }}
