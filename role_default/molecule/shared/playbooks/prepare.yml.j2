@@ -12,7 +12,7 @@
   # Molecule with virtually any container image before prepare (where Python
   # could be installed, e.g. with ansible.builtin.raw).
   gather_facts: false
-  no_log: "{{ '{{' }} molecule_no_log | default(false) {{ '}}' }}"
+  no_log: "{{ '{{' }} molecule_no_log | ansible.builtin.default(false) {{ '}}' }}"
   pre_tasks:
 
     - name: "Molecule | Prepare | Basic self-checks for the testing infrastructure"
@@ -65,7 +65,7 @@
           vars:
             __testing_basicinfo_result_msg: |-
               {{ '{%' }} for result in __testing_basicinfo_result['results'] {{ '%}' }}
-              Host: {{ '{{' }} result['item'] {{ '}}' }} - {{ '{{' }} result['stdout_lines'] | default(['No output']) | join(', ') {{ '}}' }}
+              Host: {{ '{{' }} result['item'] {{ '}}' }} - {{ '{{' }} result['stdout_lines'] | ansible.builtin.default(['No output']) | join(', ') {{ '}}' }}
               {{ '{%' }} endfor {{ '%}' }}
           when:
             - __testing_basicinfo_result is defined
@@ -101,9 +101,9 @@
         __testing_state: >-
           {{ '{{' }}
             lookup('file', molecule_ephemeral_directory ~ '/__testing_state_' ~ (inventory_hostname | ansible.builtin.md5) ~ '.yml', errors='ignore')
-            | default('{}')
+            | ansible.builtin.default('{}')
             | ansible.builtin.from_yaml
-            | default({})
+            | ansible.builtin.default({})
           {{ '}}' }}
       when:
         - (__testing_state is not defined) or (__testing_state is not mapping)

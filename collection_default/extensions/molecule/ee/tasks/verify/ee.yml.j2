@@ -41,7 +41,7 @@
     - name: "Molecule | Verify | Assert collection is present"
       ansible.builtin.assert:
         that:
-          - "__testing_state['artifact_ansible_name'] in (__testing_collection_list['stdout'] | default(''))"
+          - "__testing_state['artifact_ansible_name'] in (__testing_collection_list['stdout'] | ansible.builtin.default(''))"
         fail_msg: "Collection {{ '{{' }} __testing_state['artifact_ansible_name'] {{ '}}' }} not found in Execution Environment"
         success_msg: "Collection {{ '{{' }} __testing_state['artifact_ansible_name'] {{ '}}' }} successfully installed in Execution Environment"
 

@@ -125,7 +125,7 @@
           artifact_ansible_name: >-
             {{ '{{' }}
               __testing_artifact_meta['galaxy_info']['role_name']
-              | default(__testing_state['project_dir_path'])
+              | ansible.builtin.default(__testing_state['project_dir_path'])
               | ansible.builtin.basename
             {{ '}}' }}
 

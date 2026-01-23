@@ -9,9 +9,9 @@
 - name: "Molecule | Destroy (Podman)"
   hosts: "molecule"
   gather_facts: false
-  no_log: "{{ '{{' }} molecule_no_log | default(false) {{ '}}' }}"
+  no_log: "{{ '{{' }} molecule_no_log | ansible.builtin.default(false) {{ '}}' }}"
   vars:
-    podman_executable: "{{ '{{' }} lookup('env','MOLECULE_PODMAN_EXECUTABLE') | default('podman', true) {{ '}}' }}"
+    podman_executable: "{{ '{{' }} lookup('env','MOLECULE_PODMAN_EXECUTABLE') | ansible.builtin.default('podman', true) {{ '}}' }}"
   pre_tasks:
 
     - name: "Molecule | Destroy (Podman) | Restore __testing_state (if any) from YAML file from localhost"
@@ -24,9 +24,9 @@
         __testing_state: >-
           {{ '{{' }}
             lookup('file', molecule_ephemeral_directory ~ '/__testing_state_' ~ (inventory_hostname | ansible.builtin.md5) ~ '.yml', errors='ignore')
-            | default('{}')
+            | ansible.builtin.default('{}')
             | ansible.builtin.from_yaml
-            | default({})
+            | ansible.builtin.default({})
           {{ '}}' }}
       when:
         - (__testing_state is not defined) or (__testing_state is not mapping)
@@ -86,7 +86,7 @@
       loop: >-
         {{ '{{' }}
           lookup('fileglob', __testing_destroy_taskdir ~ '/*.yml', wantlist=True) | ansible.builtin.sort
-          if (__testing_destroy_taskdir_stat['stat']['exists'] | default(false))
+          if (__testing_destroy_taskdir_stat['stat']['exists'] | ansible.builtin.default(false))
           else []
         {{ '}}' }}
       loop_control:
@@ -114,7 +114,7 @@
 - name: "Molecule | Destroy (Podman) | Additional cleanup tasks on localhost"
   hosts: "localhost"
   gather_facts: false
-  no_log: "{{ '{{' }} molecule_no_log | default(false) {{ '}}' }}"
+  no_log: "{{ '{{' }} molecule_no_log | ansible.builtin.default(false) {{ '}}' }}"
   tasks:
 
     - name: "Molecule | Destroy (Podman) | Remove dynamic inventory file"

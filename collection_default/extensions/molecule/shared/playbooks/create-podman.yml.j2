@@ -14,9 +14,9 @@
   hosts: "localhost"
   connection: "local"
   gather_facts: false
-  no_log: "{{ '{{' }} molecule_no_log | default(false) {{ '}}' }}"
+  no_log: "{{ '{{' }} molecule_no_log | ansible.builtin.default(false) {{ '}}' }}"
   vars:
-    podman_executable: "{{ '{{' }} lookup('env','MOLECULE_PODMAN_EXECUTABLE') | default('podman', true) {{ '}}' }}"
+    podman_executable: "{{ '{{' }} lookup('env','MOLECULE_PODMAN_EXECUTABLE') | ansible.builtin.default('podman', true) {{ '}}' }}"
     # Init variable to create an inventory containing the molecule target hosts
     molecule_inventory:
       all:
@@ -35,9 +35,9 @@
         __testing_state: >-
           {{ '{{' }}
             lookup('file', molecule_ephemeral_directory ~ '/__testing_state_' ~ (inventory_hostname | ansible.builtin.md5) ~ '.yml', errors='ignore')
-            | default('{}')
+            | ansible.builtin.default('{}')
             | ansible.builtin.from_yaml
-            | default({})
+            | ansible.builtin.default({})
           {{ '}}' }}
       when:
         - (__testing_state is not defined) or (__testing_state is not mapping)
@@ -50,14 +50,14 @@
         executable: "{{ '{{' }} podman_executable {{ '}}' }}"
         registry: "{{ '{{' }} item['registry']['url'] {{ '}}' }}"
         username: "{{ '{{' }} item['registry']['credentials']['username'] {{ '}}' }}"
-        password: "{{ '{{' }} item['registry']['credentials']['password'] | default(omit) {{ '}}' }}"
-        tlsverify: "{{ '{{' }} item['registry']['tls_verify'] | default(true) {{ '}}' }}"
-        certdir: "{{ '{{' }} item['certdir'] | default(omit) {{ '}}' }}"
+        password: "{{ '{{' }} item['registry']['credentials']['password'] | ansible.builtin.default(omit) {{ '}}' }}"
+        tlsverify: "{{ '{{' }} item['registry']['tls_verify'] | ansible.builtin.default(true) {{ '}}' }}"
+        certdir: "{{ '{{' }} item['certdir'] | ansible.builtin.default(omit) {{ '}}' }}"
       loop: "{{ '{{' }} molecule_yml['platforms'] {{ '}}' }}"
       loop_control:
         label: >-
           "{{ '{{' }} item['name'] }} registry username:
-           {{ '{{' }} item['registry']['credentials']['username'] | default('None specified') {{ '}}' }}"
+           {{ '{{' }} item['registry']['credentials']['username'] | ansible.builtin.default('None specified') {{ '}}' }}"
       when:
         - item['registry'] is defined
         - item['registry']['url'] is defined
@@ -77,23 +77,23 @@
         # operation (Podman GitHub issue #7287), best effort detection if a user does
         # not specify a command.
         command: >-
-          {{ '{%-' }} if (item['systemd'] | default(false)) and not (item['command'] | default(false)) {{ '-%}' }}
-            {{ '{%-' }} if (item['image'] | default('') | ansible.builtin.lower | regex_search('debian|ubuntu')) or
-                   (item['name'] | default('') | ansible.builtin.lower | regex_search('debian|ubuntu')) {{ '-%}' }}
+          {{ '{%-' }} if (item['systemd'] | ansible.builtin.default(false)) and not (item['command'] | ansible.builtin.default(false)) {{ '-%}' }}
+            {{ '{%-' }} if (item['image'] | ansible.builtin.default('') | ansible.builtin.lower | regex_search('debian|ubuntu')) or
+                   (item['name'] | ansible.builtin.default('') | ansible.builtin.lower | regex_search('debian|ubuntu')) {{ '-%}' }}
               /lib/systemd/systemd
             {{ '{%-' }} else {{ '-%}' }}
               /usr/sbin/init
             {{ '{%-' }} endif {{ '-%}' }}
           {{ '{%-' }} else {{ '-%}' }}
-            {{ '{{' }} item['command'] if ((item['command'] | default(false)) and item['command'] != false) else 'sleep 1d' {{ '}}' }}
+            {{ '{{' }} item['command'] if ((item['command'] | ansible.builtin.default(false)) and item['command'] != false) else 'sleep 1d' {{ '}}' }}
           {{ '{%-' }} endif {{ '-%}' }}
-        cap_add: "{{ '{{' }} item['cap_add'] | default(omit) {{ '}}' }}"
-        cap_drop: "{{ '{{' }} item['cap_drop'] | default(omit) {{ '}}' }}"
+        cap_add: "{{ '{{' }} item['cap_add'] | ansible.builtin.default(omit) {{ '}}' }}"
+        cap_drop: "{{ '{{' }} item['cap_drop'] | ansible.builtin.default(omit) {{ '}}' }}"
         executable: "{{ '{{' }} podman_executable {{ '}}' }}"
-        log_driver: "{{ '{{' }} item['log_driver'] | default('journald') {{ '}}' }}"
-        privileged: "{{ '{{' }} item['privileged'] | default(omit) {{ '}}' }}"
-        systemd: "{{ '{{' }} item['systemd'] | default(omit) {{ '}}' }}"
-        volumes: "{{ '{{' }} item['volumes'] | default(omit) {{ '}}' }}"
+        log_driver: "{{ '{{' }} item['log_driver'] | ansible.builtin.default('journald') {{ '}}' }}"
+        privileged: "{{ '{{' }} item['privileged'] | ansible.builtin.default(omit) {{ '}}' }}"
+        systemd: "{{ '{{' }} item['systemd'] | ansible.builtin.default(omit) {{ '}}' }}"
+        volumes: "{{ '{{' }} item['volumes'] | ansible.builtin.default(omit) {{ '}}' }}"
       loop: "{{ '{{' }} molecule_yml['platforms'] {{ '}}' }}"
       register: __testing_createcontainer_result
 
@@ -127,7 +127,7 @@
 
 
     - name: "Molecule | Create (Podman) | Handle container failures (if any)"
-      when: __testing_failed_containers | default([]) | ansible.builtin.length > 0
+      when: __testing_failed_containers | ansible.builtin.default([]) | ansible.builtin.length > 0
       block:
 
         - name: "Molecule | Create (Podman) | Print failed container info"
@@ -212,9 +212,9 @@
       vars:
         __testing_inventory_is_windows: >
           {{ '{{' }}
-            ((item['image'] | default('') | ansible.builtin.lower is search('windows')) or
-             (item['name'] | default('') | ansible.builtin.lower is search('windows')) or
-             (item['os_family'] | default('') | ansible.builtin.lower == 'windows')) | ansible.builtin.bool
+            ((item['image'] | ansible.builtin.default('') | ansible.builtin.lower is search('windows')) or
+             (item['name'] | ansible.builtin.default('') | ansible.builtin.lower is search('windows')) or
+             (item['os_family'] | ansible.builtin.default('') | ansible.builtin.lower == 'windows')) | ansible.builtin.bool
           {{ '}}' }}
         __testing_inventory_os_group: >-
           {{ '{{' }} 'molecule_windows' if (__testing_inventory_is_windows | ansible.builtin.bool) else 'molecule_linux' {{ '}}' }}
@@ -278,7 +278,7 @@
       loop: >-
         {{ '{{' }}
           lookup('fileglob', __testing_create_taskdir ~ '/*.yml', wantlist=True) | ansible.builtin.sort
-          if (__testing_create_taskdir_stat['stat']['exists'] | default(false))
+          if (__testing_create_taskdir_stat['stat']['exists'] | ansible.builtin.default(false))
           else []
         {{ '}}' }}
       loop_control:

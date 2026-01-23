@@ -65,7 +65,7 @@
 
 - name: "Init | Set unique platform-specific filename list (most to least specific)"
   ansible.builtin.set_fact:
-    __run_{{ collection_name }}_platform_filenames_most_specific_first: "{{ '{{' }} (__run_{{ collection_name }}_platform_filenames_raw | ansible.builtin.unique | default([])) {{ '}}' }}"
+    __run_{{ collection_name }}_platform_filenames_most_specific_first: "{{ '{{' }} (__run_{{ collection_name }}_platform_filenames_raw | ansible.builtin.unique | ansible.builtin.default([])) {{ '}}' }}"
 
 
 - name: "Init | Set unique platform-specific filename list (least to most specific)"
