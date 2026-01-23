@@ -23,7 +23,7 @@
       ansible.builtin.set_fact:
         __testing_state: >-
           {{ '{{' }}
-            lookup('file', molecule_ephemeral_directory ~ '/__testing_state_' ~ (inventory_hostname | hash('md5')) ~ '.yml', errors='ignore')
+            lookup('file', molecule_ephemeral_directory ~ '/__testing_state_' ~ (inventory_hostname | ansible.builtin.md5) ~ '.yml', errors='ignore')
             | default('{}')
             | ansible.builtin.from_yaml
             | default({})
@@ -98,7 +98,7 @@
     - name: "Molecule | Destroy (Podman) | Delete __testing_state YAML file (best effort) on localhost"
       delegate_to: "localhost"
       ansible.builtin.file:
-        path: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/__testing_state_{{ '{{' }} (inventory_hostname | hash('md5')) {{ '}}' }}.yml"
+        path: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/__testing_state_{{ '{{' }} (inventory_hostname | ansible.builtin.md5) {{ '}}' }}.yml"
         state: "absent"
       # "cleanup" and "destroy" phases must tolerate missing containers
       failed_when: false

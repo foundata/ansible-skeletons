@@ -18,7 +18,7 @@
       ansible.builtin.set_fact:
         __testing_state: >-
           {{ '{{' }}
-            lookup('file', molecule_ephemeral_directory ~ '/__testing_state_' ~ (inventory_hostname | hash('md5')) ~ '.yml', errors='ignore')
+            lookup('file', molecule_ephemeral_directory ~ '/__testing_state_' ~ (inventory_hostname | ansible.builtin.md5) ~ '.yml', errors='ignore')
             | default('{}')
             | ansible.builtin.from_yaml
             | default({})
@@ -71,7 +71,7 @@
       delegate_to: "localhost"
       ansible.builtin.copy:
         content: "{{ '{{' }} __testing_state | to_nice_yaml {{ '}}' }}"
-        dest: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/__testing_state_{{ '{{' }} (inventory_hostname | hash('md5')) {{ '}}' }}.yml"
+        dest: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/__testing_state_{{ '{{' }} (inventory_hostname | ansible.builtin.md5) {{ '}}' }}.yml"
         mode: "u=rw,g=r,o=r" # 0644
       when:
         - __testing_state is defined
