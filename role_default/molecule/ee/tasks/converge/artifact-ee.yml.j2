@@ -170,7 +170,7 @@
 
           additional_build_files:
             # Copy the roles directory to the build context
-            - src: "{{ '{{' }} __testing_state['artifact_path'] | dirname | ansible.builtin.trim {{ '}}' }}"
+            - src: "{{ '{{' }} __testing_state['artifact_path'] | ansible.builtin.dirname | ansible.builtin.trim {{ '}}' }}"
               dest: "roles"
 
           # See official documentation for available sub-keys:
