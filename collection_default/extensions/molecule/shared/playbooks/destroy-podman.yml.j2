@@ -112,7 +112,7 @@
   no_log: "{{ '{{' }} molecule_no_log | ansible.builtin.default(false) {{ '}}' }}"
   tasks:
 
-    - name: "Molecule | Destroy (Podman) | Remove dynamic inventory file"
+    - name: "Molecule | Destroy (Podman) | Remove molecule_inventory.yml"
       ansible.builtin.file:
         path: "{{ '{{' }} molecule_ephemeral_directory }}/inventory/molecule_inventory.yml"
         state: "absent"

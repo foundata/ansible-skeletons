@@ -234,7 +234,7 @@
         label: "{{ '{{' }} item['name'] {{ '}}' }}"
 
 
-    - name: "Molecule | Create (Podman) | Store inventory data as Molecule inventory file"
+    - name: "Molecule | Create (Podman) | Store inventory data as molecule_inventory.yml"
       ansible.builtin.copy:
         content: |
           {{ '{{' }} molecule_inventory | ansible.builtin.to_nice_yaml {{ '}}' }}
