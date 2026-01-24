@@ -22,7 +22,7 @@
     msg: |
       Required tool '{{ '{{' }} item {{ '}}' }}' is not installed or not in PATH.
       Please install it before running this scenario.
-  loop: "{{ '{{' }}  __testing_required_tools_check['results'] {{ '}}' }}"
+  loop: "{{ '{{' }} __testing_required_tools_check['results'] {{ '}}' }}"
   loop_control:
     label: "{{ '{{' }} item['item'] {{ '}}' }}"
   when:

@@ -9,11 +9,6 @@
 # This scenario uses Podman to create and manage a container based testing
 # environment. Ensure Podman is installed on your system to use it:
 # https://podman.io/docs/installation.
-#
-# Podman is an alternative to Docker, offering improved security and better
-# systemd integration. Additionally, it is typically easier to install, as
-# most distributions provide a fully-features package it in their default
-# repositories.
 
 ---
 
@@ -30,8 +25,6 @@ platforms:
 
 
 # Scenario execution order
-# Idempotence is excluded because EE builds are inherently non-idempotent
-# (building always creates new artifacts)
 scenario:
   test_sequence:
     - dependency
@@ -41,7 +34,7 @@ scenario:
     - create
     - prepare
     - converge
-    # - idempotence  # Excluded: EE builds are not idempotent
+    # - idempotence  # Excluded: EE builds are inherently non-idempotent as it always creates new artifacts
     - side_effect
     - verify
     - cleanup
@@ -70,16 +63,17 @@ provisioner:
       hosts: "inventory/hosts.yml"
   config_options:
     defaults:
-      # If the role(s) are not found by Molecule, try to run molecule with
-      # an adjusted MOLECULE_GLOB environment variable. This is usually easier
-      # and safer than setting
-      #   roles_path: ".."
-      #   collections_path: "../.."
-      # See molecule/README.md#faq-role-path-detection for details.
+      # If roles are not found by Molecule, try to run molecule with an adjusted
+      # MOLECULE_GLOB environment variable instead of setting roles_path and/or
+      # collections_path. See molecule/README.md#faq-role-path-detection for details.
       verbosity: ${ANSIBLE_VERBOSITY:-0} # noqa
       display_args_to_stdout: ${ANSIBLE_DISPLAY_ARGS_TO_STDOUT:-false} # noqa
       # set forks >= number of test platforms for better performance
       forks: ${ANSIBLE_FORKS:-12} # noqa
+      host_key_checking: false
+      retry_files_enabled: false
+    connection:
+      pipelining: true
   playbooks:
     create: "../shared/playbooks/create.yml"
     prepare: "../shared/playbooks/prepare.yml"

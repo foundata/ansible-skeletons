@@ -41,14 +41,12 @@ __run_{{ collection_name }}_used_facts:
 # - name: "Debian"
 #   versions:
 #     - "all"
-__run_{{ collection_name }}_supported_platforms:
-  [] # Remove the "[]" when adding values to this list.
+__run_{{ collection_name }}_supported_platforms: []
 
 
 # List of package names to be installed when run_{{ collection_name }}_state is
 # set to "present".
-__run_{{ collection_name }}_packages_install:
-  [] # Remove the "[]" when adding values to this list.
+__run_{{ collection_name }}_packages_install: []
 
 
 # List of package names to be uninstalled when run_{{ collection_name }}_state is
@@ -63,16 +61,14 @@ __run_{{ collection_name }}_packages_uninstall: "{{ '{{ run_' + collection_name 
 
 # List of package names to be removed unconditionally before installation
 # (e.g., to prevent conflicts or resolve incompatibilities).
-__run_{{ collection_name }}_packages_removal:
-  [] # Remove the "[]" when adding values to this list.
+__run_{{ collection_name }}_packages_removal: []
 
 
 # List of paths of files and directories to be removed unconditionally after
 # installation. This is useful for removing default configuration resources
 # that would otherwise create confusion or conflict with custom configurations
 # managed by this role.
-__run_{{ collection_name }}_paths_removal:
-  [] # Remove the "[]" when adding values to this list.
+__run_{{ collection_name }}_paths_removal: []
 
 
 ### Override defaults of dependencies used by this role (if any).

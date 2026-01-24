@@ -207,7 +207,7 @@
       - "molecule-ee-test.yml"
       - "--prune-images"
       - "--verbosity"
-      - "{{ '{{' }} ansible_verbosity if (ansible_verbosity | ansible.builtin.default(0)) >= 3 else 3 {{ '}}' }}" # >=3 is needed for build introspection output
+      - "3" # 3 is the maximum verbosity and needed for build introspection
     chdir: "{{ '{{' }} __testing_state['build_dir_path'] {{ '}}' }}"
   changed_when:
     - true

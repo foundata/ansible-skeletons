@@ -47,8 +47,7 @@ __{{ role_name }}_supported_platforms:
 
 # List of package names to be installed when {{ role_name }}_state is
 # set to "present".
-__{{ role_name }}_packages_install:
-  [] # Remove the "[]" when adding values to this list.
+__{{ role_name }}_packages_install: []
 
 
 # List of package names to be uninstalled when {{ role_name }}_state is
@@ -63,16 +62,14 @@ __{{ role_name }}_packages_uninstall: "{{ '{{ ' + role_name  + '_packages_instal
 
 # List of package names to be removed unconditionally before installation
 # (e.g., to prevent conflicts or resolve incompatibilities).
-__{{ role_name }}_packages_removal:
-  [] # Remove the "[]" when adding values to this list.
+__{{ role_name }}_packages_removal: []
 
 
 # List of paths of files and directories to be removed unconditionally after
 # installation. This is useful for removing default configuration resources
 # that would otherwise create confusion or conflict with custom configurations
 # managed by this role.
-__{{ role_name }}_paths_removal:
-  [] # Remove the "[]" when adding values to this list.
+__{{ role_name }}_paths_removal: []
 
 
 ### Override defaults of dependencies used by this role (if any).

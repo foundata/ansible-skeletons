@@ -21,7 +21,7 @@
       This role requires Ansible {{ '{{' }} __run_{{ collection_name }}_meta['galaxy_info']['min_ansible_version'] {{ '}}' }}
       or higher. You are currently running Ansible {{ '{{' }} ansible_version['full'] {{ '}}' }} .
   when:
-    - ansible_version['full'] is version_compare(__run_{{ collection_name }}_meta['galaxy_info']['min_ansible_version'], "<")
+    - ansible_version['full'] is version_compare(__run_{{ collection_name }}_meta['galaxy_info']['min_ansible_version'], '<')
 
 
 - name: "Init | Notify when platform support check is not possible"
@@ -35,7 +35,7 @@
       ansible_facts['distribution'] is not ansible.builtin.defined or
       ansible_facts['distribution_version'] is not ansible.builtin.defined or
       ansible_facts['distribution_major_version'] is not ansible.builtin.defined or
-      (__run_{{ collection_name }}_supported_platforms | ansible.builtin.length) < 1
+      ((__run_{{ collection_name }}_supported_platforms | ansible.builtin.length) == 0)
 
 
 - name: "Init | Warn when platform is unsupported"
@@ -44,33 +44,77 @@
       Neither {{ '{{' }} ansible_facts['distribution'] {{ '}}' }} (distribution) nor {{ '{{' }} ansible_facts['os_family'] {{ '}}' }} (os_family)
       with versions '{{ '{{' }} ansible_facts['distribution_major_version'] {{ '}}' }}', '{{ '{{' }} ansible_facts['distribution_version'] {{ '}}' }}',
       or 'all' is in the list of supported platforms from vars/main.yml: {{ '{{' }} __run_{{ collection_name }}_supported_platforms {{ '}}' }}
+  vars:
+    __run_{{ collection_name }}_platform_names_regex: >-
+      ^({{ '{{' }} ansible_facts['distribution'] {{ '}}' }}|{{ '{{' }} ansible_facts['os_family'] {{ '}}' }})$
+    __run_{{ collection_name }}_platform_versions_regex: >-
+      ^({{ '{{' }} ansible_facts['distribution_major_version'] {{ '}}' }}|{{ '{{' }} ansible_facts['distribution_version'] {{ '}}' }}|all)$
+    __run_{{ collection_name }}_matched_versions: >-
+      {{ '{{' }}
+        __run_{{ collection_name }}_supported_platforms
+        | ansible.builtin.selectattr('name', 'match', __run_{{ collection_name }}_platform_names_regex, ignorecase=true)
+        | ansible.builtin.map(attribute='versions')
+        | ansible.builtin.flatten
+        | ansible.builtin.select('match', __run_{{ collection_name }}_platform_versions_regex, ignorecase=true)
+        | ansible.builtin.list
+      {{ '}}' }}
   when:
     - (__run_{{ collection_name }}_supported_platforms | ansible.builtin.length) > 0
-    - (__run_{{ collection_name }}_supported_platforms
-       | ansible.builtin.selectattr('name', 'match', '^(' ~ ansible_facts['distribution'] ~ '|' ~ ansible_facts['os_family'] ~ ')$', ignorecase=true)
-       | ansible.builtin.map(attribute='versions') | ansible.builtin.flatten
-       | ansible.builtin.select('match', '^(' ~ ansible_facts['distribution_major_version'] ~ '|' ~ ansible_facts['distribution_version'] ~ '|all)$', ignorecase=true)
-       | ansible.builtin.list | ansible.builtin.length) < 1
+    - (__run_{{ collection_name }}_matched_versions | ansible.builtin.length) == 0
   ignore_errors: true # noqa: ignore-errors
 
 
 - name: "Init | Set platform-specific filename list (most to least specific; raw with possible duplicates)"
   ansible.builtin.set_fact:
     __run_{{ collection_name }}_platform_filenames_raw:
-      - "{{ '{{' }} ansible_facts['distribution'].replace(' ', '_') | ansible.builtin.lower {{ '}}' }}_{{ '{{' }} ansible_facts['distribution_version'].replace(' ', '_') | ansible.builtin.lower {{ '}}' }}.yml"
-      - "{{ '{{' }} ansible_facts['distribution'].replace(' ', '_') | ansible.builtin.lower {{ '}}' }}_{{ '{{' }} ansible_facts['distribution_major_version'].replace(' ', '_') | ansible.builtin.lower {{ '}}' }}.yml"
-      - "{{ '{{' }} ansible_facts['distribution'].replace(' ', '_') | ansible.builtin.lower {{ '}}' }}.yml"
-      - "{{ '{{' }} ansible_facts['os_family'].replace(' ', '_') | ansible.builtin.lower {{ '}}' }}.yml"
+      - "{{ '{{' }} __run_{{ collection_name }}_dist {{ '}}' }}_{{ '{{' }} __run_{{ collection_name }}_dist_ver {{ '}}' }}.yml"
+      - "{{ '{{' }} __run_{{ collection_name }}_dist {{ '}}' }}_{{ '{{' }} __run_{{ collection_name }}_dist_major {{ '}}' }}.yml"
+      - "{{ '{{' }} __run_{{ collection_name }}_dist {{ '}}' }}.yml"
+      - "{{ '{{' }} __run_{{ collection_name }}_os_family {{ '}}' }}.yml"
+  vars:
+    __run_{{ collection_name }}_dist: >-
+      {{ '{{' }}
+        ansible_facts['distribution']
+        | ansible.builtin.regex_replace(' ', '_')
+        | ansible.builtin.lower
+      {{ '}}' }}
+    __run_{{ collection_name }}_dist_ver: >-
+      {{ '{{' }}
+        ansible_facts['distribution_version']
+        | ansible.builtin.regex_replace(' ', '_')
+        | ansible.builtin.lower
+      {{ '}}' }}
+    __run_{{ collection_name }}_dist_major: >-
+      {{ '{{' }}
+        ansible_facts['distribution_major_version']
+        | ansible.builtin.regex_replace(' ', '_')
+        | ansible.builtin.lower
+      {{ '}}' }}
+    __run_{{ collection_name }}_os_family: >-
+      {{ '{{' }}
+        ansible_facts['os_family']
+        | ansible.builtin.regex_replace(' ', '_')
+        | ansible.builtin.lower
+      {{ '}}' }}
 
 
 - name: "Init | Set unique platform-specific filename list (most to least specific)"
   ansible.builtin.set_fact:
-    __run_{{ collection_name }}_platform_filenames_most_specific_first: "{{ '{{' }} (__run_{{ collection_name }}_platform_filenames_raw | ansible.builtin.unique | ansible.builtin.default([])) {{ '}}' }}"
+    __run_{{ collection_name }}_platform_filenames_most_specific_first: >-
+      {{ '{{' }}
+        (__run_{{ collection_name }}_platform_filenames_raw
+        | ansible.builtin.unique
+        | ansible.builtin.default([]))
+      {{ '}}' }}
 
 
 - name: "Init | Set unique platform-specific filename list (least to most specific)"
   ansible.builtin.set_fact:
-    __run_{{ collection_name }}_platform_filenames_most_specific_last: "{{ '{{' }} __run_{{ collection_name }}_platform_filenames_most_specific_first | reverse {{ '}}' }}"
+    __run_{{ collection_name }}_platform_filenames_most_specific_last: >-
+      {{ '{{' }}
+        __run_{{ collection_name }}_platform_filenames_most_specific_first
+        | ansible.builtin.reverse
+      {{ '}}' }}
 
 
 - name: "Init | Include platform-specific variables (if any), overwrite values with more specific ones"
