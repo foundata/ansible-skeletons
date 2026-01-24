@@ -111,8 +111,11 @@
       ansible.builtin.assert:
         that:
           - __testing_role_exists is ansible.builtin.success
-        fail_msg: "Role {{ '{{' }} __testing_state['artifact_fsname'] {{ '}}' }} not found in Execution Environment at /usr/share/ansible/roles/{{ '{{' }} __testing_state['artifact_fsname'] {{ '}}' }}"
-        success_msg: "Role {{ '{{' }} __testing_state['artifact_fsname'] {{ '}}' }} successfully installed in Execution Environment"
+        fail_msg: >
+          Role {{ '{{' }} __testing_state['artifact_fsname'] {{ '}}' }} not found in
+          Execution Environment at /usr/share/ansible/roles/{{ '{{' }} __testing_state['artifact_fsname'] {{ '}}' }}
+        success_msg: >
+          Role {{ '{{' }} __testing_state['artifact_fsname'] {{ '}}' }} successfully installed in Execution Environment
 
 
     - name: "Molecule | Verify | Verify role has required structure (tasks/main.yml)"

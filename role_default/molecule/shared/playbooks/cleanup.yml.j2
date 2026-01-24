@@ -28,8 +28,6 @@
       when:
         - (__testing_state is not defined) or (__testing_state is not mapping)
       # "cleanup" and "destroy" phases must tolerate missing containers
-      failed_when: false
-      ignore_errors: true
       ignore_unreachable: true
 
 

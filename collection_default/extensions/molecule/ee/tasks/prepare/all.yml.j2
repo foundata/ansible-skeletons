@@ -34,22 +34,22 @@
   vars:
     __testing_state_update:
       project_type: >-
-        {{ '{%-' }}  if (__testing_state['project_type'] is defined) and ((__testing_state['project_type'] | ansible.builtin.length) > 0)  {{ '-%}' }}
+        {{ '{%-' }} if (__testing_state['project_type'] is defined) and ((__testing_state['project_type'] | ansible.builtin.length) > 0) {{ '-%}' }}
           {{ '{{' }} __testing_state['project_type'] {{ '}}' }}
-        {{ '{%-' }}  elif __testing_galaxyyml_stat['stat']['exists'] {{ '-%}' }}
+        {{ '{%-' }} elif __testing_galaxyyml_stat['stat']['exists'] {{ '-%}' }}
           collection
-        {{ '{%-' }}  elif __testing_rolemeta_stat['stat']['exists'] {{ '-%}' }}
+        {{ '{%-' }} elif __testing_rolemeta_stat['stat']['exists'] {{ '-%}' }}
           role
-        {{ '{%-' }}  else {{ '-%}' }}
+        {{ '{%-' }} else {{ '-%}' }}
           unknown
-        {{ '{%-' }}  endif {{ '-%}' }}
+        {{ '{%-' }} endif {{ '-%}' }}
 
 
 - name: "Molecule | Prepare (all) | Fail if project type cannot be determined"
   ansible.builtin.fail:
     msg: >
       Cannot determine project type. Expected either galaxy.yml (collection) or
-      meta/main.yml (role) in {{ '{{' }} __testing_state['project_dir_path']  {{ '}}' }}.
+      meta/main.yml (role) in {{ '{{' }} __testing_state['project_dir_path'] {{ '}}' }}.
   when:
     - __testing_state['project_type'] == "unknown"
 

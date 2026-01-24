@@ -31,8 +31,6 @@
       when:
         - (__testing_state is not defined) or (__testing_state is not mapping)
       # "cleanup" and "destroy" phases must tolerate missing containers
-      failed_when: false
-      ignore_errors: true
       ignore_unreachable: true
 
 
@@ -101,10 +99,7 @@
         path: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/__testing_state_{{ '{{' }} (inventory_hostname | ansible.builtin.md5) {{ '}}' }}.yml"
         state: "absent"
       # "cleanup" and "destroy" phases must tolerate missing containers
-      failed_when: false
-      ignore_errors: true
       ignore_unreachable: true
-
 
 
 # The following play runs on localhost only as the tasks do not require
