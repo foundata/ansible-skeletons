@@ -29,7 +29,7 @@
             | ansible.builtin.default({})
           {{ '}}' }}
       when:
-        - (__testing_state is not ansible.builtin.defined) or (__testing_state is not mapping)
+        - (__testing_state is not ansible.builtin.defined) or (__testing_state is not ansible.builtin.mapping)
       # "cleanup" and "destroy" phases must tolerate missing containers
       ignore_unreachable: true
 
