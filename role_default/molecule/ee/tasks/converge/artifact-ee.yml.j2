@@ -74,7 +74,7 @@
 
           additional_build_steps:
             prepend_base:
-              - 'RUN $PKGMGR -y -q install python3-devel'
+              - 'RUN $PKGMGR -y -q install python3'
 
           additional_build_files:
             # copy artifact from host into the artifacts/ directory inside the container
@@ -101,7 +101,6 @@
 
             system:
               - "python"
-              - "python3-devel"
               - "less" # needed for "ansible-doc --list --type role"
 
           options:
@@ -162,7 +161,7 @@
 
           additional_build_steps:
             prepend_base:
-              - 'RUN $PKGMGR -y -q install python3-devel'
+              - 'RUN $PKGMGR -y -q install python3'
             append_final:
               # Copy role to standard Ansible roles path
               # https://docs.ansible.com/projects/ansible/latest/reference_appendices/config.html#default-roles-path
@@ -187,7 +186,6 @@
 
             system:
               - "python"
-              - "python3-devel"
               - "less" # needed for "ansible-doc --list --type role"
 
           options:
