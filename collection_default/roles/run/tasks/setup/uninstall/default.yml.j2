@@ -7,5 +7,5 @@
     name: "{{ '{{ __run_' + collection_name + '_packages_uninstall }}' }}"
     state: "absent"
   when:
-    - __run_{{ collection_name }}_packages_uninstall is defined
+    - __run_{{ collection_name }}_packages_uninstall is ansible.builtin.defined
     - (__run_{{ collection_name }}_packages_uninstall | ansible.builtin.length) > 0

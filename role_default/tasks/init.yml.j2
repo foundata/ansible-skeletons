@@ -31,10 +31,10 @@
       or distribution facts are missing.
     verbosity: 1
   when:
-    - ansible_facts['os_family'] is not defined or
-      ansible_facts['distribution'] is not defined or
-      ansible_facts['distribution_version'] is not defined or
-      ansible_facts['distribution_major_version'] is not defined or
+    - ansible_facts['os_family'] is not ansible.builtin.defined or
+      ansible_facts['distribution'] is not ansible.builtin.defined or
+      ansible_facts['distribution_version'] is not ansible.builtin.defined or
+      ansible_facts['distribution_major_version'] is not ansible.builtin.defined or
       (__{{ role_name }}_supported_platforms | ansible.builtin.length) < 1
 
 

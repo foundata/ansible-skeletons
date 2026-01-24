@@ -7,5 +7,5 @@
     name: "{{ '{{ __' + role_name + '_packages_uninstall }}' }}"
     state: "absent"
   when:
-    - __{{ role_name }}_packages_uninstall is defined
+    - __{{ role_name }}_packages_uninstall is ansible.builtin.defined
     - (__{{ role_name }}_packages_uninstall | ansible.builtin.length) > 0

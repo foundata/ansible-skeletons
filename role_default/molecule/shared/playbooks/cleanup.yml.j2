@@ -26,7 +26,7 @@
             | ansible.builtin.default({})
           {{ '}}' }}
       when:
-        - (__testing_state is not defined) or (__testing_state is not mapping)
+        - (__testing_state is not ansible.builtin.defined) or (__testing_state is not mapping)
       # "cleanup" and "destroy" phases must tolerate missing containers
       ignore_unreachable: true
 
@@ -78,5 +78,5 @@
         dest: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/__testing_state_{{ '{{' }} (inventory_hostname | ansible.builtin.md5) {{ '}}' }}.yml"
         mode: "u=rw,g=r,o=r" # 0644
       when:
-        - __testing_state is defined
+        - __testing_state is ansible.builtin.defined
         - __testing_state is mapping

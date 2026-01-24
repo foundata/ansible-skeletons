@@ -2,7 +2,7 @@
 
 - name: "Molecule | Destroy (EE) | Container"
   when:
-    - __testing_state['ee_container_name'] is defined
+    - __testing_state['ee_container_name'] is ansible.builtin.defined
     - __testing_state['ee_container_name'] | ansible.builtin.length > 0
   block:
 
@@ -28,7 +28,7 @@
 
 - name: "Molecule | Destroy (EE) | Remove images"
   when:
-    - __testing_state['ee_image_name'] is defined
+    - __testing_state['ee_image_name'] is ansible.builtin.defined
     - __testing_state['ee_image_name'] | ansible.builtin.length > 0
   block:
 

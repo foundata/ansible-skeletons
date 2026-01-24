@@ -40,7 +40,7 @@
             | ansible.builtin.default({})
           {{ '}}' }}
       when:
-        - (__testing_state is not defined) or (__testing_state is not mapping)
+        - (__testing_state is not ansible.builtin.defined) or (__testing_state is not mapping)
 
 
   tasks:
@@ -59,11 +59,11 @@
           "{{ '{{' }} item['name'] }} registry username:
            {{ '{{' }} item['registry']['credentials']['username'] | ansible.builtin.default('None specified') {{ '}}' }}"
       when:
-        - item['registry'] is defined
-        - item['registry']['url'] is defined
+        - item['registry'] is ansible.builtin.defined
+        - item['registry']['url'] is ansible.builtin.defined
         - item['registry']['url'] | ansible.builtin.length > 0
-        - item['registry']['credentials'] is defined
-        - item['registry']['credentials']['username'] is defined
+        - item['registry']['credentials'] is ansible.builtin.defined
+        - item['registry']['credentials']['username'] is ansible.builtin.defined
       changed_when:
         - false
 
@@ -103,8 +103,8 @@
         msg: "{{ '{{' }} __testing_createcontainer_result['results'] {{ '}}' }}"
         verbosity: 3
       when:
-        - __testing_createcontainer_result is defined
-        - __testing_createcontainer_result['results'] is defined
+        - __testing_createcontainer_result is ansible.builtin.defined
+        - __testing_createcontainer_result['results'] is ansible.builtin.defined
 
 
     - name: "Molecule | Create (Podman) | Identify failed containers "
@@ -122,8 +122,8 @@
             | ansible.builtin.list
           {{ '}}' }}
       when:
-        - __testing_createcontainer_result is defined
-        - __testing_createcontainer_result['results'] is defined
+        - __testing_createcontainer_result is ansible.builtin.defined
+        - __testing_createcontainer_result['results'] is ansible.builtin.defined
 
 
     - name: "Molecule | Create (Podman) | Handle container failures (if any)"
@@ -135,16 +135,16 @@
             msg: "{{ '{{' }} __testing_failed_containers {{ '}}' }}"
           when:
             # Skip if already displayed by previous debug tasks with "verbosity: 3"
-            - (ansible_verbosity is defined) and ansible_verbosity < 3
+            - (ansible_verbosity is ansible.builtin.defined) and ansible_verbosity < 3
 
 
         - name: "Molecule | Create (Podman) | Print failed container's non-zero exit codes"
           ansible.builtin.debug:
             msg: "{{ '{{' }} __fail_item['container']['Name'] {{ '}}' }}: {{ '{{' }} __fail_item['container']['State']['ExitCode'] {{ '}}' }}"
           when:
-            - __fail_item['container'] is defined
-            - __fail_item['container']['State'] is defined
-            - __fail_item['container']['State']['ExitCode'] is defined
+            - __fail_item['container'] is ansible.builtin.defined
+            - __fail_item['container']['State'] is ansible.builtin.defined
+            - __fail_item['container']['State']['ExitCode'] is ansible.builtin.defined
             - (__fail_item['container']['State']['ExitCode']) != 0
           loop: "{{ '{{' }} __testing_failed_containers {{ '}}' }}"
           loop_control:
@@ -156,10 +156,10 @@
           ansible.builtin.debug:
             msg: "{{ '{{' }} __fail_item['container']['Name'] {{ '}}' }}: {{ '{{' }} __fail_item['container']['State']['Status'] {{ '}}' }}"
           when:
-            - __fail_item['container'] is defined
-            - __fail_item['container']['State'] is defined
-            - __fail_item['container']['State']['Status'] is defined
-            - __fail_item['container']['State']['Running'] is defined
+            - __fail_item['container'] is ansible.builtin.defined
+            - __fail_item['container']['State'] is ansible.builtin.defined
+            - __fail_item['container']['State']['Status'] is ansible.builtin.defined
+            - __fail_item['container']['State']['Running'] is ansible.builtin.defined
             - not __fail_item['container']['State']['Running']
           loop: "{{ '{{' }} __testing_failed_containers {{ '}}' }}"
           loop_control:
@@ -181,8 +181,8 @@
               {{ '{%' }} endfor {{ '%}' }}
               This might help resolve issues if the container is in a stuck state.
           when:
-            - molecule_yml is defined
-            - molecule_yml['platforms'] is defined
+            - molecule_yml is ansible.builtin.defined
+            - molecule_yml['platforms'] is ansible.builtin.defined
 
 
         - name: "Molecule | Create (Podman) | Throw error"
@@ -298,5 +298,5 @@
         dest: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/__testing_state_{{ '{{' }} (inventory_hostname | ansible.builtin.md5) {{ '}}' }}.yml"
         mode: "u=rw,g=r,o=r" # 0644
       when:
-        - __testing_state is defined
+        - __testing_state is ansible.builtin.defined
         - __testing_state is mapping

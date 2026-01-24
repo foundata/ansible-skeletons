@@ -7,7 +7,7 @@
     name: "{{ '{{ __' + role_name + '_packages_removal }}' }}"
     state: "absent"
   when:
-    - __{{ role_name }}_packages_removal is defined
+    - __{{ role_name }}_packages_removal is ansible.builtin.defined
     - (__{{ role_name }}_packages_removal | ansible.builtin.length) > 0
 
 
@@ -16,7 +16,7 @@
     name: "{{ '{{ __' + role_name + '_packages_install }}' }}"
     state: "{{ '{{' }} 'latest' if run_{{ role_name }}_autoupgrade else 'present' {{ '}}' }}"
   when:
-    - __{{ role_name }}_packages_install is defined
+    - __{{ role_name }}_packages_install is ansible.builtin.defined
     - (__{{ role_name }}_packages_install | ansible.builtin.length) > 0
 
 
@@ -25,6 +25,6 @@
     path: "{{ '{{' }} item {{ '}}' }}"
     state: "absent"
   when:
-    - __{{ role_name }}_paths_removal is defined
+    - __{{ role_name }}_paths_removal is ansible.builtin.defined
     - (__{{ role_name }}_paths_removal | ansible.builtin.length) > 0
   loop: "{{ '{{ __' + role_name + '_paths_removal }}' }}"

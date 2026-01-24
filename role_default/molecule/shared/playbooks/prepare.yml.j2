@@ -68,8 +68,8 @@
               Host: {{ '{{' }} result['item'] {{ '}}' }} - {{ '{{' }} result['stdout_lines'] | ansible.builtin.default(['No output']) | join(', ') {{ '}}' }}
               {{ '{%' }} endfor {{ '%}' }}
           when:
-            - __testing_basicinfo_result is defined
-            - __testing_basicinfo_result['results'] is defined
+            - __testing_basicinfo_result is ansible.builtin.defined
+            - __testing_basicinfo_result['results'] is ansible.builtin.defined
             - __testing_basicinfo_result['results'] | ansible.builtin.length > 0
 
 
@@ -87,7 +87,7 @@
               {{ '{%' }}   endif {{ '%}' }}
               {{ '{%' }} endfor {{ '%}' }}
           when:
-            - hostvars is defined
+            - hostvars is ansible.builtin.defined
             - inventory_hostname in hostvars
 
 
@@ -106,7 +106,7 @@
             | ansible.builtin.default({})
           {{ '}}' }}
       when:
-        - (__testing_state is not defined) or (__testing_state is not mapping)
+        - (__testing_state is not ansible.builtin.defined) or (__testing_state is not mapping)
 
 
   tasks:
@@ -119,8 +119,8 @@
         gather_subset:
           - "distribution"
       when:
-        - ansible_facts['distribution'] is not defined or
-          ansible_facts['os_family'] is not defined
+        - ansible_facts['distribution'] is not ansible.builtin.defined or
+          ansible_facts['os_family'] is not ansible.builtin.defined
 
 
     # Container cleanup task like "rm -rf /var/lib/apt/lists/*" change the mtime
@@ -131,8 +131,8 @@
       ansible.builtin.apt:
         update_cache: true
       when:
-        - ansible_facts is defined
-        - ansible_facts['os_family'] is defined
+        - ansible_facts is ansible.builtin.defined
+        - ansible_facts['os_family'] is ansible.builtin.defined
         - (ansible_facts['os_family'] | ansible.builtin.lower) == 'debian'
 
 
@@ -157,7 +157,7 @@
       ansible.builtin.include_tasks:
         file: "{{ '{{' }} __testing_prepare_loop_item {{ '}}' }}"
       when:
-        - __testing_prepare_taskdir_stat is defined
+        - __testing_prepare_taskdir_stat is ansible.builtin.defined
         - __testing_prepare_taskdir_stat['stat']['exists']
         - __testing_prepare_loop_item is ansible.builtin.file
       loop:
@@ -180,5 +180,5 @@
         dest: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/__testing_state_{{ '{{' }} (inventory_hostname | ansible.builtin.md5) {{ '}}' }}.yml"
         mode: "u=rw,g=r,o=r" # 0644
       when:
-        - __testing_state is defined
+        - __testing_state is ansible.builtin.defined
         - __testing_state is mapping
