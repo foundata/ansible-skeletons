@@ -141,7 +141,7 @@
       ansible.builtin.copy:
         src: "{{ '{{' }} __testing_state['project_dir_path'] {{ '}}' }}"
         dest: "{{ '{{' }} __testing_state['artifact_path'] {{ '}}' }}"
-        mode: "preserve" # FIXME does this make sense here?
+        mode: "preserve"
 
 
     - name: "Molecule | Converge | Write Execution Environment definition for EE test builds with role"

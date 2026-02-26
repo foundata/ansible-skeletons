@@ -57,7 +57,7 @@ __{{ role_name }}_packages_install: []
 # software. This is usually the case if there are common dependencies like
 # "curl" or "openssl" which typically should remain installed even after
 # uninstalling the software managed by this role.
-__{{ role_name }}_packages_uninstall: "{{ '{{ ' + role_name  + '_packages_install }}' }}"
+__{{ role_name }}_packages_uninstall: "{{ '{{ __' + role_name  + '_packages_install }}' }}"
 
 
 # List of package names to be removed unconditionally before installation
