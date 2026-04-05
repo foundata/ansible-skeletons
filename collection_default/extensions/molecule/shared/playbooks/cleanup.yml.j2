@@ -57,7 +57,7 @@
         - __testing_cleanup_loop_item is ansible.builtin.file
       loop: >-
         {{ '{{' }}
-          lookup('fileglob', __testing_cleanup_taskdir ~ '/*.yml', wantlist=True) | ansible.builtin.sort
+          query('ansible.builtin.fileglob', __testing_cleanup_taskdir ~ '/*.yml') | ansible.builtin.sort
           if (__testing_cleanup_taskdir_stat['stat']['exists'] | ansible.builtin.default(false))
           else []
         {{ '}}' }}

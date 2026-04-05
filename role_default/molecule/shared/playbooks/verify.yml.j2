@@ -64,7 +64,7 @@
         - __testing_verify_loop_item is ansible.builtin.file
       loop: >-
         {{ '{{' }}
-          lookup('fileglob', __testing_verify_taskdir ~ '/*.yml', wantlist=True) | ansible.builtin.sort
+          query('ansible.builtin.fileglob', __testing_verify_taskdir ~ '/*.yml') | ansible.builtin.sort
           if (__testing_verify_taskdir_stat['stat']['exists'] | ansible.builtin.default(false))
           else []
         {{ '}}' }}
