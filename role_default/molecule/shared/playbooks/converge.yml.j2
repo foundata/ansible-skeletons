@@ -79,3 +79,6 @@
       when:
         - __testing_state is ansible.builtin.defined
         - __testing_state is mapping
+      # Prevent idempotence failures from global state changes outside the code under test.
+      changed_when:
+        - false
