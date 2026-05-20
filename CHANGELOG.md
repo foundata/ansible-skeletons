@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- collection_default run role, role_default: Add Ansible DocSmith markers to README.md (details: https://foundata.com/en/projects/ansible-docsmith/) (5b38a02)
 - collection_default, role_default: Add openSUSE Leap 16.0 support, remove EOL openSUSE Leap 15.6 from roles and tests.
 - collection_default, role_default: Add Debian 13 (Trixie) support, remove EOL Debian 11 (Bullseye) from roles and tests.
 - collection_default, role_default: Add Fedora 43 support, remove EOL Fedora 41 from roles and tests.
@@ -23,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- collection_default, role_default: Molecule, prevent idempotence test failures from unrelated global state changes (9775a92)
 - collection_default, role_default: Fix a bug that the task "Init | Gather role-specific facts" did not process the specific facts listed to be gathered in the main variables file. (84de375)
 
 
