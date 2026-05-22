@@ -8,9 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Nothing worth mentioning right now.
+
+
+## [2.4.0] - 2026-05-22
+
 ### Added
 
 - collection_default, role_default: Add generic task to remove unwanted files and directories (5980d70)
+- collection_default, role_default: Add generic task to neutralize config files (89e61ca)
 
 
 ### Changed
@@ -121,7 +127,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All functionality and files, `role_default`
 
 
-[unreleased]: https://github.com/foundata/ansible-skeletons/compare/v2.3.0...HEAD
+[unreleased]: https://github.com/foundata/ansible-skeletons/compare/v2.4.0...HEAD
+[2.4.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.4.0
 [2.3.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.3.0
 [2.2.2]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.2.2
 [2.2.1]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.2.1
