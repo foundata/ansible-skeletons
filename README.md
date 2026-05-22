@@ -166,6 +166,12 @@ The skeletons are compatible with all [supported versions](https://docs.ansible.
 The skeletons were explicitly tested with `ansible-galaxy` from the following `ansible` versions (descending order):
 
 * `ansible-galaxy 2.20`
+  * `ansible-galaxy [core 2.20.6]`
+  * `ansible-galaxy [core 2.20.5]`
+  * `ansible-galaxy [core 2.20.4]`
+  * `ansible-galaxy [core 2.20.3]`
+  * `ansible-galaxy [core 2.20.2]`
+  * `ansible-galaxy [core 2.20.1]`
   * `ansible-galaxy [core 2.20.0]`
 * `ansible-galaxy 2.19`
   * `ansible-galaxy [core 2.19.2]`
