@@ -71,6 +71,15 @@ __run_{{ collection_name }}_packages_removal: []
 __run_{{ collection_name }}_paths_removal: []
 
 
+# Dictionary of files to be overwritten with a managed comment instead of being
+# deleted. Keys are file paths; values are the single-line comment characters to
+# use. This is needed on platforms where the package manager reinstalls deleted
+# files on package update. Restored files would conflict with the managed
+# configuration, while modified files are preserved. For example, RPM with
+# %config(noreplace) restores missing files but preserves modified ones.
+__run_{{ collection_name }}_paths_neutralize: {}
+
+
 ### Override defaults of dependencies used by this role (if any).
 
 # nothing right now
