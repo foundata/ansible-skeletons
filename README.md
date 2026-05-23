@@ -137,7 +137,7 @@ A general purpose skeleton to create new Ansible collection for [package and shi
   * Check for minimum Ansible version and supported operating systems / platform.
   * Automatic gathering of role-specific facts (useful with `gather_facts: false`)
   * Automatic search and include for [platform-specific variables](https://redhat-cop.github.io/automation-good-practices/#_platform_specific_variables).
-* Separation of logical task groups, automatic include for[ platform-specific tasks](https://redhat-cop.github.io/automation-good-practices/#_platform_specific_tasks).
+* Separation of logical task groups, automatic include for [platform-specific tasks](https://redhat-cop.github.io/automation-good-practices/#_platform_specific_tasks).
 * Passes `ansible-lint --profile production --strict`.
 * [`antsibull-changelog`](https://docs.ansible.com/projects/antsibull-changelog/changelogs/) support.
 * [Molecule](https://docs.ansible.com/projects/molecule/) support with a default scenario using [Podman](https://podman.io/docs/installation) and several [integration test targets](https://github.com/orgs/foundata/repositories?q=oci-*-itt).
