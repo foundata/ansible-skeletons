@@ -8,7 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning right now.
+### Fixes
+
+- collection_default, role_default: avoid bool coercion on templated Windows check (Molecule, Podman)
 
 
 ## [2.4.0] - 2026-05-22
