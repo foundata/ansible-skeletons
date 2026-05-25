@@ -8,9 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Nothing worth mentioning right now.
+
+
+## [2.4.1] - 2026-05-25
+
 ### Fixes
 
-- collection_default, role_default: avoid bool coercion on templated Windows check (Molecule, Podman)
+- collection_default, role_default: avoid bool coercion on templated Windows check (Molecule, Podman) (e31baa5)
 
 
 ## [2.4.0] - 2026-05-22
@@ -24,8 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - collection_default run role, role_default: Add Ansible DocSmith markers to README.md (details: https://foundata.com/en/projects/ansible-docsmith/) (5b38a02)
-- collection_default, role_default: Add Ubuntu 26.04 LTS (Resolute Raccoon) support
-- collection_default, role_default: Add Fedora 44 support, remove EOL Fedora 42 from roles and tests.
+- collection_default, role_default: Add Ubuntu 26.04 LTS (Resolute Raccoon) support (89e61ca)
+- collection_default, role_default: Add Fedora 44 support, remove EOL Fedora 42 from roles and tests. (89e61ca)
 - collection_default, role_default: Add openSUSE Leap 16.0 support, remove EOL openSUSE Leap 15.6 from roles and tests.
 - collection_default, role_default: Add Debian 13 (Trixie) support, remove EOL Debian 11 (Bullseye) from roles and tests.
 - collection_default, role_default: Add Fedora 43 support, remove EOL Fedora 41 from roles and tests.
@@ -129,7 +134,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All functionality and files, `role_default`
 
 
-[unreleased]: https://github.com/foundata/ansible-skeletons/compare/v2.4.0...HEAD
+[unreleased]: https://github.com/foundata/ansible-skeletons/compare/v2.4.1...HEAD
+[2.4.1]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.4.0
 [2.4.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.4.0
 [2.3.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.3.0
 [2.2.2]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.2.2
