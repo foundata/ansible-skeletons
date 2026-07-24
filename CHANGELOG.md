@@ -10,7 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixes
 
-- collection_default, role_default: fix the fact-gathering skip in `tasks/init.yml` never triggering in some cases; `__*_used_facts` is now a mapping of `gather_subset` name to the `ansible_facts` keys it provides, so subset names and fact keys can no longer be confused.)
+- collection_default, role_default: remove a stray double quote from the Debian hint in the neutralize-file comment
+- collection_default, role_default: fix the fact-gathering skip in `tasks/init.yml` never triggering in some cases; `__*_used_facts` is now a mapping of `gather_subset` name to the `ansible_facts` keys it provides, so subset names and fact keys can no longer be confused.) (5ef968f)
 
 
 
