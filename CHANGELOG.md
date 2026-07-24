@@ -8,7 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning right now.
+### Fixes
+
+- collection_default, role_default: fix the fact-gathering skip in `tasks/init.yml` never triggering in some cases; `__*_used_facts` is now a mapping of `gather_subset` name to the `ansible_facts` keys it provides, so subset names and fact keys can no longer be confused.)
+
 
 
 ## [2.4.1] - 2026-05-25
