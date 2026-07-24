@@ -9,6 +9,8 @@
 #  ansible.builtin.service:
 #    name: "example"
 #    state: "restarted"
+#  when:
+#    - {{ role_name + '_service_state' }} in ['enabled', 'running']
 #
 #- name: "reload_example"
 #  ansible.builtin.systemd:
