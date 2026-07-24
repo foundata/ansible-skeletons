@@ -10,7 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- collection_default, role_default: ignore Ansible Galaxy build artifacts (`<namespace>-<name>-<version>.tar.gz`) in `.gitignore`
+- collection_default, role_default: ignore Ansible Galaxy build artifacts (`<namespace>-<name>-<version>.tar.gz`) in `.gitignore` (6e6773d)
+
+
+### Changed
+
+- collection_default: Added [Ansible DocSmith](https://foundata.com/en/projects/ansible-docsmith/) `TOC-FULL` markers for the `run` role to the collection `README.md` template, enabling automatic inline TOC generation.
 
 
 ### Fixes
