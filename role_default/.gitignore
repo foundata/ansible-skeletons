@@ -400,3 +400,7 @@ $RECYCLE.BIN/
 
 # Files to keep empty directories in Git
 !.gitkeep
+
+# Ansible Galaxy build artifacts ("ansible-galaxy collection build" creates a
+# <namespace>-<name>-<version>.tar.gz in the repository root)
+/*-*-[0-9]*.tar.gz

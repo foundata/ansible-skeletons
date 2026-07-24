@@ -403,3 +403,7 @@ $RECYCLE.BIN/
 
 # antsibull-changelog metadata cache for modules and plugins
 changelogs/.plugin-cache.yaml
+
+# Ansible Galaxy build artifacts ("ansible-galaxy collection build" creates a
+# <namespace>-<name>-<version>.tar.gz in the repository root)
+/*-*-[0-9]*.tar.gz
