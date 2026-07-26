@@ -65,7 +65,7 @@
           vars:
             __testing_basicinfo_result_msg: |-
               {{ '{%' }} for result in __testing_basicinfo_result['results'] {{ '%}' }}
-              Host: {{ '{{' }} result['item'] {{ '}}' }} - {{ '{{' }} result['stdout_lines'] | ansible.builtin.default(['No output']) | join(', ') {{ '}}' }}
+              Host: {{ '{{' }} result['item'] {{ '}}' }} - {{ '{{' }} result['stdout_lines'] | ansible.builtin.default(['No output']) | ansible.builtin.join(', ') {{ '}}' }}
               {{ '{%' }} endfor {{ '%}' }}
           when:
             - __testing_basicinfo_result is ansible.builtin.defined
@@ -181,4 +181,4 @@
         mode: "u=rw,g=r,o=r" # 0644
       when:
         - __testing_state is ansible.builtin.defined
-        - __testing_state is mapping
+        - __testing_state is ansible.builtin.mapping
