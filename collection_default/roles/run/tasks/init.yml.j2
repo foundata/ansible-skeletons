@@ -22,7 +22,7 @@
       This role requires Ansible {{ '{{' }} __run_{{ collection_name }}_meta['galaxy_info']['min_ansible_version'] {{ '}}' }}
       or higher. You are currently running Ansible {{ '{{' }} ansible_version['full'] {{ '}}' }} .
   when:
-    - ansible_version['full'] is version_compare(__run_{{ collection_name }}_meta['galaxy_info']['min_ansible_version'], '<')
+    - ansible_version['full'] is ansible.builtin.version(__run_{{ collection_name }}_meta['galaxy_info']['min_ansible_version'], '<')
 
 
 - name: "Init | Notify when platform support check is not possible"
