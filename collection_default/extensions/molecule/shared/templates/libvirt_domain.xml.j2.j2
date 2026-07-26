@@ -1,0 +1,62 @@
+<!--
+  libvirt domain definition of a Molecule test instance. Rendered per platform
+  by the create-libvirt.yml playbook ("item" is the platform dict from
+  molecule.yml, "libvirt_cache_dir" and "molecule_ephemeral_directory" are
+  play variables).
+
+  Networking: passt user networking with a TCP port forward from
+  127.0.0.1:<ssh_port> on the host to port 22 of the instance. This works
+  with a session libvirt daemon and does not need any privileges.
+-->
+{{ '{%' }} set __testing_vm_dir = molecule_ephemeral_directory ~ '/vm/' ~ item['name'] {{ '%}' }}
+<domain type='kvm'>
+  <name>{{ '{{' }} item['name'] {{ '}}' }}</name>
+  <memory unit='MiB'>{{ '{{' }} item['memory'] | ansible.builtin.default(2048) {{ '}}' }}</memory>
+  <vcpu>{{ '{{' }} item['vcpus'] | ansible.builtin.default(2) {{ '}}' }}</vcpu>
+  <os>
+    <type arch='x86_64' machine='q35'>hvm</type>
+  </os>
+  <cpu mode='host-passthrough'/>
+  <features>
+    <acpi/>
+    <apic/>
+  </features>
+  <devices>
+    <emulator>/usr/bin/qemu-system-x86_64</emulator>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2'/>
+      <source file='{{ '{{' }} __testing_vm_dir {{ '}}' }}/overlay.qcow2'/>
+      <target dev='vda' bus='virtio'/>
+    </disk>
+    <!-- cloud-init NoCloud seed -->
+    <disk type='file' device='cdrom'>
+      <driver name='qemu' type='raw'/>
+      <source file='{{ '{{' }} __testing_vm_dir {{ '}}' }}/seed.iso'/>
+      <target dev='sda' bus='sata'/>
+      <readonly/>
+    </disk>
+    <interface type='user'>
+      <backend type='passt'/>
+      <portForward proto='tcp' address='127.0.0.1'>
+        <range start='{{ '{{' }} item['ssh_port'] {{ '}}' }}' to='22'/>
+      </portForward>
+      <model type='virtio'/>
+    </interface>
+    <!-- qemu-guest-agent channel (clean shutdown, IP debugging via domifaddr) -->
+    <channel type='unix'>
+      <target type='virtio' name='org.qemu.guest_agent.0'/>
+    </channel>
+    <!-- boot console log, main debugging resource if an instance does not come up -->
+    <serial type='file'>
+      <source path='{{ '{{' }} __testing_vm_dir {{ '}}' }}/console.log' append='off'/>
+      <target port='0'/>
+    </serial>
+    <console type='file'>
+      <source path='{{ '{{' }} __testing_vm_dir {{ '}}' }}/console.log' append='off'/>
+      <target type='serial' port='0'/>
+    </console>
+    <rng model='virtio'>
+      <backend model='random'>/dev/urandom</backend>
+    </rng>
+  </devices>
+</domain>

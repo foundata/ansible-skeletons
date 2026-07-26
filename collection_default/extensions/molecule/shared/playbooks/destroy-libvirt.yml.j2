@@ -1,0 +1,144 @@
+# Molecule destroy playbook. Destroys the testing infrastructure and removes
+# data from instance-config.
+#
+# This playbook is only compatible with scenarios using a "driver:" that
+# expects libvirt managed virtual machines (see molecule.yml).
+#
+# The cached cloud images below the image cache directory are kept on purpose
+# (they are shared between scenario runs; delete them manually if needed).
+
+---
+
+- name: "Molecule | Destroy (libvirt)"
+  hosts: "molecule"
+  gather_facts: false
+  no_log: "{{ '{{' }} molecule_no_log | ansible.builtin.default(false) {{ '}}' }}"
+  vars:
+    libvirt_uri: "{{ '{{' }} lookup('ansible.builtin.env', 'MOLECULE_VM_LIBVIRT_URI') | ansible.builtin.default('qemu:///session', true) {{ '}}' }}"
+  pre_tasks:
+
+    - name: "Molecule | Destroy (libvirt) | Restore __testing_state (if any) from YAML file from localhost"
+      # Although this task is delegated to localhost, the play itself targets
+      # "hosts: molecule", so the resulting fact is stored on the current
+      # inventory host. This is why inventory_hostname is available and must be
+      # used to load the correct per-host state file.
+      delegate_to: "localhost"
+      ansible.builtin.set_fact:
+        __testing_state: >-
+          {{ '{{' }}
+            lookup('file', molecule_ephemeral_directory ~ '/__testing_state_' ~ (inventory_hostname | ansible.builtin.md5) ~ '.yml', errors='ignore')
+            | ansible.builtin.default('{}')
+            | ansible.builtin.from_yaml
+            | ansible.builtin.default({})
+          {{ '}}' }}
+      when:
+        - (__testing_state is not ansible.builtin.defined) or (__testing_state is not ansible.builtin.mapping)
+      # "cleanup" and "destroy" phases must tolerate missing instances
+      ignore_unreachable: true
+
+
+  tasks:
+
+    # Tasks delegated to run locally (delegate_to or local_action), but iterate
+    # remotely-defined inventory items (as "hosts: molecule" == needed data source
+    # for at least inventory_hostname).
+    - name: "Molecule | Destroy (libvirt) | Force off libvirt domain on localhost (best effort)"
+      delegate_to: "localhost"
+      # The command module is used intentionally: community.libvirt would
+      # need the libvirt-python binding which has no pre-built wheels and
+      # requires build tooling (gcc, libvirt-devel) on every machine.
+      ansible.builtin.command:
+        argv:
+          - "virsh"
+          - "--connect"
+          - "{{ '{{' }} libvirt_uri {{ '}}' }}"
+          - "destroy"
+          - "{{ '{{' }} inventory_hostname {{ '}}' }}"
+      changed_when:
+        - __testing_virsh_destroy_result is ansible.builtin.success
+      failed_when:
+        - false
+      register: __testing_virsh_destroy_result
+
+
+    - name: "Molecule | Destroy (libvirt) | Undefine libvirt domain on localhost (best effort)"
+      delegate_to: "localhost"
+      # The command module is used intentionally, see "Force off libvirt domain".
+      ansible.builtin.command:
+        argv:
+          - "virsh"
+          - "--connect"
+          - "{{ '{{' }} libvirt_uri {{ '}}' }}"
+          - "undefine"
+          - "{{ '{{' }} inventory_hostname {{ '}}' }}"
+      changed_when:
+        - __testing_virsh_undefine_result is ansible.builtin.success
+      failed_when:
+        - false
+      register: __testing_virsh_undefine_result
+
+
+    - name: "Molecule | Destroy (libvirt) | Remove instance working directory on localhost"
+      delegate_to: "localhost"
+      ansible.builtin.file:
+        path: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/vm/{{ '{{' }} inventory_hostname {{ '}}' }}"
+        state: "absent"
+
+
+    - name: "Molecule | Destroy (libvirt) | Set <scenario>/tasks/destroy directory path"
+      ansible.builtin.set_fact:
+        __testing_destroy_taskdir: >-
+          {{ '{{' }}
+            (lookup('env', 'MOLECULE_SCENARIO_DIRECTORY') | ansible.builtin.regex_replace('/$', ''))
+            ~ '/tasks/destroy'
+          {{ '}}' }}
+
+
+    - name: "Molecule | Destroy (libvirt) | Check if <scenario>/tasks/destroy directory exists on localhost"
+      delegate_to: "localhost"
+      ansible.builtin.stat:
+        path: "{{ '{{' }} __testing_destroy_taskdir {{ '}}' }}"
+      run_once: true # noqa: run-once[task]
+      register: __testing_destroy_taskdir_stat
+
+
+    - name: "Molecule | Destroy (libvirt) | Include additional tasks from <scenario>/tasks/destroy"
+      ansible.builtin.include_tasks:
+        file: "{{ '{{' }} __testing_destroy_loop_item {{ '}}' }}"
+      when:
+        - __testing_destroy_loop_item is ansible.builtin.file
+      loop: >-
+        {{ '{{' }}
+          query('ansible.builtin.fileglob', __testing_destroy_taskdir ~ '/*.yml') | ansible.builtin.sort
+          if (__testing_destroy_taskdir_stat['stat']['exists'] | ansible.builtin.default(false))
+          else []
+        {{ '}}' }}
+      loop_control:
+        label: "{{ '{{' }} __testing_destroy_loop_item {{ '}}' }}"
+        index_var: "__testing_destroy_loop_index"
+        loop_var: "__testing_destroy_loop_item"
+
+
+    - name: "Molecule | Destroy (libvirt) | Delete __testing_state YAML file (best effort) on localhost"
+      delegate_to: "localhost"
+      ansible.builtin.file:
+        path: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/__testing_state_{{ '{{' }} (inventory_hostname | ansible.builtin.md5) {{ '}}' }}.yml"
+        state: "absent"
+      # "cleanup" and "destroy" phases must tolerate missing instances
+      ignore_unreachable: true
+
+
+# The following play runs on localhost only as the tasks do not require
+# target-related data like inventory_hostname. Therefore, there is no need to
+# specify "hosts: molecule" with delegate_to or local_action. Running the play
+# directly on localhost saves time and results in less noisy output.
+- name: "Molecule | Destroy (libvirt) | Additional cleanup tasks on localhost"
+  hosts: "localhost"
+  gather_facts: false
+  no_log: "{{ '{{' }} molecule_no_log | ansible.builtin.default(false) {{ '}}' }}"
+  tasks:
+
+    - name: "Molecule | Destroy (libvirt) | Remove molecule_inventory.yml"
+      ansible.builtin.file:
+        path: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/inventory/molecule_inventory.yml"
+        state: "absent"

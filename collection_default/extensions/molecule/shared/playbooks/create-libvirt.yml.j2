@@ -1,0 +1,590 @@
+# Molecule create playbook. Creates the testing infrastructure and stores data
+# in instance-config.
+#
+# This playbook is only compatible with scenarios using a "driver:" that
+# expects libvirt managed virtual machines (see molecule.yml).
+#
+# Approach: vendor cloud images (qcow2) + cloud-init NoCloud seed ISO + qcow2
+# backing-file overlays, driven via a session libvirt daemon (qemu:///session)
+# with passt user networking and a deterministic SSH port forward per platform.
+# This works without root, without libvirt group membership and without any
+# IP discovery (instances are reachable via 127.0.0.1:<ssh_port>).
+
+---
+
+- name: "Molecule | Create (libvirt) | Create testing infrastructure on localhost"
+  hosts: "localhost"
+  connection: "local"
+  gather_facts: false
+  no_log: "{{ '{{' }} molecule_no_log | ansible.builtin.default(false) {{ '}}' }}"
+  vars:
+    libvirt_uri: "{{ '{{' }} lookup('ansible.builtin.env', 'MOLECULE_VM_LIBVIRT_URI') | ansible.builtin.default('qemu:///session', true) {{ '}}' }}"
+    libvirt_cache_dir: >-
+      {{ '{{' }}
+        lookup('ansible.builtin.env', 'MOLECULE_VM_CACHE_DIR')
+        | ansible.builtin.default((lookup('ansible.builtin.env', 'HOME') ~ '/.cache/ansible-molecule-libvirt/images'), true)
+      {{ '}}' }}
+    # SSH options for all connections to the instances. IdentitiesOnly=yes is
+    # important: without it, a loaded ssh-agent offers all of its keys first
+    # and the guest's MaxAuthTries limit gets exhausted before the correct key.
+    ssh_common_args: "-o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+    # Resource guard thresholds (override the guard with MOLECULE_VM_IGNORE_RESOURCES=1)
+    guard_memory_reserve_mib: 3072
+    guard_disk_base_mib: 10240
+    guard_disk_per_platform_mib: 1536
+    # Init variable to create an inventory containing the molecule target hosts
+    molecule_inventory:
+      all:
+        hosts: {}
+        children:
+          molecule:
+            hosts: {}
+          molecule_linux:
+            hosts: {}
+          molecule_windows:
+            hosts: {}
+  pre_tasks:
+
+    - name: "Molecule | Create (libvirt) | Restore __testing_state (if any) from YAML file from localhost"
+      ansible.builtin.set_fact:
+        __testing_state: >-
+          {{ '{{' }}
+            lookup('file', molecule_ephemeral_directory ~ '/__testing_state_' ~ (inventory_hostname | ansible.builtin.md5) ~ '.yml', errors='ignore')
+            | ansible.builtin.default('{}')
+            | ansible.builtin.from_yaml
+            | ansible.builtin.default({})
+          {{ '}}' }}
+      when:
+        - (__testing_state is not ansible.builtin.defined) or (__testing_state is not ansible.builtin.mapping)
+
+
+  tasks:
+
+    - name: "Molecule | Create (libvirt) | Basic self-checks for the testing infrastructure"
+      block:
+
+        - name: "Molecule | Create (libvirt) | Assert platform definitions are complete"
+          ansible.builtin.assert:
+            that:
+              - item['image_url'] is ansible.builtin.defined
+              - item['image_url'] | ansible.builtin.length > 0
+              - item['ssh_port'] is ansible.builtin.defined
+              - item['ssh_port'] | int > 0
+            fail_msg: >-
+              Platform "{{ '{{' }} item['name'] {{ '}}' }}" needs at least the keys
+              "image_url" (URL of a cloud image with cloud-init) and "ssh_port"
+              (unique local port for the SSH port forward) in molecule.yml.
+          loop: "{{ '{{' }} molecule_yml['platforms'] {{ '}}' }}"
+          loop_control:
+            label: "{{ '{{' }} item['name'] {{ '}}' }}"
+
+
+        - name: "Molecule | Create (libvirt) | Assert ssh_port values are unique"
+          ansible.builtin.assert:
+            that:
+              - >-
+                (molecule_yml['platforms'] | ansible.builtin.map(attribute='ssh_port') | ansible.builtin.unique | ansible.builtin.length)
+                ==
+                (molecule_yml['platforms'] | ansible.builtin.length)
+            fail_msg: "At least two platforms in molecule.yml share the same ssh_port value."
+
+
+        # Using virsh on purpose: As of 2026-Q3, the community.libvirt collection
+        # requires the libvirt-python binding which has no pre-built wheels.
+        - name: "Molecule | Create (libvirt) | Check for required command line tools"
+          # The command module is used intentionally: this only probes for the
+          # existence of the tools themselves, there is nothing to manage yet.
+          ansible.builtin.command:
+            argv:
+              - "{{ '{{' }} item {{ '}}' }}"
+              - "--version"
+          changed_when:
+            - false
+          failed_when:
+            - false
+          loop:
+            - "virsh"
+            - "qemu-img"
+          register: __testing_tools_result
+
+
+        - name: "Molecule | Create (libvirt) | Assert required command line tools are available"
+          ansible.builtin.assert:
+            that:
+              - >-
+                (__testing_tools_result['results']
+                 | ansible.builtin.selectattr('rc', 'defined')
+                 | ansible.builtin.selectattr('rc', 'ne', 0)
+                 | ansible.builtin.length) == 0
+              - >-
+                (__testing_tools_result['results']
+                 | ansible.builtin.selectattr('rc', 'defined')
+                 | ansible.builtin.length) == 2
+            fail_msg: >-
+              virsh and/or qemu-img are not available. Install the libvirt client
+              and QEMU tooling (Fedora: "libvirt-client qemu-img", Debian/Ubuntu:
+              "libvirt-clients qemu-utils") as well as the QEMU/KVM libvirt driver
+              and passt (Fedora: "libvirt-daemon-driver-qemu qemu-kvm passt",
+              Debian/Ubuntu: "libvirt-daemon qemu-system-x86 passt").
+
+
+        - name: "Molecule | Create (libvirt) | Get information about /dev/kvm"
+          ansible.builtin.stat:
+            path: "/dev/kvm"
+          register: __testing_kvm_stat
+
+
+        - name: "Molecule | Create (libvirt) | Assert /dev/kvm is usable"
+          ansible.builtin.assert:
+            that:
+              - __testing_kvm_stat['stat']['exists'] | ansible.builtin.default(false)
+              - __testing_kvm_stat['stat']['readable'] | ansible.builtin.default(false)
+              - __testing_kvm_stat['stat']['writeable'] | ansible.builtin.default(false)
+            fail_msg: >-
+              /dev/kvm is missing or not accessible for the current user. Ensure KVM
+              is available (check BIOS/UEFI virtualization settings). On Debian and
+              Ubuntu, users of local (seated) sessions get access automatically;
+              headless sessions need membership in the "kvm" group
+              ("usermod -aG kvm <user>", then re-login). On Fedora, /dev/kvm is
+              accessible for everybody by default.
+
+
+        - name: "Molecule | Create (libvirt) | Check connectivity to the libvirt daemon"
+          # The command module is used intentionally: community.libvirt would
+          # need the libvirt-python binding which has no pre-built wheels and
+          # requires build tooling (gcc, libvirt-devel) on every machine.
+          ansible.builtin.command:
+            argv:
+              - "virsh"
+              - "--connect"
+              - "{{ '{{' }} libvirt_uri {{ '}}' }}"
+              - "version"
+          changed_when:
+            - false
+          register: __testing_libvirt_conn_result
+          failed_when:
+            - __testing_libvirt_conn_result is ansible.builtin.failed
+
+
+    - name: "Molecule | Create (libvirt) | Ensure image cache directory exists"
+      ansible.builtin.file:
+        path: "{{ '{{' }} libvirt_cache_dir {{ '}}' }}"
+        state: "directory"
+        mode: "u=rwx,g=rx,o=rx" # 0755
+
+
+    - name: "Molecule | Create (libvirt) | Resource guard (skip with MOLECULE_VM_IGNORE_RESOURCES=1)"
+      when:
+        - (lookup('ansible.builtin.env', 'MOLECULE_VM_IGNORE_RESOURCES') | ansible.builtin.default('', true) | ansible.builtin.length) == 0
+      block:
+
+        - name: "Molecule | Create (libvirt) | Gather hardware facts for the resource guard"
+          ansible.builtin.setup:
+            gather_subset:
+              - "!all"
+              - "!min"
+              - "hardware"
+
+
+        - name: "Molecule | Create (libvirt) | Determine free disk space of the image cache directory"
+          # The command module is used intentionally: there is no Ansible module
+          # to determine the free disk space of an arbitrary path (mount facts
+          # would need fragile longest-prefix path matching).
+          ansible.builtin.command:
+            argv:
+              - "df"
+              - "-P"
+              - "-k"
+              - "{{ '{{' }} libvirt_cache_dir {{ '}}' }}"
+          changed_when:
+            - false
+          register: __testing_df_result
+
+
+        - name: "Molecule | Create (libvirt) | Set resource guard facts"
+          ansible.builtin.set_fact:
+            __testing_guard_memory_required_mib: >-
+              {{ '{{' }}
+                (molecule_yml['platforms'] | ansible.builtin.map(attribute='memory', default=2048) | ansible.builtin.sum)
+                + guard_memory_reserve_mib
+              {{ '}}' }}
+            __testing_guard_memory_available_mib: "{{ '{{' }} ansible_facts['memory_mb']['nocache']['free'] | int {{ '}}' }}"
+            __testing_guard_disk_required_mib: >-
+              {{ '{{' }}
+                guard_disk_base_mib + (guard_disk_per_platform_mib * (molecule_yml['platforms'] | ansible.builtin.length))
+              {{ '}}' }}
+            __testing_guard_disk_available_mib: "{{ '{{' }} ((__testing_df_result['stdout_lines'][-1]).split()[3] | int) // 1024 {{ '}}' }}"
+
+
+        - name: "Molecule | Create (libvirt) | Fail if system resources are insufficient"
+          ansible.builtin.fail:
+            msg: >-
+              Not enough free resources to start all {{ '{{' }} molecule_yml['platforms'] | ansible.builtin.length {{ '}}' }} platforms:
+              memory required (incl. {{ '{{' }} guard_memory_reserve_mib {{ '}}' }} MiB host reserve): {{ '{{' }} __testing_guard_memory_required_mib {{ '}}' }} MiB,
+              memory available: {{ '{{' }} __testing_guard_memory_available_mib {{ '}}' }} MiB;
+              disk required at {{ '{{' }} libvirt_cache_dir {{ '}}' }}: {{ '{{' }} __testing_guard_disk_required_mib {{ '}}' }} MiB,
+              disk available: {{ '{{' }} __testing_guard_disk_available_mib {{ '}}' }} MiB.
+              Run fewer platforms at once (--platform-name=<name>) or set the
+              environment variable MOLECULE_VM_IGNORE_RESOURCES=1 to skip this check.
+          when:
+            - (__testing_guard_memory_required_mib | int) > (__testing_guard_memory_available_mib | int) or
+              (__testing_guard_disk_required_mib | int) > (__testing_guard_disk_available_mib | int)
+
+
+    - name: "Molecule | Create (libvirt) | Download cloud images (if not cached)"
+      ansible.builtin.get_url:
+        url: "{{ '{{' }} item['image_url'] {{ '}}' }}"
+        dest: "{{ '{{' }} libvirt_cache_dir {{ '}}' }}/{{ '{{' }} item['image_url'] | ansible.builtin.basename {{ '}}' }}"
+        mode: "u=rw,g=r,o=r" # 0644
+        checksum: "{{ '{{' }} item['image_checksum'] | ansible.builtin.default(omit) {{ '}}' }}"
+        force: "{{ '{{' }} (lookup('ansible.builtin.env', 'MOLECULE_VM_REFRESH_IMAGES') | ansible.builtin.default('', true) | ansible.builtin.length) > 0 {{ '}}' }}"
+      loop: "{{ '{{' }} molecule_yml['platforms'] {{ '}}' }}"
+      loop_control:
+        label: "{{ '{{' }} item['name'] {{ '}}' }}"
+
+
+    - name: "Molecule | Create (libvirt) | Generate SSH keypair for this scenario run"
+      community.crypto.openssh_keypair:
+        path: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/id_ed25519"
+        type: "ed25519"
+        comment: "molecule-libvirt"
+        mode: "u=rw,g=,o=" # 0600
+
+
+    - name: "Molecule | Create (libvirt) | Ensure per-instance working directories exist"
+      ansible.builtin.file:
+        path: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/vm/{{ '{{' }} item['name'] {{ '}}' }}"
+        state: "directory"
+        mode: "u=rwx,g=,o=" # 0700
+      loop: "{{ '{{' }} molecule_yml['platforms'] {{ '}}' }}"
+      loop_control:
+        label: "{{ '{{' }} item['name'] {{ '}}' }}"
+
+
+    - name: "Molecule | Create (libvirt) | Create cloud-init user-data"
+      ansible.builtin.template:
+        src: "{{ '{{' }} playbook_dir | ansible.builtin.dirname {{ '}}' }}/templates/cloud_init_user_data.yml.j2"
+        dest: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/vm/{{ '{{' }} item['name'] {{ '}}' }}/user-data"
+        mode: "u=rw,g=,o=" # 0600
+      loop: "{{ '{{' }} molecule_yml['platforms'] {{ '}}' }}"
+      loop_control:
+        label: "{{ '{{' }} item['name'] {{ '}}' }}"
+
+
+    - name: "Molecule | Create (libvirt) | Create cloud-init meta-data"
+      ansible.builtin.copy:
+        content: |
+          instance-id: "molecule-{{ '{{' }} item['name'] {{ '}}' }}"
+          local-hostname: "{{ '{{' }} item['name'] {{ '}}' }}"
+        dest: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/vm/{{ '{{' }} item['name'] {{ '}}' }}/meta-data"
+        mode: "u=rw,g=,o=" # 0600
+      loop: "{{ '{{' }} molecule_yml['platforms'] {{ '}}' }}"
+      loop_control:
+        label: "{{ '{{' }} item['name'] {{ '}}' }}"
+
+
+    - name: "Molecule | Create (libvirt) | Create cloud-init NoCloud seed ISO"
+      community.general.iso_create:
+        src_files:
+          - "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/vm/{{ '{{' }} item['name'] {{ '}}' }}/user-data"
+          - "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/vm/{{ '{{' }} item['name'] {{ '}}' }}/meta-data"
+        dest_iso: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/vm/{{ '{{' }} item['name'] {{ '}}' }}/seed.iso"
+        vol_ident: "cidata"
+        # Rock Ridge preserves the exact lowercase file names cloud-init needs;
+        # interchange level 4 is required as "user-data" (9 characters) exceeds
+        # the 8.3 file name limit of the default level 1.
+        rock_ridge: "1.09"
+        interchange_level: 4
+      loop: "{{ '{{' }} molecule_yml['platforms'] {{ '}}' }}"
+      loop_control:
+        label: "{{ '{{' }} item['name'] {{ '}}' }}"
+
+
+    - name: "Molecule | Create (libvirt) | Create qcow2 overlay images"
+      # The command module is used intentionally: there is no suitable Ansible
+      # module to create qcow2 overlays with a backing file.
+      ansible.builtin.command:
+        argv:
+          - "qemu-img"
+          - "create"
+          - "-f"
+          - "qcow2"
+          # backing file: the pristine, cached cloud image (never written to)
+          - "-b"
+          - "{{ '{{' }} libvirt_cache_dir {{ '}}' }}/{{ '{{' }} item['image_url'] | ansible.builtin.basename {{ '}}' }}"
+          - "-F"
+          - "qcow2"
+          - "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/vm/{{ '{{' }} item['name'] {{ '}}' }}/overlay.qcow2"
+          # virtual disk size; cloud-init growpart expands the root filesystem
+          - "{{ '{{' }} item['disk_size'] | ansible.builtin.default('10G') {{ '}}' }}"
+        creates: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/vm/{{ '{{' }} item['name'] {{ '}}' }}/overlay.qcow2"
+      loop: "{{ '{{' }} molecule_yml['platforms'] {{ '}}' }}"
+      loop_control:
+        label: "{{ '{{' }} item['name'] {{ '}}' }}"
+
+
+    - name: "Molecule | Create (libvirt) | Create libvirt domain XML"
+      ansible.builtin.template:
+        src: "{{ '{{' }} playbook_dir | ansible.builtin.dirname {{ '}}' }}/templates/libvirt_domain.xml.j2"
+        dest: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/vm/{{ '{{' }} item['name'] {{ '}}' }}/domain.xml"
+        mode: "u=rw,g=,o=" # 0600
+      loop: "{{ '{{' }} molecule_yml['platforms'] {{ '}}' }}"
+      loop_control:
+        label: "{{ '{{' }} item['name'] {{ '}}' }}"
+
+
+    - name: "Molecule | Create (libvirt) | Start instances and wait for SSH"
+      block:
+
+        - name: "Molecule | Create (libvirt) | Define libvirt domains"
+          # The command module is used intentionally: community.libvirt would
+          # need the libvirt-python binding which has no pre-built wheels and
+          # requires build tooling (gcc, libvirt-devel) on every machine.
+          ansible.builtin.command:
+            argv:
+              - "virsh"
+              - "--connect"
+              - "{{ '{{' }} libvirt_uri {{ '}}' }}"
+              - "define"
+              - "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/vm/{{ '{{' }} item['name'] {{ '}}' }}/domain.xml"
+          changed_when:
+            - true
+          loop: "{{ '{{' }} molecule_yml['platforms'] {{ '}}' }}"
+          loop_control:
+            label: "{{ '{{' }} item['name'] {{ '}}' }}"
+
+
+        - name: "Molecule | Create (libvirt) | Start libvirt domains"
+          # The command module is used intentionally, see "Define libvirt domains".
+          ansible.builtin.command:
+            argv:
+              - "virsh"
+              - "--connect"
+              - "{{ '{{' }} libvirt_uri {{ '}}' }}"
+              - "start"
+              - "{{ '{{' }} item['name'] {{ '}}' }}"
+          changed_when:
+            - __testing_start_result is ansible.builtin.success
+          failed_when:
+            - __testing_start_result is ansible.builtin.failed
+            - "'already active' not in (__testing_start_result['stderr'] | ansible.builtin.default(''))"
+          loop: "{{ '{{' }} molecule_yml['platforms'] {{ '}}' }}"
+          loop_control:
+            label: "{{ '{{' }} item['name'] {{ '}}' }}"
+          register: __testing_start_result
+
+
+        - name: "Molecule | Create (libvirt) | Wait for the SSH port forwards"
+          ansible.builtin.wait_for:
+            host: "127.0.0.1"
+            port: "{{ '{{' }} item['ssh_port'] {{ '}}' }}"
+            timeout: 30
+          loop: "{{ '{{' }} molecule_yml['platforms'] {{ '}}' }}"
+          loop_control:
+            label: "{{ '{{' }} item['name'] {{ '}}' }}"
+
+
+        - name: "Molecule | Create (libvirt) | Wait for SSH authentication (cloud-init user setup)"
+          # The command module is used intentionally: this probes the full SSH
+          # login (including the key deployed by cloud-init), which no Ansible
+          # module provides for a not-yet-inventoried host.
+          ansible.builtin.command:
+            argv:
+              - "ssh"
+              - "-p"
+              - "{{ '{{' }} item['ssh_port'] {{ '}}' }}"
+              - "-i"
+              - "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/id_ed25519"
+              - "-o"
+              - "IdentitiesOnly=yes"
+              - "-o"
+              - "StrictHostKeyChecking=no"
+              - "-o"
+              - "UserKnownHostsFile=/dev/null"
+              - "-o"
+              - "ConnectTimeout=5"
+              - "-o"
+              - "BatchMode=yes"
+              - "molecule@127.0.0.1"
+              - "true"
+          changed_when:
+            - false
+          retries: 60
+          delay: 5
+          until:
+            - __testing_ssh_probe_result is ansible.builtin.success
+          loop: "{{ '{{' }} molecule_yml['platforms'] {{ '}}' }}"
+          loop_control:
+            label: "{{ '{{' }} item['name'] {{ '}}' }}"
+          register: __testing_ssh_probe_result
+
+      rescue:
+
+        - name: "Molecule | Create (libvirt) | Show state of all libvirt domains"
+          # The command module is used intentionally, see "Define libvirt domains".
+          ansible.builtin.command:
+            argv:
+              - "virsh"
+              - "--connect"
+              - "{{ '{{' }} libvirt_uri {{ '}}' }}"
+              - "list"
+              - "--all"
+          changed_when:
+            - false
+          failed_when:
+            - false
+          register: __testing_domlist_result
+
+
+        - name: "Molecule | Create (libvirt) | Show failure analysis and cleanup hints"
+          ansible.builtin.debug:
+            # split() to improve readability for humans
+            msg: "{{ '{{' }} __testing_failhint_msg.split('\n') {{ '}}' }}"
+          vars:
+            __testing_failhint_msg: |-
+              At least one instance did not become reachable via SSH.
+              {{ '{{' }} __testing_domlist_result['stdout'] | ansible.builtin.default('') {{ '}}' }}
+              Debugging hints:
+              {{ '{%' }} for platform in molecule_yml['platforms'] {{ '%}' }}
+              less '{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/vm/{{ '{{' }} platform['name'] {{ '}}' }}/console.log'
+              virsh --connect '{{ '{{' }} libvirt_uri {{ '}}' }}' domifaddr '{{ '{{' }} platform['name'] {{ '}}' }}' --source agent
+              {{ '{%' }} endfor {{ '%}' }}
+              You can manually remove the instance(s) with:
+              {{ '{%' }} for platform in molecule_yml['platforms'] {{ '%}' }}
+              virsh --connect '{{ '{{' }} libvirt_uri {{ '}}' }}' destroy '{{ '{{' }} platform['name'] {{ '}}' }}'
+              virsh --connect '{{ '{{' }} libvirt_uri {{ '}}' }}' undefine '{{ '{{' }} platform['name'] {{ '}}' }}'
+              {{ '{%' }} endfor {{ '%}' }}
+
+
+        - name: "Molecule | Create (libvirt) | Throw error"
+          ansible.builtin.fail:
+            msg: >-
+              Error during setup of the testing infrastructure with libvirt. At
+              least one instance did not become reachable via SSH in time.
+
+
+    - name: "Molecule | Create (libvirt) | Collect instance configuration data"
+      ansible.builtin.set_fact:
+        __testing_instance_config: >-
+          {{ '{{' }}
+            (__testing_instance_config | ansible.builtin.default([]))
+            + [{'instance': item['name'],
+                'address': '127.0.0.1',
+                'user': 'molecule',
+                'port': item['ssh_port'],
+                'identity_file': (molecule_ephemeral_directory ~ '/id_ed25519')}]
+          {{ '}}' }}
+      loop: "{{ '{{' }} molecule_yml['platforms'] {{ '}}' }}"
+      loop_control:
+        label: "{{ '{{' }} item['name'] {{ '}}' }}"
+
+
+    - name: "Molecule | Create (libvirt) | Store instance configuration for molecule login"
+      ansible.builtin.copy:
+        content: |
+          {{ '{{' }} __testing_instance_config | ansible.builtin.to_nice_yaml {{ '}}' }}
+        dest: "{{ '{{' }} molecule_instance_config {{ '}}' }}"
+        mode: "u=rw,g=,o=" # 0600
+
+
+    # Conditionally assign platforms to 'molecule_linux' or 'molecule_windows'
+    # based on name/os_family detection.
+    - name: "Molecule | Create (libvirt) | Create inventory data, add instances to groups"
+      ansible.builtin.set_fact:
+        molecule_inventory: >
+          {{ '{{' }} molecule_inventory | ansible.builtin.combine(__testing_inventory_partial_yaml | ansible.builtin.from_yaml, recursive=true) {{ '}}' }}
+      vars:
+        __testing_inventory_is_windows: >
+          {{ '{{' }}
+            (item['name'] | ansible.builtin.default('') | ansible.builtin.lower is search('windows')) or
+            (item['os_family'] | ansible.builtin.default('') | ansible.builtin.lower == 'windows')
+          {{ '}}' }}
+        __testing_inventory_os_group: >-
+          {{ '{{' }} 'molecule_windows' if __testing_inventory_is_windows else 'molecule_linux' {{ '}}' }}
+        __testing_inventory_partial_yaml: |
+          all:
+            children:
+              molecule:
+                hosts:
+                  "{{ '{{' }} item['name'] {{ '}}' }}":
+                    ansible_connection: "ssh"
+                    ansible_host: "127.0.0.1"
+                    ansible_port: {{ '{{' }} item['ssh_port'] {{ '}}' }}
+                    ansible_user: "molecule"
+                    ansible_become: true
+                    ansible_ssh_private_key_file: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/id_ed25519"
+                    ansible_ssh_common_args: "{{ '{{' }} ssh_common_args {{ '}}' }}"
+              {{ '{{' }} __testing_inventory_os_group {{ '}}' }}:
+                hosts:
+                  "{{ '{{' }} item['name'] {{ '}}' }}": {}
+      loop: "{{ '{{' }} molecule_yml['platforms'] {{ '}}' }}"
+      loop_control:
+        label: "{{ '{{' }} item['name'] {{ '}}' }}"
+
+
+    - name: "Molecule | Create (libvirt) | Store inventory data as molecule_inventory.yml"
+      ansible.builtin.copy:
+        content: |
+          {{ '{{' }} molecule_inventory | ansible.builtin.to_nice_yaml {{ '}}' }}
+        dest: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/inventory/molecule_inventory.yml"
+        mode: "u=rw,g=,o=" # 0600
+
+
+    - name: "Molecule | Create (libvirt) | Ensure new instances exist in inventory"
+      ansible.builtin.meta: "refresh_inventory"
+
+
+    - name: "Molecule | Create (libvirt) | Print inventory groups"
+      ansible.builtin.debug:
+        msg: |
+          groups: {{ '{{' }} groups {{ '}}' }}
+        verbosity: 1
+
+
+    - name: "Molecule | Create (libvirt) | Set <scenario>/tasks/create directory path"
+      ansible.builtin.set_fact:
+        __testing_create_taskdir: >-
+          {{ '{{' }}
+            (lookup('env', 'MOLECULE_SCENARIO_DIRECTORY') | ansible.builtin.regex_replace('/$', ''))
+            ~ '/tasks/create'
+          {{ '}}' }}
+
+
+    - name: "Molecule | Create (libvirt) | Check if <scenario>/tasks/create directory exists on localhost"
+      delegate_to: "localhost"
+      ansible.builtin.stat:
+        path: "{{ '{{' }} __testing_create_taskdir {{ '}}' }}"
+      run_once: true # noqa: run-once[task]
+      register: __testing_create_taskdir_stat
+
+
+    - name: "Molecule | Create (libvirt) | Include additional tasks from <scenario>/tasks/create"
+      ansible.builtin.include_tasks:
+        file: "{{ '{{' }} __testing_create_loop_item {{ '}}' }}"
+      when:
+        - __testing_create_loop_item is ansible.builtin.file
+      loop: >-
+        {{ '{{' }}
+          query('ansible.builtin.fileglob', __testing_create_taskdir ~ '/*.yml') | ansible.builtin.sort
+          if (__testing_create_taskdir_stat['stat']['exists'] | ansible.builtin.default(false))
+          else []
+        {{ '}}' }}
+      loop_control:
+        label: "{{ '{{' }} __testing_create_loop_item {{ '}}' }}"
+        index_var: "__testing_create_loop_index"
+        loop_var: "__testing_create_loop_item"
+
+
+  post_tasks:
+
+    - name: "Molecule | Create (libvirt) | Persist __testing_state (if any) to YAML file on localhost"
+      # Although this task is delegated to localhost, the play itself targets
+      # "hosts: molecule", so inventory_hostname is available.
+      delegate_to: "localhost"
+      ansible.builtin.copy:
+        content: "{{ '{{' }} __testing_state | to_nice_yaml {{ '}}' }}"
+        dest: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/__testing_state_{{ '{{' }} (inventory_hostname | ansible.builtin.md5) {{ '}}' }}.yml"
+        mode: "u=rw,g=r,o=r" # 0644
+      when:
+        - __testing_state is ansible.builtin.defined
+        - __testing_state is mapping

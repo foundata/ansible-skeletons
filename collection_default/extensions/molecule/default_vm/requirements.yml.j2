@@ -1,0 +1,12 @@
+# Ansible Galaxy dependencies required for the Molecule "default_vm" scenario.
+
+---
+
+roles: []
+
+collections:
+  # SSH keypair generation (create-libvirt.yml)
+  - "community.crypto"
+  # cloud-init NoCloud seed ISO creation via iso_create, needs the "pycdlib"
+  # Python package in the Molecule virtual environment (create-libvirt.yml)
+  - "community.general"

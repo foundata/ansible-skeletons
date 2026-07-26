@@ -8,10 +8,12 @@ This directory provides resources for testing the collection and its resources w
 
 - [Requirements](#requirements)
   - [Scenario `default`](#requirements-scenario-default)
+  - [Scenario `default_vm`](#requirements-scenario-default-vm)
   - [Scenario `ee`](#requirements-scenario-ee)
 - [Usage](#usage)
   - [Run tests](#usage-testing)
     - [Scenario `default`](#usage-testing-default)
+    - [Scenario `default_vm`](#usage-testing-default-vm)
     - [Scenario `ee`](#usage-testing-ee)
   - [Access instance terminal](#usage-instance-access)
   - [Write tests](#usage-add-tests)
@@ -19,6 +21,7 @@ This directory provides resources for testing the collection and its resources w
   - [Molecule role path detection issues](#faq-role-path-detection)
   - [Air-gapped environments](#faq-air-gapped)
   - [Container: `inotify_init1(): Too many open files`](#faq-inotify)
+  - [VMs: Instance-to-instance networking (multi-node scenarios)](#faq-vm-multi-node)
 
 
 
@@ -40,6 +43,31 @@ Additional requirements:
    or when using [`uv`](https://docs.astral.sh/uv/getting-started/installation/):
    ```bash
    uv pip install "molecule" "molecule-plugins[podman]"
+   ```
+
+
+
+### Scenario `default_vm`<a id="requirements-scenario-default-vm"></a>
+
+Additional requirements:
+
+1. libvirt (QEMU/KVM driver and client), QEMU tooling and [passt](https://passt.top/):
+   ```bash
+   # Fedora
+   sudo dnf install libvirt-daemon-driver-qemu libvirt-client qemu-kvm qemu-img passt
+
+   # Debian, Ubuntu
+   sudo apt install libvirt-daemon libvirt-clients qemu-system-x86 qemu-utils passt
+   ```
+   Please note that a user session (`qemu:///session`) needs no root privileges and no `libvirt` group membership.
+2. Access to `/dev/kvm`. This works out of the box for locally logged-in (seated) users on Fedora, Debian and Ubuntu. Headless sessions (SSH, CI runners) on Debian and Ubuntu additionally need membership in the `kvm` group (`sudo usermod -aG kvm <user>`, then re-login).
+3. The [`pycdlib`](https://pypi.org/project/pycdlib/) Python package in the Molecule virtual environment (used to build cloud-init NoCloud seed ISO images):
+   ```bash
+   pip install "pycdlib"
+   ```
+   or when using [`uv`](https://docs.astral.sh/uv/getting-started/installation/):
+   ```bash
+   uv pip install "pycdlib"
    ```
 
 
@@ -92,6 +120,46 @@ molecule test --platform-name="molecule-debian12" --destroy="never"
 molecule list
 molecule destroy
 ```
+
+
+
+#### Scenario `default_vm`<a id="usage-testing-default-vm"></a>
+
+Tests the collection's resources in QEMU/KVM virtual machines. This scenario exists for tests that containers cannot cover (kernel settings, nested virtualization, Podman in a VM, ...). The Podman based `default` scenario stays the everyday and CI workhorse; `default_vm` is opt-in and never runs on a plain `molecule test`.
+
+```bash
+cd "/collection-root-dir"
+export MOLECULE_GLOB="./{extensions/molecule,molecule}/*/molecule.yml"
+
+# Test a single platform (recommended; VMs are resource hungry)
+molecule test -s default_vm --platform-name="molecule-fedora44"
+
+# Test all active platforms
+# See the platforms key in extensions/molecule/default_vm/molecule.yml for a list.
+molecule test -s default_vm
+
+# Keep instances after testing for debugging, clean up manually when done
+molecule test -s default_vm --platform-name="molecule-fedora44" --destroy="never"
+molecule login -s default_vm --host="molecule-fedora44"
+molecule destroy -s default_vm
+```
+
+A resource guard fails the `create` step early when the sum of the requested instance memory (plus a host reserve) exceeds the available memory or when the image cache disk space runs low, pointing to `--platform-name` as the way out. Environment variables of this scenario:
+
+| Variable                       | Default                                    | Purpose                                                        |
+|--------------------------------|--------------------------------------------|----------------------------------------------------------------|
+| `MOLECULE_VM_LIBVIRT_URI`      | `qemu:///session`                          | libvirt connection URI                                         |
+| `MOLECULE_VM_CACHE_DIR`        | `~/.cache/ansible-molecule-libvirt/images` | cloud image cache directory                                    |
+| `MOLECULE_VM_REFRESH_IMAGES`   | (unset)                                    | set to `1` to force re-downloading the cached cloud images     |
+| `MOLECULE_VM_IGNORE_RESOURCES` | (unset)                                    | set to `1` to skip the memory / disk space resource guard      |
+
+The scenario downloads vendor cloud images (qcow2, several hundred MiB each) on first use and caches them at `~/.cache/ansible-molecule-libvirt/images` (override with the `MOLECULE_VM_CACHE_DIR` environment variable). The cache is safe to delete at any time, images are re-downloaded on demand.
+
+Debugging hints if an instance does not come up:
+
+- Boot console log: `~/.cache/molecule/<collection>/default_vm/vm/<name>/console.log`
+- Domain states: `virsh --connect 'qemu:///session' list --all`
+- Guest IP via the guest agent: `virsh --connect 'qemu:///session' domifaddr '<name>' --source agent`
 
 
 
@@ -223,3 +291,14 @@ molecule test --destroy="never"
 podman image
 podman start <imageid> --log-level debug 2>&1 | grep -i -E "not|warn|err|deny|denie"
 ```
+
+
+
+### VMs: Instance-to-instance networking (multi-node scenarios)<a id="faq-vm-multi-node"></a>
+
+The `default_vm` scenario uses [passt](https://passt.top/) user networking: every instance gets its own isolated userspace network stack. Host-to-instance traffic works via the SSH port forwards, but instances cannot reach each other. If your scenario really needs instance-to-instance traffic, the escalation path is bridged networking via the setuid `qemu-bridge-helper` (`<interface type='bridge'><source bridge='virbr0'/>`), which keeps the privilege inside one narrow, audited helper binary instead of making the whole user session root-equivalent:
+
+- **Fedora** ships everything needed (`/etc/qemu/bridge.conf` containing `allow virbr0`, setuid helper). One-time setup: `sudo virsh --connect 'qemu:///system' net-start default && sudo virsh --connect 'qemu:///system' net-autostart default`.
+- **Debian and Ubuntu** deliberately ship the helper without setuid and without a `bridge.conf`. You would need `sudo dpkg-statoverride --update --add root root 4755 /usr/lib/qemu/qemu-bridge-helper` and to create `/etc/qemu/bridge.conf` with the content `allow virbr0` yourself. Consider this carefully, it is a security posture change.
+
+This is documented for completeness, it is not implemented or supported by the shared playbooks yet.
