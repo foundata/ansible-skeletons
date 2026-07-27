@@ -49,7 +49,8 @@
       ansible.builtin.set_fact:
         __testing_state: >-
           {{ '{{' }}
-            lookup('file', molecule_ephemeral_directory ~ '/__testing_state_' ~ (inventory_hostname | ansible.builtin.md5) ~ '.yml', errors='ignore')
+            lookup('ansible.builtin.file', molecule_ephemeral_directory
+                   ~ '/__testing_state_' ~ (inventory_hostname | ansible.builtin.md5) ~ '.yml', errors='ignore')
             | ansible.builtin.default('{}')
             | ansible.builtin.from_yaml
             | ansible.builtin.default({})
@@ -69,7 +70,7 @@
               - item['image_url'] is ansible.builtin.defined
               - item['image_url'] | ansible.builtin.length > 0
               - item['ssh_port'] is ansible.builtin.defined
-              - item['ssh_port'] | int > 0
+              - item['ssh_port'] | ansible.builtin.int > 0
             fail_msg: >-
               Platform "{{ '{{' }} item['name'] {{ '}}' }}" needs at least the keys
               "image_url" (URL of a cloud image with cloud-init) and "ssh_port"
@@ -113,12 +114,12 @@
             that:
               - >-
                 (__testing_tools_result['results']
-                 | ansible.builtin.selectattr('rc', 'defined')
-                 | ansible.builtin.selectattr('rc', 'ne', 0)
+                 | ansible.builtin.selectattr('rc', 'ansible.builtin.defined')
+                 | ansible.builtin.selectattr('rc', 'ansible.builtin.ne', 0)
                  | ansible.builtin.length) == 0
               - >-
                 (__testing_tools_result['results']
-                 | ansible.builtin.selectattr('rc', 'defined')
+                 | ansible.builtin.selectattr('rc', 'ansible.builtin.defined')
                  | ansible.builtin.length) == 2
             fail_msg: >-
               virsh and/or qemu-img are not available. Install the libvirt client
@@ -208,12 +209,12 @@
                 (molecule_yml['platforms'] | ansible.builtin.map(attribute='memory', default=2048) | ansible.builtin.sum)
                 + guard_memory_reserve_mib
               {{ '}}' }}
-            __testing_guard_memory_available_mib: "{{ '{{' }} ansible_facts['memory_mb']['nocache']['free'] | int {{ '}}' }}"
+            __testing_guard_memory_available_mib: "{{ '{{' }} ansible_facts['memory_mb']['nocache']['free'] | ansible.builtin.int {{ '}}' }}"
             __testing_guard_disk_required_mib: >-
               {{ '{{' }}
                 guard_disk_base_mib + (guard_disk_per_platform_mib * (molecule_yml['platforms'] | ansible.builtin.length))
               {{ '}}' }}
-            __testing_guard_disk_available_mib: "{{ '{{' }} ((__testing_df_result['stdout_lines'][-1]).split()[3] | int) // 1024 {{ '}}' }}"
+            __testing_guard_disk_available_mib: "{{ '{{' }} ((__testing_df_result['stdout_lines'][-1]).split()[3] | ansible.builtin.int) // 1024 {{ '}}' }}"
 
 
         - name: "Molecule | Create (libvirt) | Fail if system resources are insufficient"
@@ -227,8 +228,8 @@
               Run fewer platforms at once (--platform-name=<name>) or set the
               environment variable MOLECULE_VM_IGNORE_RESOURCES=1 to skip this check.
           when:
-            - (__testing_guard_memory_required_mib | int) > (__testing_guard_memory_available_mib | int) or
-              (__testing_guard_disk_required_mib | int) > (__testing_guard_disk_available_mib | int)
+            - (__testing_guard_memory_required_mib | ansible.builtin.int) > (__testing_guard_memory_available_mib | ansible.builtin.int) or
+              (__testing_guard_disk_required_mib | ansible.builtin.int) > (__testing_guard_disk_available_mib | ansible.builtin.int)
 
 
     - name: "Molecule | Create (libvirt) | Download cloud images (if not cached)"
@@ -545,7 +546,7 @@
       ansible.builtin.set_fact:
         __testing_create_taskdir: >-
           {{ '{{' }}
-            (lookup('env', 'MOLECULE_SCENARIO_DIRECTORY') | ansible.builtin.regex_replace('/$', ''))
+            (lookup('ansible.builtin.env', 'MOLECULE_SCENARIO_DIRECTORY') | ansible.builtin.regex_replace('/$', ''))
             ~ '/tasks/create'
           {{ '}}' }}
 
@@ -587,4 +588,4 @@
         mode: "u=rw,g=r,o=r" # 0644
       when:
         - __testing_state is ansible.builtin.defined
-        - __testing_state is mapping
+        - __testing_state is ansible.builtin.mapping

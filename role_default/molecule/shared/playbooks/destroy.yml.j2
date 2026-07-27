@@ -18,7 +18,8 @@
       ansible.builtin.set_fact:
         __testing_state: >-
           {{ '{{' }}
-            lookup('file', molecule_ephemeral_directory ~ '/__testing_state_' ~ (inventory_hostname | ansible.builtin.md5) ~ '.yml', errors='ignore')
+            lookup('ansible.builtin.file', molecule_ephemeral_directory
+                   ~ '/__testing_state_' ~ (inventory_hostname | ansible.builtin.md5) ~ '.yml', errors='ignore')
             | ansible.builtin.default('{}')
             | ansible.builtin.from_yaml
             | ansible.builtin.default({})
@@ -35,7 +36,7 @@
       ansible.builtin.set_fact:
         __testing_destroy_taskdir: >-
           {{ '{{' }}
-            (lookup('env', 'MOLECULE_SCENARIO_DIRECTORY') | ansible.builtin.regex_replace('/$', ''))
+            (lookup('ansible.builtin.env', 'MOLECULE_SCENARIO_DIRECTORY') | ansible.builtin.regex_replace('/$', ''))
             ~ '/tasks/destroy'
           {{ '}}' }}
 

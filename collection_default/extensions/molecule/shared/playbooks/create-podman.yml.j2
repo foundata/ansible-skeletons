@@ -16,7 +16,7 @@
   gather_facts: false
   no_log: "{{ '{{' }} molecule_no_log | ansible.builtin.default(false) {{ '}}' }}"
   vars:
-    podman_executable: "{{ '{{' }} lookup('env','MOLECULE_PODMAN_EXECUTABLE') | ansible.builtin.default('podman', true) {{ '}}' }}"
+    podman_executable: "{{ '{{' }} lookup('ansible.builtin.env', 'MOLECULE_PODMAN_EXECUTABLE') | ansible.builtin.default('podman', true) {{ '}}' }}"
     # Init variable to create an inventory containing the molecule target hosts
     molecule_inventory:
       all:
@@ -34,7 +34,8 @@
       ansible.builtin.set_fact:
         __testing_state: >-
           {{ '{{' }}
-            lookup('file', molecule_ephemeral_directory ~ '/__testing_state_' ~ (inventory_hostname | ansible.builtin.md5) ~ '.yml', errors='ignore')
+            lookup('ansible.builtin.file', molecule_ephemeral_directory
+                   ~ '/__testing_state_' ~ (inventory_hostname | ansible.builtin.md5) ~ '.yml', errors='ignore')
             | ansible.builtin.default('{}')
             | ansible.builtin.from_yaml
             | ansible.builtin.default({})
@@ -112,13 +113,13 @@
         __testing_failed_containers: >-
           {{ '{{' }}
             __testing_createcontainer_result['results']
-            | ansible.builtin.selectattr('container.State.Running', 'defined')
-            | ansible.builtin.selectattr('container.State.Running', 'equalto', false)
+            | ansible.builtin.selectattr('container.State.Running', 'ansible.builtin.defined')
+            | ansible.builtin.selectattr('container.State.Running', 'ansible.builtin.equalto', false)
             | ansible.builtin.list
             +
             __testing_createcontainer_result['results']
-            | ansible.builtin.selectattr('container.State.ExitCode', 'defined')
-            | ansible.builtin.selectattr('container.State.ExitCode', 'ne', 0)
+            | ansible.builtin.selectattr('container.State.ExitCode', 'ansible.builtin.defined')
+            | ansible.builtin.selectattr('container.State.ExitCode', 'ansible.builtin.ne', 0)
             | ansible.builtin.list
           {{ '}}' }}
       when:
@@ -257,7 +258,7 @@
       ansible.builtin.set_fact:
         __testing_create_taskdir: >-
           {{ '{{' }}
-            (lookup('env', 'MOLECULE_SCENARIO_DIRECTORY') | ansible.builtin.regex_replace('/$', ''))
+            (lookup('ansible.builtin.env', 'MOLECULE_SCENARIO_DIRECTORY') | ansible.builtin.regex_replace('/$', ''))
             ~ '/tasks/create'
           {{ '}}' }}
 
@@ -299,4 +300,4 @@
         mode: "u=rw,g=r,o=r" # 0644
       when:
         - __testing_state is ansible.builtin.defined
-        - __testing_state is mapping
+        - __testing_state is ansible.builtin.mapping

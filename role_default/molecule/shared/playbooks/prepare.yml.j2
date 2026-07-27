@@ -23,7 +23,7 @@
           ansible.builtin.fail:
             msg: "MOLECULE_SCENARIO_DIRECTORY env var is not set or empty"
           when:
-            - (lookup('env', 'MOLECULE_SCENARIO_DIRECTORY') | ansible.builtin.trim) | ansible.builtin.length == 0
+            - (lookup('ansible.builtin.env', 'MOLECULE_SCENARIO_DIRECTORY') | ansible.builtin.trim) | ansible.builtin.length == 0
 
 
         - name: "Molecule | Prepare | Assert inventory groups existence on localhost"
@@ -100,7 +100,8 @@
       ansible.builtin.set_fact:
         __testing_state: >-
           {{ '{{' }}
-            lookup('file', molecule_ephemeral_directory ~ '/__testing_state_' ~ (inventory_hostname | ansible.builtin.md5) ~ '.yml', errors='ignore')
+            lookup('ansible.builtin.file', molecule_ephemeral_directory
+                   ~ '/__testing_state_' ~ (inventory_hostname | ansible.builtin.md5) ~ '.yml', errors='ignore')
             | ansible.builtin.default('{}')
             | ansible.builtin.from_yaml
             | ansible.builtin.default({})
@@ -140,7 +141,7 @@
       ansible.builtin.set_fact:
         __testing_prepare_taskdir: >-
           {{ '{{' }}
-            (lookup('env', 'MOLECULE_SCENARIO_DIRECTORY') | ansible.builtin.regex_replace('/$', ''))
+            (lookup('ansible.builtin.env', 'MOLECULE_SCENARIO_DIRECTORY') | ansible.builtin.regex_replace('/$', ''))
             ~ '/tasks/prepare'
           {{ '}}' }}
 

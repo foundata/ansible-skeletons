@@ -6,7 +6,7 @@
   vars:
     __testing_state_update:
       project_type: ""
-      project_dir_path: "{{ '{{' }} lookup('env', 'MOLECULE_PROJECT_DIRECTORY') {{ '}}' }}"
+      project_dir_path: "{{ '{{' }} lookup('ansible.builtin.env', 'MOLECULE_PROJECT_DIRECTORY') {{ '}}' }}"
       build_dir_path: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/ee-build"
       artifact_ansible_name: "" # technical name like foo.bar
       artifact_path: "" # full absolute path to the built artifact (file if collection, dir if role)

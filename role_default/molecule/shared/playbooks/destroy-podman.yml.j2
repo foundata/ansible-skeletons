@@ -11,7 +11,7 @@
   gather_facts: false
   no_log: "{{ '{{' }} molecule_no_log | ansible.builtin.default(false) {{ '}}' }}"
   vars:
-    podman_executable: "{{ '{{' }} lookup('env','MOLECULE_PODMAN_EXECUTABLE') | ansible.builtin.default('podman', true) {{ '}}' }}"
+    podman_executable: "{{ '{{' }} lookup('ansible.builtin.env', 'MOLECULE_PODMAN_EXECUTABLE') | ansible.builtin.default('podman', true) {{ '}}' }}"
   pre_tasks:
 
     - name: "Molecule | Destroy (Podman) | Restore __testing_state (if any) from YAML file from localhost"
@@ -23,7 +23,8 @@
       ansible.builtin.set_fact:
         __testing_state: >-
           {{ '{{' }}
-            lookup('file', molecule_ephemeral_directory ~ '/__testing_state_' ~ (inventory_hostname | ansible.builtin.md5) ~ '.yml', errors='ignore')
+            lookup('ansible.builtin.file', molecule_ephemeral_directory
+                   ~ '/__testing_state_' ~ (inventory_hostname | ansible.builtin.md5) ~ '.yml', errors='ignore')
             | ansible.builtin.default('{}')
             | ansible.builtin.from_yaml
             | ansible.builtin.default({})
@@ -63,7 +64,7 @@
       ansible.builtin.set_fact:
         __testing_destroy_taskdir: >-
           {{ '{{' }}
-            (lookup('env', 'MOLECULE_SCENARIO_DIRECTORY') | ansible.builtin.regex_replace('/$', ''))
+            (lookup('ansible.builtin.env', 'MOLECULE_SCENARIO_DIRECTORY') | ansible.builtin.regex_replace('/$', ''))
             ~ '/tasks/destroy'
           {{ '}}' }}
 
