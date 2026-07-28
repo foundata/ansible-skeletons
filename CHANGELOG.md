@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Nothing worth mentioning right now.
+
+
+
+## [2.5.0] - 2026-07-29
+
 ### Added
 
 - collection_default, role_default: The Molecule `default` scenario now selects its test backend per platform via a `type` key: `"podman"` (container, the default when omitted, fully backward compatible) or `"libvirt"` (QEMU/KVM virtual machine booted from a vendor cloud image via a session libvirt daemon, `qemu:///session`, without root privileges, `libvirt` group membership or polkit rules). VM platforms enable tests containers cannot cover (kernel settings, nested virtualization, Podman inside the test target); mixed container/VM scenarios work in one run. Implementation: dispatcher playbooks (`create-dispatch.yml`, `destroy-dispatch.yml`) import the backend-specific create/destroy playbooks which filter the platform list, compose a shared inventory plus instance configuration and no-op silently when no platform matches. The VM backend uses cloud-init NoCloud seed images, qcow2 backing-file overlays over a local image cache, passt user networking with one deterministic SSH port forward per platform, a resource guard (memory/disk, override via `MOLECULE_VM_IGNORE_RESOURCES=1`), a boot console log per instance and a VNC console for `virt-manager` access. Commented `libvirt` alternates for every platform ship in `molecule.yml`. (9604572)
@@ -149,8 +155,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All functionality and files, `role_default`
 
 
-[unreleased]: https://github.com/foundata/ansible-skeletons/compare/v2.4.1...HEAD
-[2.4.1]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.4.0
+[unreleased]: https://github.com/foundata/ansible-skeletons/compare/v2.5.1...HEAD
+[2.5.1]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.5.1
+[2.4.1]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.4.1
 [2.4.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.4.0
 [2.3.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.3.0
 [2.2.2]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.2.2
