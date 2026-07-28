@@ -83,7 +83,7 @@
             __testing_moleculevars_msg: |-
               {{ '{%' }} for key, value in hostvars[inventory_hostname].items() {{ '%}' }}
               {{ '{%' }}   if key is ansible.builtin.string and key.startswith('molecule_') {{ '%}' }}
-              {{ '{{' }}     key {{ '}}' }} = {{ '{{' }} value | to_nice_json {{ '}}' }}
+              {{ '{{' }}     key {{ '}}' }} = {{ '{{' }} value | ansible.builtin.to_nice_json {{ '}}' }}
               {{ '{%' }}   endif {{ '%}' }}
               {{ '{%' }} endfor {{ '%}' }}
           when:
@@ -177,7 +177,7 @@
       # "hosts: molecule", so inventory_hostname is available.
       delegate_to: "localhost"
       ansible.builtin.copy:
-        content: "{{ '{{' }} __testing_state | to_nice_yaml {{ '}}' }}"
+        content: "{{ '{{' }} __testing_state | ansible.builtin.to_nice_yaml {{ '}}' }}"
         dest: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/__testing_state_{{ '{{' }} (inventory_hostname | ansible.builtin.md5) {{ '}}' }}.yml"
         mode: "u=rw,g=r,o=r" # 0644
       when:

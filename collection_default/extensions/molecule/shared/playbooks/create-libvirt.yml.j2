@@ -497,7 +497,7 @@
       vars:
         __testing_inventory_is_windows: >
           {{ '{{' }}
-            (item['name'] | ansible.builtin.default('') | ansible.builtin.lower is search('windows')) or
+            (item['name'] | ansible.builtin.default('') | ansible.builtin.lower is ansible.builtin.search('windows')) or
             (item['os_family'] | ansible.builtin.default('') | ansible.builtin.lower == 'windows')
           {{ '}}' }}
         __testing_inventory_os_group: >-
@@ -583,7 +583,7 @@
       # "hosts: molecule", so inventory_hostname is available.
       delegate_to: "localhost"
       ansible.builtin.copy:
-        content: "{{ '{{' }} __testing_state | to_nice_yaml {{ '}}' }}"
+        content: "{{ '{{' }} __testing_state | ansible.builtin.to_nice_yaml {{ '}}' }}"
         dest: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/__testing_state_{{ '{{' }} (inventory_hostname | ansible.builtin.md5) {{ '}}' }}.yml"
         mode: "u=rw,g=r,o=r" # 0644
       when:
