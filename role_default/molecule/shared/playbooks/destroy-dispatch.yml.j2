@@ -1,0 +1,11 @@
+# Molecule destroy playbook: backend-agnostic cleanup. Both imported playbooks
+# tolerate the absence of their instances (and even of their tooling), so this
+# removes whatever exists regardless of which backend created it.
+
+---
+
+- name: "Molecule | Destroy (dispatch) | Podman"
+  ansible.builtin.import_playbook: "destroy-podman.yml"
+
+- name: "Molecule | Destroy (dispatch) | libvirt"
+  ansible.builtin.import_playbook: "destroy-libvirt.yml"

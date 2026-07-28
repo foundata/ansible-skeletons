@@ -1,0 +1,13 @@
+# Molecule create playbook: backend dispatcher. Each imported playbook only
+# processes the platforms whose "type" key in molecule.yml matches its backend
+# (entries without a "type" key default to podman) and no-ops silently
+# otherwise. This allows per-platform backend selection and even mixed
+# container/VM scenarios without any further configuration.
+
+---
+
+- name: "Molecule | Create (dispatch) | Podman typed platforms"
+  ansible.builtin.import_playbook: "create-podman.yml"
+
+- name: "Molecule | Create (dispatch) | libvirt typed platforms"
+  ansible.builtin.import_playbook: "create-libvirt.yml"

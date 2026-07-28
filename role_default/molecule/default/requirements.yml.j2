@@ -1,8 +1,16 @@
 # Ansible Galaxy dependencies required for the Molecule "default" scenario.
+# The union of all backend dependencies is listed; unused ones are harmless.
 
 ---
 
 roles: []
 
 collections:
+  # Container platforms (type: "podman")
   - "containers.podman"
+  # VM platforms (type: "libvirt"): SSH keypair generation
+  - "community.crypto"
+  # VM platforms (type: "libvirt"): cloud-init NoCloud seed ISO creation via
+  # iso_create, needs the "pycdlib" Python package in the Molecule virtual
+  # environment
+  - "community.general"

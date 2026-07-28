@@ -12,6 +12,7 @@ This directory provides resources for testing the role and its resources with [M
 - [Usage](#usage)
   - [Run tests](#usage-testing)
     - [Scenario `default`](#usage-testing-default)
+    - [VM platforms (`type: "libvirt"`)](#usage-testing-vm)
     - [Scenario `ee`](#usage-testing-ee)
   - [Access instance terminal](#usage-instance-access)
   - [Write tests](#usage-add-tests)
@@ -19,6 +20,7 @@ This directory provides resources for testing the role and its resources with [M
   - [Molecule role path detection issues](#faq-role-path-detection)
   - [Air-gapped environments](#faq-air-gapped)
   - [Container: `inotify_init1(): Too many open files`](#faq-inotify)
+  - [VMs: Instance-to-instance networking (multi-node scenarios)](#faq-vm-multi-node)
 
 
 
@@ -30,7 +32,9 @@ See the official documentation on how to [install Molecule](https://docs.ansible
 
 ### Scenario `default`<a id="requirements-scenario-default"></a>
 
-Additional requirements:
+Each platform in `default/molecule.yml` selects its backend via the `type` key: `"podman"` (container, the default when omitted) or `"libvirt"` (QEMU/KVM virtual machine). The requirements depend on which backend types the platform list uses.
+
+For container platforms (`type: "podman"` or no `type` key):
 
 1. [Podman](https://podman.io/docs/installation).
 2. The Molecule [plugin](https://github.com/ansible-community/molecule-plugins) `podman`:
@@ -40,6 +44,27 @@ Additional requirements:
    or when using [`uv`](https://docs.astral.sh/uv/getting-started/installation/):
    ```bash
    uv pip install "molecule" "molecule-plugins[podman]"
+   ```
+
+For VM platforms (`type: "libvirt"`):
+
+1. libvirt (QEMU/KVM driver and client), QEMU tooling and [passt](https://passt.top/):
+   ```bash
+   # Fedora
+   sudo dnf install libvirt-daemon-driver-qemu libvirt-client qemu-kvm qemu-img passt
+
+   # Debian, Ubuntu
+   sudo apt install libvirt-daemon libvirt-clients qemu-system-x86 qemu-utils passt
+   ```
+   Please note that a user session (`qemu:///session`) needs *no* root privileges and *no* `libvirt` group membership.
+2. Access to `/dev/kvm`. This works out of the box for locally logged-in (seated) users on Fedora, Debian and Ubuntu. Headless sessions (SSH, CI runners) on Debian and Ubuntu additionally need membership in the `kvm` group (`sudo usermod -aG kvm <user>`, then re-login).
+3. The [`pycdlib`](https://pypi.org/project/pycdlib/) Python package in the Molecule virtual environment (used to build cloud-init NoCloud seed ISO images):
+   ```bash
+   pip install "pycdlib"
+   ```
+   or when using [`uv`](https://docs.astral.sh/uv/getting-started/installation/):
+   ```bash
+   uv pip install "pycdlib"
    ```
 
 
@@ -67,14 +92,13 @@ Additional requirements:
    ```
 
 
-
 ## Usage<a id="usage"></a>
 
 ### Run tests<a id="usage-testing"></a>
 
 #### Scenario `default`<a id="usage-testing-default"></a>
 
-Tests the role against multiple OS platforms using Podman containers.
+Tests the role against multiple OS platforms. Each platform runs as a Podman container or as a QEMU/KVM virtual machine, depending on its `type` key in `default/molecule.yml` (see the comments there; swap the active entry per platform to switch the backend). Containers and VMs can be mixed within one run.
 
 ```bash
 cd "/role-root-dir"
@@ -94,6 +118,29 @@ molecule list
 molecule destroy
 ```
 
+
+
+#### VM platforms (`type: "libvirt"`)<a id="usage-testing-vm"></a>
+
+VM platforms exist for tests containers cannot cover (kernel settings, nested virtualization, Podman inside the test target, ...). They boot vendor cloud images via a session libvirt daemon (`qemu:///session`) with [passt](https://passt.top/) user networking, which deliberately needs no root privileges, no `libvirt` group membership and no polkit rules.
+
+VMs are resource hungry compared to containers, prefer `--platform-name` runs on smaller machines. A resource guard fails the `create` step early when the sum of the requested instance memory (plus a host reserve) exceeds the available memory or when the image cache disk space runs low. Environment variables:
+
+| Variable                       | Default                                    | Purpose                                                        |
+|--------------------------------|--------------------------------------------|----------------------------------------------------------------|
+| `MOLECULE_VM_LIBVIRT_URI`      | `qemu:///session`                          | libvirt connection URI                                         |
+| `MOLECULE_VM_CACHE_DIR`        | `~/.cache/ansible-molecule-libvirt/images` | cloud image cache directory                                    |
+| `MOLECULE_VM_REFRESH_IMAGES`   | (unset)                                    | set to `1` to force re-downloading the cached cloud images     |
+| `MOLECULE_VM_IGNORE_RESOURCES` | (unset)                                    | set to `1` to skip the memory / disk space resource guard      |
+
+The scenario downloads vendor cloud images (qcow2, several hundred MiB each) on first use and caches them at `~/.cache/ansible-molecule-libvirt/images` (override with the `MOLECULE_VM_CACHE_DIR` environment variable). The cache is safe to delete at any time, images are re-downloaded on demand.
+
+Debugging hints if an instance does not come up:
+
+- Boot console log: `vm/<name>/console.log` inside Molecule's ephemeral directory (usually `~/.ansible/tmp/molecule.*.default/`)
+- Domain states: `virsh --connect 'qemu:///session' list --all`
+- Guest IP via the guest agent: `virsh --connect 'qemu:///session' domifaddr '<name>' --source agent`
+- Graphical console: [`virt-manager`](https://virt-manager.org/) connected to `qemu:///session` shows the text console with boot output of each instance.
 
 
 #### Scenario `ee`<a id="usage-testing-ee"></a>
@@ -224,3 +271,14 @@ molecule test --destroy="never"
 podman image
 podman start <imageid> --log-level debug 2>&1 | grep -i -E "not|warn|err|deny|denie"
 ```
+
+
+
+### VMs: Instance-to-instance networking (multi-node scenarios)<a id="faq-vm-multi-node"></a>
+
+VM platforms (`type: "libvirt"`) use [passt](https://passt.top/) user networking: every instance gets its own isolated userspace network stack. Host-to-instance traffic works via the SSH port forwards, but instances cannot reach each other. If your scenario really needs instance-to-instance traffic, the escalation path is bridged networking via the setuid `qemu-bridge-helper` (`<interface type='bridge'><source bridge='virbr0'/>`), which keeps the privilege inside one narrow, audited helper binary instead of making the whole user session root-equivalent:
+
+- **Fedora** ships everything needed (`/etc/qemu/bridge.conf` containing `allow virbr0`, setuid helper). One-time setup: `sudo virsh --connect 'qemu:///system' net-start default && sudo virsh --connect 'qemu:///system' net-autostart default`.
+- **Debian and Ubuntu** deliberately ship the helper without setuid and without a `bridge.conf`. You would need `sudo dpkg-statoverride --update --add root root 4755 /usr/lib/qemu/qemu-bridge-helper` and to create `/etc/qemu/bridge.conf` with the content `allow virbr0` yourself. Consider this carefully, it is a security posture change.
+
+This is documented for completeness, it is not implemented or supported by the shared playbooks yet.

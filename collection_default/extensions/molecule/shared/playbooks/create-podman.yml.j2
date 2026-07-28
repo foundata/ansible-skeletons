@@ -17,17 +17,28 @@
   no_log: "{{ '{{' }} molecule_no_log | ansible.builtin.default(false) {{ '}}' }}"
   vars:
     podman_executable: "{{ '{{' }} lookup('ansible.builtin.env', 'MOLECULE_PODMAN_EXECUTABLE') | ansible.builtin.default('podman', true) {{ '}}' }}"
-    # Init variable to create an inventory containing the molecule target hosts
-    molecule_inventory:
-      all:
-        hosts: {}
-        children:
-          molecule:
-            hosts: {}
-          molecule_linux:
-            hosts: {}
-          molecule_windows: # Placeholder - Windows containers are not supported (github.com/containers/podman/issues/11809)
-            hosts: {}
+    # Platforms handled by this playbook. Backend dispatch: platform entries
+    # with type: "podman" or without a "type" key (the default) are containers;
+    # other backends are handled by their own create playbooks (see
+    # create-dispatch.yml).
+    podman_platforms: >-
+      {{ '{{' }}
+        (molecule_yml['platforms'] | ansible.builtin.selectattr('type', 'ansible.builtin.undefined') | ansible.builtin.list)
+        + (molecule_yml['platforms']
+           | ansible.builtin.selectattr('type', 'ansible.builtin.defined')
+           | ansible.builtin.selectattr('type', 'ansible.builtin.equalto', 'podman')
+           | ansible.builtin.list)
+      {{ '}}' }}
+    # Inventory containing the molecule target hosts. Merge-initialized from an
+    # existing file (if any) so the create playbooks of several backends compose.
+    molecule_inventory: >-
+      {{ '{{' }}
+        lookup('ansible.builtin.file', molecule_ephemeral_directory ~ '/inventory/molecule_inventory.yml', errors='ignore')
+        | ansible.builtin.default('', true)
+        | ansible.builtin.from_yaml
+        | ansible.builtin.default({'all': {'hosts': {}, 'children': {'molecule': {'hosts': {} },
+          'molecule_linux': {'hosts': {} }, 'molecule_windows': {'hosts': {} } } } }, true)
+      {{ '}}' }}
   pre_tasks:
 
     - name: "Molecule | Create (Podman) | Restore __testing_state (if any) from YAML file from localhost"
@@ -54,7 +65,7 @@
         password: "{{ '{{' }} item['registry']['credentials']['password'] | ansible.builtin.default(omit) {{ '}}' }}"
         tlsverify: "{{ '{{' }} item['registry']['tls_verify'] | ansible.builtin.default(true) {{ '}}' }}"
         certdir: "{{ '{{' }} item['certdir'] | ansible.builtin.default(omit) {{ '}}' }}"
-      loop: "{{ '{{' }} molecule_yml['platforms'] {{ '}}' }}"
+      loop: "{{ '{{' }} podman_platforms {{ '}}' }}"
       loop_control:
         label: >-
           "{{ '{{' }} item['name'] }} registry username:
@@ -95,7 +106,7 @@
         privileged: "{{ '{{' }} item['privileged'] | ansible.builtin.default(omit) {{ '}}' }}"
         systemd: "{{ '{{' }} item['systemd'] | ansible.builtin.default(omit) {{ '}}' }}"
         volumes: "{{ '{{' }} item['volumes'] | ansible.builtin.default(omit) {{ '}}' }}"
-      loop: "{{ '{{' }} molecule_yml['platforms'] {{ '}}' }}"
+      loop: "{{ '{{' }} podman_platforms {{ '}}' }}"
       register: __testing_createcontainer_result
 
 
@@ -175,7 +186,7 @@
           vars:
             __testing_failcleanhint_msg: |-
               Container creation failed. You can manually remove the container(s) with:
-              {{ '{%' }} for container in molecule_yml['platforms'] {{ '%}' }}
+              {{ '{%' }} for container in podman_platforms {{ '%}' }}
               {{ '{{' }} podman_executable {{ '}}' }} container stop '{{ '{{' }} container['name'] {{ '}}' }}'
               {{ '{{' }} podman_executable {{ '}}' }} container rm --ignore '{{ '{{' }} container['name'] {{ '}}' }}'
 
@@ -191,6 +202,42 @@
             msg: >
               Error during setup of the testing infrastructure with Podman. At least
               one container is not in state 'Running' or returned a non-zero exit code.
+
+
+    - name: "Molecule | Create (Podman) | Restore instance configuration data of other backends (if any)"
+      ansible.builtin.set_fact:
+        __testing_instance_config: >-
+          {{ '{{' }}
+            lookup('ansible.builtin.file', molecule_instance_config, errors='ignore')
+            | ansible.builtin.default('', true)
+            | ansible.builtin.from_yaml
+            | ansible.builtin.default([], true)
+            | ansible.builtin.rejectattr('instance', 'ansible.builtin.in', podman_platforms | ansible.builtin.map(attribute='name') | ansible.builtin.list)
+            | ansible.builtin.list
+          {{ '}}' }}
+      when:
+        - __testing_instance_config is not ansible.builtin.defined
+
+
+    - name: "Molecule | Create (Podman) | Collect instance configuration data (used by molecule login)"
+      ansible.builtin.set_fact:
+        __testing_instance_config: >-
+          {{ '{{' }}
+            (__testing_instance_config | ansible.builtin.default([]))
+            + [{'instance': item['name'],
+                'login_cmd': (podman_executable ~ ' exec -it ' ~ item['name'] ~ ' bash')}]
+          {{ '}}' }}
+      loop: "{{ '{{' }} podman_platforms {{ '}}' }}"
+      loop_control:
+        label: "{{ '{{' }} item['name'] {{ '}}' }}"
+
+
+    - name: "Molecule | Create (Podman) | Store instance configuration for molecule login"
+      ansible.builtin.copy:
+        content: |
+          {{ '{{' }} __testing_instance_config | ansible.builtin.to_nice_yaml {{ '}}' }}
+        dest: "{{ '{{' }} molecule_instance_config {{ '}}' }}"
+        mode: "u=rw,g=,o=" # 0600
 
 
     # Conditionally assign platforms to 'molecule_linux' or 'molecule_windows'
@@ -230,7 +277,7 @@
                 hosts:
                   "{{ '{{' }} item['name'] {{ '}}' }}":
                     ansible_connection: "containers.podman.podman"
-      loop: "{{ '{{' }} molecule_yml['platforms'] {{ '}}' }}"
+      loop: "{{ '{{' }} podman_platforms {{ '}}' }}"
       loop_control:
         label: "{{ '{{' }} item['name'] {{ '}}' }}"
 
