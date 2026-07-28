@@ -1,0 +1,69 @@
+# Check collection role "run" outcomes.
+
+# FIXME: Assert the converged state here (files, services, timers, users,
+# compiled databases, ...) BEFORE the uninstall block below - the uninstall
+# converges that state away.
+
+
+## Uninstall (state "absent") verification.
+#
+# This block has to stay the LAST one in the verify stage: it converges the
+# instances away from the state every earlier check relies on. Do NOT move
+# these assertions into the cleanup stage: cleanup also runs when an earlier
+# stage fails (and again before create), so the state is arbitrary there and
+# assertions would produce misleading secondary failures masking the real
+# one. Cleanup has to stay best-effort and assertion-free.
+
+# Simulate a resource whose name can no longer be derived from the current
+# variables (renamed or de-listed since deployment). It carries the role's
+# ownership marker, so the uninstall has to find it via the marker sweep.
+- name: "Molecule | Verify | Plant a historical role-managed file before the uninstall"
+  ansible.builtin.copy:
+    dest: "/etc/FIXME/renamed-leftover.conf"
+    content: |
+      # Managed by Ansible ({{ namespace }}.{{ collection_name }}.run)
+      # FIXME: historical content the current variables no longer describe
+    owner: "root"
+    group: "root"
+    mode: "u=rw,g=r,o=r"
+
+
+- name: "Molecule | Verify | Uninstall the {{ namespace }}.{{ collection_name }}.run role"
+  ansible.builtin.include_role:
+    name: "{{ namespace }}.{{ collection_name }}.run"
+  vars:
+    run_{{ collection_name }}_state: "absent"
+
+
+- name: "Molecule | Verify | Check role-managed resources are gone after the uninstall"
+  ansible.builtin.stat:
+    path: "{{ '{{' }} __testing_uninstall_path {{ '}}' }}"
+  register: "__testing_uninstall_stat"
+  failed_when:
+    - __testing_uninstall_stat['stat']['exists']
+  loop:
+    - "/etc/FIXME/managed.conf"           # a regular role-managed file
+    - "/etc/FIXME/renamed-leftover.conf"  # the planted historical file (found via the marker sweep)
+  loop_control:
+    loop_var: "__testing_uninstall_path"
+
+# FIXME: also check non-file artifacts where the role creates them, e.g.:
+# - services and timers are stopped/removed (ansible.builtin.systemd_service /
+#   ansible.builtin.command with systemctl show)
+# - service users and groups are removed (ansible.builtin.getent)
+# - compiled databases, credentials and state files are removed
+
+
+# Assert retention, too: resources the role must NOT touch have to survive
+# (distribution defaults, operator-managed files, shared packages). Without
+# this half, an overly aggressive cleanup regression passes unnoticed.
+- name: "Molecule | Verify | Check unmanaged resources survived the uninstall"
+  ansible.builtin.stat:
+    path: "{{ '{{' }} __testing_uninstall_path {{ '}}' }}"
+  register: "__testing_retained_stat"
+  failed_when:
+    - not __testing_retained_stat['stat']['exists']
+  loop:
+    - "/etc/FIXME/distribution-default.conf" # FIXME: unmanaged file that has to stay
+  loop_control:
+    loop_var: "__testing_uninstall_path"
