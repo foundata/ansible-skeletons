@@ -10,7 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- collection_default, role_default: Molecule VM platforms (`type: "libvirt"`) support two new capabilities for testing storage management and locally built golden images: an `extra_disks` platform key (list of `serial`/`size` mappings; each disk is attached with its serial set and appears as `/dev/disk/by-id/virtio-<serial>` inside the instance) and absolute local paths as `image:` value (used as-is instead of being downloaded, e.g. for a locally baked Proxmox VE image).
+- collection_default, role_default: Molecule VM platforms (`type: "libvirt"`) support two new capabilities for testing storage management and locally built golden images: an `extra_disks` platform key (list of `serial`/`size` mappings; each disk is attached with its serial set and appears as `/dev/disk/by-id/virtio-<serial>` inside the instance) and absolute local paths as `image:` value (used as-is instead of being downloaded, e.g. for a locally baked Proxmox VE image). (c5cffe0)
+
+
+### Fixes
+
+- collection_default, role_default: Molecule VM instances no longer stall during the SSH authentication. [passt](https://passt.top/) advertises an MTU of 65520 via DHCP; guests that enslave the interface into a bridge (e.g. Proxmox VE with `vmbr0`) then run a bridge whose MTU their port cannot carry, which silently drops larger packets. The domain definition now sets a conventional MTU of 1500. (14ea77d)
+- collection_default, role_default: The Molecule `destroy` step now also removes instances that a failed `create` step left behind. Both destroy playbooks are driven by the inventory, which `create` writes only after all instances are up, so instances created before the failure were unknown to them (leaked virtual machines keep their memory allocated until removed by hand). (041a188)
+- collection_default, role_default: The SSH probes of the libvirt `create` step no longer block indefinitely when an instance authenticates but hangs guest-side (e.g. a degraded boot); a hard timeout turns such hangs into regular retries. (1841c67)
+- collection_default, role_default: The Molecule `cleanup` step tolerates instances that no longer exist, so a stale inventory from an interrupted run no longer aborts the test sequence before `destroy` can reset the state. (40da16b)
 
 
 
