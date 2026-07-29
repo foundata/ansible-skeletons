@@ -431,9 +431,13 @@
         - name: "Molecule | Create (libvirt) | Wait for SSH authentication (cloud-init user setup)"
           # The command module is used intentionally: this probes the full SSH
           # login (including the key deployed by cloud-init), which no Ansible
-          # module provides for a not-yet-inventoried host.
+          # module provides for a not-yet-inventoried host. The hard timeout
+          # covers sessions that authenticate but hang guest-side (e.g. a
+          # degraded boot), which ConnectTimeout does not.
           ansible.builtin.command:
             argv:
+              - "timeout"
+              - "30"
               - "ssh"
               - "-p"
               - "{{ '{{' }} item['ssh_port'] {{ '}}' }}"
@@ -467,9 +471,12 @@
           # The command module is used intentionally: this blocks until the
           # instance's first-boot provisioning is complete. Without it, later
           # steps race the cloud-init package installation for the package
-          # manager lock (e.g. zypper on openSUSE).
+          # manager lock (e.g. zypper on openSUSE). The hard timeout covers
+          # guest-side hangs; cloud-init gets up to 15 minutes.
           ansible.builtin.command:
             argv:
+              - "timeout"
+              - "900"
               - "ssh"
               - "-p"
               - "{{ '{{' }} item['ssh_port'] {{ '}}' }}"
