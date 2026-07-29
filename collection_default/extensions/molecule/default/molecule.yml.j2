@@ -33,13 +33,19 @@ platforms:
   #
   # type: "libvirt" - QEMU/KVM virtual machines from vendor cloud images via a
   # session libvirt daemon (no root privileges needed):
-  #   image (required):          URL of a cloud image (qcow2, cloud-init inside)
+  #   image (required):          URL of a cloud image (qcow2, cloud-init
+  #                              inside) or an absolute local path to one
   #   ssh_port (required):       unique local port for the SSH port forward
   #   image_checksum (optional): e.g. "sha512:...", off by default (trust in
   #                              vendor and TLS, like the ":latest" ITT images)
   #   memory (optional):         RAM in MiB, default 2048
   #   vcpus (optional):          default 2
   #   disk_size (optional):      virtual disk size, default "10G"
+  #   extra_disks (optional):    additional blank disks (e.g. for testing
+  #                              storage management): list of mappings with
+  #                              "serial" (required, becomes
+  #                              /dev/disk/by-id/virtio-<serial>) and "size"
+  #                              (default "4G")
   #
   # A commented "libvirt" alternate follows each container platform; swap the
   # active entry per platform to switch the backend.

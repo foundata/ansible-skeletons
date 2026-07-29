@@ -84,7 +84,8 @@
               - item['ssh_port'] | ansible.builtin.int > 0
             fail_msg: >-
               Platform "{{ '{{' }} item['name'] {{ '}}' }}" needs at least the keys
-              "image" (URL of a cloud image with cloud-init) and "ssh_port"
+              "image" (URL of a cloud image with cloud-init, or an absolute
+              local path to one) and "ssh_port"
               (unique local port for the SSH port forward) in molecule.yml.
           loop: "{{ '{{' }} libvirt_platforms {{ '}}' }}"
           loop_control:
@@ -253,6 +254,9 @@
         mode: "u=rw,g=r,o=r" # 0644
         checksum: "{{ '{{' }} item['image_checksum'] | ansible.builtin.default(omit) {{ '}}' }}"
         force: "{{ '{{' }} (lookup('ansible.builtin.env', 'MOLECULE_VM_REFRESH_IMAGES') | ansible.builtin.default('', true) | ansible.builtin.length) > 0 {{ '}}' }}"
+      when:
+        # absolute local paths (e.g. locally built golden images) are used as-is
+        - not (item['image'] is ansible.builtin.match('/'))
       loop: "{{ '{{' }} libvirt_platforms {{ '}}' }}"
       loop_control:
         label: "{{ '{{' }} item['name'] {{ '}}' }}"
@@ -326,9 +330,13 @@
           - "create"
           - "-f"
           - "qcow2"
-          # backing file: the pristine, cached cloud image (never written to)
+          # backing file: the pristine, cached or local image (never written to)
           - "-b"
-          - "{{ '{{' }} libvirt_cache_dir {{ '}}' }}/{{ '{{' }} item['image'] | ansible.builtin.basename {{ '}}' }}"
+          - >-
+            {{ '{{' }}
+              item['image'] if (item['image'] is ansible.builtin.match('/'))
+              else (libvirt_cache_dir ~ '/' ~ (item['image'] | ansible.builtin.basename))
+            {{ '}}' }}
           - "-F"
           - "qcow2"
           - "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/vm/{{ '{{' }} item['name'] {{ '}}' }}/overlay.qcow2"
@@ -338,6 +346,25 @@
       loop: "{{ '{{' }} libvirt_platforms {{ '}}' }}"
       loop_control:
         label: "{{ '{{' }} item['name'] {{ '}}' }}"
+
+
+    - name: "Molecule | Create (libvirt) | Create additional blank disk images (extra_disks)"
+      # The command module is used intentionally: there is no suitable Ansible
+      # module to create qcow2 images. The disks are attached with their
+      # "serial" set, so they appear as /dev/disk/by-id/virtio-<serial> inside
+      # the instance (e.g. for testing storage management roles).
+      ansible.builtin.command:
+        argv:
+          - "qemu-img"
+          - "create"
+          - "-f"
+          - "qcow2"
+          - "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/vm/{{ '{{' }} item[0]['name'] {{ '}}' }}/extra-{{ '{{' }} item[1]['serial'] {{ '}}' }}.qcow2"
+          - "{{ '{{' }} item[1]['size'] | ansible.builtin.default('4G') {{ '}}' }}"
+        creates: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/vm/{{ '{{' }} item[0]['name'] {{ '}}' }}/extra-{{ '{{' }} item[1]['serial'] {{ '}}' }}.qcow2"
+      loop: "{{ '{{' }} libvirt_platforms | ansible.builtin.subelements('extra_disks', {'skip_missing': true}) {{ '}}' }}"
+      loop_control:
+        label: "{{ '{{' }} item[0]['name'] {{ '}}' }}/extra-{{ '{{' }} item[1]['serial'] {{ '}}' }}"
 
 
     - name: "Molecule | Create (libvirt) | Create libvirt domain XML"

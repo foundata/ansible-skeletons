@@ -28,6 +28,16 @@
       <source file='{{ '{{' }} __testing_vm_dir {{ '}}' }}/overlay.qcow2'/>
       <target dev='vda' bus='virtio'/>
     </disk>
+    <!-- additional blank disks (platform key "extra_disks"); the serial makes
+         them addressable as /dev/disk/by-id/virtio-<serial> -->
+    {{ '{%' }} for disk in item['extra_disks'] | ansible.builtin.default([]) {{ '%}' }}
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2'/>
+      <source file='{{ '{{' }} __testing_vm_dir {{ '}}' }}/extra-{{ '{{' }} disk['serial'] {{ '}}' }}.qcow2'/>
+      <target dev='vd{{ '{{' }} 'bcdefghijklmnop'[loop.index0] {{ '}}' }}' bus='virtio'/>
+      <serial>{{ '{{' }} disk['serial'] {{ '}}' }}</serial>
+    </disk>
+    {{ '{%' }} endfor {{ '%}' }}
     <!-- cloud-init NoCloud seed -->
     <disk type='file' device='cdrom'>
       <driver name='qemu' type='raw'/>

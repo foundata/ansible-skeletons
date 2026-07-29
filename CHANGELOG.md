@@ -8,7 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning right now.
+### Added
+
+- collection_default, role_default: Molecule VM platforms (`type: "libvirt"`) support two new capabilities for testing storage management and locally built golden images: an `extra_disks` platform key (list of `serial`/`size` mappings; each disk is attached with its serial set and appears as `/dev/disk/by-id/virtio-<serial>` inside the instance) and absolute local paths as `image:` value (used as-is instead of being downloaded, e.g. for a locally baked Proxmox VE image).
 
 
 
