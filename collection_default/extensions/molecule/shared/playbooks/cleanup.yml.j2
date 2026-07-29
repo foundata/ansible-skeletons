@@ -8,6 +8,10 @@
 - name: "Molecule | Cleanup"
   hosts: "molecule"
   gather_facts: false
+  # The cleanup phase runs before destroy and must tolerate instances that no
+  # longer exist (e.g. after an interrupted earlier run left a stale inventory),
+  # otherwise the whole test sequence aborts before destroy can reset anything.
+  ignore_unreachable: true
   no_log: "{{ '{{' }} molecule_no_log | ansible.builtin.default(false) {{ '}}' }}"
   pre_tasks:
 
