@@ -137,7 +137,49 @@
   hosts: "localhost"
   gather_facts: false
   no_log: "{{ '{{' }} molecule_no_log | ansible.builtin.default(false) {{ '}}' }}"
+  vars:
+    libvirt_uri: "{{ '{{' }} lookup('ansible.builtin.env', 'MOLECULE_VM_LIBVIRT_URI') | ansible.builtin.default('qemu:///session', true) {{ '}}' }}"
+    libvirt_platforms: >-
+      {{ '{{' }}
+        molecule_yml['platforms']
+        | ansible.builtin.selectattr('type', 'ansible.builtin.defined')
+        | ansible.builtin.selectattr('type', 'ansible.builtin.equalto', 'libvirt')
+        | ansible.builtin.list
+      {{ '}}' }}
   tasks:
+
+    - name: "Molecule | Destroy (libvirt) | Remove instances left behind by a failed create (best effort)"
+      # The play above is driven by the inventory, which the create playbook
+      # writes only after all instances are up. A create step that fails in
+      # between leaves running instances no inventory knows about, so they are
+      # removed here by their platform name.
+      # The command module is used intentionally: community.libvirt would need
+      # the libvirt-python binding which has no pre-built wheels.
+      ansible.builtin.command:
+        argv:
+          - "virsh"
+          - "--connect"
+          - "{{ '{{' }} libvirt_uri {{ '}}' }}"
+          - "{{ '{{' }} item[1] {{ '}}' }}"
+          - "{{ '{{' }} item[0]['name'] {{ '}}' }}"
+      changed_when:
+        - __testing_sweep_result is ansible.builtin.success
+      failed_when:
+        - false
+      loop: "{{ '{{' }} libvirt_platforms | ansible.builtin.product(['destroy', 'undefine']) | ansible.builtin.list {{ '}}' }}"
+      loop_control:
+        label: "{{ '{{' }} item[0]['name'] {{ '}}' }} ({{ '{{' }} item[1] {{ '}}' }})"
+      register: __testing_sweep_result
+
+
+    - name: "Molecule | Destroy (libvirt) | Remove instance working directories left behind"
+      ansible.builtin.file:
+        path: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/vm/{{ '{{' }} item['name'] {{ '}}' }}"
+        state: "absent"
+      loop: "{{ '{{' }} libvirt_platforms {{ '}}' }}"
+      loop_control:
+        label: "{{ '{{' }} item['name'] {{ '}}' }}"
+
 
     - name: "Molecule | Destroy (libvirt) | Remove molecule_inventory.yml"
       ansible.builtin.file:

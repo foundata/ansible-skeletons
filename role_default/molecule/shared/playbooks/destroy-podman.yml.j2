@@ -111,7 +111,34 @@
   hosts: "localhost"
   gather_facts: false
   no_log: "{{ '{{' }} molecule_no_log | ansible.builtin.default(false) {{ '}}' }}"
+  vars:
+    podman_executable: "{{ '{{' }} lookup('ansible.builtin.env', 'MOLECULE_PODMAN_EXECUTABLE') | ansible.builtin.default('podman', true) {{ '}}' }}"
   tasks:
+
+    - name: "Molecule | Destroy (Podman) | Remove instances left behind by a failed create (best effort)"
+      # The play above is driven by the inventory, which the create playbook
+      # writes only after all instances are up. A create step that fails in
+      # between leaves containers no inventory knows about, so they are removed
+      # here by their platform name.
+      containers.podman.podman_container:
+        name: "{{ '{{' }} item['name'] {{ '}}' }}"
+        state: "absent"
+        delete_volumes: true
+        executable: "{{ '{{' }} podman_executable {{ '}}' }}"
+        force_delete: true
+      failed_when:
+        - false
+      loop: >-
+        {{ '{{' }}
+          (molecule_yml['platforms'] | ansible.builtin.selectattr('type', 'ansible.builtin.undefined') | ansible.builtin.list)
+          + (molecule_yml['platforms']
+             | ansible.builtin.selectattr('type', 'ansible.builtin.defined')
+             | ansible.builtin.selectattr('type', 'ansible.builtin.equalto', 'podman')
+             | ansible.builtin.list)
+        {{ '}}' }}
+      loop_control:
+        label: "{{ '{{' }} item['name'] {{ '}}' }}"
+
 
     - name: "Molecule | Destroy (Podman) | Remove molecule_inventory.yml"
       ansible.builtin.file:
