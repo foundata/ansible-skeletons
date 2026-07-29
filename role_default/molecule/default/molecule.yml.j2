@@ -24,9 +24,7 @@ driver:
 platforms:
   # Platform keys by backend type:
   #
-  # type: "podman" (default when omitted) - containers using the foundata
-  # Integration Test Target (ITT) images which aim to replicate a "VM-like"
-  # testing environment and provide a fully functional systemd:
+  # type: "podman" (default when omitted)
   #   image (required):          OCI image reference
   #   systemd (optional):        run a systemd entrypoint, usually true
   #
@@ -45,119 +43,117 @@ platforms:
   #                              "serial" (required, becomes
   #                              /dev/disk/by-id/virtio-<serial>) and "size"
   #                              (default "4G")
-  #
-  # A commented "libvirt" alternate follows each container platform; swap the
-  # active entry per platform to switch the backend.
 
   # Debian 13 (Trixie)
   - name: "molecule-debian13"
-    image: "quay.io/foundata/debian13-itt:latest"
+    type: "podman"
+    image: "quay.io/foundata/debian13-itt:latest" # Integration Test Target (ITT) with systemd
     systemd: true
-  # - name: "molecule-debian13"
-  #   type: "libvirt"
-  #   image: "https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-amd64.qcow2"
-  #   ssh_port: 2201
+    #type: "libvirt"
+    #image: "https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-amd64.qcow2"
+    #ssh_port: 2201
 
   # Debian 12 (Bookworm)
   - name: "molecule-debian12"
-    image: "quay.io/foundata/debian12-itt:latest"
+    type: "podman"
+    image: "quay.io/foundata/debian12-itt:latest" # Integration Test Target (ITT) with systemd
     systemd: true
-  # - name: "molecule-debian12"
-  #   type: "libvirt"
-  #   image: "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2"
-  #   ssh_port: 2202
+    #type: "libvirt"
+    #image: "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2"
+    #ssh_port: 2202
 
   # Ubuntu 26.04 LTS (Resolute Raccoon)
   - name: "molecule-ubuntu2604"
-    image: "quay.io/foundata/ubuntu2604-itt:latest"
+    type: "podman"
+    image: "quay.io/foundata/ubuntu2604-itt:latest" # Integration Test Target (ITT) with systemd
     systemd: true
-  # - name: "molecule-ubuntu2604"
-  #   type: "libvirt"
-  #   image: "https://cloud-images.ubuntu.com/resolute/current/resolute-server-cloudimg-amd64.img" # .img is qcow2
-  #   ssh_port: 2203
+    #type: "libvirt"
+    #image: "https://cloud-images.ubuntu.com/resolute/current/resolute-server-cloudimg-amd64.img" # .img == qcow2
+    #ssh_port: 2203
 
   # Ubuntu 24.04 LTS (Noble Numbat)
   - name: "molecule-ubuntu2404"
-    image: "quay.io/foundata/ubuntu2404-itt:latest"
+    type: "podman"
+    image: "quay.io/foundata/ubuntu2404-itt:latest" # Integration Test Target (ITT) with systemd
     systemd: true
-  # - name: "molecule-ubuntu2404"
-  #   type: "libvirt"
-  #   image: "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img" # .img is qcow2
-  #   ssh_port: 2204
+    #type: "libvirt"
+    #image: "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img"# .img == qcow2
+    #ssh_port: 2204
 
   # Ubuntu 22.04 LTS (Jammy Jellyfish)
   - name: "molecule-ubuntu2204"
-    image: "quay.io/foundata/ubuntu2204-itt:latest"
+    type: "podman"
+    image: "quay.io/foundata/ubuntu2204-itt:latest" # Integration Test Target (ITT) with systemd
     systemd: true
-  # - name: "molecule-ubuntu2204"
-  #   type: "libvirt"
-  #   image: "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img" # .img is qcow2
-  #   ssh_port: 2205
+    #type: "libvirt"
+    #image: "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img" # .img == qcow2
+    #ssh_port: 2205
 
   # AlmaLinux 10 (best effort RHEL 10 (Red Hat Enterprise Linux))
   - name: "molecule-almalinux10"
-    image: "quay.io/foundata/almalinux10-itt:latest"
+    type: "podman"
+    image: "quay.io/foundata/almalinux10-itt:latest" # Integration Test Target (ITT) with systemd
     systemd: true
-  # - name: "molecule-almalinux10"
-  #   type: "libvirt"
-  #   image: "https://repo.almalinux.org/almalinux/10/cloud/x86_64/images/AlmaLinux-10-GenericCloud-latest.x86_64.qcow2"
-  #   ssh_port: 2206
+    #type: "libvirt"
+    #image: "https://repo.almalinux.org/almalinux/10/cloud/x86_64/images/AlmaLinux-10-GenericCloud-latest.x86_64.qcow2"
+    #ssh_port: 2206
 
   # AlmaLinux 9 (best effort RHEL 9 (Red Hat Enterprise Linux))
   - name: "molecule-almalinux9"
-    image: "quay.io/foundata/almalinux9-itt:latest"
+    type: "podman"
+    image: "quay.io/foundata/almalinux9-itt:latest" # Integration Test Target (ITT) with systemd
     systemd: true
-  # - name: "molecule-almalinux9"
-  #   type: "libvirt"
-  #   image: "https://repo.almalinux.org/almalinux/9/cloud/x86_64/images/AlmaLinux-9-GenericCloud-latest.x86_64.qcow2"
-  #   ssh_port: 2207
+    #type: "libvirt"
+    #image: "https://repo.almalinux.org/almalinux/9/cloud/x86_64/images/AlmaLinux-9-GenericCloud-latest.x86_64.qcow2"
+    #ssh_port: 2207
 
   # CentOS Stream 10
   - name: "molecule-centosstream10"
-    image: "quay.io/foundata/centosstream10-itt:latest"
+    type: "podman"
+    image: "quay.io/foundata/centosstream10-itt:latest" # Integration Test Target (ITT) with systemd
     systemd: true
-  # - name: "molecule-centosstream10"
-  #   type: "libvirt"
-  #   image: "https://cloud.centos.org/centos/10-stream/x86_64/images/CentOS-Stream-GenericCloud-10-latest.x86_64.qcow2"
-  #   ssh_port: 2208
+    #type: "libvirt"
+    #image: "https://cloud.centos.org/centos/10-stream/x86_64/images/CentOS-Stream-GenericCloud-10-latest.x86_64.qcow2"
+    #ssh_port: 2208
 
   # CentOS Stream 9
   - name: "molecule-centosstream9"
-    image: "quay.io/foundata/centosstream9-itt:latest"
+    type: "podman"
+    image: "quay.io/foundata/centosstream9-itt:latest" # Integration Test Target (ITT) with systemd
     systemd: true
-  # - name: "molecule-centosstream9"
-  #   type: "libvirt"
-  #   image: "https://cloud.centos.org/centos/9-stream/x86_64/images/CentOS-Stream-GenericCloud-9-latest.x86_64.qcow2"
-  #   ssh_port: 2209
+    #type: "libvirt"
+    #image: "https://cloud.centos.org/centos/9-stream/x86_64/images/CentOS-Stream-GenericCloud-9-latest.x86_64.qcow2"
+    #ssh_port: 2209
 
   # Fedora 44
   - name: "molecule-fedora44"
-    image: "quay.io/foundata/fedora44-itt:latest"
+    type: "podman"
+    image: "quay.io/foundata/fedora44-itt:latest" # Integration Test Target (ITT) with systemd
     systemd: true
-  # No "latest" alias upstream; release images are immutable, bump the URL on new releases.
-  # - name: "molecule-fedora44"
-  #   type: "libvirt"
-  #   image: "https://download.fedoraproject.org/pub/fedora/linux/releases/44/Cloud/x86_64/images/Fedora-Cloud-Base-Generic-44-1.7.x86_64.qcow2"
-  #   ssh_port: 2210
+    #type: "libvirt"
+    # No "latest" alias upstream; release images are immutable, bump the URL on new releases (https://fedoraproject.org/cloud/download/)
+    #image: "https://download.fedoraproject.org/pub/fedora/linux/releases/44/Cloud/x86_64/images/Fedora-Cloud-Base-Generic-44-1.7.x86_64.qcow2"
+    #ssh_port: 2210
 
   # Fedora 43
   - name: "molecule-fedora43"
-    image: "quay.io/foundata/fedora43-itt:latest"
+    type: "podman"
+    image: "quay.io/foundata/fedora43-itt:latest" # Integration Test Target (ITT) with systemd
     systemd: true
-  # - name: "molecule-fedora43"
-  #   type: "libvirt"
-  #   image: "https://download.fedoraproject.org/pub/fedora/linux/releases/43/Cloud/x86_64/images/Fedora-Cloud-Base-Generic-43-1.6.x86_64.qcow2"
-  #   ssh_port: 2211
+    #type: "libvirt"
+    # No "latest" alias upstream; release images are immutable, bump the URL on new releases (https://fedoraproject.org/cloud/download/)
+    #image: "https://download.fedoraproject.org/pub/fedora/linux/releases/43/Cloud/x86_64/images/Fedora-Cloud-Base-Generic-43-1.6.x86_64.qcow2"
+    #ssh_port: 2211
 
   # openSUSE Leap 16.0
   - name: "molecule-opensuseleap160"
-    image: "quay.io/foundata/opensuseleap160-itt:latest"
+    type: "podman"
+    image: "quay.io/foundata/opensuseleap160-itt:latest" # Integration Test Target (ITT) with systemd
     systemd: true
-  # Unversioned alias alongside build-suffixed files.
-  # - name: "molecule-opensuseleap160"
-  #   type: "libvirt"
-  #   image: "https://download.opensuse.org/distribution/leap/16.0/appliances/Leap-16.0-Minimal-VM.x86_64-Cloud.qcow2"
-  #   ssh_port: 2212
+    #type: "libvirt"
+    # Image is unversioned alias alongside build-suffixed files.
+    #image: "https://download.opensuse.org/distribution/leap/16.0/appliances/Leap-16.0-Minimal-VM.x86_64-Cloud.qcow2"
+    #ssh_port: 2212
 
   # openSUSE Leap 15.6
   # Currently not supported by us and therefore not tested.
