@@ -51,6 +51,12 @@
         <range start='{{ '{{' }} item['ssh_port'] {{ '}}' }}' to='22'/>
       </portForward>
       <model type='virtio'/>
+      <!-- passt advertises a very large MTU (65520) via DHCP. Instances that
+           put the interface into a bridge (e.g. Proxmox VE with vmbr0) then
+           run a bridge with an MTU their port cannot carry, which silently
+           drops larger packets: connections establish, but SSH stalls during
+           authentication. A conventional MTU avoids that for all guests. -->
+      <mtu size='1500'/>
     </interface>
     <!-- Graphical console (VNC on 127.0.0.1, automatic port) for optional
          access with virt-manager or virt-viewer (connect to qemu:///session).
