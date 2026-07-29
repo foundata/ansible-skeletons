@@ -34,15 +34,22 @@
     <disk type='file' device='disk'>
       <driver name='qemu' type='qcow2'/>
       <source file='{{ '{{' }} __testing_vm_dir {{ '}}' }}/extra-{{ '{{' }} disk['serial'] {{ '}}' }}.qcow2'/>
-      <target dev='vd{{ '{{' }} 'bcdefghijklmnop'[loop.index0] {{ '}}' }}' bus='virtio'/>
+      <target dev='vd{{ '{{' }} 'cdefghijklmnopq'[loop.index0] {{ '}}' }}' bus='virtio'/>
       <serial>{{ '{{' }} disk['serial'] {{ '}}' }}</serial>
     </disk>
     {{ '{%' }} endfor {{ '%}' }}
-    <!-- cloud-init NoCloud seed -->
-    <disk type='file' device='cdrom'>
+    <!-- cloud-init NoCloud seed. Attached as a virtio disk instead of a
+         CD-ROM on purpose: cloud-init decides very early (in a systemd
+         generator) whether a datasource exists, and an emulated SATA CD-ROM
+         is not probed yet at that point on some distributions (e.g. Debian
+         12). cloud-init then disables itself for the whole boot, so no user
+         and no SSH host keys are created and the instance never becomes
+         reachable. virtio disks are available early enough, and NoCloud
+         finds the seed by its file system label regardless of device type. -->
+    <disk type='file' device='disk'>
       <driver name='qemu' type='raw'/>
       <source file='{{ '{{' }} __testing_vm_dir {{ '}}' }}/seed.iso'/>
-      <target dev='sda' bus='sata'/>
+      <target dev='vdb' bus='virtio'/>
       <readonly/>
     </disk>
     <interface type='user'>
