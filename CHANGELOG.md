@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Nothing worth mentioning right now.
+
+
+## [2.6.0] - 2026-07-30
+
 ### Added
 
 - collection_default, role_default: Molecule VM platforms (`type: "libvirt"`) support two new capabilities for testing storage management and locally built golden images: an `extra_disks` platform key (list of `serial`/`size` mappings; each disk is attached with its serial set and appears as `/dev/disk/by-id/virtio-<serial>` inside the instance) and absolute local paths as `image:` value (used as-is instead of being downloaded, e.g. for a locally baked Proxmox VE image). (c5cffe0)
@@ -165,8 +170,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All functionality and files, `role_default`
 
 
-[unreleased]: https://github.com/foundata/ansible-skeletons/compare/v2.5.1...HEAD
-[2.5.1]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.5.1
+[unreleased]: https://github.com/foundata/ansible-skeletons/compare/v2.6.0...HEAD
+[2.6.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.6.0
+[2.5.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.5.0
 [2.4.1]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.4.1
 [2.4.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.4.0
 [2.3.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.3.0
