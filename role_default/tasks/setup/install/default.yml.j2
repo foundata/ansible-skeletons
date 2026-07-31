@@ -14,7 +14,7 @@
 - name: "Setup | Install | Default | Install or upgrade packages"
   ansible.builtin.package:
     name: "{{ '{{ __' + role_name + '_packages_install }}' }}"
-    state: "{{ '{{' }} 'latest' if run_{{ role_name }}_autoupgrade else 'present' {{ '}}' }}"
+    state: "{{ '{{' }} 'latest' if (run_{{ role_name }}_autoupgrade | ansible.builtin.bool) else 'present' {{ '}}' }}"
   when:
     - __{{ role_name }}_packages_install is ansible.builtin.defined
     - (__{{ role_name }}_packages_install | ansible.builtin.length) > 0

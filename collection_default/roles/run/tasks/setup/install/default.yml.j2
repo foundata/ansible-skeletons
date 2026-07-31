@@ -14,7 +14,7 @@
 - name: "Setup | Install | Default | Install or upgrade packages"
   ansible.builtin.package:
     name: "{{ '{{ __run_' + collection_name + '_packages_install }}' }}"
-    state: "{{ '{{' }} 'latest' if run_{{ collection_name }}_autoupgrade else 'present' {{ '}}' }}"
+    state: "{{ '{{' }} 'latest' if (run_{{ collection_name }}_autoupgrade | ansible.builtin.bool) else 'present' {{ '}}' }}"
   when:
     - __run_{{ collection_name }}_packages_install is ansible.builtin.defined
     - (__run_{{ collection_name }}_packages_install | ansible.builtin.length) > 0
