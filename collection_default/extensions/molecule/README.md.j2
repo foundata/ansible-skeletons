@@ -223,7 +223,7 @@ Molecule scenarios typically require network access to Container registries ([qu
 
    - name: "Molecule | Prepare | Configure internal package repository mirrors for Debian/Ubuntu"
      when:
-       - ansible_os_family == "Debian"
+       - (ansible_facts['os_family'] | ansible.builtin.lower) == 'debian'
      block:
        - name: "Molecule | Prepare | Create sources.list"
          ansible.builtin.copy:
