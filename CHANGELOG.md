@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Nothing worth mentioning right now.
 
 
+## [2.6.1] - 2026-08-05
+
+### Fixes
+
+- (collection|role)_default: coerce boolean arguments in Jinja expressions, apply ansible.builtin.bool. (c12178f)
+- style: normalize categorical string facts (3f9273a)
+
+
+
 ## [2.6.0] - 2026-07-30
 
 ### Added
@@ -170,7 +179,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All functionality and files, `role_default`
 
 
-[unreleased]: https://github.com/foundata/ansible-skeletons/compare/v2.6.0...HEAD
+[unreleased]: https://github.com/foundata/ansible-skeletons/compare/v2.6.1...HEAD
+[2.6.1]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.6.1
 [2.6.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.6.0
 [2.5.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.5.0
 [2.4.1]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.4.1
