@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Nothing worth mentioning right now.
 
 
+## [2.6.2] - 2026-08-28
+
+### Fixes
+
+- (collection|role)_default: every loop in the generated task files now uses a private, purpose-specific loop variable instead of `item`. A role rendered from an older skeleton rebinds the caller's `item` when it is included from a loop and its parameters reference that `item`, which can silently hand the role an empty value. (f474786)
+
+
 ## [2.6.1] - 2026-08-05
 
 ### Fixes
@@ -179,7 +186,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All functionality and files, `role_default`
 
 
-[unreleased]: https://github.com/foundata/ansible-skeletons/compare/v2.6.1...HEAD
+[unreleased]: https://github.com/foundata/ansible-skeletons/compare/v2.6.2...HEAD
+[2.6.2]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.6.2
 [2.6.1]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.6.1
 [2.6.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.6.0
 [2.5.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.5.0
