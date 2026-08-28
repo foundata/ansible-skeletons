@@ -91,9 +91,9 @@ readonly ansible_extravar_homepage_default="https://FIXME.example.com"
 readonly ansible_extravar_min_ansible_version_default="2.16.0"
 
 
-# --- BOILERPLATE START v1.1.1 ---
+# --- BOILERPLATE START v1.1.2 ---
 # Consistent environment for predictable tool and shell behavior
-export PATH="${PATH:-'/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin'}"
+export PATH="${PATH:-/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin}"
 if command -v locale >/dev/null 2>&1; then
   for locale_candidate in 'C.UTF-8' 'C.utf8' 'en_US.UTF-8' 'UTF-8' 'C'; do
     if LC_ALL="${locale_candidate}" locale charmap >/dev/null 2>&1; then
@@ -278,7 +278,7 @@ ensure() {
 
 # Convenience wrappers (see the used functions for documentation)
 require_cmd() { check_cmd -r "$@"; }
-# --- BOILERPLATE END v1.1.1 ---
+# --- BOILERPLATE END v1.1.2 ---
 
 ###
 # Parse command line arguments.
