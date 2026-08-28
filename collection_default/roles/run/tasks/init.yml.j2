@@ -122,7 +122,9 @@
   ansible.builtin.include_vars:
     file: "{{ '{{' }} __run_{{ collection_name }}_vars_file {{ '}}' }}"
   vars:
-    __run_{{ collection_name }}_vars_file: "{{ '{{' }} role_path {{ '}}' }}/vars/{{ '{{' }} item {{ '}}' }}"
+    __run_{{ collection_name }}_vars_file: "{{ '{{' }} role_path {{ '}}' }}/vars/{{ '{{' }} __run_{{ collection_name }}_varsfile_item {{ '}}' }}"
   when:
     - __run_{{ collection_name }}_vars_file is ansible.builtin.file
   loop: "{{ '{{' }} __run_{{ collection_name }}_platform_filenames_most_specific_last {{ '}}' }}"
+  loop_control:
+    loop_var: "__run_{{ collection_name }}_varsfile_item"
