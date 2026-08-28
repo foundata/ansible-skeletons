@@ -47,11 +47,10 @@ All skeletons follow several guidelines and best practices:
 
 Main features:
 
-* **Sensible defaults** – metadata, version checks, and directory structures already configured.
-* **Linting and testing built-in** – ready for [`ansible-lint`](https://docs.ansible.com/projects/lint/) and [Molecule](https://docs.ansible.com/projects/molecule/)
+* **Linting and testing built-in** – ready for [`ansible-lint`](https://docs.ansible.com/projects/lint/) and [Molecule](https://docs.ansible.com/projects/molecule/) (using Containers via Podman and/or VMs via libvirt)
 * **Platform-aware design** – clear separation for OS-specific variables and tasks.
 * **Changelog tooling** – conventions and helpers for transparent release notes.
-* **Reproducible structure** - faster bootstrapping, fewer style debates. Focus on automation logic instead of boilerplate.
+* **Reproducible structure, sensible defaults** - faster bootstrapping, fewer style debates. Focus on automation logic instead of boilerplate.
 
 
 ## Examples<a id="examples"></a>
@@ -193,7 +192,7 @@ The following versions are known to be problematic:
 
 See [`CONTRIBUTING.md`](./CONTRIBUTING.md) if you want to get involved.
 
-This project's functionality is mature, so there might be little activity on the repository in the future. Don't get fooled by this, the project is under active maintenance and used on daily basis by the maintainers.
+This project's functionality is mature, so there might be little activity on the repository in the future. Don't get fooled by this, the project is under active maintenance and used on a daily basis by the maintainers.
 
 
 
