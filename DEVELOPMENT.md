@@ -3,7 +3,16 @@
 This file provides additional information for maintainers and contributors.
 
 
-## Testing
+## Table of contents<a id="toc"></a>
+
+- [Testing](#testing)
+- [Releases](#releases)
+- [Miscellaneous](#miscellaneous)
+  - [Encoding](#encoding)
+  - [Helper script](#helper-script)
+
+
+## Testing<a id="testing"></a>
 
 Nothing special or automated yet. Therefore just some hints for manual testing:
 
@@ -12,7 +21,7 @@ Nothing special or automated yet. Therefore just some hints for manual testing:
 * Create resources with your skeleton for a simple program and test if everything works out conceptually as expected.
 
 
-## Releases
+## Releases<a id="releases"></a>
 
 1. Do proper [Testing](#testing). Continue only if everything is fine.
 2. Determine the next version number. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -21,7 +30,7 @@ Nothing special or automated yet. Therefore just some hints for manual testing:
    ```console
    version="<FIXME version>"
    git add "./CHANGELOG.md"
-   git commit -m "Release preparations: v${version}"
+   git commit -m "release: prepare ${version}"
 
    git tag "v${version}" "$(git rev-parse --verify HEAD)" -m "version ${version}"
    git show "v${version}"
@@ -43,13 +52,13 @@ Nothing special or automated yet. Therefore just some hints for manual testing:
    ```
 
 
-## Miscellaneous
+## Miscellaneous<a id="miscellaneous"></a>
 
-### Encoding
+### Encoding<a id="encoding"></a>
 
 * Use UTF-8 encoding with `LF` (Line Feed `\n`) line endings *without* [BOM](https://en.wikipedia.org/wiki/Byte_order_mark) for all files.
 
-### Helper script
+### Helper script<a id="helper-script"></a>
 
 ```bash
 #!/usr/bin/env bash
@@ -73,7 +82,7 @@ Nothing special or automated yet. Therefore just some hints for manual testing:
 
 
 # version of the script
-readonly version="1.1.0"
+readonly version="1.1.1"
 
 # config
 MSG_SCRIPTNAME=1 # Enable script name as prefix for msg()
@@ -290,7 +299,7 @@ require_cmd() { check_cmd -r "$@"; }
 # Returns:
 #   0 on success, 2 on usage error.
 parse_args() {
-  opt_source_dir_path="${HOME}/dev/ansible-skeletons" # -s
+  opt_source_dir_path="${HOME}/dev/foundata/ansible-skeletons" # -s
   opt_show_version="0" # -v
 
   # Leading ':' silences STDERR, 'x:' needs value, 'x' is a flag.
