@@ -6,7 +6,7 @@ Ansible Skeletons help you start new [roles](https://docs.ansible.com/ansible/la
 
 All skeletons follow several guidelines and best practices:
 
-* [foundata: Ansible style guide](https://github.com/foundata/guidelines/blob/master/ansible-style-guide.md)
+* [foundata: Ansible style guide](https://github.com/foundata/guidelines/blob/main/ansible-style-guide.md)
 * [Red Hat's Coding Style Good Practices for Ansible](https://github.com/redhat-cop/automation-good-practices/blob/main/coding_style/README.adoc#ansible-guidelines)
 * [Best Practices of the Ansible User guide](https://docs.ansible.com/ansible/latest/user_guide/playbooks_best_practices.html)
 

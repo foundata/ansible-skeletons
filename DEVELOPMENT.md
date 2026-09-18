@@ -17,7 +17,7 @@ This file provides additional information for maintainers and contributors.
 Nothing special or automated yet. Therefore just some hints for manual testing:
 
 * Create dummy resources to see if everything renders and do linting. The helper script at the end of the file may help with that.
-* Check if the outcome fits our [Ansible style guide](https://github.com/foundata/guidelines/blob/master/ansible-style-guide.md).
+* Check if the outcome fits our [Ansible style guide](https://github.com/foundata/guidelines/blob/main/ansible-style-guide.md).
 * Create resources with your skeleton for a simple program and test if everything works out conceptually as expected.
 
 
