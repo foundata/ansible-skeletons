@@ -2,15 +2,25 @@
 
 ## Reporting a vulnerability
 
-Please use one of the following ways to report a security vulnerability or concern:
+Please report security vulnerabilities or concerns **privately** using one of
+these channels:
 
-* GitHub's private [security reporting feature](https://github.com/foundata/ansible-skeletons/security/advisories/new)
-* Write an email to `security@foundata.com`.
+- Email us at [`security@foundata.com`](mailto:security@foundata.com)
+- GitHub's private
+  [security reporting feature](https://github.com/foundata/ansible-skeletons/security/advisories/new)
 
-Please make sure your report contains information about
+Please include:
 
-* on how to reproduce the issue.
-* a fix (if any) which's code is compatible with the project's [licensing](./.reuse/dep5).
-* attribution (Name? Email? Any URL to mention?) or if you want to stay anonymous.
+1. Steps to reproduce the issue.
+2. Your preferred attribution (name, email, and/or URL), or let us know if you
+   prefer to remain anonymous.
+3. A proposed fix, if available. Any proposed fix must be compatible with the
+   project's licensing as documented in [`REUSE.toml`](./REUSE.toml).
 
-Beside our thanks, you can expect attribution in the release notes of the version shipping a fix if your report was valid. Please note that we do not pay any bug bounties.
+
+## Recognition and compensation
+
+We maintain this project as open source and do **not** offer bug bounties. We
+value responsible reports and contributions as part of giving back to the
+open-source community. Valid reports may be credited in the release notes for
+the version containing the fix.
