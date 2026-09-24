@@ -8,7 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning right now.
+### Added
+
+- (collection|role)_default: `.rumdl.toml`, the `rumdl` configuration of the foundata Markdown style guide. The collection skeleton keeps it out of the built artifact through `build_ignore`.
 
 
 ## [2.6.2] - 2026-08-28
