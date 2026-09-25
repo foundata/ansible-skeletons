@@ -59,22 +59,30 @@ Uninstall:
 
 It might be useful and faster to only call parts of the role by using tags:
 
-- `{{ role_name }}_setup`: Manage basic resources, such as packages or service users.
-- `{{ role_name }}_config`: Manage settings, such as adapting or creating configuration files.
-- `{{ role_name }}_service`: Manage services and daemons, such as running states and service boot configurations.
+- `{{ role_name }}_setup`: Manage basic resources, such as packages or service
+  users.
+- `{{ role_name }}_config`: Manage settings, such as adapting or creating
+  configuration files.
+- `{{ role_name }}_service`: Manage services and daemons, such as running states
+  and service boot configurations.
 
-There are also tags that are generally not intended to be called directly but are included for completeness and to cover edge cases:
+There are also tags that are generally not intended to be called directly but
+are included for completeness and to cover edge cases:
 
-- `{{ role_name }}_always`, `always`: Tasks needed by the role itself for internal role setup and the Ansible environment.
+- `{{ role_name }}_always`, `always`: Tasks needed by the role itself for
+  internal role setup and the Ansible environment.
 
 
 <!-- ANSIBLE DOCSMITH MAIN START -->
 
 ## Role variables<a id="variables"></a>
 
-See [`defaults/main.yml`](./defaults/main.yml) for all available role parameters and their description. [`vars/main.yml`](./vars/main.yml) contains internal variables you should not override (but their description might be interesting).
+See [`defaults/main.yml`](./defaults/main.yml) for all available role parameters
+and their description. [`vars/main.yml`](./vars/main.yml) contains internal
+variables you should not override (but their description might be interesting).
 
-Additionally, there are variables read from other roles and/or the global scope (for example, host or group vars) as follows:
+Additionally, there are variables read from other roles and/or the global scope
+(for example, host or group vars) as follows:
 
 - None right now.
 
@@ -88,7 +96,8 @@ See `dependencies` in [`meta/main.yml`](./meta/main.yml).
 
 ## Compatibility<a id="compatibility"></a>
 
-See `min_ansible_version` in [`meta/main.yml`](./meta/main.yml) and `__{{ role_name }}_supported_platforms` in [`vars/main.yml`](./vars/main.yml).
+See `min_ansible_version` in [`meta/main.yml`](./meta/main.yml) and
+`__{{ role_name }}_supported_platforms` in [`vars/main.yml`](./vars/main.yml).
 
 
 
@@ -103,9 +112,19 @@ There are no special requirements not covered by Ansible itself.
 <!--REUSE-IgnoreStart-->
 Copyright (c) {{ '%Y' | strftime }} {{ company }}
 
-This project is licensed under the GNU General Public License v3.0 or later (SPDX-License-Identifier: `GPL-3.0-or-later`), see [`LICENSES/GPL-3.0-or-later.txt`](LICENSES/GPL-3.0-or-later.txt) for the full text.
+This project is licensed under the GNU General Public License v3.0 or later
+(SPDX-License-Identifier: `GPL-3.0-or-later`), see
+[`LICENSES/GPL-3.0-or-later.txt`](LICENSES/GPL-3.0-or-later.txt) for the full
+text.
 
-The [`REUSE.toml`](REUSE.toml) file provides detailed licensing and copyright information in a human- and machine-readable format. This includes parts that may be subject to different licensing or usage terms, such as third-party components. The repository conforms to the [REUSE specification](https://reuse.software/spec/). You can use [`reuse spdx`](https://reuse.readthedocs.io/en/latest/readme.html#cli) to create a [SPDX software bill of materials (SBOM)](https://en.wikipedia.org/wiki/Software_Package_Data_Exchange).
+The [`REUSE.toml`](REUSE.toml) file provides detailed licensing and copyright
+information in a human- and machine-readable format. This includes parts that
+may be subject to different licensing or usage terms, such as third-party
+components. The repository conforms to the
+[REUSE specification](https://reuse.software/spec/). You can use
+[`reuse spdx`](https://reuse.readthedocs.io/en/latest/readme.html#cli) to create
+a
+[SPDX software bill of materials (SBOM)](https://en.wikipedia.org/wiki/Software_Package_Data_Exchange).
 <!--REUSE-IgnoreEnd-->
 
 
@@ -114,4 +133,6 @@ The [`REUSE.toml`](REUSE.toml) file provides detailed licensing and copyright in
 
 This project was created and is maintained by {{ company }}.
 
-Initially based on an [Ansible skeleton](https://foundata.com/en/projects/ansible-skeletons/) developed by [foundata](https://foundata.com/).
+Initially based on an
+[Ansible skeleton](https://foundata.com/en/projects/ansible-skeletons/)
+developed by [foundata](https://foundata.com/).

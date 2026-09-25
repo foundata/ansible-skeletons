@@ -3,28 +3,36 @@
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+and this project adheres to
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
 ## [Unreleased]
 
 ### Added
 
-- (collection|role)_default: `.rumdl.toml`, the `rumdl` configuration of the foundata Markdown style guide. The collection skeleton keeps it out of the built artifact through `build_ignore`.
+- (collection|role)_default: `.rumdl.toml`, the `rumdl` configuration of the
+  foundata Markdown style guide. The collection skeleton keeps it out of the
+  built artifact through `build_ignore`.
 
 
 ## [2.6.2] - 2026-08-28
 
 ### Fixes
 
-- (collection|role)_default: every loop in the generated task files now uses a private, purpose-specific loop variable instead of `item`. A role rendered from an older skeleton rebinds the caller's `item` when it is included from a loop and its parameters reference that `item`, which can silently hand the role an empty value. (f474786)
+- (collection|role)_default: every loop in the generated task files now uses a
+  private, purpose-specific loop variable instead of `item`. A role rendered
+  from an older skeleton rebinds the caller's `item` when it is included from a
+  loop and its parameters reference that `item`, which can silently hand the
+  role an empty value. (f474786)
 
 
 ## [2.6.1] - 2026-08-05
 
 ### Fixes
 
-- (collection|role)_default: coerce boolean arguments in Jinja expressions, apply ansible.builtin.bool. (c12178f)
+- (collection|role)_default: coerce boolean arguments in Jinja expressions,
+  apply ansible.builtin.bool. (c12178f)
 - style: normalize categorical string facts (3f9273a)
 
 
@@ -33,15 +41,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- collection_default, role_default: Molecule VM platforms (`type: "libvirt"`) support two new capabilities for testing storage management and locally built golden images: an `extra_disks` platform key (list of `serial`/`size` mappings; each disk is attached with its serial set and appears as `/dev/disk/by-id/virtio-<serial>` inside the instance) and absolute local paths as `image:` value (used as-is instead of being downloaded, e.g. for a locally baked Proxmox VE image). (c5cffe0)
+- collection_default, role_default: Molecule VM platforms (`type: "libvirt"`)
+  support two new capabilities for testing storage management and locally built
+  golden images: an `extra_disks` platform key (list of `serial`/`size`
+  mappings; each disk is attached with its serial set and appears as
+  `/dev/disk/by-id/virtio-<serial>` inside the instance) and absolute local
+  paths as `image:` value (used as-is instead of being downloaded, e.g. for a
+  locally baked Proxmox VE image). (c5cffe0)
 
 
 ### Fixes
 
-- collection_default, role_default: Molecule VM instances no longer stall during the SSH authentication. [passt](https://passt.top/) advertises an MTU of 65520 via DHCP; guests that enslave the interface into a bridge (e.g. Proxmox VE with `vmbr0`) then run a bridge whose MTU their port cannot carry, which silently drops larger packets. The domain definition now sets a conventional MTU of 1500. (14ea77d)
-- collection_default, role_default: The Molecule `destroy` step now also removes instances that a failed `create` step left behind. Both destroy playbooks are driven by the inventory, which `create` writes only after all instances are up, so instances created before the failure were unknown to them (leaked virtual machines keep their memory allocated until removed by hand). (041a188)
-- collection_default, role_default: The SSH probes of the libvirt `create` step no longer block indefinitely when an instance authenticates but hangs guest-side (e.g. a degraded boot); a hard timeout turns such hangs into regular retries. (1841c67)
-- collection_default, role_default: The Molecule `cleanup` step tolerates instances that no longer exist, so a stale inventory from an interrupted run no longer aborts the test sequence before `destroy` can reset the state. (40da16b)
+- collection_default, role_default: Molecule VM instances no longer stall during
+  the SSH authentication. [passt](https://passt.top/) advertises an MTU of 65520
+  via DHCP; guests that enslave the interface into a bridge (e.g. Proxmox VE
+  with `vmbr0`) then run a bridge whose MTU their port cannot carry, which
+  silently drops larger packets. The domain definition now sets a conventional
+  MTU of 1500. (14ea77d)
+- collection_default, role_default: The Molecule `destroy` step now also removes
+  instances that a failed `create` step left behind. Both destroy playbooks are
+  driven by the inventory, which `create` writes only after all instances are
+  up, so instances created before the failure were unknown to them (leaked
+  virtual machines keep their memory allocated until removed by hand). (041a188)
+- collection_default, role_default: The SSH probes of the libvirt `create` step
+  no longer block indefinitely when an instance authenticates but hangs
+  guest-side (e.g. a degraded boot); a hard timeout turns such hangs into
+  regular retries. (1841c67)
+- collection_default, role_default: The Molecule `cleanup` step tolerates
+  instances that no longer exist, so a stale inventory from an interrupted run
+  no longer aborts the test sequence before `destroy` can reset the state.
+  (40da16b)
 
 
 
@@ -49,19 +78,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- collection_default, role_default: The Molecule `default` scenario now selects its test backend per platform via a `type` key: `"podman"` (container, the default when omitted, fully backward compatible) or `"libvirt"` (QEMU/KVM virtual machine booted from a vendor cloud image via a session libvirt daemon, `qemu:///session`, without root privileges, `libvirt` group membership or polkit rules). VM platforms enable tests containers cannot cover (kernel settings, nested virtualization, Podman inside the test target); mixed container/VM scenarios work in one run. Implementation: dispatcher playbooks (`create-dispatch.yml`, `destroy-dispatch.yml`) import the backend-specific create/destroy playbooks which filter the platform list, compose a shared inventory plus instance configuration and no-op silently when no platform matches. The VM backend uses cloud-init NoCloud seed images, qcow2 backing-file overlays over a local image cache, passt user networking with one deterministic SSH port forward per platform, a resource guard (memory/disk, override via `MOLECULE_VM_IGNORE_RESOURCES=1`), a boot console log per instance and a VNC console for `virt-manager` access. Commented `libvirt` alternates for every platform ship in `molecule.yml`. (9604572)
-- collection_default, role_default: ignore Ansible Galaxy build artifacts (`<namespace>-<name>-<version>.tar.gz`) in `.gitignore` (6e6773d)
+- collection_default, role_default: The Molecule `default` scenario now selects
+  its test backend per platform via a `type` key: `"podman"` (container, the
+  default when omitted, fully backward compatible) or `"libvirt"` (QEMU/KVM
+  virtual machine booted from a vendor cloud image via a session libvirt daemon,
+  `qemu:///session`, without root privileges, `libvirt` group membership or
+  polkit rules). VM platforms enable tests containers cannot cover (kernel
+  settings, nested virtualization, Podman inside the test target); mixed
+  container/VM scenarios work in one run. Implementation: dispatcher playbooks
+  (`create-dispatch.yml`, `destroy-dispatch.yml`) import the backend-specific
+  create/destroy playbooks which filter the platform list, compose a shared
+  inventory plus instance configuration and no-op silently when no platform
+  matches. The VM backend uses cloud-init NoCloud seed images, qcow2
+  backing-file overlays over a local image cache, passt user networking with one
+  deterministic SSH port forward per platform, a resource guard (memory/disk,
+  override via `MOLECULE_VM_IGNORE_RESOURCES=1`), a boot console log per
+  instance and a VNC console for `virt-manager` access. Commented `libvirt`
+  alternates for every platform ship in `molecule.yml`. (9604572)
+- collection_default, role_default: ignore Ansible Galaxy build artifacts
+  (`<namespace>-<name>-<version>.tar.gz`) in `.gitignore` (6e6773d)
 
 
 ### Changed
 
-- collection_default: Added [Ansible DocSmith](https://foundata.com/en/projects/ansible-docsmith/) `TOC-FULL` markers for the `run` role to the collection `README.md` template, enabling automatic inline TOC generation.
+- collection_default: Added
+  [Ansible DocSmith](https://foundata.com/en/projects/ansible-docsmith/)
+  `TOC-FULL` markers for the `run` role to the collection `README.md` template,
+  enabling automatic inline TOC generation.
 
 
 ### Fixes
 
-- collection_default, role_default: remove a stray double quote from the Debian hint in the neutralize-file comment (51c1b46)
-- collection_default, role_default: fix the fact-gathering skip in `tasks/init.yml` never triggering in some cases; `__*_used_facts` is now a mapping of `gather_subset` name to the `ansible_facts` keys it provides, so subset names and fact keys can no longer be confused.) (5ef968f)
+- collection_default, role_default: remove a stray double quote from the Debian
+  hint in the neutralize-file comment (51c1b46)
+- collection_default, role_default: fix the fact-gathering skip in
+  `tasks/init.yml` never triggering in some cases; `__*_used_facts` is now a
+  mapping of `gather_subset` name to the `ansible_facts` keys it provides, so
+  subset names and fact keys can no longer be confused.) (5ef968f)
 
 
 
@@ -69,94 +122,131 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixes
 
-- collection_default, role_default: avoid bool coercion on templated Windows check (Molecule, Podman) (e31baa5)
+- collection_default, role_default: avoid bool coercion on templated Windows
+  check (Molecule, Podman) (e31baa5)
 
 
 ## [2.4.0] - 2026-05-22
 
 ### Added
 
-- collection_default, role_default: Add generic task to remove unwanted files and directories (5980d70)
-- collection_default, role_default: Add generic task to neutralize config files (89e61ca)
+- collection_default, role_default: Add generic task to remove unwanted files
+  and directories (5980d70)
+- collection_default, role_default: Add generic task to neutralize config files
+  (89e61ca)
 
 
 ### Changed
 
-- collection_default run role, role_default: Add Ansible DocSmith markers to README.md (details: https://foundata.com/en/projects/ansible-docsmith/) (5b38a02)
-- collection_default, role_default: Add Ubuntu 26.04 LTS (Resolute Raccoon) support (89e61ca)
-- collection_default, role_default: Add Fedora 44 support, remove EOL Fedora 42 from roles and tests. (89e61ca)
-- collection_default, role_default: Add openSUSE Leap 16.0 support, remove EOL openSUSE Leap 15.6 from roles and tests.
-- collection_default, role_default: Add Debian 13 (Trixie) support, remove EOL Debian 11 (Bullseye) from roles and tests.
-- collection_default, role_default: Add Fedora 43 support, remove EOL Fedora 41 from roles and tests.
-- collection_default, role_default: Exclude "extensions/molecule" from build artifacts. (645604b)
+- collection_default run role, role_default: Add Ansible DocSmith markers to
+  README.md (details: <https://foundata.com/en/projects/ansible-docsmith/>)
+  (5b38a02)
+- collection_default, role_default: Add Ubuntu 26.04 LTS (Resolute Raccoon)
+  support (89e61ca)
+- collection_default, role_default: Add Fedora 44 support, remove EOL Fedora 42
+  from roles and tests. (89e61ca)
+- collection_default, role_default: Add openSUSE Leap 16.0 support, remove EOL
+  openSUSE Leap 15.6 from roles and tests.
+- collection_default, role_default: Add Debian 13 (Trixie) support, remove EOL
+  Debian 11 (Bullseye) from roles and tests.
+- collection_default, role_default: Add Fedora 43 support, remove EOL Fedora 41
+  from roles and tests.
+- collection_default, role_default: Exclude "extensions/molecule" from build
+  artifacts. (645604b)
 
 
 ### Fixed
 
-- collection_default, role_default: Molecule, prevent idempotence test failures from unrelated global state changes (9775a92)
-- collection_default, role_default: Fix a bug that the task "Init | Gather role-specific facts" did not process the specific facts listed to be gathered in the main variables file. (84de375)
+- collection_default, role_default: Molecule, prevent idempotence test failures
+  from unrelated global state changes (9775a92)
+- collection_default, role_default: Fix a bug that the task "Init | Gather
+  role-specific facts" did not process the specific facts listed to be gathered
+  in the main variables file. (84de375)
 
 
 ## [2.3.0] - 2025-05-02
 
 ### Changed
 
-- collection_default, role_default: Reverse task inclusion of main role entry point order for better platform handling. (f2a3202)
+- collection_default, role_default: Reverse task inclusion of main role entry
+  point order for better platform handling. (f2a3202)
 
 
 ### Fixed
 
-- collection_default, role_default: Fix a bug that prevented inclusion of more than two specific task files in the sequence in main role entry point. (f2a3202)
+- collection_default, role_default: Fix a bug that prevented inclusion of more
+  than two specific task files in the sequence in main role entry point.
+  (f2a3202)
 
 
 ## [2.2.2] - 2025-04-21
 
 ### Changed
 
-- collection_default, role_default: Add Fedora 42 support, remove EOL Fedora 40 from roles and tests. (705fcc9)
+- collection_default, role_default: Add Fedora 42 support, remove EOL Fedora 40
+  from roles and tests. (705fcc9)
 
 
 ### Fixed
 
-- collection_default, role_default: Molecule: correct path resolution for prepare tasks includes. (31ba386)
+- collection_default, role_default: Molecule: correct path resolution for
+  prepare tasks includes. (31ba386)
 
 
 ## [2.2.1] - 2025-04-19
 
 ### Fixed
 
-- collection_default, role_default: Fix off-by-one and templating errors in setup task examples. (e077d6f)
+- collection_default, role_default: Fix off-by-one and templating errors in
+  setup task examples. (e077d6f)
 
 
 ## [2.2.0] - 2025-04-05
 
 ### Added
 
-- collection_default: [Molecule](https://docs.ansible.com/projects/molecule/) support with a default scenario using [Podman](https://podman.io/docs/installation) and several [integration test targets](https://github.com/orgs/foundata/repositories?q=oci-*-itt). (4c8a01c, #3)
-- role_default: [Molecule](https://docs.ansible.com/projects/molecule/) support with a default scenario using [Podman](https://podman.io/docs/installation) and several [integration test targets](https://github.com/orgs/foundata/repositories?q=oci-*-itt). (f57cd625, #3)
+- collection_default: [Molecule](https://docs.ansible.com/projects/molecule/)
+  support with a default scenario using
+  [Podman](https://podman.io/docs/installation) and several
+  [integration test targets](https://github.com/orgs/foundata/repositories?q=oci-*-itt).
+  (4c8a01c, #3)
+- role_default: [Molecule](https://docs.ansible.com/projects/molecule/) support
+  with a default scenario using [Podman](https://podman.io/docs/installation)
+  and several
+  [integration test targets](https://github.com/orgs/foundata/repositories?q=oci-*-itt).
+  (f57cd625, #3)
 
 ### Changed
 
-- collection_default: Init task: Improve check of supported platforms from `vars/main.yml`, support listing a `os_family` value. (ca0d4c1)
-- role_default: Init task: Improve check of supported platforms from `vars/main.yml`, support listing a `os_family` value. (ca0d4c1)
+- collection_default: Init task: Improve check of supported platforms from
+  `vars/main.yml`, support listing a `os_family` value. (ca0d4c1)
+- role_default: Init task: Improve check of supported platforms from
+  `vars/main.yml`, support listing a `os_family` value. (ca0d4c1)
 
 ### Fixed
 
-- collection_default: Fix `run_run_` typo in check for package state `latest`. (624cdb5)
-- collection_default: Fix left-over usage of role meta data `platforms` key. (228b3a3)
+- collection_default: Fix `run_run_` typo in check for package state `latest`.
+  (624cdb5)
+- collection_default: Fix left-over usage of role meta data `platforms` key.
+  (228b3a3)
 
 
 ## [2.1.0] - 2025-03-02
 
 ### Changed
 
-- collection_default, role_default: Setup tasks are now split into separate `install` and `uninstall` sub-directories. Managing installation and removal in separate files simplifies handling in real-world scenarios compared to implementing optional removal logic within the installation context. (5bf9580)
+- collection_default, role_default: Setup tasks are now split into separate
+  `install` and `uninstall` sub-directories. Managing installation and removal
+  in separate files simplifies handling in real-world scenarios compared to
+  implementing optional removal logic within the installation context. (5bf9580)
 - collection_default: Changed `antsibull-changelog` config to RST. (ec7fe76)
 
 ### Fixed
 
-- collection_default, role_default: Use dedicated loop var in main entry point to prevent "variable 'item' is already in use" warnings. (5d13ea1)
-- collection_default: .gitignore: Moved file into the correct directory, added `antsibull-changelog`. (33613eb)
+- collection_default, role_default: Use dedicated loop var in main entry point
+  to prevent "variable 'item' is already in use" warnings. (5d13ea1)
+- collection_default: .gitignore: Moved file into the correct directory, added
+  `antsibull-changelog`. (33613eb)
 
 
 ## [2.0.0] - 2025-02-17
@@ -164,16 +254,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - collection_default: Added first version (#2)
-- role_default: Check for used facts and gather this subset if needed. (6191b1a, #13)
-- role_default: Implement automatic search for platform-specific variables. (d783728, #12)
+- role_default: Check for used facts and gather this subset if needed. (6191b1a,
+  #13)
+- role_default: Implement automatic search for platform-specific variables.
+  (d783728, #12)
 
 ### Changed
 
 - ⚠️ Changed license from `Apache 2.0` to `GPL-3.0-or-later`.
 - ⚠️ Note for developers: the `master` branch was renamed to `main`.
-- role_default: Use an internal variable for platform compatibility checks. (d0ed55c, #4)
-- role_default: Use argument validation instead of `{{ role_name }}_required_vars` / `assert`. (e729a5d, #1)
-- role_default: Remove internal check to prevent calling task files directly. (70bf734, #9)
+- role_default: Use an internal variable for platform compatibility checks.
+  (d0ed55c, #4)
+- role_default: Use argument validation instead of
+  `{{ role_name }}_required_vars` / `assert`. (e729a5d, #1)
+- role_default: Remove internal check to prevent calling task files directly.
+  (70bf734, #9)
 
 ### Fixed
 

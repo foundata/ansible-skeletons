@@ -2,13 +2,18 @@
 
 **Opinionated blueprints for `ansible-galaxy role|collection init`**
 
-Ansible Skeletons help you start new [roles](https://docs.ansible.com/ansible/latest/user_guide/playbooks_reuse_roles.html) and [collections](https://docs.ansible.com/ansible/devel/dev_guide/developing_collections.html) with a clean, consistent, and proven structure. Focus immediately on logic instead of boilerplate.
+Ansible Skeletons help you start new
+[roles](https://docs.ansible.com/ansible/latest/user_guide/playbooks_reuse_roles.html)
+and
+[collections](https://docs.ansible.com/ansible/devel/dev_guide/developing_collections.html)
+with a clean, consistent, and proven structure. Focus immediately on logic
+instead of boilerplate.
 
 All skeletons follow several guidelines and best practices:
 
-* [foundata: Ansible style guide](https://github.com/foundata/guidelines/blob/main/ansible-style-guide.md)
-* [Red Hat's Coding Style Good Practices for Ansible](https://github.com/redhat-cop/automation-good-practices/blob/main/coding_style/README.adoc#ansible-guidelines)
-* [Best Practices of the Ansible User guide](https://docs.ansible.com/ansible/latest/user_guide/playbooks_best_practices.html)
+- [foundata: Ansible style guide](https://github.com/foundata/guidelines/blob/main/ansible-style-guide.md)
+- [Red Hat's Coding Style Good Practices for Ansible](https://github.com/redhat-cop/automation-good-practices/blob/main/coding_style/README.adoc#ansible-guidelines)
+- [Best Practices of the Ansible User guide](https://docs.ansible.com/ansible/latest/user_guide/playbooks_best_practices.html)
 
 
 <div align="center" id="project-readme-header">
@@ -47,25 +52,30 @@ All skeletons follow several guidelines and best practices:
 
 Main features:
 
-* **Linting and testing built-in** – ready for [`ansible-lint`](https://docs.ansible.com/projects/lint/) and [Molecule](https://docs.ansible.com/projects/molecule/) (using Containers via Podman and/or VMs via libvirt)
-* **Platform-aware design** – clear separation for OS-specific variables and tasks.
-* **Changelog tooling** – conventions and helpers for transparent release notes.
-* **Reproducible structure, sensible defaults** - faster bootstrapping, fewer style debates. Focus on automation logic instead of boilerplate.
+- **Linting and testing built-in** – ready for
+  [`ansible-lint`](https://docs.ansible.com/projects/lint/) and
+  [Molecule](https://docs.ansible.com/projects/molecule/) (using Containers via
+  Podman and/or VMs via libvirt)
+- **Platform-aware design** – clear separation for OS-specific variables and
+  tasks.
+- **Changelog tooling** – conventions and helpers for transparent release notes.
+- **Reproducible structure, sensible defaults** - faster bootstrapping, fewer
+  style debates. Focus on automation logic instead of boilerplate.
 
 
 ## Examples<a id="examples"></a>
 
 Some collections built using these skeletons:
 
-* `foundata.acmesh`:
-  * GitHub: https://github.com/foundata/ansible-collection-acmesh
-  * Galaxy: https://galaxy.ansible.com/ui/repo/published/foundata/acmesh/
-* `foundata.sshd`:
-  * GitHub: https://github.com/foundata/ansible-collection-sshd
-  * Galaxy: https://galaxy.ansible.com/ui/repo/published/foundata/sshd/
-* `foundata.postfix`:
-  * GitHub: https://github.com/foundata/ansible-collection-postfix
-  * Galaxy: https://galaxy.ansible.com/ui/repo/published/foundata/postfix/
+- `foundata.acmesh`:
+  - GitHub: <https://github.com/foundata/ansible-collection-acmesh>
+  - Galaxy: <https://galaxy.ansible.com/ui/repo/published/foundata/acmesh/>
+- `foundata.sshd`:
+  - GitHub: <https://github.com/foundata/ansible-collection-sshd>
+  - Galaxy: <https://galaxy.ansible.com/ui/repo/published/foundata/sshd/>
+- `foundata.postfix`:
+  - GitHub: <https://github.com/foundata/ansible-collection-postfix>
+  - Galaxy: <https://galaxy.ansible.com/ui/repo/published/foundata/postfix/>
 
 Check their project structures for inspiration and reference.
 
@@ -73,6 +83,7 @@ Check their project structures for inspiration and reference.
 ## Usage<a id="usage"></a>
 
 1. **Clone this repository and check out the latest release:**
+
    ```bash
    # Get the version number of the latest release
    version="$(curl -s -L https://api.github.com/repos/foundata/ansible-skeletons/releases/latest | jq -r '.tag_name' | sed -e 's/^v//g')"
@@ -81,8 +92,13 @@ Check their project structures for inspiration and reference.
    # Clone and check out the latest release (you can switch versions anytime using "git checkout vX.Y.Z")
    git clone https://github.com/foundata/ansible-skeletons.git -b "v${version}"
    ```
+
    <br>
-2. **Use `ansible-galaxy` to initialize a new collection or stand-alone role**. Provide the path to the desired skeleton, along with any necessary variable values (or let `ansible-galaxy` use default values), and specify a name for your new resource.<br>Examples:
+2. **Use `ansible-galaxy` to initialize a new collection or stand-alone role**.
+   Provide the path to the desired skeleton, along with any necessary variable
+   values (or let `ansible-galaxy` use default values), and specify a name for
+   your new resource.<br>Examples:
+
    ```bash
    # Ensure ansible-galaxy is available and navigate to the cloned repository from step one
    ansible-galaxy --version
@@ -115,76 +131,112 @@ Check their project structures for inspiration and reference.
       --extra-var "min_ansible_version='2.16.0'" \
       "new_role"
    ```
+
    Additional Notes:
-     - Names of namespaces, collections or roles must follow [some](https://docs.ansible.com/ansible/latest/dev_guide/developing_collections_structure.html#roles-directory) [rules](https://docs.ansible.com/ansible/latest/dev_guide/developing_collections_creating.html#naming-your-collection) and should consist of `a-z`, `0-9` and `_` only.
-     - Adapt the directory name of the `--[collection|role]-skeleton` parameter value if you want to use another skeleton than `[collection|role_]default`. You can find a description of the available skeletons below.
-3. Each created collection or stand-alone role includes a **`FIXME.md` file in its root directory** with further instructions about what to change to your needs.
+     - Names of namespaces, collections or roles must follow
+       [some](https://docs.ansible.com/ansible/latest/dev_guide/developing_collections_structure.html#roles-directory)
+       [rules](https://docs.ansible.com/ansible/latest/dev_guide/developing_collections_creating.html#naming-your-collection)
+       and should consist of `a-z`, `0-9` and `_` only.
+     - Adapt the directory name of the `--[collection|role]-skeleton` parameter
+       value if you want to use another skeleton than
+       `[collection|role_]default`. You can find a description of the available
+       skeletons below.
+3. Each created collection or stand-alone role includes a
+   **`FIXME.md` file in its root directory** with further instructions about
+   what to change to your needs.
 
 
 
 ## Provided skeletons<a id="content"></a>
 
-The following list provides an overview of the available skeletons. You can also explore the subdirectories of this repository to examine their code. However, keep in mind that some parts may be difficult to read, as they contain [Jinja](https://palletsprojects.com/p/jinja/) code. This Jinja code is processed by `ansible-galaxy [collection|role]` with it's templating to generate the final files.
+The following list provides an overview of the available skeletons. You can also
+explore the subdirectories of this repository to examine their code. However,
+keep in mind that some parts may be difficult to read, as they contain
+[Jinja](https://palletsprojects.com/p/jinja/) code. This Jinja code is processed
+by `ansible-galaxy [collection|role]` with it's templating to generate the final
+files.
 
 
 ### `collection_default`<a id="collection_default"></a>
 
-A general purpose skeleton to create new Ansible collection for [package and ship](https://redhat-cop.github.io/automation-good-practices/#_package_roles_in_an_ansible_collection_to_simplify_distribution_and_consumption) a `run`-role. Main features:
+A general purpose skeleton to create new Ansible collection for
+[package and ship](https://redhat-cop.github.io/automation-good-practices/#_package_roles_in_an_ansible_collection_to_simplify_distribution_and_consumption)
+a `run`-role. Main features:
 
-* Init tasks to check the environment and usage:
-  * Role argument validation
-  * Check for minimum Ansible version and supported operating systems / platform.
-  * Automatic gathering of role-specific facts (useful with `gather_facts: false`)
-  * Automatic search and include for [platform-specific variables](https://redhat-cop.github.io/automation-good-practices/#_platform_specific_variables).
-* Separation of logical task groups, automatic include for [platform-specific tasks](https://redhat-cop.github.io/automation-good-practices/#_platform_specific_tasks).
-* Passes `ansible-lint --profile production --strict`.
-* [`antsibull-changelog`](https://docs.ansible.com/projects/antsibull-changelog/changelogs/) support.
-* [Molecule](https://docs.ansible.com/projects/molecule/) support with a default scenario using [Podman](https://podman.io/docs/installation) and several [integration test targets](https://github.com/orgs/foundata/repositories?q=oci-*-itt).
+- Init tasks to check the environment and usage:
+  - Role argument validation
+  - Check for minimum Ansible version and supported operating systems /
+    platform.
+  - Automatic gathering of role-specific facts (useful with
+    `gather_facts: false`)
+  - Automatic search and include for
+    [platform-specific variables](https://redhat-cop.github.io/automation-good-practices/#_platform_specific_variables).
+- Separation of logical task groups, automatic include for
+  [platform-specific tasks](https://redhat-cop.github.io/automation-good-practices/#_platform_specific_tasks).
+- Passes `ansible-lint --profile production --strict`.
+- [`antsibull-changelog`](https://docs.ansible.com/projects/antsibull-changelog/changelogs/)
+  support.
+- [Molecule](https://docs.ansible.com/projects/molecule/) support with a default
+  scenario using [Podman](https://podman.io/docs/installation) and several
+  [integration test targets](https://github.com/orgs/foundata/repositories?q=oci-*-itt).
 
 
 
 ### `role_default`<a id="role_default"></a>
 
-A general purpose skeleton to create new Ansible stand-alone role. Main features:
+A general purpose skeleton to create new Ansible stand-alone role. Main
+features:
 
-* Init tasks to check the environment and usage:
-  * Role argument validation
-  * Check for minimum Ansible version and supported operating systems / platform.
-  * Automatic gathering of role-specific facts (useful with `gather_facts: false`)
-  * Automatic search and include for [platform-specific variables](https://redhat-cop.github.io/automation-good-practices/#_platform_specific_variables).
-* Separation of logical task groups, automatic include for [platform-specific tasks](https://redhat-cop.github.io/automation-good-practices/#_platform_specific_tasks).
-* Passes `ansible-lint --profile production --strict`.
-* [Molecule](https://docs.ansible.com/projects/molecule/) support with a default scenario using [Podman](https://podman.io/docs/installation) and several [integration test targets](https://github.com/orgs/foundata/repositories?q=oci-*-itt).
+- Init tasks to check the environment and usage:
+  - Role argument validation
+  - Check for minimum Ansible version and supported operating systems /
+    platform.
+  - Automatic gathering of role-specific facts (useful with
+    `gather_facts: false`)
+  - Automatic search and include for
+    [platform-specific variables](https://redhat-cop.github.io/automation-good-practices/#_platform_specific_variables).
+- Separation of logical task groups, automatic include for
+  [platform-specific tasks](https://redhat-cop.github.io/automation-good-practices/#_platform_specific_tasks).
+- Passes `ansible-lint --profile production --strict`.
+- [Molecule](https://docs.ansible.com/projects/molecule/) support with a default
+  scenario using [Podman](https://podman.io/docs/installation) and several
+  [integration test targets](https://github.com/orgs/foundata/repositories?q=oci-*-itt).
 
 
 
 ## Compatibility<a id="compatibility"></a>
 
-The skeletons are compatible with all [supported versions](https://docs.ansible.com/ansible/latest/reference_appendices/release_and_maintenance.html#ansible-core-support-matrix) of `ansible-galaxy` and `ansible` that are not end-of-life and still receive patches. While older versions should also work as long as `ansible-core` is >= v2.16, we no might not explicitly test them.
+The skeletons are compatible with all
+[supported versions](https://docs.ansible.com/ansible/latest/reference_appendices/release_and_maintenance.html#ansible-core-support-matrix)
+of `ansible-galaxy` and `ansible` that are not end-of-life and still receive
+patches. While older versions should also work as long as `ansible-core` is >=
+v2.16, we no might not explicitly test them.
 
-The skeletons were explicitly tested with `ansible-galaxy` from the following `ansible` versions (descending order):
+The skeletons were explicitly tested with `ansible-galaxy` from the following
+`ansible` versions (descending order):
 
-* `ansible-galaxy 2.20`
-  * `ansible-galaxy [core 2.20.6]`
-  * `ansible-galaxy [core 2.20.5]`
-  * `ansible-galaxy [core 2.20.4]`
-  * `ansible-galaxy [core 2.20.3]`
-  * `ansible-galaxy [core 2.20.2]`
-  * `ansible-galaxy [core 2.20.1]`
-  * `ansible-galaxy [core 2.20.0]`
-* `ansible-galaxy 2.19`
-  * `ansible-galaxy [core 2.19.2]`
-* `ansible-galaxy 2.18`
-  * `ansible-galaxy [core 2.18.9]`
-  * `ansible-galaxy [core 2.18.8]`
-  * `ansible-galaxy [core 2.18.4]`
-  * `ansible-galaxy [core 2.18.3]`
-  * `ansible-galaxy [core 2.18.2]`
-  * `ansible-galaxy [core 2.18.1]`
+- `ansible-galaxy 2.20`
+  - `ansible-galaxy [core 2.20.6]`
+  - `ansible-galaxy [core 2.20.5]`
+  - `ansible-galaxy [core 2.20.4]`
+  - `ansible-galaxy [core 2.20.3]`
+  - `ansible-galaxy [core 2.20.2]`
+  - `ansible-galaxy [core 2.20.1]`
+  - `ansible-galaxy [core 2.20.0]`
+- `ansible-galaxy 2.19`
+  - `ansible-galaxy [core 2.19.2]`
+- `ansible-galaxy 2.18`
+  - `ansible-galaxy [core 2.18.9]`
+  - `ansible-galaxy [core 2.18.8]`
+  - `ansible-galaxy [core 2.18.4]`
+  - `ansible-galaxy [core 2.18.3]`
+  - `ansible-galaxy [core 2.18.2]`
+  - `ansible-galaxy [core 2.18.1]`
 
 The following versions are known to be problematic:
 
-* `ansible-galaxy [core 2.16.4]` ("ERROR! Invalid collection name" when passing `authors` as extra-var)
+- `ansible-galaxy [core 2.16.4]` ("ERROR! Invalid collection name" when passing
+  `authors` as extra-var)
 
 
 
@@ -192,18 +244,31 @@ The following versions are known to be problematic:
 
 See [`CONTRIBUTING.md`](./CONTRIBUTING.md) if you want to get involved.
 
-This project's functionality is mature, so there might be little activity on the repository in the future. Don't get fooled by this, the project is under active maintenance and used on a daily basis by the maintainers.
+This project's functionality is mature, so there might be little activity on the
+repository in the future. Don't get fooled by this, the project is under active
+maintenance and used on a daily basis by the maintainers.
 
 
 
 ## Licensing, copyright<a id="licensing-copyright"></a>
 
 <!--REUSE-IgnoreStart-->
-Copyright (c) 2020, 2023-2026 [foundata GmbH](https://foundata.com/) (https://foundata.com)
+Copyright (c) 2020, 2023-2026 [foundata GmbH](https://foundata.com/)
+(<https://foundata.com>)
 
-This project is licensed under the GNU General Public License v3.0 or later (SPDX-License-Identifier: `GPL-3.0-or-later`), see [`LICENSES/GPL-3.0-or-later.txt`](./LICENSES/GPL-3.0-or-later.txt) for the full text.
+This project is licensed under the GNU General Public License v3.0 or later
+(SPDX-License-Identifier: `GPL-3.0-or-later`), see
+[`LICENSES/GPL-3.0-or-later.txt`](./LICENSES/GPL-3.0-or-later.txt) for the full
+text.
 
-The [`REUSE.toml`](./REUSE.toml) file provides detailed licensing and copyright information in a human- and machine-readable format. This includes parts that may be subject to different licensing or usage terms, such as third-party components. The repository conforms to the [REUSE specification](https://reuse.software/spec/). You can use [`reuse spdx`](https://reuse.readthedocs.io/en/latest/readme.html#cli) to create a [SPDX software bill of materials (SBOM)](https://en.wikipedia.org/wiki/Software_Package_Data_Exchange).
+The [`REUSE.toml`](./REUSE.toml) file provides detailed licensing and copyright
+information in a human- and machine-readable format. This includes parts that
+may be subject to different licensing or usage terms, such as third-party
+components. The repository conforms to the
+[REUSE specification](https://reuse.software/spec/). You can use
+[`reuse spdx`](https://reuse.readthedocs.io/en/latest/readme.html#cli) to create
+a
+[SPDX software bill of materials (SBOM)](https://en.wikipedia.org/wiki/Software_Package_Data_Exchange).
 <!--REUSE-IgnoreEnd-->
 
 [![REUSE status](https://api.reuse.software/badge/github.com/foundata/ansible-skeletons)](https://api.reuse.software/info/github.com/foundata/ansible-skeletons)
@@ -211,14 +276,21 @@ The [`REUSE.toml`](./REUSE.toml) file provides detailed licensing and copyright 
 
 ### Trademarks<a id="trademarks"></a>
 
-* Red Hat® is a trademark of Red Hat, Inc., registered in the US and other countries.
-* Ansible® is a trademark of Red Hat, Inc., registered in the US and other countries.
+- Red Hat® is a trademark of Red Hat, Inc., registered in the US and other
+  countries.
+- Ansible® is a trademark of Red Hat, Inc., registered in the US and other
+  countries.
 
-Their use here is purely descriptive and does not imply any affiliation with or endorsement by the trademark holders.
+Their use here is purely descriptive and does not imply any affiliation with or
+endorsement by the trademark holders.
 
 
 ## Author information<a id="author-information"></a>
 
-This [project](https://foundata.com/en/projects/) was created and is maintained by [foundata](https://foundata.com/). If you like it, you might [buy us a coffee](https://buy-me-a.coffee/ansible-skeletons/).
+This [project](https://foundata.com/en/projects/) was created and is maintained
+by [foundata](https://foundata.com/). If you like it, you might
+[buy us a coffee](https://buy-me-a.coffee/ansible-skeletons/).
 
-The Ansible Skeletons project is *not* associated with [Red Hat](https://www.redhat.com/) nor the [Ansible project](https://ansible.com/).
+The Ansible Skeletons project is *not* associated with
+[Red Hat](https://www.redhat.com/) nor the
+[Ansible project](https://ansible.com/).
