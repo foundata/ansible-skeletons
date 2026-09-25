@@ -16,6 +16,14 @@ and this project adheres to
   built artifact through `build_ignore`.
 
 
+### Changed
+
+- collection_default: `build_ignore` keeps more repository-only files out of the
+  built artifact: repository hosting and editor configuration, coding agent
+  files, OS metadata, and the `CODE_OF_CONDUCT.md`, `CONTRIBUTING.md` and
+  `DEVELOPMENT.md` contributor documents. The list is grouped by purpose.
+
+
 ## [2.6.2] - 2026-08-28
 
 ### Fixes

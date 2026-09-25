@@ -37,15 +37,45 @@ tags:
 # not be included in the build artifact. Some are always filtered by
 # _build_files_manifest_walk(), e.g. galaxy.yml, *.pyc, *.retry, and .git
 build_ignore:
+  # Build artifacts, Ansible
+  - "*.tar.gz"
   - ".ansible"
+  # Parts of the collection itself
+  - "changelogs/.plugin-cache.yaml"
+  - "changelogs/fragments/00-fragment-template.txt"
+  - "changelogs/fragments/archive"
+  - "extensions/molecule"
+  - "CODE_OF_CONDUCT.md"
+  - "CONTRIBUTING.md"
+  - "DEVELOPMENT.md"
+  # Development tooling
   - ".gitattributes"
   - ".gitignore"
+  - ".releasing.toml"
   - ".rumdl.toml"
-  - ".vscode"
-  - "*.tar.gz"
-  - "changelogs/.plugin-cache.yaml"
-  - "changelogs/fragments/archive"
-  - "changelogs/fragments/00-fragment-template.txt"
-  - "extensions/molecule"
   - "hack"
   - "releasing.toml"
+  - "rumdl.toml"
+  # Repository hosting
+  - ".github"
+  - ".gitlab"
+  # Editor / IDE configuration
+  - ".idea"
+  - ".vscode"
+  # Coding agents
+  - ".aider.conf.yml"
+  - ".aiderignore"
+  - ".claude"
+  - ".continue"
+  - ".cursor"
+  - ".cursorrules"
+  - ".windsurf"
+  - ".windsurfrules"
+  - "AGENTS.md"
+  - "CLAUDE.md"
+  - "GEMINI.md"
+  # OS metadata
+  - ".DS_Store"
+  - "Desktop.ini"
+  - "Thumbs.db"
+  - "Thumbs.db:encryptable"
