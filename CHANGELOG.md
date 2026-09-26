@@ -9,6 +9,11 @@ and the project adheres to
 
 ## [Unreleased]
 
+- Nothing worth mentioning right now.
+
+
+## [2.7.0] - 2026-09-26
+
 ### Added
 
 - Development checks for generated roles and collections across the supported
@@ -310,7 +315,8 @@ and the project adheres to
 - All functionality and files, `role_default`
 
 
-[unreleased]: https://github.com/foundata/ansible-skeletons/compare/v2.6.2...HEAD
+[unreleased]: https://github.com/foundata/ansible-skeletons/compare/v2.7.0...HEAD
+[2.7.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.7.0
 [2.6.2]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.6.2
 [2.6.1]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.6.1
 [2.6.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.6.0
