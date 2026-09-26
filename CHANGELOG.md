@@ -30,6 +30,8 @@ and this project adheres to
   for company and minimum Ansible version.
 - (collection|role)_default: quoted author, company and description values no
   longer produce invalid YAML or TOML metadata.
+- role_default: package installation reads the standalone role's autoupgrade
+  variable instead of a nonexistent variable prefixed with `run_`.
 
 
 ## [2.6.2] - 2026-08-28
