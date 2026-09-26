@@ -9,7 +9,11 @@ and the project adheres to
 
 ## [Unreleased]
 
-- Nothing worth mentioning right now.
+### Changed
+
+- Releases run through foundata's `releasing` tool for the changelog section,
+  the tag, the push, the GitHub release entry and the publication checks. The
+  skeleton-specific gate and its retained evidence stay in `scripts/release.py`.
 
 
 ## [2.7.0] - 2026-09-26

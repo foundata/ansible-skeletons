@@ -33,10 +33,12 @@ uv python install 3.12 3.13 3.14
 uv sync --locked
 ```
 
-uv installs the Python tools in isolated environments. `pyproject.toml` contains
-development dependencies and configuration; its `0.0.0` version belongs to the
-development setup. Skeleton releases use the version in the dated changelog
-section and the corresponding `vX.Y.Z` Git tag.
+uv installs the Python tools in isolated environments, foundata's
+[`releasing`](https://github.com/foundata/releasing) among them.
+`pyproject.toml` contains development dependencies and configuration; its
+`0.0.0` version belongs to the development setup. Skeleton releases use the
+version in the dated changelog section and the corresponding `vX.Y.Z` Git tag,
+which is what `.releasing.toml` declares.
 
 
 ## Getting started<a id="getting-started"></a>
@@ -70,7 +72,7 @@ variables. The helper refuses to overwrite an existing directory.
 | `scripts/smoke.py`          | Validate rendering, artifacts and role behavior |
 | `scripts/check.sh`          | Local quality-check entry point |
 | `scripts/integration.py`    | Generated Molecule scenarios with active fixtures |
-| `scripts/release.py`        | Validate a release commit and create its local tag |
+| `scripts/release.py`        | Validate a release commit, then hand the tag to `releasing` |
 | `tests/unit/`               | Release and helper regression tests |
 | `tests/fixtures/`           | Disposable role execution fixtures |
 | `tests/requirements.yml`    | Pinned Galaxy dependencies for infrastructure tests |
@@ -92,9 +94,9 @@ and
 [Markdown](https://github.com/foundata/guidelines/blob/main/markdown-style-guide.md)
 style guides. Use UTF-8 without a BOM, LF line endings, and a trailing newline.
 
-Use Python for structured data and validation. Keep shell wrappers small and
-check important exit statuses explicitly. Add regression tests for new behavior
-and bug fixes, and explain any lint suppressions.
+Use Python for structured data and validation. Keep shell wrappers small. Add
+regression tests for new behavior and bug fixes, and explain any lint
+suppressions.
 
 ```sh
 uv run --locked ruff format scripts tests
@@ -113,23 +115,12 @@ trailers. Review the diff and stage only changes intended for the commit.
 
 `scripts/check.sh` accepts uncommitted changes and checks the working tree. It
 runs Python and shell checks, Markdown linting, REUSE validation, helper tests,
-and the default Ansible lane. Generated-resource checks cover:
+and the default Ansible lane. Generated-resource checks cover (including but not
+limited to):
 
 - Initialization with defaults, explicit metadata, and quoted metadata.
-- Expected output files, parsed YAML and TOML, and preserved runtime templates.
-- Strict production-profile Ansible linting and collection changelog linting.
 - Collection build contents and installation into an isolated collection path.
-- Both roles' initialization, argument validation, package-task expressions,
-  removal of disposable files, and use from a caller loop.
-
-The package backend in the localhost smoke fixture is a test double, so these
-checks do not install or remove controller packages. File operations stay in
-the generated workspace. Infrastructure tests use the actual generated roles.
-
-Generated Ansible linting excludes `yaml[comments]` because removable example
-comments intentionally omit the space after `#`. Molecule infrastructure also
-excludes `var-naming[no-role-prefix]`, since those playbooks do not belong to a
-role. Its playbooks are linted separately by the infrastructure command.
+- Strict production-profile Ansible linting and collection changelog linting.
 
 To retain results, including generated projects and collection archives:
 
@@ -147,16 +138,15 @@ Use `python -m pytest` so repository-local modules are importable without an
 installation or test-specific `sys.path` changes. Warnings are errors and pytest
 configuration is strict. Required suites must execute without failures or skips.
 
+
 ### Compatibility matrix<a id="compatibility-matrix"></a>
 
 ```sh
 ./scripts/check.sh --matrix
 ```
 
-The matrix is defined in `[tool.skeletons]` in `pyproject.toml`. It covers
-Ansible core 2.19 on Python 3.12 and 3.13, and core 2.20 and 2.21 on Python
-3.12, 3.13 and 3.14. Helper tests run on all three Python versions. Each lane
-uses a separate locked environment; no lane upgrades dependencies during a run.
+The matrix is defined in `[tool.skeletons]` in `pyproject.toml`. Each lane uses
+a separate locked environment; no lane upgrades dependencies during a run.
 
 Review the matrix against the
 [upstream maintenance policy](https://docs.ansible.com/ansible/latest/reference_appendices/release_and_maintenance.html#ansible-core-support-matrix)
@@ -165,9 +155,7 @@ with the configuration.
 
 ### Infrastructure tests<a id="infrastructure-tests"></a>
 
-Each tier runs both generated projects. The fixture adds converge and verify
-tasks because the shipped `.yml.example` files alone do not execute a role.
-Missing prerequisites or failed cleanup make the command fail.
+Overview:
 
 |   Tier    |                               Coverage                               | Additional prerequisites |
 | --------- | -------------------------------------------------------------------- | ------------------------ |
@@ -194,17 +182,6 @@ an existing Debian-compatible cloud-init image. Each run uses unique VM and
 container names. Podman tests use a separate disposable storage configuration,
 including the execution-environment build and its image cleanup.
 
-The EE tier also removes a role's `tasks/main.yml` temporarily and checks that
-the shipped verification rejects the incomplete installation. Container tags
-and the default cloud-image URL can change; Python and Galaxy dependency pins
-do not lock those images.
-
-The release gate always requires Podman. Changes to shared or default Molecule
-infrastructure also require libvirt; changes to shared or EE infrastructure,
-collection build metadata, or execution-environment metadata require EE.
-Changes to the gate, fixtures, or dependency locks require all three tiers.
-When no earlier reachable release tag exists, all three tiers are required.
-Required tiers cannot be skipped.
 
 ### Updating dependencies<a id="updating-dependencies"></a>
 
@@ -217,39 +194,39 @@ uv lock --upgrade
 
 Review lock changes before committing. Galaxy pins live in
 `tests/requirements.yml`; update them together with infrastructure validation.
-Generated projects retain their own dependency requirements, independently of
-the development gate's pins.
 
 
 ## Releases<a id="releases"></a>
 
-Release checks must pass on the exact committed revision being tagged. The
-tagging helper rejects reports from other commits. The checker exports Git
-content into a fresh directory, runs all required checks there, and retains the
-source archive, generated collection archives, logs and a report outside the
-checkout. It never creates a tag, pushes, or publishes.
+A release is a tag on a validated commit.
 
-The generated collections are retained for inspection as test artifacts.
-Consumers use the skeletons from the tagged source repository; this project
-does not publish a Python package or an Ansible collection.
+The changelog section, the tag, the push, the GitHub release entry and the
+publication checks run through
+[`releasing`](https://foundata.com/en/projects/releasing/), whose declaration is
+[`.releasing.toml`](./.releasing.toml). What stays in this repository is the
+skeleton-specific gate (`scripts/release.py check`).
+
 
 ### Release checklist<a id="release-checklist"></a>
 
 1. Run `./scripts/check.sh` during development and resolve failures.
-2. Choose the next Semantic Versioning `X.Y.Z` version. Move the Unreleased
-   entries in `CHANGELOG.md` into a dated release section and update both its
-   release link and the Unreleased comparison link. Leave
-   `- Nothing worth mentioning right now.` under the Unreleased heading so it
-   passes Markdown linting. Do not change the development project's `0.0.0`
-   version in `pyproject.toml`.
-3. Review and commit the complete release preparation:
+2. Choose the next Semantic Versioning `X.Y.Z` version and move the Unreleased
+   entries into a dated section. The command writes the section, its release
+   link and the Unreleased comparison link, and leaves the placeholder entry
+   under the Unreleased heading. Do not change the development project's
+   `0.0.0` version in `pyproject.toml`.
 
    ```sh
    version='X.Y.Z'
+   uv run --locked release changelog release "${version}"
+   ```
+
+3. Review and commit the release preparation:
+
+   ```sh
    git diff --check
    git diff
    git add CHANGELOG.md
-   git diff --cached
    git commit -m "release: prepare ${version}"
    git status --short
    ```
@@ -274,30 +251,37 @@ does not publish a Python package or an Ansible collection.
    git show "v${version}"
    ```
 
-   The helper checks the commit, required checks, source and artifact hashes,
-   and local and remote release tags. An equal or newer version on either side
-   blocks tagging, as does a failed remote query. The helper does not push
-   anything.
-6. Push the reviewed branch and then this specific tag:
+   The helper checks that the report belongs to `HEAD` and that its checks,
+   source archive and artifact digests are intact, and refuses when an equal or
+   newer release tag exists locally or on the remote or when the remote cannot
+   be asked. `release tag create` then refuses a dirty tree or a tag that
+   already exists, and writes the annotated tag. Nothing is pushed.
+6. Push the branch, then the tag:
 
    ```sh
-   git push origin main
-   git push origin "refs/tags/v${version}"
+   uv run --locked release push "${version}"
    ```
 
-   Confirm that the release commit belongs to the branch being pushed. Do not
-   use `--follow-tags`, which could also publish unrelated local tags.
-7. Create the GitHub release for that existing tag, with title `vX.Y.Z` and
-   notes from the matching changelog section. This needs an authenticated
-   maintainer account. No PyPI or Galaxy publication is involved.
-8. Verify the published tag, latest stable release and a fresh public clone:
+   The branch goes first, so the tag never names a commit the remote has on no
+   branch, and the command refuses a tag the branch does not contain.
+7. Create the GitHub release from the changelog section. This needs an
+   authenticated `gh`:
+
+   ```sh
+   uv run --locked release forge release-create "${version}"
+   ```
+
+8. Verify the published tag, the latest release and a fresh public clone:
 
    ```sh
    uv run --locked python -m scripts.release verify "${evidence}/report.json"
    ```
 
-   This command needs authenticated `gh` for the API query. It checks the public
-   clone's commit and runs rendering, build, installation and role smoke tests.
+   `release verify` checks that the remote holds the tag and that the forge
+   reports it as latest. The helper then clones the tag anonymously and runs
+   rendering, build, installation and role smoke tests on that clone. At any
+   point, `uv run --locked release status "${version}"` reports where the
+   release stands.
 
 Maintainers can bypass these local checks by invoking Git directly. Enforce
 protected tags or equivalent forge rules separately if server-side enforcement
@@ -309,17 +293,14 @@ For a failed check, inspect its log, fix the cause, commit source changes, and
 run the gate into a new evidence directory. Never edit a report to turn a
 failure into success or carry it forward to another commit.
 
-An unpublished local tag may be deleted after inspection. Once a tag is pushed,
-do not move, replace or reuse it. Correct a defective release with a new patch
-version, even if the forge release entry has not yet been created.
+While no GitHub release exists, `uv run --locked release tag delete
+"${version}"` removes a wrong tag locally and on the remote; it refuses once a
+release exists. Do not move, replace or reuse a tag that consumers may have
+checked out. Correct a defective release with a new patch version.
 
 After an interrupted push or release creation, inspect the existing remote tag
 and release entry and finish the missing publication step. Preserve the
 validated commit and rerun publication verification when complete.
-
-Integration with foundata's `releasing` project is deferred because it does not
-yet support generic source repositories such as this one. Add that support
-separately and keep the skeleton-specific checks here.
 
 
 ## Troubleshooting<a id="troubleshooting"></a>

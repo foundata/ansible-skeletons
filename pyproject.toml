@@ -10,6 +10,7 @@ dev = [
   "mypy",
   "pytest>=9",
   "PyYAML",
+  "releasing>=5,<6",
   "reuse",
   "ruff",
   "rumdl",

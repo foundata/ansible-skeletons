@@ -9,7 +9,6 @@ from scripts.check import required_checks
 from scripts.common import GateError, digest, write_json
 from scripts.release import (
     REPOSITORY,
-    check_changelog,
     check_release,
     clean_revision,
     create_tag,
@@ -31,6 +30,11 @@ def repository(tmp_path: Path) -> Path:
     git("config", "commit.gpgsign", "false", root=root)
     git("config", "tag.gpgsign", "false", root=root)
     (root / "content.txt").write_text("original\n", encoding="utf-8")
+    (root / "README.md").write_text("# Skeletons\n", encoding="utf-8")
+    (root / ".releasing.toml").write_text(
+        f'repository = "{REPOSITORY}"\necosystem = "source-repository"\n',
+        encoding="utf-8",
+    )
     git("add", ".", root=root)
     git("commit", "-m", "test: initial content", root=root)
     git("tag", "-a", "v1.0.0", "-m", "version 1.0.0", root=root)
@@ -102,36 +106,17 @@ def test_untracked_file_prevents_release(repository: Path) -> None:
         clean_revision(repository)
 
 
-@pytest.mark.parametrize(
-    ("original", "replacement", "message"),
-    [
-        ("## [1.1.0]", "## [1.0.1]", "must match"),
-        ("2026-01-01", "9999-01-01", "non-future"),
-        (
-            "- Nothing worth mentioning right now.",
-            "- Unreleased fix.",
-            "Move the Unreleased",
-        ),
-        (
-            "- Nothing worth mentioning right now.",
-            "- Nothing worth mentioning right now.\n\n- Unreleased fix.",
-            "Move the Unreleased",
-        ),
-        ("- Release checks.", "", "section is empty"),
-        ("v1.1.0...HEAD", "v1.0.0...HEAD", "comparison link"),
-        ("/releases/tag/v1.1.0", "/releases/tag/v1.0.0", "changelog link"),
-    ],
-)
-def test_invalid_changelog_prevents_release(
-    repository: Path, original: str, replacement: str, message: str
-) -> None:
+def test_a_changelog_the_tool_rejects_prevents_release(repository: Path) -> None:
+    # The changelog rules live in the releasing tool; this only proves that its
+    # refusal stops the release here instead of being logged and passed over.
     changelog = repository / "CHANGELOG.md"
     changelog.write_text(
-        changelog.read_text(encoding="utf-8").replace(original, replacement),
+        changelog.read_text(encoding="utf-8").replace("## [1.1.0]", "## [1.0.1]"),
         encoding="utf-8",
     )
-    with pytest.raises(GateError, match=message):
-        check_changelog("1.1.0", repository)
+    git("commit", "-qam", "test: break the changelog", root=repository)
+    with pytest.raises(GateError, match="failed with exit status"):
+        release_inputs("1.1.0", repository)
 
 
 def test_changed_source_archive_prevents_tag(repository: Path, report: Path) -> None:

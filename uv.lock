@@ -59,9 +59,9 @@ name = "ansible-compat"
 version = "26.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ansible-core", version = "2.19.13", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-29-ansible-skeletons-development-core219' or (extra == 'group-29-ansible-skeletons-development-core220' and extra == 'group-29-ansible-skeletons-development-core221')" },
+    { name = "ansible-core", version = "2.19.13", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.14' and extra == 'group-29-ansible-skeletons-development-core219') or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core220') or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core221') or (extra == 'group-29-ansible-skeletons-development-core220' and extra == 'group-29-ansible-skeletons-development-core221')" },
     { name = "ansible-core", version = "2.20.9", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-29-ansible-skeletons-development-core220' or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core221')" },
-    { name = "ansible-core", version = "2.21.4", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-29-ansible-skeletons-development-core221' or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core220') or (extra != 'group-29-ansible-skeletons-development-core219' and extra != 'group-29-ansible-skeletons-development-core220')" },
+    { name = "ansible-core", version = "2.21.4", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.14' and extra == 'group-29-ansible-skeletons-development-core219') or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core220') or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core221') or (extra == 'group-29-ansible-skeletons-development-core220' and extra == 'group-29-ansible-skeletons-development-core221') or (extra != 'group-29-ansible-skeletons-development-core219' and extra != 'group-29-ansible-skeletons-development-core220')" },
     { name = "jsonschema" },
     { name = "packaging" },
     { name = "pyyaml" },
@@ -77,16 +77,14 @@ name = "ansible-core"
 version = "2.19.13"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.15'",
-    "python_full_version == '3.14.*'",
     "python_full_version < '3.14'",
 ]
 dependencies = [
-    { name = "cryptography", marker = "extra == 'group-29-ansible-skeletons-development-core219' or (extra == 'group-29-ansible-skeletons-development-core220' and extra == 'group-29-ansible-skeletons-development-core221')" },
-    { name = "jinja2", marker = "extra == 'group-29-ansible-skeletons-development-core219' or (extra == 'group-29-ansible-skeletons-development-core220' and extra == 'group-29-ansible-skeletons-development-core221')" },
-    { name = "packaging", marker = "extra == 'group-29-ansible-skeletons-development-core219' or (extra == 'group-29-ansible-skeletons-development-core220' and extra == 'group-29-ansible-skeletons-development-core221')" },
-    { name = "pyyaml", marker = "extra == 'group-29-ansible-skeletons-development-core219' or (extra == 'group-29-ansible-skeletons-development-core220' and extra == 'group-29-ansible-skeletons-development-core221')" },
-    { name = "resolvelib", marker = "extra == 'group-29-ansible-skeletons-development-core219' or (extra == 'group-29-ansible-skeletons-development-core220' and extra == 'group-29-ansible-skeletons-development-core221')" },
+    { name = "cryptography", marker = "(python_full_version < '3.14' and extra == 'group-29-ansible-skeletons-development-core219') or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core220') or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core221') or (extra == 'group-29-ansible-skeletons-development-core220' and extra == 'group-29-ansible-skeletons-development-core221')" },
+    { name = "jinja2", marker = "(python_full_version < '3.14' and extra == 'group-29-ansible-skeletons-development-core219') or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core220') or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core221') or (extra == 'group-29-ansible-skeletons-development-core220' and extra == 'group-29-ansible-skeletons-development-core221')" },
+    { name = "packaging", marker = "(python_full_version < '3.14' and extra == 'group-29-ansible-skeletons-development-core219') or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core220') or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core221') or (extra == 'group-29-ansible-skeletons-development-core220' and extra == 'group-29-ansible-skeletons-development-core221')" },
+    { name = "pyyaml", marker = "(python_full_version < '3.14' and extra == 'group-29-ansible-skeletons-development-core219') or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core220') or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core221') or (extra == 'group-29-ansible-skeletons-development-core220' and extra == 'group-29-ansible-skeletons-development-core221')" },
+    { name = "resolvelib", marker = "(python_full_version < '3.14' and extra == 'group-29-ansible-skeletons-development-core219') or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core220') or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core221') or (extra == 'group-29-ansible-skeletons-development-core220' and extra == 'group-29-ansible-skeletons-development-core221')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/70/10/fb022a98682af71ec7b21ea24dab3103af1c85ae884ac21c9e3f0a2ded9b/ansible_core-2.19.13.tar.gz", hash = "sha256:3711fc5db7a265f93b34cf3f0db8b9708fb0eec12211a6be32ed6edd6c68044b", size = 3432103, upload-time = "2026-09-08T16:47:54.44Z" }
 wheels = [
@@ -124,11 +122,11 @@ resolution-markers = [
     "python_full_version < '3.14'",
 ]
 dependencies = [
-    { name = "cryptography" },
-    { name = "jinja2" },
-    { name = "packaging" },
-    { name = "pyyaml" },
-    { name = "resolvelib" },
+    { name = "cryptography", marker = "(python_full_version >= '3.14' and extra == 'group-29-ansible-skeletons-development-core219') or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core220') or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core221') or (extra == 'group-29-ansible-skeletons-development-core220' and extra == 'group-29-ansible-skeletons-development-core221') or (extra != 'group-29-ansible-skeletons-development-core219' and extra != 'group-29-ansible-skeletons-development-core220')" },
+    { name = "jinja2", marker = "(python_full_version >= '3.14' and extra == 'group-29-ansible-skeletons-development-core219') or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core220') or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core221') or (extra == 'group-29-ansible-skeletons-development-core220' and extra == 'group-29-ansible-skeletons-development-core221') or (extra != 'group-29-ansible-skeletons-development-core219' and extra != 'group-29-ansible-skeletons-development-core220')" },
+    { name = "packaging", marker = "(python_full_version >= '3.14' and extra == 'group-29-ansible-skeletons-development-core219') or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core220') or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core221') or (extra == 'group-29-ansible-skeletons-development-core220' and extra == 'group-29-ansible-skeletons-development-core221') or (extra != 'group-29-ansible-skeletons-development-core219' and extra != 'group-29-ansible-skeletons-development-core220')" },
+    { name = "pyyaml", marker = "(python_full_version >= '3.14' and extra == 'group-29-ansible-skeletons-development-core219') or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core220') or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core221') or (extra == 'group-29-ansible-skeletons-development-core220' and extra == 'group-29-ansible-skeletons-development-core221') or (extra != 'group-29-ansible-skeletons-development-core219' and extra != 'group-29-ansible-skeletons-development-core220')" },
+    { name = "resolvelib", marker = "(python_full_version >= '3.14' and extra == 'group-29-ansible-skeletons-development-core219') or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core220') or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core221') or (extra == 'group-29-ansible-skeletons-development-core220' and extra == 'group-29-ansible-skeletons-development-core221') or (extra != 'group-29-ansible-skeletons-development-core219' and extra != 'group-29-ansible-skeletons-development-core220')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/df/72/2152230f254bd9c6b892f95d6d291a96fd09b632ce01c6b406eda8c5cd75/ansible_core-2.21.4.tar.gz", hash = "sha256:81a9329f4f12cfa5008dcab5d1bf23ae69b7effc08c0f00048ab2461147ae95a", size = 3394492, upload-time = "2026-09-08T16:51:48.569Z" }
 wheels = [
@@ -141,9 +139,9 @@ version = "26.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "ansible-compat" },
-    { name = "ansible-core", version = "2.19.13", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-29-ansible-skeletons-development-core219' or (extra == 'group-29-ansible-skeletons-development-core220' and extra == 'group-29-ansible-skeletons-development-core221')" },
+    { name = "ansible-core", version = "2.19.13", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.14' and extra == 'group-29-ansible-skeletons-development-core219') or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core220') or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core221') or (extra == 'group-29-ansible-skeletons-development-core220' and extra == 'group-29-ansible-skeletons-development-core221')" },
     { name = "ansible-core", version = "2.20.9", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-29-ansible-skeletons-development-core220' or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core221')" },
-    { name = "ansible-core", version = "2.21.4", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-29-ansible-skeletons-development-core221' or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core220') or (extra != 'group-29-ansible-skeletons-development-core219' and extra != 'group-29-ansible-skeletons-development-core220')" },
+    { name = "ansible-core", version = "2.21.4", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.14' and extra == 'group-29-ansible-skeletons-development-core219') or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core220') or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core221') or (extra == 'group-29-ansible-skeletons-development-core220' and extra == 'group-29-ansible-skeletons-development-core221') or (extra != 'group-29-ansible-skeletons-development-core219' and extra != 'group-29-ansible-skeletons-development-core220')" },
     { name = "black" },
     { name = "cffi" },
     { name = "cryptography" },
@@ -183,6 +181,7 @@ dev = [
     { name = "mypy" },
     { name = "pytest" },
     { name = "pyyaml" },
+    { name = "releasing" },
     { name = "reuse" },
     { name = "ruff" },
     { name = "rumdl" },
@@ -208,6 +207,7 @@ dev = [
     { name = "mypy" },
     { name = "pytest", specifier = ">=9" },
     { name = "pyyaml" },
+    { name = "releasing", specifier = ">=5,<6" },
     { name = "reuse" },
     { name = "ruff" },
     { name = "rumdl" },
@@ -858,9 +858,9 @@ version = "26.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "ansible-compat" },
-    { name = "ansible-core", version = "2.19.13", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-29-ansible-skeletons-development-core219' or (extra == 'group-29-ansible-skeletons-development-core220' and extra == 'group-29-ansible-skeletons-development-core221')" },
+    { name = "ansible-core", version = "2.19.13", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.14' and extra == 'group-29-ansible-skeletons-development-core219') or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core220') or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core221') or (extra == 'group-29-ansible-skeletons-development-core220' and extra == 'group-29-ansible-skeletons-development-core221')" },
     { name = "ansible-core", version = "2.20.9", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-29-ansible-skeletons-development-core220' or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core221')" },
-    { name = "ansible-core", version = "2.21.4", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-29-ansible-skeletons-development-core221' or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core220') or (extra != 'group-29-ansible-skeletons-development-core219' and extra != 'group-29-ansible-skeletons-development-core220')" },
+    { name = "ansible-core", version = "2.21.4", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.14' and extra == 'group-29-ansible-skeletons-development-core219') or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core220') or (extra == 'group-29-ansible-skeletons-development-core219' and extra == 'group-29-ansible-skeletons-development-core221') or (extra == 'group-29-ansible-skeletons-development-core220' and extra == 'group-29-ansible-skeletons-development-core221') or (extra != 'group-29-ansible-skeletons-development-core219' and extra != 'group-29-ansible-skeletons-development-core220')" },
     { name = "click" },
     { name = "enrich" },
     { name = "jinja2" },
@@ -1234,6 +1234,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/22/f5/df4e9027acead3ecc63e50fe1e36aca1523e1719559c499951bb4b53188f/referencing-0.37.0.tar.gz", hash = "sha256:44aefc3142c5b842538163acb373e24cce6632bd54bdb01b21ad5863489f50d8", size = 78036, upload-time = "2025-10-13T15:30:48.871Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/2c/58/ca301544e1fa93ed4f80d724bf5b194f6e4b945841c5bfd555878eea9fcb/referencing-0.37.0-py3-none-any.whl", hash = "sha256:381329a9f99628c9069361716891d34ad94af76e461dcb0335825aecc7692231", size = 26766, upload-time = "2025-10-13T15:30:47.625Z" },
+]
+
+[[package]]
+name = "releasing"
+version = "5.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "markdown-it-py" },
+    { name = "pyyaml" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/13/2b/0b5e814a4b254102ba94b06da322d6a5d48f0b67a17dcbfb5d4f059fc15e/releasing-5.0.0.tar.gz", hash = "sha256:12699236ddc4c810a1638d10f51e831d4b856d353e7f58b3ac7192113958d4c7", size = 79286, upload-time = "2026-09-26T03:12:48.776Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d3/f2/1e89091f0f20c28ac9e3a8833fd6cf02c3432acac02d54110b2d823b39a4/releasing-5.0.0-py3-none-any.whl", hash = "sha256:454301db7969c8e7cec30b23fcd9e0f7ba2963ff4977c5cb8b5d8bfb11759d4c", size = 90256, upload-time = "2026-09-26T03:12:47.223Z" },
 ]
 
 [[package]]

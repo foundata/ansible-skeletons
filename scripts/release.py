@@ -8,7 +8,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from scripts.check import default_lane, required_checks
@@ -30,6 +30,21 @@ def version_parts(value: str) -> tuple[int, ...]:
     return tuple(int(part) for part in value.split("."))
 
 
+def releasing(*arguments: str, root: Path = ROOT) -> None:
+    """Run one command of foundata's releasing tool against this repository.
+
+    The tool owns the changelog, the tag, the push, the forge entry and the
+    publication checks. This module keeps what only this repository can know:
+    which checks a release needs and whether their retained evidence still
+    belongs to the commit being tagged.
+    """
+    run(
+        [sys.executable, "-m", "releasing", *arguments, "--project", str(root)],
+        cwd=root,
+        timeout=600,
+    )
+
+
 def clean_revision(root: Path = ROOT) -> str:
     """Reject staged, unstaged and untracked changes before identifying HEAD."""
     if git("status", "--porcelain", "--untracked-files=all", root=root):
@@ -38,54 +53,6 @@ def clean_revision(root: Path = ROOT) -> str:
         )
     git("diff", "--check", "HEAD", root=root)
     return git("rev-parse", "--verify", "HEAD", root=root)
-
-
-def check_changelog(version: str, root: Path = ROOT) -> None:
-    """Validate the release section, date and links in this repository's format."""
-    version_parts(version)
-    text = (root / "CHANGELOG.md").read_text(encoding="utf-8")
-    sections = list(
-        re.finditer(
-            r"^## \[([^\]]+)\](?: - (\d{4}-\d{2}-\d{2}))?\s*$", text, re.MULTILINE
-        )
-    )
-    if (
-        len(sections) < 2
-        or sections[0][1].lower() != "unreleased"
-        or sections[1][1] != version
-    ):
-        raise GateError(
-            "The first dated changelog section must match the intended version"
-        )
-    if sum(section[1] == version for section in sections) != 1:
-        raise GateError("Duplicate release section in CHANGELOG.md")
-    if (
-        not sections[1][2]
-        or date.fromisoformat(sections[1][2]) > datetime.now(UTC).date()
-    ):
-        raise GateError("The release needs a valid, non-future changelog date")
-    unreleased = text[sections[0].end() : sections[1].start()]
-    if any(
-        line.strip() not in ("", "- Nothing worth mentioning right now.")
-        for line in unreleased.splitlines()
-    ):
-        raise GateError("Move the Unreleased entries into the release section first")
-    end = sections[2].start() if len(sections) > 2 else len(text)
-    if not re.search(r"^\s*[-*] \S", text[sections[1].end() : end], re.MULTILINE):
-        raise GateError("The release changelog section is empty")
-    links = dict(re.findall(r"^\[([^\]]+)\]:\s+(\S+)\s*$", text, re.MULTILINE))
-    expected = f"https://github.com/{REPOSITORY}"
-    if (
-        links.get("unreleased", links.get("Unreleased"))
-        != f"{expected}/compare/v{version}...HEAD"
-    ):
-        raise GateError("Update the Unreleased comparison link to the intended tag")
-    release_link = links.get(version, "")
-    if release_link != f"{expected}/releases/tag/v{version}" and not (
-        release_link.startswith(f"{expected}/compare/")
-        and release_link.endswith(f"...v{version}")
-    ):
-        raise GateError("The release changelog link does not identify the intended tag")
 
 
 def previous_release(version: str, root: Path = ROOT) -> str | None:
@@ -130,7 +97,10 @@ def release_inputs(
 ) -> tuple[str, str | None, list[str]]:
     """Determine the immutable revision and all required integration backends."""
     revision = clean_revision(root)
-    check_changelog(version, root)
+    version_parts(version)
+    # The changelog names the version, dates it and links it; the tool checks
+    # all of that and that this version is the newest section.
+    releasing("version", "check", "--expect", version, root=root)
     base = previous_release(version, root)
     changed = (
         git("diff", "--name-only", f"{base}..{revision}", root=root).splitlines()
@@ -260,7 +230,7 @@ def validate_report(
     version_parts(version)
     if clean_revision(root) != revision:
         raise GateError("This release report belongs to a different commit")
-    check_changelog(version, root)
+    releasing("version", "check", "--expect", version, root=root)
     if tagged:
         if (
             git("cat-file", "-t", f"refs/tags/v{version}", root=root) != "tag"
@@ -316,7 +286,10 @@ def create_tag(path: Path, root: Path = ROOT) -> None:
     """Create only a local annotated tag after checking retained release evidence."""
     report = validate_report(path, root)
     version, revision = str(report["version"]), str(report["revision"])
-    # Check all remote versions, including tags absent from the local checkout.
+    # Every release of this repository is newer than every earlier one; there
+    # are no maintenance branches. That is this project's policy rather than a
+    # rule of the tool, so it is checked here, against every remote tag and
+    # including tags absent from the local checkout.
     result = subprocess.run(
         [
             "git",
@@ -346,7 +319,11 @@ def create_tag(path: Path, root: Path = ROOT) -> None:
             raise GateError("An equal or newer remote tag already exists")
     if clean_revision(root) != revision:
         raise GateError("HEAD changed before tagging")
-    git("tag", "-a", f"v{version}", revision, "-m", f"version {version}", root=root)
+    # The tool exports the revision and checks its declaration and changelog
+    # there, refuses a tag that exists locally or on the remote, and writes the
+    # annotated tag with the project's message. The remote listing above has
+    # already answered the forge's question, so the forge is not asked twice.
+    releasing("tag", "create", version, "--revision", revision, "--offline", root=root)
     print(f"Created local tag v{version}; nothing was pushed or published")
 
 
@@ -354,27 +331,9 @@ def verify_publication(path: Path, root: Path = ROOT) -> None:
     """Check the remote tag, forge release and fresh clone's consumer workflow."""
     report = validate_report(path, root, tagged=True)
     version, revision = str(report["version"]), str(report["revision"])
-    remote = git("ls-remote", "origin", f"refs/tags/v{version}^{{}}", root=root)
-    if remote.split()[:1] != [revision]:
-        raise GateError(
-            "The published annotated tag does not match the validated commit"
-        )
-    release = json.loads(
-        run(
-            ["gh", "api", f"repos/{REPOSITORY}/releases/latest"],
-            cwd=root,
-            capture=True,
-            timeout=60,
-        )
-    )
-    if (
-        release.get("tag_name") != f"v{version}"
-        or release.get("draft")
-        or release.get("prerelease")
-    ):
-        raise GateError(
-            "The forge does not report the intended stable release as latest"
-        )
+    # The remote must hold the release tag and the forge must report it as its
+    # latest release; what only this repository can check is the clone below.
+    releasing("verify", "--version", version, root=root)
     with tempfile.TemporaryDirectory(
         prefix="ansible-skeletons-published-"
     ) as temporary:
