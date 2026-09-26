@@ -1,21 +1,22 @@
 # Ansible (Galaxy) Skeletons
 
-**Opinionated blueprints for `ansible-galaxy role|collection init`**
+Opinionated blueprints for `ansible-galaxy role|collection init`.
 
 Ansible Skeletons help you start new
 [roles](https://docs.ansible.com/ansible/latest/user_guide/playbooks_reuse_roles.html)
 and
 [collections](https://docs.ansible.com/ansible/devel/dev_guide/developing_collections.html)
-with a clean, consistent, and proven structure. Focus immediately on logic
-instead of boilerplate.
+with a shared structure for tasks, metadata and tests.
 
-All skeletons follow several guidelines and best practices:
+The skeletons follow these style guides:
 
 - [foundata: Ansible style guide](https://github.com/foundata/guidelines/blob/main/ansible-style-guide.md)
 - [Red Hat's Coding Style Good Practices for Ansible](https://github.com/redhat-cop/automation-good-practices/blob/main/coding_style/README.adoc#ansible-guidelines)
 - [Best Practices of the Ansible User guide](https://docs.ansible.com/ansible/latest/user_guide/playbooks_best_practices.html)
 
 
+<!-- rumdl-disable MD033 -->
+<!-- The project header uses HTML to size and center its logo. -->
 <div align="center" id="project-readme-header">
 <br>
 <br>
@@ -31,6 +32,7 @@ All skeletons follow several guidelines and best practices:
 
 <br>
 </div>
+<!-- rumdl-enable MD033 -->
 
 
 ## Table of contents<a id="toc"></a>
@@ -50,17 +52,13 @@ All skeletons follow several guidelines and best practices:
 
 ## Features<a id="features"></a>
 
-Main features:
-
-- **Linting and testing built-in** – ready for
+- Configuration for
   [`ansible-lint`](https://docs.ansible.com/projects/lint/) and
   [Molecule](https://docs.ansible.com/projects/molecule/) (using Containers via
-  Podman and/or VMs via libvirt)
-- **Platform-aware design** – clear separation for OS-specific variables and
-  tasks.
-- **Changelog tooling** – conventions and helpers for transparent release notes.
-- **Reproducible structure, sensible defaults** - faster bootstrapping, fewer
-  style debates. Focus on automation logic instead of boilerplate.
+  Podman and/or VMs via libvirt).
+- Separate files for OS-specific variables and tasks.
+- Changelog conventions and release-note helpers.
+- A common project structure and defaults for new roles and collections.
 
 
 ## Examples<a id="examples"></a>
@@ -77,12 +75,10 @@ Some collections built using these skeletons:
   - GitHub: <https://github.com/foundata/ansible-collection-postfix>
   - Galaxy: <https://galaxy.ansible.com/ui/repo/published/foundata/postfix/>
 
-Check their project structures for inspiration and reference.
-
 
 ## Usage<a id="usage"></a>
 
-1. **Clone this repository and check out the latest release:**
+1. Clone this repository and check out the latest release:
 
    ```bash
    # Get the version number of the latest release
@@ -94,10 +90,9 @@ Check their project structures for inspiration and reference.
    ```
 
    <br>
-2. **Use `ansible-galaxy` to initialize a new collection or stand-alone role**.
-   Provide the path to the desired skeleton, along with any necessary variable
-   values (or let `ansible-galaxy` use default values), and specify a name for
-   your new resource.<br>Examples:
+2. Use `ansible-galaxy` to initialize a new collection or standalone role.
+   Provide the skeleton path and a name for the new resource. Pass any variable
+   values you want to override, or use the defaults.<br>Examples:
 
    ```bash
    # Ensure ansible-galaxy is available and navigate to the cloned repository from step one
@@ -132,36 +127,31 @@ Check their project structures for inspiration and reference.
       "new_role"
    ```
 
-   Additional Notes:
+   Notes:
      - Names of namespaces, collections or roles must follow
        [some](https://docs.ansible.com/ansible/latest/dev_guide/developing_collections_structure.html#roles-directory)
        [rules](https://docs.ansible.com/ansible/latest/dev_guide/developing_collections_creating.html#naming-your-collection)
        and should consist of `a-z`, `0-9` and `_` only.
      - Adapt the directory name of the `--[collection|role]-skeleton` parameter
-       value if you want to use another skeleton than
-       `[collection|role_]default`. You can find a description of the available
-       skeletons below.
-3. Each created collection or stand-alone role includes a
-   **`FIXME.md` file in its root directory** with further instructions about
-   what to change to your needs.
+       value to use a skeleton other than `[collection|role_]default`. The
+       available skeletons are described below.
+3. Follow the instructions in the generated `FIXME.md` file to adapt the
+   collection or standalone role to your project.
 
 
 
 ## Provided skeletons<a id="content"></a>
 
-The following list provides an overview of the available skeletons. You can also
-explore the subdirectories of this repository to examine their code. However,
-keep in mind that some parts may be difficult to read, as they contain
-[Jinja](https://palletsprojects.com/p/jinja/) code. This Jinja code is processed
-by `ansible-galaxy [collection|role]` with it's templating to generate the final
-files.
+Each skeleton has its own subdirectory. The source files contain
+[Jinja](https://palletsprojects.com/p/jinja/) expressions that
+`ansible-galaxy [collection|role]` renders when generating a project.
 
 
 ### `collection_default`<a id="collection_default"></a>
 
-A general purpose skeleton to create new Ansible collection for
-[package and ship](https://redhat-cop.github.io/automation-good-practices/#_package_roles_in_an_ansible_collection_to_simplify_distribution_and_consumption)
-a `run`-role. Main features:
+A skeleton for
+[packaging and shipping](https://redhat-cop.github.io/automation-good-practices/#_package_roles_in_an_ansible_collection_to_simplify_distribution_and_consumption)
+a `run` role in an Ansible collection. It includes:
 
 - Init tasks to check the environment and usage:
   - Role argument validation
@@ -184,8 +174,7 @@ a `run`-role. Main features:
 
 ### `role_default`<a id="role_default"></a>
 
-A general purpose skeleton to create new Ansible stand-alone role. Main
-features:
+A skeleton for standalone Ansible roles. It includes:
 
 - Init tasks to check the environment and usage:
   - Role argument validation
@@ -206,32 +195,24 @@ features:
 
 ## Compatibility<a id="compatibility"></a>
 
-The skeletons are compatible with all
-[supported versions](https://docs.ansible.com/ansible/latest/reference_appendices/release_and_maintenance.html#ansible-core-support-matrix)
-of `ansible-galaxy` and `ansible` that are not end-of-life and still receive
-patches. While older versions should also work as long as `ansible-core` is >=
-v2.16, we no might not explicitly test them.
+The release gate tests rendering and role execution with these controller
+combinations, using the exact dependency versions recorded in `uv.lock`:
 
-The skeletons were explicitly tested with `ansible-galaxy` from the following
-`ansible` versions (descending order):
+| Ansible core | Controller Python |
+| ------------ | ----------------- |
+| 2.19         | 3.12, 3.13        |
+| 2.20         | 3.12, 3.13, 3.14  |
+| 2.21         | 3.12, 3.13, 3.14  |
 
-- `ansible-galaxy 2.20`
-  - `ansible-galaxy [core 2.20.6]`
-  - `ansible-galaxy [core 2.20.5]`
-  - `ansible-galaxy [core 2.20.4]`
-  - `ansible-galaxy [core 2.20.3]`
-  - `ansible-galaxy [core 2.20.2]`
-  - `ansible-galaxy [core 2.20.1]`
-  - `ansible-galaxy [core 2.20.0]`
-- `ansible-galaxy 2.19`
-  - `ansible-galaxy [core 2.19.2]`
-- `ansible-galaxy 2.18`
-  - `ansible-galaxy [core 2.18.9]`
-  - `ansible-galaxy [core 2.18.8]`
-  - `ansible-galaxy [core 2.18.4]`
-  - `ansible-galaxy [core 2.18.3]`
-  - `ansible-galaxy [core 2.18.2]`
-  - `ansible-galaxy [core 2.18.1]`
+The matrix is defined in `pyproject.toml`; see
+[Development: Testing](./DEVELOPMENT.md#testing) for repeatable commands and
+infrastructure coverage. It is reviewed against the
+[upstream support matrix](https://docs.ansible.com/ansible/latest/reference_appendices/release_and_maintenance.html#ansible-core-support-matrix).
+
+Older Ansible core versions from 2.16 may work, but are outside the required
+release matrix. Historical manual checks included core 2.18. The development
+helpers require Python 3.12 or newer; consumers only need Ansible and its
+supported Python runtime.
 
 The following versions are known to be problematic:
 
@@ -244,9 +225,8 @@ The following versions are known to be problematic:
 
 See [`CONTRIBUTING.md`](./CONTRIBUTING.md) if you want to get involved.
 
-This project's functionality is mature, so there might be little activity on the
-repository in the future. Don't get fooled by this, the project is under active
-maintenance and used on a daily basis by the maintainers.
+The maintainers use the skeletons daily and continue to maintain them, even
+during periods with few repository updates.
 
 
 

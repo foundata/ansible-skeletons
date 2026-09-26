@@ -1,0 +1,72 @@
+---
+- name: "Exercise the generated role"
+  hosts: "all"
+  gather_facts: false
+  tasks:
+    - name: "Create scratch directory"
+      ansible.builtin.file:
+        path: "{{ gate_scratch }}"
+        state: "directory"
+        mode: "u=rwx,g=,o=" # 0700
+
+    - name: "Create removal fixtures and an unmanaged file"
+      ansible.builtin.copy:
+        dest: "{{ gate_scratch }}/{{ gate_file }}"
+        content: "smoke fixture\n"
+        mode: "u=rw,g=,o=" # 0600
+      loop:
+        - "remove-one"
+        - "remove-two"
+        - "unmanaged"
+      loop_control:
+        loop_var: gate_file
+
+    - name: "Exercise present, repeated present and absent through the caller's item"
+      ansible.builtin.include_role:
+        name: "{{ gate_role }}"
+        public: true
+      vars:
+        GATE_PREFIX_state: "{{ item }}"
+        GATE_PREFIX_autoupgrade: false
+      loop:
+        - "present"
+        - "present"
+        - "absent"
+
+    - name: "Check that the role gathered its required facts"
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['distribution'] is ansible.builtin.defined
+          - ansible_facts['os_family'] is ansible.builtin.defined
+          - __GATE_PREFIX_platform_filenames_most_specific_first | ansible.builtin.length > 0
+
+    - name: "Check removal task outcomes"
+      ansible.builtin.stat:
+        path: "{{ gate_scratch }}/{{ gate_file }}"
+      register: gate_removed
+      failed_when:
+        - gate_removed['stat']['exists']
+      loop:
+        - "remove-one"
+        - "remove-two"
+      loop_control:
+        loop_var: gate_file
+
+    - name: "Check unmanaged data survived"
+      ansible.builtin.stat:
+        path: "{{ gate_scratch }}/unmanaged"
+      register: gate_unmanaged
+      failed_when:
+        - not gate_unmanaged['stat']['exists']
+
+    - name: "Execute a task from the expected installed role"
+      ansible.builtin.include_role:
+        name: "{{ gate_role }}"
+        tasks_from: "init"
+      vars:
+        GATE_PREFIX_state: "present"
+
+    - name: "Confirm runtime templates survived Galaxy rendering"
+      ansible.builtin.assert:
+        that:
+          - lookup('ansible.builtin.file', gate_expected_role_path ~ '/tasks/main.yml') is ansible.builtin.search('role_path')

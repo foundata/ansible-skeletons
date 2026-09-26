@@ -1,9 +1,9 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable, user-facing changes to this project are documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
@@ -11,6 +11,10 @@ and this project adheres to
 
 ### Added
 
+- Development checks for generated roles and collections across the supported
+  Ansible/Python versions, with Podman, libvirt and execution-environment tests.
+- Release validation and local tagging commands that require passing checks
+  for the exact release commit and reject stale or modified test results.
 - (collection|role)_default: `.rumdl.toml`, the `rumdl` configuration of the
   foundata Markdown style guide. The collection skeleton keeps it out of the
   built artifact through `build_ignore`.
@@ -18,6 +22,8 @@ and this project adheres to
 
 ### Changed
 
+- Development guide now covers the helper commands, test requirements and
+  release procedure, including recovery after failed checks or publication.
 - collection_default: `build_ignore` keeps more repository-only files out of the
   built artifact: repository hosting and editor configuration, coding agent
   files, OS metadata, and the `CODE_OF_CONDUCT.md`, `CONTRIBUTING.md` and

@@ -1,0 +1,9 @@
+---
+roles: []
+collections:
+  - name: containers.podman
+    version: 1.20.2
+  - name: community.crypto
+    version: 3.3.0
+  - name: community.general
+    version: 13.2.0

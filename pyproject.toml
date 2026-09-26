@@ -1,0 +1,76 @@
+[project]
+name = "ansible-skeletons-development"
+version = "0.0.0"
+description = "Development tools for the Ansible skeleton repository"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = [
+  "mypy",
+  "pytest>=9",
+  "PyYAML",
+  "reuse",
+  "ruff",
+  "rumdl",
+  "types-PyYAML",
+]
+core219 = ["ansible-core>=2.19,<2.20"]
+core220 = ["ansible-core>=2.20,<2.21"]
+core221 = ["ansible-core>=2.21,<2.22"]
+lint = ["ansible-lint", "antsibull-changelog"]
+integration = ["molecule", "ansible-builder", "pycdlib"]
+
+[tool.uv]
+package = false
+conflicts = [
+  [{ group = "core219" }, { group = "core220" }, { group = "core221" }],
+]
+
+[tool.uv.dependency-groups]
+core219 = { requires-python = ">=3.12,<3.14" }
+
+[tool.skeletons]
+python-versions = ["3.12", "3.13", "3.14"]
+matrix = [
+  { python = "3.12", group = "core219" },
+  { python = "3.13", group = "core219" },
+  { python = "3.12", group = "core220" },
+  { python = "3.13", group = "core220" },
+  { python = "3.14", group = "core220" },
+  { python = "3.12", group = "core221" },
+  { python = "3.13", group = "core221" },
+  { python = "3.14", group = "core221" },
+]
+default-python = "3.14"
+default-group = "core221"
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "B", "C4", "UP", "RUF", "A", "DTZ", "PTH"]
+
+[tool.ruff.format]
+docstring-code-format = true
+indent-style = "space"
+line-ending = "lf"
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+enable_error_code = ["explicit-override"]
+warn_unreachable = true
+
+[[tool.mypy.overrides]]
+module = ["ansible.module_utils.basic", "ansible.plugins.callback"]
+# Ansible does not provide a typed interface for test modules.
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+addopts = ["--import-mode=importlib"]
+filterwarnings = ["error"]
+strict = true
+testpaths = ["tests/unit"]
