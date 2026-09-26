@@ -1,7 +1,7 @@
 version = 1
 SPDX-PackageName = "Ansible role: {{ role_name }}"
-SPDX-PackageDownloadLocation = "{{ repository_url }}"
-SPDX-PackageSupplier = "{{ company }}"
+SPDX-PackageDownloadLocation = {{ repository_url | to_json(ensure_ascii=False) }}
+SPDX-PackageSupplier = {{ company | to_json(ensure_ascii=False) }}
 SPDX-PackageComment = """
 This project may include calls to Application Programming Interfaces
 ("API calls"), as well as their respective specifications and code that
@@ -16,5 +16,5 @@ supersede any terms of these additional agreements.
 [[annotations]]
 path = "**"
 precedence = "closest"
-SPDX-FileCopyrightText = "{{ company }}"
+SPDX-FileCopyrightText = {{ company | to_json(ensure_ascii=False) }}
 SPDX-License-Identifier = "GPL-3.0-or-later"

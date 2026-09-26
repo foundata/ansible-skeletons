@@ -5,11 +5,11 @@
 galaxy_info:
   description: "{{ namespace }}.{{ collection_name }}.run role"
   license: "GPL-3.0-or-later" # See https://spdx.org/licenses/ for valid IDs and syntax.
-  author: "{{ authors | join(", ") }}"
-  company: "{{ company }}"
+  author: {{ authors | join(", ") | to_json(ensure_ascii=False) }}
+  company: {{ company | default('FIXME your organization') | to_json(ensure_ascii=False) }}
 
   standalone: false # This role is part of a collection (useful hint for ansible-lint)
-  min_ansible_version: "{{ min_ansible_version }}"
+  min_ansible_version: {{ min_ansible_version | default('2.16.0') | string | to_json }}
 
 
 # Roles that this role requires to be installed.

@@ -2,4 +2,4 @@
 
 ---
 
-requires_ansible: ">={{ min_ansible_version }}"
+requires_ansible: {{ ('>=' ~ (min_ansible_version | default('2.16.0'))) | to_json }}

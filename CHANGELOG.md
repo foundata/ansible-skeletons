@@ -24,6 +24,14 @@ and this project adheres to
   `DEVELOPMENT.md` contributor documents. The list is grouped by purpose.
 
 
+### Fixed
+
+- collection_default: initialization without extra variables provides defaults
+  for company and minimum Ansible version.
+- (collection|role)_default: quoted author, company and description values no
+  longer produce invalid YAML or TOML metadata.
+
+
 ## [2.6.2] - 2026-08-28
 
 ### Fixes

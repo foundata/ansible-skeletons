@@ -12,12 +12,12 @@ license:
   - "GPL-3.0-or-later"
 authors:
 {% for author in authors %}
-  - "{{ author }}"
+  - {{ author | to_json(ensure_ascii=False) }}
 {% endfor %}
 
 readme: "README.md"
-description: "{{ description }}"
-repository: "{{ repository }}"
+description: {{ description | to_json(ensure_ascii=False) }}
+repository: {{ repository | to_json(ensure_ascii=False) }}
 #documentation: "{{ documentation }}"
 #issues: "{{ issues }}" # Use only if the issue tracker is separate from the repository.
 #homepage: "{{ homepage }}"

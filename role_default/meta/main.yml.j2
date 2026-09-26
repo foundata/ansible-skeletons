@@ -4,10 +4,10 @@
 
 galaxy_info:
   role_name: "{{ role_name }}"
-  description: "{{ description }}"
+  description: {{ description | to_json(ensure_ascii=False) }}
   license: "GPL-3.0-or-later" # See https://spdx.org/licenses/ for valid IDs and syntax.
-  author: "{{ author }}"
-  company: "{{ company }}"
+  author: {{ author | to_json(ensure_ascii=False) }}
+  company: {{ company | to_json(ensure_ascii=False) }}
 
   standalone: true # This role not part of a collection (useful hint for ansible-lint)
   min_ansible_version: "{{ min_ansible_version }}"
