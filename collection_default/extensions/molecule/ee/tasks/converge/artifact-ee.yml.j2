@@ -139,7 +139,7 @@
 
     - name: "Molecule | Converge | Copy role to build directory"
       ansible.builtin.copy:
-        src: "{{ '{{' }} __testing_state['project_dir_path'] {{ '}}' }}"
+        src: "{{ '{{' }} __testing_state['project_dir_path'] {{ '}}' }}/"
         dest: "{{ '{{' }} __testing_state['artifact_path'] {{ '}}' }}"
         mode: "preserve"
 

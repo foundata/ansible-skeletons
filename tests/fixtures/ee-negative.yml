@@ -1,0 +1,52 @@
+---
+
+- name: "Gate | Initialize missing role file check"
+  ansible.builtin.set_fact:
+    __testing_gate_missing_tasks_rejected: false
+
+- name: "Gate | Temporarily remove the installed role entry point"
+  containers.podman.podman_container_exec:
+    name: "{{ __testing_state['ee_container_name'] }}"
+    user: "root"
+    argv:
+      - "mv"
+      - "/usr/share/ansible/roles/{{ __testing_state['artifact_fsname'] }}/tasks/main.yml"
+      - "/usr/share/ansible/roles/{{ __testing_state['artifact_fsname'] }}/tasks/main.yml.gate-hidden"
+    executable: "{{ podman_executable }}"
+  changed_when:
+    - true
+
+- name: "Gate | Check that EE verification rejects the missing file"
+  block:
+    - name: "Gate | Rerun the shipped EE verification"
+      ansible.builtin.include_tasks:
+        file: "ee.yml"
+
+  rescue:
+    - name: "Gate | Confirm that the file probe failed"
+      ansible.builtin.assert:
+        that:
+          - ansible_failed_result is ansible.builtin.failed
+          - ansible_failed_task['name'] == 'Molecule | Verify | Verify role has required structure (tasks/main.yml)'
+
+    - name: "Gate | Record the expected verification failure"
+      ansible.builtin.set_fact:
+        __testing_gate_missing_tasks_rejected: true
+
+  always:
+    - name: "Gate | Restore the installed role entry point"
+      containers.podman.podman_container_exec:
+        name: "{{ __testing_state['ee_container_name'] }}"
+        user: "root"
+        argv:
+          - "mv"
+          - "/usr/share/ansible/roles/{{ __testing_state['artifact_fsname'] }}/tasks/main.yml.gate-hidden"
+          - "/usr/share/ansible/roles/{{ __testing_state['artifact_fsname'] }}/tasks/main.yml"
+        executable: "{{ podman_executable }}"
+      changed_when:
+        - true
+
+- name: "Gate | Reject false-positive EE verification"
+  ansible.builtin.assert:
+    that:
+      - __testing_gate_missing_tasks_rejected

@@ -32,6 +32,9 @@ and this project adheres to
   longer produce invalid YAML or TOML metadata.
 - role_default: package installation reads the standalone role's autoupgrade
   variable instead of a nonexistent variable prefixed with `run_`.
+- (collection|role)_default: execution-environment builds install standalone
+  roles at the correct directory level. Verification now fails when a role
+  directory or its `tasks/main.yml` is missing.
 
 
 ## [2.6.2] - 2026-08-28

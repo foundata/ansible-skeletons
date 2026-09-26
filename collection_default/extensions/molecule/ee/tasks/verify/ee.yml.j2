@@ -103,8 +103,6 @@
       register: __testing_role_exists
       changed_when:
         - false
-      failed_when:
-        - false
 
 
     - name: "Molecule | Verify | Assert role is present"
@@ -128,8 +126,6 @@
         executable: "{{ '{{' }} podman_executable {{ '}}' }}"
       register: __testing_role_tasks
       changed_when:
-        - false
-      failed_when:
         - false
 
 
