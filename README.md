@@ -233,7 +233,7 @@ during periods with few repository updates.
 ## Licensing, copyright<a id="licensing-copyright"></a>
 
 <!--REUSE-IgnoreStart-->
-Copyright (c) 2020, 2023-2026 [foundata GmbH](https://foundata.com/)
+Copyright (c) 2020, 2023-2026, [foundata GmbH](https://foundata.com/)
 (<https://foundata.com>)
 
 This project is licensed under the GNU General Public License v3.0 or later
