@@ -34,7 +34,7 @@ uv sync --locked
 ```
 
 uv installs the Python tools in isolated environments, foundata's
-[`releasing`](https://github.com/foundata/releasing) among them.
+[`releasing`](https://foundata.com/en/projects/releasing/) among them.
 `pyproject.toml` contains development dependencies and configuration; its
 `0.0.0` version belongs to the development setup. Skeleton releases use the
 version in the dated changelog section and the corresponding `vX.Y.Z` Git tag,
@@ -87,11 +87,11 @@ Do not reject all remaining Jinja expressions or placeholders as render errors.
 ## Development standards<a id="development-standards"></a>
 
 Follow the foundata
-[Ansible](https://github.com/foundata/guidelines/blob/main/ansible-style-guide.md),
-[shell](https://github.com/foundata/guidelines/blob/main/shell-scripting-style-guide.md),
-[Python](https://github.com/foundata/guidelines/blob/main/python-style-guide.md),
+[Ansible](https://foundata.com/en/guidelines/ansible-style-guide/),
+[shell](https://foundata.com/en/guidelines/shell-scripting-style-guide/),
+[Python](https://foundata.com/en/guidelines/python-style-guide/),
 and
-[Markdown](https://github.com/foundata/guidelines/blob/main/markdown-style-guide.md)
+[Markdown](https://foundata.com/en/guidelines/markdown-style-guide/)
 style guides. Use UTF-8 without a BOM, LF line endings, and a trailing newline.
 
 Use Python for structured data and validation. Keep shell wrappers small. Add

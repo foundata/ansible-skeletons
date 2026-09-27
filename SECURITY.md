@@ -1,6 +1,6 @@
 # Security policy
 
-## Reporting a vulnerability
+## Reporting a vulnerability<a id="reporting"></a>
 
 Please report security vulnerabilities or concerns **privately** using one of
 these channels:
@@ -18,7 +18,7 @@ Please include:
    project's licensing as documented in [`REUSE.toml`](./REUSE.toml).
 
 
-## Recognition and compensation
+## Recognition and compensation<a id="recognition-compensation"></a>
 
 We maintain this project as open source and do **not** offer bug bounties. We
 value responsible reports and contributions as part of giving back to the

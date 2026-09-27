@@ -10,7 +10,7 @@ with a shared structure for tasks, metadata and tests.
 
 The skeletons follow these style guides:
 
-- [foundata: Ansible style guide](https://github.com/foundata/guidelines/blob/main/ansible-style-guide.md)
+- [foundata: Ansible style guide](https://foundata.com/en/guidelines/ansible-style-guide/)
 - [Red Hat's Coding Style Good Practices for Ansible](https://github.com/redhat-cop/automation-good-practices/blob/main/coding_style/README.adoc#ansible-guidelines)
 - [Best Practices of the Ansible User guide](https://docs.ansible.com/ansible/latest/user_guide/playbooks_best_practices.html)
 
@@ -233,8 +233,11 @@ during periods with few repository updates.
 ## Licensing, copyright<a id="licensing-copyright"></a>
 
 <!--REUSE-IgnoreStart-->
+<!-- rumdl-disable MD034 -->
+<!-- Plain URL retained in the copyright notice for plain-text reuse. -->
 Copyright (c) 2020, 2023-2026, [foundata GmbH](https://foundata.com/)
-(<https://foundata.com>)
+(https://foundata.com)
+<!-- rumdl-enable MD034 -->
 
 This project is licensed under the GNU General Public License v3.0 or later
 (SPDX-License-Identifier: `GPL-3.0-or-later`), see
