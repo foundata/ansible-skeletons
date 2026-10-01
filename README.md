@@ -10,7 +10,8 @@ with a shared structure for tasks, metadata and tests.
 
 The skeletons follow these style guides:
 
-- [foundata: Ansible style guide](https://foundata.com/en/guidelines/ansible-style-guide/)
+- [foundata: Ansible playbooks](https://foundata.com/en/guidelines/ansible-playbooks/)
+- [foundata: Ansible roles and collections](https://foundata.com/en/guidelines/ansible-roles-collections/)
 - [Red Hat's Coding Style Good Practices for Ansible](https://github.com/redhat-cop/automation-good-practices/blob/main/coding_style/README.adoc#ansible-guidelines)
 - [Best Practices of the Ansible User guide](https://docs.ansible.com/ansible/latest/user_guide/playbooks_best_practices.html)
 

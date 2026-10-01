@@ -87,11 +87,12 @@ Do not reject all remaining Jinja expressions or placeholders as render errors.
 ## Development standards<a id="development-standards"></a>
 
 Follow the foundata
-[Ansible](https://foundata.com/en/guidelines/ansible-style-guide/),
-[shell](https://foundata.com/en/guidelines/shell-scripting-style-guide/),
-[Python](https://foundata.com/en/guidelines/python-style-guide/),
+[Ansible playbooks](https://foundata.com/en/guidelines/ansible-playbooks/),
+[Ansible roles and collections](https://foundata.com/en/guidelines/ansible-roles-collections/),
+[shell](https://foundata.com/en/guidelines/shell-scripting/),
+[Python](https://foundata.com/en/guidelines/python/),
 and
-[Markdown](https://foundata.com/en/guidelines/markdown-style-guide/)
+[Markdown](https://foundata.com/en/guidelines/markdown/)
 style guides. Use UTF-8 without a BOM, LF line endings, and a trailing newline.
 
 Use Python for structured data and validation. Keep shell wrappers small. Add
