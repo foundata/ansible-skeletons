@@ -9,8 +9,7 @@ galaxy_info:
   company: {{ company | default('FIXME your organization') | to_json(ensure_ascii=False) }}
 
   standalone: false # This role is part of a collection (useful hint for ansible-lint)
-  min_ansible_version: {{ min_ansible_version | default('2.16.0') | string | to_json }}
-
+  min_ansible_version: {{ min_ansible_version | default('2.16.0') | string | to_json }} # should align with collection's meta/runtime.yml
 
 # Roles that this role requires to be installed.
 dependencies: []

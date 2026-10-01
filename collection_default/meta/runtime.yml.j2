@@ -2,4 +2,12 @@
 
 ---
 
+# Notable ansible-core control-node compatibility anchors:
+# - v2.12: Ubuntu 22.04 LTS
+# - v2.14: RHEL 9, Debian 12
+# - v2.16: RHEL 10, AAP 2.5-2.7 (default EE), Ubuntu 24.04 LTS
+# - v2.18: SLES 16
+# - v2.19: Debian 13
+# - v2.20: Ubuntu 26.04 LTS, Fedora 44
+# Raising this floor is a breaking release.
 requires_ansible: {{ ('>=' ~ (min_ansible_version | default('2.16.0'))) | to_json }}
