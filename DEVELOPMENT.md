@@ -123,6 +123,10 @@ limited to):
 - Collection build contents and installation into an isolated collection path.
 - Strict production-profile Ansible linting and collection changelog linting.
 
+```sh
+./scripts/check.sh --foundata-wheel /absolute/path/to/ansible_lint_foundata-1.0.0a1-py3-none-any.whl
+```
+
 To retain results, including generated projects and collection archives:
 
 ```sh

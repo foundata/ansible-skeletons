@@ -129,7 +129,8 @@
         state: "directory"
         mode: "u=rwx,g=rx,o=rx" # 0755
 
-    - name: "Molecule | Converge | Copy role to build directory"
+    # Staging must retain each source file's mode, including executable scripts.
+    - name: "Molecule | Converge | Copy role to build directory" # noqa: foundata-file-mode
       ansible.builtin.copy:
         src: "{{ '{{' }} __testing_state['project_dir_path'] {{ '}}' }}/"
         dest: "{{ '{{' }} __testing_state['artifact_path'] {{ '}}' }}"
@@ -201,8 +202,8 @@
     chdir: "{{ '{{' }} __testing_state['build_dir_path'] {{ '}}' }}"
   changed_when:
     - true
-  register: __testing_ee_build_result
   ignore_errors: true
+  register: __testing_ee_build_result
 
 - name: "Molecule | Converge | Fail if Execution Environment (EE) build failed"
   ansible.builtin.fail:

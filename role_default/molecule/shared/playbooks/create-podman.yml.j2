@@ -61,11 +61,6 @@
         password: "{{ '{{' }} item['registry']['credentials']['password'] | ansible.builtin.default(omit) {{ '}}' }}"
         tlsverify: "{{ '{{' }} item['registry']['tls_verify'] | ansible.builtin.default(true) {{ '}}' }}"
         certdir: "{{ '{{' }} item['certdir'] | ansible.builtin.default(omit) {{ '}}' }}"
-      loop: "{{ '{{' }} podman_platforms {{ '}}' }}"
-      loop_control:
-        label: >-
-          "{{ '{{' }} item['name'] }} registry username:
-           {{ '{{' }} item['registry']['credentials']['username'] | ansible.builtin.default('None specified') {{ '}}' }}"
       when:
         - item['registry'] is ansible.builtin.defined
         - item['registry']['url'] is ansible.builtin.defined
@@ -74,6 +69,11 @@
         - item['registry']['credentials']['username'] is ansible.builtin.defined
       changed_when:
         - false
+      loop: "{{ '{{' }} podman_platforms {{ '}}' }}"
+      loop_control:
+        label: >-
+          "{{ '{{' }} item['name'] }} registry username:
+           {{ '{{' }} item['registry']['credentials']['username'] | ansible.builtin.default('None specified') {{ '}}' }}"
 
     - name: "Molecule | Create (Podman) | Create containers running tests on target platforms"
       containers.podman.podman_container:
@@ -131,10 +131,12 @@
         - __testing_createcontainer_result['results'] is ansible.builtin.defined
 
     - name: "Molecule | Create (Podman) | Handle container failures (if any)"
-      when: __testing_failed_containers | ansible.builtin.default([]) | ansible.builtin.length > 0
+      when:
+        - __testing_failed_containers | ansible.builtin.default([]) | ansible.builtin.length > 0
       block:
         - name: "Molecule | Create (Podman) | Print failed container info"
           ansible.builtin.debug:
+            verbosity: 0
             msg: "{{ '{{' }} __testing_failed_containers {{ '}}' }}"
           when:
             # Skip if already displayed by previous debug tasks with "verbosity: 3"
@@ -142,6 +144,7 @@
 
         - name: "Molecule | Create (Podman) | Print failed container's non-zero exit codes"
           ansible.builtin.debug:
+            verbosity: 0
             msg: "{{ '{{' }} __fail_item['container']['Name'] {{ '}}' }}: {{ '{{' }} __fail_item['container']['State']['ExitCode'] {{ '}}' }}"
           when:
             - __fail_item['container'] is ansible.builtin.defined
@@ -155,6 +158,7 @@
 
         - name: "Molecule | Create (Podman) | Print the failed container's non-running states"
           ansible.builtin.debug:
+            verbosity: 0
             msg: "{{ '{{' }} __fail_item['container']['Name'] {{ '}}' }}: {{ '{{' }} __fail_item['container']['State']['Status'] {{ '}}' }}"
           when:
             - __fail_item['container'] is ansible.builtin.defined
@@ -169,6 +173,7 @@
 
         - name: "Molecule | Create (Podman) | Show cleanup hints"
           ansible.builtin.debug:
+            verbosity: 0
             # split() to improve readability for humans
             msg: "{{ '{{' }} __testing_failcleanhint_msg.split('\n') {{ '}}' }}"
           vars:

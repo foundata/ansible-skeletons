@@ -59,8 +59,8 @@
         state: "absent"
         executable: "{{ '{{' }} podman_executable {{ '}}' }}"
         force: true
-      loop: "{{ '{{' }} __testing_dangling_images['stdout_lines'] | ansible.builtin.default([]) {{ '}}' }}"
       when:
         - (__testing_dangling_images['stdout_lines'] | ansible.builtin.default([])) | ansible.builtin.length > 0
       failed_when:
         - false
+      loop: "{{ '{{' }} __testing_dangling_images['stdout_lines'] | ansible.builtin.default([]) {{ '}}' }}"

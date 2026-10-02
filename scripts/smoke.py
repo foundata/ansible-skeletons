@@ -113,6 +113,8 @@ def build_collection(rendered: Rendered) -> Path:
             if name in (
                 *excluded,
                 ".rumdl.toml",
+                ".ansible-lint",
+                ".yamllint",
                 "CODE_OF_CONDUCT.md",
             ) or name.startswith("extensions/molecule/"):
                 raise GateError(
@@ -244,7 +246,9 @@ def exercise_role(rendered: Rendered, *, collection: bool) -> None:
         )
 
 
-def smoke(output: Path, *, lint: bool = False) -> None:
+def smoke(
+    output: Path, *, lint: bool = False, require_foundata_rules: bool = False
+) -> None:
     """Run a complete rendering and consumer smoke test in the current lane."""
     output.mkdir(parents=True, exist_ok=False)
     for case, metadata in (
@@ -260,7 +264,7 @@ def smoke(output: Path, *, lint: bool = False) -> None:
         if case != "explicit":
             continue
         if lint:
-            lint_resources(rendered)
+            lint_resources(rendered, require_foundata_rules=require_foundata_rules)
         build_collection(rendered)
         exercise_role(rendered, collection=False)
         exercise_role(rendered, collection=True)
@@ -270,11 +274,41 @@ def smoke(output: Path, *, lint: bool = False) -> None:
             "python": sys.version,
             "ansible-core": importlib.metadata.version("ansible-core"),
             "PyYAML": importlib.metadata.version("PyYAML"),
+            "foundata-rules-required": require_foundata_rules,
+            "ansible-lint-foundata": (
+                importlib.metadata.version("ansible-lint-foundata")
+                if require_foundata_rules
+                else None
+            ),
         },
     )
 
 
-def lint_resources(rendered: Rendered) -> None:
+def require_rule_discovery(project: Path, env: dict[str, str]) -> None:
+    """Reject silent fallback when a check explicitly requires the extension."""
+    config = yaml.safe_load((project / ".ansible-lint").read_text(encoding="utf-8"))
+    expected = {rule for rule in config["enable_list"] if rule.startswith("foundata-")}
+    if not expected:
+        raise GateError("No foundata rules enabled in the generated configuration")
+    output = run(
+        ["ansible-lint", "--list-rules", "--format", "brief"],
+        cwd=project,
+        env=env,
+        capture=True,
+    )
+    available = {
+        words[1]
+        for line in output.splitlines()
+        if len(words := line.split()) >= 2 and words[0] == "-"
+    }
+    missing = expected - available
+    if missing:
+        raise GateError(
+            f"foundata rules were not discovered: {', '.join(sorted(missing))}"
+        )
+
+
+def lint_resources(rendered: Rendered, *, require_foundata_rules: bool = False) -> None:
     """Lint generated resources, Molecule included, with their own configuration."""
     # The syntax check of the Molecule playbooks needs the collections they use.
     run(
@@ -290,11 +324,15 @@ def lint_resources(rendered: Rendered) -> None:
         env=rendered.env,
     )
     for project in (rendered.role, rendered.collection):
+        if require_foundata_rules:
+            require_rule_discovery(project, rendered.env)
         run(
             ["ansible-lint", "--strict", "--project-dir", str(project)],
             cwd=project,
             env=rendered.env,
         )
+        if require_foundata_rules:
+            check_fix_stability(project, rendered.env)
         run(["reuse", "lint"], cwd=project, env=rendered.env)
     run(["antsibull-changelog", "lint"], cwd=rendered.collection, env=rendered.env)
     run(
@@ -304,14 +342,47 @@ def lint_resources(rendered: Rendered) -> None:
     )
 
 
+def check_fix_stability(project: Path, env: dict[str, str]) -> None:
+    """Require a second native autofix pass to leave generated YAML unchanged."""
+    command = ["ansible-lint", "--offline", "--fix", "--project-dir", str(project)]
+    # Ansible Lint 26.9 returns 8 when fixes changed files, including layout only.
+    run(command, cwd=project, env=env, allowed_exit_codes=(0, 8))
+    files = {
+        path: path.read_bytes()
+        for path in project.rglob("*")
+        if path.is_file()
+        and path.suffix in (".yml", ".yaml")
+        and not {".cache", ".ansible", ".nox", ".venv"}.intersection(
+            path.relative_to(project).parts
+        )
+    }
+    run(command, cwd=project, env=env)
+    changed = [
+        str(path.relative_to(project))
+        for path, data in files.items()
+        if path.read_bytes() != data
+    ]
+    if changed:
+        raise GateError(
+            f"Second autofix pass changed YAML: {', '.join(sorted(changed))}"
+        )
+
+
 def main() -> int:
     """Run one lane; the outer check command owns matrix selection."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--lint", action="store_true")
+    parser.add_argument("--require-foundata-rules", action="store_true")
     args = parser.parse_args()
+    if args.require_foundata_rules and not args.lint:
+        parser.error("--require-foundata-rules needs --lint")
     try:
-        smoke(args.output.resolve(), lint=args.lint)
+        smoke(
+            args.output.resolve(),
+            lint=args.lint,
+            require_foundata_rules=args.require_foundata_rules,
+        )
     except (GateError, OSError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

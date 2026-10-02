@@ -1,4 +1,4 @@
-# YAML checks used by ansible-lint, following foundata's guidelines:
+# ansible-lint YAML checks (see adjacent .ansible-lint). Details, reasoning:
 # https://foundata.com/en/guidelines/ansible-playbooks/
 
 ---
@@ -11,9 +11,8 @@ rules:
   indentation:
     spaces: 2
     indent-sequences: true
-  # Let ansible-lint --fix own layout. Maxima cannot require task separators.
   empty-lines:
-    max: 1
+    max: 2
     max-start: 0
     max-end: 0
   new-line-at-end-of-file: "enable"
@@ -24,15 +23,11 @@ rules:
   truthy:
     allowed-values: ["true", "false"]
     level: "error"
-  # Enforcing quotes on every string would also quote raw Jinja conditions and
-  # variable references such as register/debug.var, contrary to the guidelines.
   quoted-strings:
     quote-type: "double"
     required: false
     allow-quoted-quotes: true
 
-  # Keep ansible-lint's required formatter-compatible defaults when extending
-  # yamllint's default configuration instead of ansible-lint's internal one.
   comments:
     min-spaces-from-content: 1
   comments-indentation: false

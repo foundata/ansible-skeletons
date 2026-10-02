@@ -3,21 +3,26 @@
 ---
 # none right now
 
-# - name: "restart_example"
+# - name: "Restart example service"
 #   ansible.builtin.service:
 #     name: "example"
 #     state: "restarted"
 #   when:
 #     - {{ 'run_' + collection_name + '_service_state' }} in ['enabled', 'running']
+#   listen:
+#     - "restart example service"
 #
-# - name: "reload_example"
-#   ansible.builtin.systemd:
+# - name: "Reload example service"
+#   ansible.builtin.systemd_service:
 #     name: "example"
 #     enabled: true
 #     daemon_reload: true
+#   listen:
+#     - "reload example service"
 #
 # Usage Example:
 #
 # - name: "Reconfigure example service"
 #   [...]
-#   notify: "restart_example"
+#   notify:
+#     - "restart example service"

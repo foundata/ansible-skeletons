@@ -163,9 +163,9 @@
               - "version"
           changed_when:
             - false
-          register: __testing_libvirt_conn_result
           failed_when:
             - __testing_libvirt_conn_result is ansible.builtin.failed
+          register: __testing_libvirt_conn_result
 
     - name: "Molecule | Create (libvirt) | Ensure image cache directory exists"
       ansible.builtin.file:
@@ -244,13 +244,13 @@
         label: "{{ '{{' }} item['name'] {{ '}}' }}"
 
     - name: "Molecule | Create (libvirt) | Generate SSH keypair for this scenario run"
-      when:
-        - libvirt_platforms | ansible.builtin.length > 0
       community.crypto.openssh_keypair:
         path: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/id_ed25519"
         type: "ed25519"
         comment: "molecule-libvirt"
         mode: "u=rw,g=,o=" # 0600
+      when:
+        - libvirt_platforms | ansible.builtin.length > 0
 
     - name: "Molecule | Create (libvirt) | Ensure per-instance working directories exist"
       ansible.builtin.file:
@@ -488,6 +488,7 @@
 
         - name: "Molecule | Create (libvirt) | Show failure analysis and cleanup hints"
           ansible.builtin.debug:
+            verbosity: 0
             # split() to improve readability for humans
             msg: "{{ '{{' }} __testing_failhint_msg.split('\n') {{ '}}' }}"
           vars:

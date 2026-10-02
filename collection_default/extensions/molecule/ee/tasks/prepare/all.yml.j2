@@ -53,6 +53,7 @@
 - name: "Molecule | Prepare (all) | Display detected project type"
   ansible.builtin.debug:
     msg: "Detected project type: {{ '{{' }} __testing_state['project_type'] {{ '}}' }}"
+    verbosity: 0
 
 # Collection
 - name: "Molecule | Prepare (all) | Collection meta data"
@@ -120,3 +121,4 @@
 - name: "Molecule | Prepare (all) | Display artifact name"
   ansible.builtin.debug:
     msg: "Artifact name: {{ '{{' }} __testing_state['artifact_ansible_name'] {{ '}}' }}"
+    verbosity: 0

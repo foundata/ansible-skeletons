@@ -62,6 +62,7 @@ def run(
     env: Mapping[str, str] | None = None,
     timeout: int = 600,
     capture: bool = False,
+    allowed_exit_codes: tuple[int, ...] = (0,),
 ) -> str:
     """Run a bounded command, raising on failure and preserving its diagnostics."""
     print(f"+ {' '.join(command)}", flush=True)
@@ -70,13 +71,17 @@ def run(
             command,
             cwd=cwd,
             env=env,
-            check=True,
+            check=False,
             timeout=timeout,
             text=True,
             encoding="utf-8",
             stdout=subprocess.PIPE if capture else None,
             stderr=subprocess.STDOUT if capture else None,
         )
+        if result.returncode not in allowed_exit_codes:
+            raise subprocess.CalledProcessError(
+                result.returncode, command, output=result.stdout
+            )
     except subprocess.CalledProcessError as exc:
         if exc.stdout:
             print(exc.stdout, flush=True)
@@ -154,7 +159,12 @@ def isolated_environment(work: Path) -> dict[str, str]:
     return env
 
 
-def uv_command(lane: Lane, *arguments: str, groups: Sequence[str] = ()) -> list[str]:
+def uv_command(
+    lane: Lane,
+    *arguments: str,
+    groups: Sequence[str] = (),
+    packages: Sequence[str] = (),
+) -> list[str]:
     """Select a locked, throwaway tool environment for one matrix lane."""
     command = [
         "uv",
@@ -168,4 +178,6 @@ def uv_command(lane: Lane, *arguments: str, groups: Sequence[str] = ()) -> list[
     ]
     for group in groups:
         command.extend(["--group", group])
+    for package in packages:
+        command.extend(["--with", package])
     return [*command, *arguments]

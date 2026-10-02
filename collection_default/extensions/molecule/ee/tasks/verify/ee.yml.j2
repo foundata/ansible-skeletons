@@ -26,9 +26,9 @@
           - "collection"
           - "list"
         executable: "{{ '{{' }} podman_executable {{ '}}' }}"
-      register: __testing_collection_list
       changed_when:
         - false
+      register: __testing_collection_list
 
     - name: "Molecule | Verify | Print collection list"
       ansible.builtin.debug:
@@ -52,9 +52,9 @@
           - "role"
           - "{{ '{{' }} __testing_state['artifact_ansible_name'] {{ '}}' }}"
         executable: "{{ '{{' }} podman_executable {{ '}}' }}"
-      register: __testing_role_list
       changed_when:
         - false
+      register: __testing_role_list
 
     - name: "Molecule | Verify | Print available roles"
       ansible.builtin.debug:
@@ -74,9 +74,9 @@
           - "-la"
           - "/usr/share/ansible/roles"
         executable: "{{ '{{' }} podman_executable {{ '}}' }}"
-      register: __testing_role_list
       changed_when:
         - false
+      register: __testing_role_list
 
     - name: "Molecule | Verify | Print role directory listing"
       ansible.builtin.debug:
@@ -91,9 +91,9 @@
           - "-d"
           - "/usr/share/ansible/roles/{{ '{{' }} __testing_state['artifact_fsname'] {{ '}}' }}"
         executable: "{{ '{{' }} podman_executable {{ '}}' }}"
-      register: __testing_role_exists
       changed_when:
         - false
+      register: __testing_role_exists
 
     - name: "Molecule | Verify | Assert role is present"
       ansible.builtin.assert:
@@ -113,9 +113,9 @@
           - "-f"
           - "/usr/share/ansible/roles/{{ '{{' }} __testing_state['artifact_fsname'] {{ '}}' }}/tasks/main.yml"
         executable: "{{ '{{' }} podman_executable {{ '}}' }}"
-      register: __testing_role_tasks
       changed_when:
         - false
+      register: __testing_role_tasks
 
     - name: "Molecule | Verify | Assert role has tasks/main.yml"
       ansible.builtin.assert:

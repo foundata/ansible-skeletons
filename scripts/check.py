@@ -113,10 +113,19 @@ def required_checks(*, full: bool, backends: list[str]) -> list[str]:
 
 
 def check(
-    output: Path, *, full: bool = False, backends: list[str] | None = None
+    output: Path,
+    *,
+    full: bool = False,
+    backends: list[str] | None = None,
+    foundata_wheel: Path | None = None,
 ) -> None:
     """Run required stages and emit a complete report only after all succeed."""
     selected = backends or []
+    if foundata_wheel is not None and (
+        not foundata_wheel.is_file() or foundata_wheel.suffix != ".whl"
+    ):
+        raise GateError("--foundata-wheel must name an existing wheel file")
+    packages = [str(foundata_wheel.resolve())] if foundata_wheel else []
     output.mkdir(parents=True, exist_ok=False)
     checks: list[str] = []
     check_static()
@@ -164,9 +173,11 @@ def check(
             "-m",
             "scripts.smoke",
             "--lint",
+            *(["--require-foundata-rules"] if foundata_wheel else []),
             "--output",
             str(output / "generated-lint"),
             groups=["lint"],
+            packages=packages,
         ),
         timeout=1800,
     )
@@ -182,6 +193,7 @@ def check(
                 "--output",
                 str(output / f"integration-{backend}"),
                 groups=["integration", "lint"],
+                packages=packages,
             ),
             timeout=7200,
         )
@@ -198,6 +210,11 @@ def check(
         {
             "checks": checks,
             "artifacts": artifacts,
+            "foundata-wheel": (
+                {"name": foundata_wheel.name, "sha256": digest(foundata_wheel)}
+                if foundata_wheel
+                else None
+            ),
             "environments": {
                 path.parent.name: json.loads(path.read_text(encoding="utf-8"))
                 for path in output.glob("*/environment.json")
@@ -225,10 +242,18 @@ def main() -> int:
         default=[],
     )
     parser.add_argument("--output", type=Path, help="Retain results in a new directory")
+    parser.add_argument(
+        "--foundata-wheel", type=Path, help="Test the unpublished foundata extension"
+    )
     args = parser.parse_args()
     try:
         if args.output:
-            check(args.output.resolve(), full=args.matrix, backends=args.integration)
+            check(
+                args.output.resolve(),
+                full=args.matrix,
+                backends=args.integration,
+                foundata_wheel=args.foundata_wheel,
+            )
         else:
             with tempfile.TemporaryDirectory(
                 prefix="ansible-skeletons-check-"
@@ -237,6 +262,7 @@ def main() -> int:
                     Path(temporary) / "results",
                     full=args.matrix,
                     backends=args.integration,
+                    foundata_wheel=args.foundata_wheel,
                 )
     except (GateError, OSError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)

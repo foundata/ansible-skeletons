@@ -1,18 +1,35 @@
-# ansible-lint config implementing foundata's guidelines. Details, reasoning:
-# https://foundata.com/en/guidelines/ansible-playbooks/#linting
+# ansible-lint config implementing foundata's guideline. Details, reasoning:
+# https://foundata.com/en/guidelines/ansible-playbooks/
 
 ---
-
 profile: "production"
 strict: true
 
 enable_list:
   - "loop-var-prefix"
+  - "foundata-condition-list"
+  - "foundata-handler-listen"
+  - "foundata-task-order"
+  - "foundata-file-mode"
+  - "foundata-debug-verbosity"
+  - "foundata-no-end-play"
+  - "foundata-task-name"
 
-# Private, role-prefixed loop variables with a purpose and an _item suffix.
 loop_var_prefix: "^__{role}_[a-z0-9_]+_item$"
 
 skip_list:
   - "use-loop"
+
+exclude_paths:
+  # Explicit exclusions replace ansible-lint's defaults.
+  - ".cache/"
+  - ".git/"
+  - ".hg/"
+  - ".svn/"
+  - ".tox/"
+  - ".nox/"
+  - ".venv/"
+  # Generator-owned output; validate separately with antsibull-changelog.
+  - "changelogs/changelog.yaml"
 
 # YAML formatting is configured in the adjacent .yamllint file.

@@ -11,6 +11,8 @@ and the project adheres to
 
 ### Added
 
+- (collection|role)_default: opt-in configuration for
+  `ansible-lint-foundata` rules.
 - collection_default: `noxfile.py` and `antsibull-nox.toml`.
 - collection_default: `tests/config.yml`, which declares Python 3.9 as the
   lowest version for module code on managed nodes.
@@ -25,6 +27,10 @@ and the project adheres to
 
 ### Changed
 
+- (collection|role)_default: generated changelog output is excluded from style
+  linting; dedicated changelog validation remains enabled. Molecule tasks follow
+  the custom rules, with a documented permission-preserving EE staging
+  exception.
 - (collection|role)_default: YAML templates use one blank line between tasks
   and no blank line immediately after document markers or task/block headers.
 - (collection|role)_default: commented-out examples in YAML files start with
