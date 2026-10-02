@@ -9,6 +9,11 @@ and the project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- (collection|role)_default: descriptions for the entry point and the three
+  base options in `meta/argument_specs.yml`. `antsibull-docs` requires them.
+
 ### Changed
 
 - (collection|role)_default: commented-out examples in YAML files start with

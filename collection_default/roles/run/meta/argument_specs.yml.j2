@@ -10,9 +10,19 @@ argument_specs:
   # {{ namespace }}.{{ collection_name }}/roles/run/tasks/main.yml entry point
   main:
     short_description: "Main entry point for the {{ namespace }}.{{ collection_name }}.run role"
+    description: |
+      FIXME Describe what this entry point manages.
     options:
 
       run_{{ collection_name }}_state:
+        description: |
+          Determines whether the managed resources should be `present` or `absent`.
+
+          `present` ensures that required components, such as software packages, are
+          installed and configured.
+
+          `absent` reverts changes as much as possible, such as removing packages,
+          deleting created users, stopping services, restoring modified settings, ...
         type: "str"
         required: true
         choices:
@@ -20,10 +30,27 @@ argument_specs:
           - "absent"
 
       run_{{ collection_name }}_autoupgrade:
+        description: |
+          If set to `true`, all managed packages will be upgraded during each Ansible
+          run (e.g., when the package provider detects a newer version than the
+          currently installed one).
         type: "bool"
         required: true
 
       run_{{ collection_name }}_service_state:
+        description: |
+          Defines the status of the service(s). Possible values:
+
+          - `enabled`: Service is running and will start automatically at boot.
+          - `disabled`: Service is stopped and will not start automatically at boot.
+          - `running`: Service is running but will not start automatically at boot.
+            This can be used to start a service on the first Ansible run without
+            enabling it for boot.
+          - `unmanaged`: Ansible does not manage the service at all: both the
+            running state and the boot (enablement) state are left exactly as they
+            are.
+
+          The defined status applies to all services if the role manages several.
         type: "str"
         required: true
         choices:
