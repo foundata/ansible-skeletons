@@ -168,6 +168,7 @@ a `run` role in an Ansible collection. It includes:
   [foundata Ansible playbook guideline](https://foundata.com/en/guidelines/ansible-playbooks/#linting).
 - [`antsibull-changelog`](https://docs.ansible.com/projects/antsibull-changelog/changelogs/)
   support.
+- [`antsibull-nox`](https://docs.ansible.com/projects/antsibull-nox/) checks.
 - [Molecule](https://docs.ansible.com/projects/molecule/) support with a default
   scenario using [Podman](https://podman.io/docs/installation) and several
   [integration test targets](https://github.com/orgs/foundata/repositories?q=oci-*-itt).

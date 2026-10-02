@@ -1,0 +1,48 @@
+# Checks of this collection, run by antsibull-nox:
+# https://docs.ansible.com/projects/antsibull-nox/config-file/
+#
+#   nox              default checks (no containers or VMs needed)
+#   nox -t sanity    ansible-test sanity in a container, for each supported
+#                    ansible-core version
+#   nox -s molecule  Molecule scenario "default" from extensions/molecule
+#
+# ansible-core versions are derived from "requires_ansible" in meta/runtime.yml.
+# Run nox inside the collection's Git repository: the license check honors
+# .gitignore only there. noxfile.py prefers Podman over Docker when both are
+# installed.
+
+version = 1
+
+[collection]
+# Python versions of module code are read from tests/config.yml.
+min_python_version = "ansible-test-config"
+
+[sessions.docs_check]
+validate_collection_refs = "all"
+
+[sessions.license_check]
+# REUSE.toml states the licensing; files carry no license header of their own.
+run_license_check = false
+
+[sessions.extra_checks]
+run_no_unwanted_files = true
+
+[sessions.build_import_check]
+run_galaxy_importer = true
+
+[sessions.ansible_lint]
+strict = true
+# Collections the Molecule scenarios use, so their playbooks are linted too.
+additional_requirements_files = [
+  "extensions/molecule/default/requirements.yml",
+  "extensions/molecule/ee/requirements.yml",
+]
+
+[sessions.ansible_test_sanity]
+include_devel = true
+# changelog: changelogs/fragments also holds the fragment template and the
+# archive, which this test rejects. Use "antsibull-changelog lint" instead.
+# no-smart-quotes: the license text in LICENSES/ uses typographic quotes.
+skip_tests = ["changelog", "no-smart-quotes"]
+
+[sessions.molecule]

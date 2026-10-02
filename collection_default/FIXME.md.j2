@@ -54,4 +54,10 @@ new collection based on the skeleton, especially before releasing anything:
        [module_utils source code](https://github.com/ansible/ansible/blob/devel/lib/ansible/module_utils/facts/system/distribution.py)
        might give you some hints.
 
-5. **Search for FIXME** in all files (e.g., via `grep "FIXME" -r ./`).
+5. **Check the test configuration**
+   - [`tests/config.yml`](./tests/config.yml) → `python_requires`: the Python
+     versions module code supports on managed nodes.
+   - [`antsibull-nox.toml`](./antsibull-nox.toml): run `nox` once. The file
+     header lists the available checks.
+
+6. **Search for FIXME** in all files (e.g., via `grep "FIXME" -r ./`).

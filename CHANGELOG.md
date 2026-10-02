@@ -11,6 +11,9 @@ and the project adheres to
 
 ### Added
 
+- collection_default: `noxfile.py` and `antsibull-nox.toml`.
+- collection_default: `tests/config.yml`, which declares Python 3.9 as the
+  lowest version for module code on managed nodes.
 - (collection|role)_default: `.ansible-lint` with the `production` profile and
   the skipped `use-loop` rule of the Ansible guidelines. The repository checks
   lint generated roles and collections with it, Molecule resources included.

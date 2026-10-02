@@ -1,0 +1,25 @@
+# /// script
+# dependencies = ["nox>=2025.02.09", "antsibull-nox"]
+# ///
+"""Run the collection's checks with nox, as configured in antsibull-nox.toml."""
+
+import os
+import sys
+
+import nox
+
+try:
+    import antsibull_nox
+except ImportError:
+    print("Install antsibull-nox in the same Python environment as nox.")
+    sys.exit(1)
+
+# Prefer Podman when both Podman and Docker are installed. Docker is still used
+# when it is the only one. Override through the environment, for example with
+# ANTSIBULL_NOX_CONTAINER_ENGINE=auto-prefer-docker.
+os.environ.setdefault("ANTSIBULL_NOX_CONTAINER_ENGINE", "auto-prefer-podman")
+
+antsibull_nox.load_antsibull_nox_toml()
+
+if __name__ == "__main__":
+    nox.main()
