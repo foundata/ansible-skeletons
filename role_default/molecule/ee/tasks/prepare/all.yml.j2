@@ -1,7 +1,6 @@
 # Prepare metadata, files and directories
 
 ---
-
 - name: "Molecule | Prepare (all) | Init data used across stages"
   ansible.builtin.include_tasks:
     file: "../tasks/state_update.yml"
@@ -17,18 +16,15 @@
       ee_image_tag: "latest"
       ee_container_name: "molecule-verify-ee"
 
-
 - name: "Molecule | Prepare (all) | Check for galaxy.yml (collection indicator)"
   ansible.builtin.stat:
     path: "{{ '{{' }} __testing_state['project_dir_path'] {{ '}}' }}/galaxy.yml"
   register: __testing_galaxyyml_stat
 
-
 - name: "Molecule | Prepare (all) | Check for meta/main.yml (role indicator)"
   ansible.builtin.stat:
     path: "{{ '{{' }} __testing_state['project_dir_path'] {{ '}}' }}/meta/main.yml"
   register: __testing_rolemeta_stat
-
 
 - name: "Molecule | Prepare (all) | Determine project type"
   ansible.builtin.include_tasks:
@@ -46,7 +42,6 @@
           unknown
         {{ '{%-' }} endif {{ '-%}' }}
 
-
 - name: "Molecule | Prepare (all) | Fail if project type cannot be determined"
   ansible.builtin.fail:
     msg: >
@@ -55,23 +50,19 @@
   when:
     - __testing_state['project_type'] == "unknown"
 
-
 - name: "Molecule | Prepare (all) | Display detected project type"
   ansible.builtin.debug:
     msg: "Detected project type: {{ '{{' }} __testing_state['project_type'] {{ '}}' }}"
-
 
 # Collection
 - name: "Molecule | Prepare (all) | Collection meta data"
   when:
     - __testing_state['project_type'] == "collection"
   block:
-
     - name: "Molecule | Prepare (all) | Read collection metadata (galaxy.yml)"
       ansible.builtin.slurp:
         src: "{{ '{{' }} __testing_state['project_dir_path'] {{ '}}' }}/galaxy.yml"
       register: __testing_artifact_meta_raw
-
 
     - name: "Molecule | Prepare (all) | Parse collection metadata"
       ansible.builtin.set_fact:
@@ -81,7 +72,6 @@
             | ansible.builtin.b64decode
             | ansible.builtin.from_yaml
           {{ '}}' }}
-
 
     - name: "Molecule | Prepare (all) | Extract collection namespace and name, set collection FQCN"
       ansible.builtin.include_tasks:
@@ -95,18 +85,15 @@
               __testing_artifact_meta['name']
             {{ '}}' }}
 
-
 # Role
 - name: "Molecule | Prepare (all) | Role meta data"
   when:
     - __testing_state['project_type'] == "role"
   block:
-
     - name: "Molecule | Prepare (all) | Read role metadata (meta/main.yml)"
       ansible.builtin.slurp:
         src: "{{ '{{' }} __testing_state['project_dir_path'] {{ '}}' }}/meta/main.yml"
       register: __testing_artifact_meta_raw
-
 
     - name: "Molecule | Prepare (all) | Parse role metadata"
       ansible.builtin.set_fact:
@@ -116,7 +103,6 @@
             | ansible.builtin.b64decode
             | ansible.builtin.from_yaml
           {{ '}}' }}
-
 
     - name: "Molecule | Prepare (all) | Extract role name from metadata or directory"
       ansible.builtin.include_tasks:
@@ -130,7 +116,6 @@
               | ansible.builtin.default(__testing_state['project_dir_path'])
               | ansible.builtin.basename
             {{ '}}' }}
-
 
 - name: "Molecule | Prepare (all) | Display artifact name"
   ansible.builtin.debug:

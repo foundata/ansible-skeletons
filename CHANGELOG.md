@@ -25,6 +25,8 @@ and the project adheres to
 
 ### Changed
 
+- (collection|role)_default: YAML templates use one blank line between tasks
+  and no blank line immediately after document markers or task/block headers.
 - (collection|role)_default: commented-out examples in YAML files start with
   `# `, as the `yaml[comments]` rule of `ansible-lint` requires. Multi-line
   examples keep their indentation when an editor uncomments them.

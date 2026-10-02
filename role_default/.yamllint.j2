@@ -2,7 +2,6 @@
 # https://foundata.com/en/guidelines/ansible-playbooks/
 
 ---
-
 extends: "default"
 
 rules:
@@ -12,12 +11,11 @@ rules:
   indentation:
     spaces: 2
     indent-sequences: true
-  # These are maxima, not requirements. Exact blank-line placement after task
-  # headers, between tasks, around --- and at EOF needs a custom lint rule.
+  # Let ansible-lint --fix own layout. Maxima cannot require task separators.
   empty-lines:
-    max: 2
-    max-start: 1
-    max-end: 1
+    max: 1
+    max-start: 0
+    max-end: 0
   new-line-at-end-of-file: "enable"
   new-lines:
     type: "unix"
@@ -44,4 +42,3 @@ rules:
   octal-values:
     forbid-implicit-octal: true
     forbid-explicit-octal: true
-

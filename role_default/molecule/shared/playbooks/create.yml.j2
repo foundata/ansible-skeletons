@@ -2,13 +2,11 @@
 # in instance-config.
 
 ---
-
 - name: "Molecule | Create"
   hosts: "molecule"
   gather_facts: false
   no_log: "{{ '{{' }} molecule_no_log | ansible.builtin.default(false) {{ '}}' }}"
   pre_tasks:
-
     - name: "Molecule | Create | Restore __testing_state (if any) from YAML file from localhost"
       # Although this task is delegated to localhost, the play itself targets
       # "hosts: molecule", so the resulting fact is stored on the current
@@ -27,9 +25,7 @@
       when:
         - (__testing_state is not ansible.builtin.defined) or (__testing_state is not ansible.builtin.mapping)
 
-
   tasks:
-
     - name: "Molecule | Create | Set <scenario>/tasks/create directory path"
       ansible.builtin.set_fact:
         __testing_create_taskdir: >-
@@ -38,14 +34,12 @@
             ~ '/tasks/create'
           {{ '}}' }}
 
-
     - name: "Molecule | Create | Check if <scenario>/tasks/create directory exists on localhost"
       delegate_to: "localhost"
       ansible.builtin.stat:
         path: "{{ '{{' }} __testing_create_taskdir {{ '}}' }}"
       run_once: true # noqa: run-once[task]
       register: __testing_create_taskdir_stat
-
 
     - name: "Molecule | Create | Include additional tasks from <scenario>/tasks/create"
       ansible.builtin.include_tasks:
@@ -63,9 +57,7 @@
         index_var: "__testing_create_loop_index"
         loop_var: "__testing_create_loop_item"
 
-
   post_tasks:
-
     - name: "Molecule | Create | Persist __testing_state (if any) to YAML file on localhost"
       # Although this task is delegated to localhost, the play itself targets
       # "hosts: molecule", so inventory_hostname is available.

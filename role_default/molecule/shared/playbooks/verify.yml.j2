@@ -13,13 +13,11 @@
 # - Some special configuration values set correctly
 
 ---
-
 - name: "Molecule | Verify"
   hosts: "molecule"
   gather_facts: false
   no_log: "{{ '{{' }} molecule_no_log | ansible.builtin.default(false) {{ '}}' }}"
   pre_tasks:
-
     - name: "Molecule | Verify | Restore __testing_state (if any) from YAML file from localhost"
       # Although this task is delegated to localhost, the play itself targets
       # "hosts: molecule", so the resulting fact is stored on the current
@@ -38,9 +36,7 @@
       when:
         - (__testing_state is not ansible.builtin.defined) or (__testing_state is not ansible.builtin.mapping)
 
-
   tasks:
-
     - name: "Molecule | Verify | Set <scenario>/tasks/verify directory path"
       ansible.builtin.set_fact:
         __testing_verify_taskdir: >-
@@ -49,14 +45,12 @@
             ~ '/tasks/verify'
           {{ '}}' }}
 
-
     - name: "Molecule | Verify | Check if <scenario>/tasks/verify directory exists on localhost"
       delegate_to: "localhost"
       ansible.builtin.stat:
         path: "{{ '{{' }} __testing_verify_taskdir {{ '}}' }}"
       run_once: true # noqa: run-once[task]
       register: __testing_verify_taskdir_stat
-
 
     - name: "Molecule | Verify | Include additional tasks from <scenario>/tasks/verify"
       ansible.builtin.include_tasks:
@@ -74,9 +68,7 @@
         index_var: "__testing_verify_loop_index"
         loop_var: "__testing_verify_loop_item"
 
-
   post_tasks:
-
     - name: "Molecule | Verify | Persist __testing_state (if any) to YAML file on localhost"
       # Although this task is delegated to localhost, the play itself targets
       # "hosts: molecule", so inventory_hostname is available.

@@ -1,7 +1,6 @@
 # Prepare prerequisites for building the Execution Environment image
 
 ---
-
 - name: "Molecule | Prepare (localhost) | Check for required tools"
   # The command or shell module is used intentionally: Ansible provides no
   # dedicated module to perform this operation.
@@ -17,7 +16,6 @@
     - false
   failed_when:
     - false
-
 
 - name: "Molecule | Prepare (localhost) | Fail if required tools are missing"
   ansible.builtin.fail:

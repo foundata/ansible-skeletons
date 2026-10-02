@@ -2,13 +2,11 @@
 # data from instance-config.create
 
 ---
-
 - name: "Molecule | Destroy"
   hosts: "molecule"
   gather_facts: false
   no_log: "{{ '{{' }} molecule_no_log | ansible.builtin.default(false) {{ '}}' }}"
   pre_tasks:
-
     - name: "Molecule | Destroy | Restore __testing_state (if any) from YAML file from localhost"
       # Although this task is delegated to localhost, the play itself targets
       # "hosts: molecule", so the resulting fact is stored on the current
@@ -29,9 +27,7 @@
       # "cleanup" and "destroy" phases must tolerate missing containers
       ignore_unreachable: true
 
-
   tasks:
-
     - name: "Molecule | Destroy | Set <scenario>/tasks/destroy directory path"
       ansible.builtin.set_fact:
         __testing_destroy_taskdir: >-
@@ -40,14 +36,12 @@
             ~ '/tasks/destroy'
           {{ '}}' }}
 
-
     - name: "Molecule | Destroy | Check if <scenario>/tasks/destroy directory exists on localhost"
       delegate_to: "localhost"
       ansible.builtin.stat:
         path: "{{ '{{' }} __testing_destroy_taskdir {{ '}}' }}"
       run_once: true # noqa: run-once[task]
       register: __testing_destroy_taskdir_stat
-
 
     - name: "Molecule | Destroy | Include additional tasks from <scenario>/tasks/destroy"
       ansible.builtin.include_tasks:
@@ -64,7 +58,6 @@
         label: "{{ '{{' }} __testing_destroy_loop_item {{ '}}' }}"
         index_var: "__testing_destroy_loop_index"
         loop_var: "__testing_destroy_loop_item"
-
 
     - name: "Molecule | Destroy (Podman) | Delete __testing_state YAML file (best effort) on localhost"
       delegate_to: "localhost"

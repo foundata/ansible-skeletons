@@ -4,7 +4,6 @@
 # https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_reuse_roles.html#role-argument-validation
 
 ---
-
 argument_specs:
 
   # {{ namespace }}.{{ collection_name }}/roles/run/tasks/main.yml entry point
@@ -13,7 +12,6 @@ argument_specs:
     description: |
       FIXME Describe what this entry point manages.
     options:
-
       run_{{ collection_name }}_state:
         description: |
           Determines whether the managed resources should be `present` or `absent`.

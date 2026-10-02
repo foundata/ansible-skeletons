@@ -10,7 +10,6 @@
 # possible. See molecule/README.md for requirements and usage details.
 
 ---
-
 driver:
   name: "default"
   options:
@@ -18,7 +17,6 @@ driver:
     # Resolved per instance from the instance config written by the create
     # playbooks, so "molecule login" works for containers and VMs alike.
     login_cmd_template: "{login_cmd}"
-
 
 # Target platforms for testing
 platforms:
@@ -158,7 +156,6 @@ platforms:
   # openSUSE Leap 15.6
   # Currently not supported by us and therefore not tested.
 
-
 # Ansible dependencies (collections, roles) of this Molecule scenario
 dependency:
   name: "galaxy"
@@ -167,7 +164,6 @@ dependency:
     requirements-file: "${MOLECULE_SCENARIO_DIRECTORY}/requirements.yml"
     ignore-certs: false
     ignore-errors: false
-
 
 # Configuration parameters for Ansible to provision test infrastructure and
 # enable Molecule to execute test scenarios against the provisioned environment.
@@ -201,11 +197,9 @@ provisioner:
     cleanup: "../shared/playbooks/cleanup.yml"
     destroy: "../shared/playbooks/destroy-dispatch.yml"
 
-
 verifier:
   name: "ansible"
   enabled: true
-
 
 # Skip role name validation against Ansible Galaxy standards. This prevents
 # development friction when working without a Galaxy account.

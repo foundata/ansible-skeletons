@@ -1,7 +1,6 @@
 # Install: Manage basic resource setup, such as packages or service users.
 
 ---
-
 - name: "Setup | Install | Default | Remove unwanted packages (e.g., to prevent conflicts or resolve incompatibilities)"
   ansible.builtin.package:
     name: "{{ '{{ __run_' + collection_name + '_packages_removal }}' }}"
@@ -10,7 +9,6 @@
     - __run_{{ collection_name }}_packages_removal is ansible.builtin.defined
     - (__run_{{ collection_name }}_packages_removal | ansible.builtin.length) > 0
 
-
 - name: "Setup | Install | Default | Install or upgrade packages"
   ansible.builtin.package:
     name: "{{ '{{ __run_' + collection_name + '_packages_install }}' }}"
@@ -18,7 +16,6 @@
   when:
     - __run_{{ collection_name }}_packages_install is ansible.builtin.defined
     - (__run_{{ collection_name }}_packages_install | ansible.builtin.length) > 0
-
 
 - name: "Setup | Install | Default | Remove unwanted files and directories (e.g., to prevent conflicts or resolve incompatibilities)"
   ansible.builtin.file:
@@ -30,7 +27,6 @@
   loop: "{{ '{{ __run_' + collection_name + '_paths_removal }}' }}"
   loop_control:
     loop_var: "__run_{{ collection_name }}_removal_path_item"
-
 
 - name: "Setup | Install | Default | Neutralize distribution config files (overwrite to survive package updates)"
   ansible.builtin.copy:

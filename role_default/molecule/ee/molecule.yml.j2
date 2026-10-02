@@ -11,18 +11,15 @@
 # details.
 
 ---
-
 driver:
   name: "default"
   options:
     managed: false
 
-
 # Target platforms for testing
 platforms:
   # No target platforms needed - we test on localhost by building an EE image
   - name: "localhost"
-
 
 # Scenario execution order
 scenario:
@@ -40,7 +37,6 @@ scenario:
     - cleanup
     - destroy
 
-
 # Ansible dependencies (collections, roles) of this Molecule scenario
 dependency:
   name: "galaxy"
@@ -49,7 +45,6 @@ dependency:
     requirements-file: "${MOLECULE_SCENARIO_DIRECTORY}/requirements.yml"
     ignore-certs: false
     ignore-errors: false
-
 
 # Configuration parameters for Ansible to provision test infrastructure and
 # enable Molecule to execute test scenarios against the provisioned environment.
@@ -83,11 +78,9 @@ provisioner:
     cleanup: "../shared/playbooks/cleanup.yml"
     destroy: "../shared/playbooks/destroy.yml"
 
-
 verifier:
   name: "ansible"
   enabled: true
-
 
 # Skip role name validation against Ansible Galaxy standards. This prevents
 # development friction when working without a Galaxy account.

@@ -5,13 +5,11 @@
 # declarative approach, which fails on execution errors.
 
 ---
-
 - name: "Molecule | Converge"
   hosts: "molecule"
   gather_facts: false
   no_log: "{{ '{{' }} molecule_no_log | ansible.builtin.default(false) {{ '}}' }}"
   pre_tasks:
-
     - name: "Molecule | Converge | Restore __testing_state (if any) from YAML file from localhost"
       # Although this task is delegated to localhost, the play itself targets
       # "hosts: molecule", so the resulting fact is stored on the current
@@ -30,9 +28,7 @@
       when:
         - (__testing_state is not ansible.builtin.defined) or (__testing_state is not ansible.builtin.mapping)
 
-
   tasks:
-
     - name: "Molecule | Converge | Set <scenario>/tasks/converge directory path"
       ansible.builtin.set_fact:
         __testing_converge_taskdir: >-
@@ -41,14 +37,12 @@
             ~ '/tasks/converge'
           {{ '}}' }}
 
-
     - name: "Molecule | Converge | Check if <scenario>/tasks/converge directory exists on localhost"
       delegate_to: "localhost"
       ansible.builtin.stat:
         path: "{{ '{{' }} __testing_converge_taskdir {{ '}}' }}"
       run_once: true # noqa: run-once[task]
       register: __testing_converge_taskdir_stat
-
 
     - name: "Molecule | Converge | Include additional tasks from <scenario>/tasks/converge"
       ansible.builtin.include_tasks:
@@ -66,9 +60,7 @@
         index_var: "__testing_converge_loop_index"
         loop_var: "__testing_converge_loop_item"
 
-
   post_tasks:
-
     - name: "Molecule | Converge | Persist __testing_state (if any) to YAML file on localhost"
       # Although this task is delegated to localhost, the play itself targets
       # "hosts: molecule", so inventory_hostname is available.

@@ -1,7 +1,6 @@
 # Main entry point for the role.
 
 ---
-
 - name: "Main | Include role initialization tasks"
   ansible.builtin.include_tasks:
     file: "{{ '{{' }} role_path {{ '}}' }}/tasks/init.yml"
@@ -12,7 +11,6 @@
   tags:
     - "always"
     - "run_{{ collection_name }}_always"
-
 
 # Separate includes for platform-specific files and default.yml on purpose. When
 # looping over "platform files + ['default.yml']" for multiple platforms in one
@@ -37,7 +35,6 @@
   tags:
     - "run_{{ collection_name }}_setup"
 
-
 - name: "Main | Include setup tasks (install): default"
   ansible.builtin.include_tasks:
     file: "{{ '{{' }} __run_{{ collection_name }}_task_file {{ '}}' }}"
@@ -51,7 +48,6 @@
     - __run_{{ collection_name }}_task_file is ansible.builtin.file
   tags:
     - "run_{{ collection_name }}_setup"
-
 
 - name: "Main | Include configuration tasks: best platform matches (if any)"
   ansible.builtin.include_tasks:
@@ -70,7 +66,6 @@
   tags:
     - "run_{{ collection_name }}_config"
 
-
 - name: "Main | Include configuration tasks: default"
   ansible.builtin.include_tasks:
     file: "{{ '{{' }} __run_{{ collection_name }}_task_file {{ '}}' }}"
@@ -84,7 +79,6 @@
     - __run_{{ collection_name }}_task_file is ansible.builtin.file
   tags:
     - "run_{{ collection_name }}_config"
-
 
 - name: "Main | Include service or daemon management tasks: best platform matches (if any)"
   ansible.builtin.include_tasks:
@@ -103,7 +97,6 @@
   tags:
     - "run_{{ collection_name }}_service"
 
-
 - name: "Main | Include service or daemon management tasks: default"
   ansible.builtin.include_tasks:
     file: "{{ '{{' }} __run_{{ collection_name }}_task_file {{ '}}' }}"
@@ -117,7 +110,6 @@
     - __run_{{ collection_name }}_task_file is ansible.builtin.file
   tags:
     - "run_{{ collection_name }}_service"
-
 
 - name: "Main | Include setup tasks (uninstall): best platform matches (if any)"
   ansible.builtin.include_tasks:

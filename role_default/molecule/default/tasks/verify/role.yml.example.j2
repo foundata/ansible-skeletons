@@ -4,7 +4,6 @@
 # compiled databases, ...) BEFORE the uninstall block below - the uninstall
 # converges that state away.
 
-
 ## Uninstall (state "absent") verification.
 #
 # This block has to stay the LAST one in the verify stage: it converges the
@@ -27,13 +26,11 @@
     group: "root"
     mode: "u=rw,g=r,o=r"
 
-
 - name: "Molecule | Verify | Uninstall the {{ role_name }} role"
   ansible.builtin.include_role:
     name: "{{ role_name }}"
   vars:
     {{ role_name }}_state: "absent"
-
 
 - name: "Molecule | Verify | Check role-managed resources are gone after the uninstall"
   ansible.builtin.stat:
@@ -52,7 +49,6 @@
 #   ansible.builtin.command with systemctl show)
 # - service users and groups are removed (ansible.builtin.getent)
 # - compiled databases, credentials and state files are removed
-
 
 # Assert retention, too: resources the role must NOT touch have to survive
 # (distribution defaults, operator-managed files, shared packages). Without

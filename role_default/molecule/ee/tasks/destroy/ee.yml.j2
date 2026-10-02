@@ -1,13 +1,11 @@
 # Destroy throwaway verification container(s) and EE image(s)
 
 ---
-
 - name: "Molecule | Destroy (EE) | Container"
   when:
     - __testing_state['ee_container_name'] is ansible.builtin.defined
     - __testing_state['ee_container_name'] | ansible.builtin.length > 0
   block:
-
     - name: "Molecule | Destroy | Stop verification container on localhost (best effort)"
       delegate_to: "localhost"
       containers.podman.podman_container:
@@ -16,7 +14,6 @@
         executable: "{{ '{{' }} podman_executable {{ '}}' }}"
       failed_when:
         - false
-
 
     - name: "Molecule | Destroy | Remove verification container"
       containers.podman.podman_container:
@@ -27,20 +24,17 @@
         force_delete: true
         rmi: false
 
-
 - name: "Molecule | Destroy (EE) | Remove images"
   when:
     - __testing_state['ee_image_name'] is ansible.builtin.defined
     - __testing_state['ee_image_name'] | ansible.builtin.length > 0
   block:
-
     - name: "Molecule | Destroy | Remove EE image"
       containers.podman.podman_image:
         name: "{{ '{{' }} __testing_state['ee_image_name'] {{ '}}' }}"
         state: "absent"
         executable: "{{ '{{' }} podman_executable {{ '}}' }}"
         force: true
-
 
     - name: "Molecule | Destroy (EE) | Find dangling images"
       # The command or shell module is used intentionally:
@@ -58,7 +52,6 @@
       failed_when:
         - false
       register: __testing_dangling_images
-
 
     - name: "Molecule | Destroy (EE) | Remove dangling images (if any)"
       containers.podman.podman_image:

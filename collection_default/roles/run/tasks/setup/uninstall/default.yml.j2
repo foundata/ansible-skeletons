@@ -1,7 +1,6 @@
 # Uninstall: Manage basic resource removal, such as packages or service users.
 
 ---
-
 - name: "Setup | Uninstall | Remove packages"
   ansible.builtin.package:
     name: "{{ '{{ __run_' + collection_name + '_packages_uninstall }}' }}"

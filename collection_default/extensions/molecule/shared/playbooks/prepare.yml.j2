@@ -4,7 +4,6 @@
 # clarity of the converge step.
 
 ---
-
 - name: "Molecule | Prepare"
   hosts: "molecule"
   # gather_facts fails if Python is not installed on the target hosts. While
@@ -14,17 +13,14 @@
   gather_facts: false
   no_log: "{{ '{{' }} molecule_no_log | ansible.builtin.default(false) {{ '}}' }}"
   pre_tasks:
-
     - name: "Molecule | Prepare | Basic self-checks for the testing infrastructure"
       run_once: true # noqa: run-once[task]
       block:
-
         - name: "Molecule | Prepare | Fail if MOLECULE_SCENARIO_DIRECTORY is not set or empty"
           ansible.builtin.fail:
             msg: "MOLECULE_SCENARIO_DIRECTORY env var is not set or empty"
           when:
             - (lookup('ansible.builtin.env', 'MOLECULE_SCENARIO_DIRECTORY') | ansible.builtin.trim) | ansible.builtin.length == 0
-
 
         - name: "Molecule | Prepare | Assert inventory groups existence on localhost"
           delegate_to: "localhost"
@@ -35,7 +31,6 @@
               - "'molecule_windows' in groups"
             fail_msg: |
               At least one molecule group was not found inside inventory groups: {{ '{{' }} groups {{ '}}' }}
-
 
         - name: "Molecule | Prepare | Get basic information from 'molecule_linux' targets"
           delegate_to: "{{ '{{' }} item {{ '}}' }}"
@@ -55,7 +50,6 @@
             label: "{{ '{{' }} item {{ '}}' }}"
           register: __testing_basicinfo_result
 
-
         - name: "Molecule | Prepare | Display basic information of 'molecule_linux' targets on localhost"
           delegate_to: "localhost"
           ansible.builtin.debug:
@@ -71,7 +65,6 @@
             - __testing_basicinfo_result is ansible.builtin.defined
             - __testing_basicinfo_result['results'] is ansible.builtin.defined
             - __testing_basicinfo_result['results'] | ansible.builtin.length > 0
-
 
         - name: "Molecule | Prepare | Print all molecule_ variables on localhost"
           delegate_to: "localhost"
@@ -89,7 +82,6 @@
           when:
             - hostvars is ansible.builtin.defined
             - inventory_hostname in hostvars
-
 
     - name: "Molecule | Prepare | Restore __testing_state (if any) from YAML file from localhost"
       # Although this task is delegated to localhost, the play itself targets
@@ -109,9 +101,7 @@
       when:
         - (__testing_state is not ansible.builtin.defined) or (__testing_state is not ansible.builtin.mapping)
 
-
   tasks:
-
     # This prevents testing whether the project to test itself verifies the
     # availability of these facts but it avoids fragile workarounds (like
     # parsing container names) if additional platform specific preparations are.
@@ -122,7 +112,6 @@
       when:
         - ansible_facts['distribution'] is not ansible.builtin.defined or
           ansible_facts['os_family'] is not ansible.builtin.defined
-
 
     # Container cleanup task like "rm -rf /var/lib/apt/lists/*" change the mtime
     # of the directory, causing ansible.builtin.apt installs to fail due to
@@ -136,7 +125,6 @@
         - ansible_facts['os_family'] is ansible.builtin.defined
         - (ansible_facts['os_family'] | ansible.builtin.lower) == 'debian'
 
-
     - name: "Molecule | Prepare | Set <scenario>/tasks/prepare directory path"
       ansible.builtin.set_fact:
         __testing_prepare_taskdir: >-
@@ -145,14 +133,12 @@
             ~ '/tasks/prepare'
           {{ '}}' }}
 
-
     - name: "Molecule | Prepare | Check if <scenario>/tasks/prepare directory exists on localhost"
       delegate_to: "localhost"
       ansible.builtin.stat:
         path: "{{ '{{' }} __testing_prepare_taskdir {{ '}}' }}"
       run_once: true # noqa: run-once[task]
       register: __testing_prepare_taskdir_stat
-
 
     - name: "Molecule | Prepare | Include additional tasks from <scenario>/tasks/prepare"
       ansible.builtin.include_tasks:
@@ -169,9 +155,7 @@
         index_var: "__testing_prepare_loop_index"
         loop_var: "__testing_prepare_loop_item"
 
-
   post_tasks:
-
     - name: "Molecule | Prepare | Persist __testing_state (if any) to YAML file on localhost"
       # Although this task is delegated to localhost, the play itself targets
       # "hosts: molecule", so inventory_hostname is available.

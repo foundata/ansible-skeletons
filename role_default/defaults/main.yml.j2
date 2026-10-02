@@ -6,7 +6,6 @@
 # and how it fits into the role's functionality.
 
 ---
-
 # String. Determines whether the managed resources should be "present" or
 # "absent". Defaults to "present". Possible values:
 #
@@ -16,12 +15,10 @@
 #   deleting created users, stopping services, restoring modified settings, …
 {{ role_name }}_state: "present"
 
-
 # Boolean. If set to true, all managed packages will be upgraded during each
 # Ansible run (e.g., when the package provider detects a newer version than
 # the currently installed one). Defaults to false.
 {{ role_name }}_autoupgrade: false
-
 
 # String. Defines the status of the service(s). Defaults to "enabled".
 # Possible values:
@@ -39,7 +36,6 @@
 # The singular form ("service") is used for simplicity. However, the defined
 # status applies to all services if multiple are being managed by this role.
 {{ role_name }}_service_state: "enabled"
-
 
 # FIXME Description of a very important example parameter. Do not forget to
 #       update meta/argument_specs.yml if you add new parameters.

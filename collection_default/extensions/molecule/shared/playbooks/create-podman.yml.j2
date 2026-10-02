@@ -9,7 +9,6 @@
 # https://docs.ansible.com/projects/molecule/examples/podman/
 
 ---
-
 - name: "Molecule | Create (Podman) | Create testing infrastructure on localhost"
   hosts: "localhost"
   connection: "local"
@@ -40,7 +39,6 @@
           'molecule_linux': {'hosts': {} }, 'molecule_windows': {'hosts': {} } } } }, true)
       {{ '}}' }}
   pre_tasks:
-
     - name: "Molecule | Create (Podman) | Restore __testing_state (if any) from YAML file from localhost"
       ansible.builtin.set_fact:
         __testing_state: >-
@@ -54,9 +52,7 @@
       when:
         - (__testing_state is not ansible.builtin.defined) or (__testing_state is not ansible.builtin.mapping)
 
-
   tasks:
-
     - name: "Molecule | Create (Podman) | Log into container registry"
       containers.podman.podman_login:
         executable: "{{ '{{' }} podman_executable {{ '}}' }}"
@@ -78,7 +74,6 @@
         - item['registry']['credentials']['username'] is ansible.builtin.defined
       changed_when:
         - false
-
 
     - name: "Molecule | Create (Podman) | Create containers running tests on target platforms"
       containers.podman.podman_container:
@@ -109,7 +104,6 @@
       loop: "{{ '{{' }} podman_platforms {{ '}}' }}"
       register: __testing_createcontainer_result
 
-
     - name: "Molecule | Create (Podman) | Print container info"
       ansible.builtin.debug:
         msg: "{{ '{{' }} __testing_createcontainer_result['results'] {{ '}}' }}"
@@ -117,7 +111,6 @@
       when:
         - __testing_createcontainer_result is ansible.builtin.defined
         - __testing_createcontainer_result['results'] is ansible.builtin.defined
-
 
     - name: "Molecule | Create (Podman) | Identify failed containers "
       ansible.builtin.set_fact:
@@ -137,18 +130,15 @@
         - __testing_createcontainer_result is ansible.builtin.defined
         - __testing_createcontainer_result['results'] is ansible.builtin.defined
 
-
     - name: "Molecule | Create (Podman) | Handle container failures (if any)"
       when: __testing_failed_containers | ansible.builtin.default([]) | ansible.builtin.length > 0
       block:
-
         - name: "Molecule | Create (Podman) | Print failed container info"
           ansible.builtin.debug:
             msg: "{{ '{{' }} __testing_failed_containers {{ '}}' }}"
           when:
             # Skip if already displayed by previous debug tasks with "verbosity: 3"
             - (ansible_verbosity is ansible.builtin.defined) and ansible_verbosity < 3
-
 
         - name: "Molecule | Create (Podman) | Print failed container's non-zero exit codes"
           ansible.builtin.debug:
@@ -163,7 +153,6 @@
             loop_var: "__fail_item"
             label: "{{ '{{' }} __fail_item['container']['Name'] {{ '}}' }}"
 
-
         - name: "Molecule | Create (Podman) | Print the failed container's non-running states"
           ansible.builtin.debug:
             msg: "{{ '{{' }} __fail_item['container']['Name'] {{ '}}' }}: {{ '{{' }} __fail_item['container']['State']['Status'] {{ '}}' }}"
@@ -177,7 +166,6 @@
           loop_control:
             loop_var: "__fail_item"
             label: "{{ '{{' }} __fail_item['container']['Name'] {{ '}}' }}"
-
 
         - name: "Molecule | Create (Podman) | Show cleanup hints"
           ansible.builtin.debug:
@@ -196,13 +184,11 @@
             - molecule_yml is ansible.builtin.defined
             - molecule_yml['platforms'] is ansible.builtin.defined
 
-
         - name: "Molecule | Create (Podman) | Throw error"
           ansible.builtin.fail:
             msg: >
               Error during setup of the testing infrastructure with Podman. At least
               one container is not in state 'Running' or returned a non-zero exit code.
-
 
     - name: "Molecule | Create (Podman) | Restore instance configuration data of other backends (if any)"
       ansible.builtin.set_fact:
@@ -218,7 +204,6 @@
       when:
         - __testing_instance_config is not ansible.builtin.defined
 
-
     - name: "Molecule | Create (Podman) | Collect instance configuration data (used by molecule login)"
       ansible.builtin.set_fact:
         __testing_instance_config: >-
@@ -231,14 +216,12 @@
       loop_control:
         label: "{{ '{{' }} item['name'] {{ '}}' }}"
 
-
     - name: "Molecule | Create (Podman) | Store instance configuration for molecule login"
       ansible.builtin.copy:
         content: |
           {{ '{{' }} __testing_instance_config | ansible.builtin.to_nice_yaml {{ '}}' }}
         dest: "{{ '{{' }} molecule_instance_config {{ '}}' }}"
         mode: "u=rw,g=,o=" # 0600
-
 
     # Conditionally assign platforms to 'molecule_linux' or 'molecule_windows'
     # based on image/name detection.
@@ -281,7 +264,6 @@
       loop_control:
         label: "{{ '{{' }} item['name'] {{ '}}' }}"
 
-
     - name: "Molecule | Create (Podman) | Store inventory data as molecule_inventory.yml"
       ansible.builtin.copy:
         content: |
@@ -289,17 +271,14 @@
         dest: "{{ '{{' }} molecule_ephemeral_directory }}/inventory/molecule_inventory.yml"
         mode: "u=rw,g=,o=" # 0600
 
-
     - name: "Molecule | Create (Podman) | Ensure new instances exist in inventory"
       ansible.builtin.meta: "refresh_inventory"
-
 
     - name: "Molecule | Create (Podman) | Print inventory groups"
       ansible.builtin.debug:
         msg: |
           groups: {{ '{{' }} groups {{ '}}' }}
         verbosity: 1
-
 
     - name: "Molecule | Create (Podman) | Set <scenario>/tasks/create directory path"
       ansible.builtin.set_fact:
@@ -309,14 +288,12 @@
             ~ '/tasks/create'
           {{ '}}' }}
 
-
     - name: "Molecule | Create (Podman) | Check if <scenario>/tasks/create directory exists on localhost"
       delegate_to: "localhost"
       ansible.builtin.stat:
         path: "{{ '{{' }} __testing_create_taskdir {{ '}}' }}"
       run_once: true # noqa: run-once[task]
       register: __testing_create_taskdir_stat
-
 
     - name: "Molecule | Create (Podman) | Include additional tasks from <scenario>/tasks/create"
       ansible.builtin.include_tasks:
@@ -334,9 +311,7 @@
         index_var: "__testing_create_loop_index"
         loop_var: "__testing_create_loop_item"
 
-
   post_tasks:
-
     - name: "Molecule | Create (Podman) | Persist __testing_state (if any) to YAML file on localhost"
       # Although this task is delegated to localhost, the play itself targets
       # "hosts: molecule", so inventory_hostname is available.

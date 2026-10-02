@@ -1,7 +1,6 @@
 # Initialization: Manage internal role setup and the Ansible environment.
 
 ---
-
 - name: "Init | Gather role-specific facts"
   ansible.builtin.setup:
     gather_subset: "{{ '{{' }} __run_{{ collection_name }}_used_facts.keys() | ansible.builtin.list {{ '}}' }}"
@@ -9,12 +8,10 @@
     - not ((__run_{{ collection_name }}_used_facts.values() | ansible.builtin.flatten)
            is ansible.builtin.subset(ansible_facts.keys()))
 
-
 - name: "Init | Include role meta data"
   ansible.builtin.include_vars:
     file: "../meta/main.yml"
     name: "__run_{{ collection_name }}_meta"
-
 
 - name: "Init | Check Ansible version requirement and fail if unmet"
   ansible.builtin.fail:
@@ -23,7 +20,6 @@
       or higher. You are currently running Ansible {{ '{{' }} ansible_version['full'] {{ '}}' }} .
   when:
     - ansible_version['full'] is ansible.builtin.version(__run_{{ collection_name }}_meta['galaxy_info']['min_ansible_version'], '<')
-
 
 - name: "Init | Notify when platform support check is not possible"
   ansible.builtin.debug:
@@ -37,7 +33,6 @@
       ansible_facts['distribution_version'] is not ansible.builtin.defined or
       ansible_facts['distribution_major_version'] is not ansible.builtin.defined or
       ((__run_{{ collection_name }}_supported_platforms | ansible.builtin.length) == 0)
-
 
 - name: "Init | Warn when platform is unsupported"
   ansible.builtin.fail:
@@ -63,7 +58,6 @@
     - (__run_{{ collection_name }}_supported_platforms | ansible.builtin.length) > 0
     - (__run_{{ collection_name }}_matched_versions | ansible.builtin.length) == 0
   ignore_errors: true # noqa: ignore-errors
-
 
 - name: "Init | Set platform-specific filename list (most to least specific; raw with possible duplicates)"
   ansible.builtin.set_fact:
@@ -98,7 +92,6 @@
         | ansible.builtin.lower
       {{ '}}' }}
 
-
 - name: "Init | Set unique platform-specific filename list (most to least specific)"
   ansible.builtin.set_fact:
     __run_{{ collection_name }}_platform_filenames_most_specific_first: >-
@@ -108,7 +101,6 @@
         | ansible.builtin.default([]))
       {{ '}}' }}
 
-
 - name: "Init | Set unique platform-specific filename list (least to most specific)"
   ansible.builtin.set_fact:
     __run_{{ collection_name }}_platform_filenames_most_specific_last: >-
@@ -116,7 +108,6 @@
         __run_{{ collection_name }}_platform_filenames_most_specific_first
         | ansible.builtin.reverse
       {{ '}}' }}
-
 
 - name: "Init | Include platform-specific variables (if any), overwrite values with more specific ones"
   ansible.builtin.include_vars:
