@@ -11,6 +11,9 @@ and the project adheres to
 
 ### Added
 
+- (collection|role)_default: `.ansible-lint` with the `production` profile and
+  the skipped `use-loop` rule of the Ansible guidelines. The repository checks
+  lint generated roles and collections with it, Molecule resources included.
 - (collection|role)_default: descriptions for the entry point and the three
   base options in `meta/argument_specs.yml`. `antsibull-docs` requires them.
 

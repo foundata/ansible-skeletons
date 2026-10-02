@@ -164,7 +164,8 @@ a `run` role in an Ansible collection. It includes:
     [platform-specific variables](https://redhat-cop.github.io/automation-good-practices/#_platform_specific_variables).
 - Separation of logical task groups, automatic include for
   [platform-specific tasks](https://redhat-cop.github.io/automation-good-practices/#_platform_specific_tasks).
-- Passes `ansible-lint --profile production --strict`.
+- `.ansible-lint` configuration following the
+  [foundata Ansible playbook guideline](https://foundata.com/en/guidelines/ansible-playbooks/#linting).
 - [`antsibull-changelog`](https://docs.ansible.com/projects/antsibull-changelog/changelogs/)
   support.
 - [Molecule](https://docs.ansible.com/projects/molecule/) support with a default
@@ -187,7 +188,8 @@ A skeleton for standalone Ansible roles. It includes:
     [platform-specific variables](https://redhat-cop.github.io/automation-good-practices/#_platform_specific_variables).
 - Separation of logical task groups, automatic include for
   [platform-specific tasks](https://redhat-cop.github.io/automation-good-practices/#_platform_specific_tasks).
-- Passes `ansible-lint --profile production --strict`.
+- `.ansible-lint` configuration following the
+  [foundata Ansible playbook guideline](https://foundata.com/en/guidelines/ansible-playbooks/#linting).
 - [Molecule](https://docs.ansible.com/projects/molecule/) support with a default
   scenario using [Podman](https://podman.io/docs/installation) and several
   [integration test targets](https://github.com/orgs/foundata/repositories?q=oci-*-itt).

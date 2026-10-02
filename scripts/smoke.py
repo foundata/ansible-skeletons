@@ -275,30 +275,23 @@ def smoke(output: Path, *, lint: bool = False) -> None:
 
 
 def lint_resources(rendered: Rendered) -> None:
-    """Lint generated resources with explicit, narrowly scoped exclusions."""
-    config = rendered.work / "ansible-lint.yml"
-    config.write_text(
-        "profile: production\nstrict: true\nskip_list:\n  - yaml[comments]\n",
-        encoding="utf-8",
+    """Lint generated resources, Molecule included, with their own configuration."""
+    # The syntax check of the Molecule playbooks needs the collections they use.
+    run(
+        [
+            "ansible-galaxy",
+            "collection",
+            "install",
+            "--no-deps",
+            "--requirements-file",
+            str(ROOT / "tests/requirements.yml"),
+        ],
+        cwd=rendered.work,
+        env=rendered.env,
     )
-    for project, molecule in (
-        (rendered.role, "molecule"),
-        (rendered.collection, "extensions/molecule"),
-    ):
-        files = sorted(
-            str(path)
-            for path in project.rglob("*.yml")
-            if not path.is_relative_to(project / molecule)
-        )
+    for project in (rendered.role, rendered.collection):
         run(
-            [
-                "ansible-lint",
-                "--config-file",
-                str(config),
-                "--project-dir",
-                str(project),
-                *files,
-            ],
+            ["ansible-lint", "--strict", "--project-dir", str(project)],
             cwd=project,
             env=rendered.env,
         )
