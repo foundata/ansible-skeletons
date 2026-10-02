@@ -1,0 +1,47 @@
+# YAML checks used by ansible-lint, following foundata's guidelines:
+# https://foundata.com/en/guidelines/ansible-playbooks/
+
+---
+
+extends: "default"
+
+rules:
+  document-start:
+    present: true
+    level: "error"
+  indentation:
+    spaces: 2
+    indent-sequences: true
+  # These are maxima, not requirements. Exact blank-line placement after task
+  # headers, between tasks, around --- and at EOF needs a custom lint rule.
+  empty-lines:
+    max: 2
+    max-start: 1
+    max-end: 1
+  new-line-at-end-of-file: "enable"
+  new-lines:
+    type: "unix"
+  line-length:
+    max: 160
+  truthy:
+    allowed-values: ["true", "false"]
+    level: "error"
+  # Enforcing quotes on every string would also quote raw Jinja conditions and
+  # variable references such as register/debug.var, contrary to the guidelines.
+  quoted-strings:
+    quote-type: "double"
+    required: false
+    allow-quoted-quotes: true
+
+  # Keep ansible-lint's required formatter-compatible defaults when extending
+  # yamllint's default configuration instead of ansible-lint's internal one.
+  comments:
+    min-spaces-from-content: 1
+  comments-indentation: false
+  braces:
+    min-spaces-inside: 0
+    max-spaces-inside: 1
+  octal-values:
+    forbid-implicit-octal: true
+    forbid-explicit-octal: true
+

@@ -2,6 +2,8 @@
 # This playbook supports both collections and roles, detecting the artifact type
 # automatically based on the presence of galaxy.yml (collection) or meta/main.yml (role).
 
+---
+
 # Collection specific tasks
 - name: "Molecule | Converge | Build collection artifact"
   when:

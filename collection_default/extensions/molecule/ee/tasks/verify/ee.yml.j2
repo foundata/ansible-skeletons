@@ -1,6 +1,8 @@
 # Verify that the Ansible artifact (role or collection) is properly installed in
 # the Execution Environment image.
 
+---
+
 - name: "Molecule | Verify | Start throwaway verification container"
   containers.podman.podman_container:
     name: "{{ '{{' }} __testing_state['ee_container_name'] {{ '}}' }}"

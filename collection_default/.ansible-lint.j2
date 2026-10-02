@@ -4,6 +4,15 @@
 ---
 
 profile: "production"
+strict: true
+
+enable_list:
+  - "loop-var-prefix"
+
+# Private, role-prefixed loop variables with a purpose and an _item suffix.
+loop_var_prefix: "^__{role}_[a-z0-9_]+_item$"
 
 skip_list:
   - "use-loop"
+
+# YAML formatting is configured in the adjacent .yamllint file.

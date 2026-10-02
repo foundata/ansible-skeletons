@@ -1,5 +1,7 @@
 # Destroy throwaway verification container(s) and EE image(s)
 
+---
+
 - name: "Molecule | Destroy (EE) | Container"
   when:
     - __testing_state['ee_container_name'] is ansible.builtin.defined

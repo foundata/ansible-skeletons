@@ -12,6 +12,8 @@
 #           - "two"
 #         some_flag: true     # accessible via __testing_state['some_flag']
 
+---
+
 - name: "Molecule | State | Merge __testing_state_update into __testing_state"
   ansible.builtin.set_fact:
     __testing_state: >-

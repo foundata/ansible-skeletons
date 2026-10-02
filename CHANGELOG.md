@@ -19,6 +19,9 @@ and the project adheres to
   lint generated roles and collections with it, Molecule resources included.
 - (collection|role)_default: descriptions for the entry point and the three
   base options in `meta/argument_specs.yml`. `antsibull-docs` requires them.
+- (collection|role)_default: `.yamllint` for explicit YAML style checks, strict
+  lint warnings, and role-prefixed loop variable checks. Molecule task files
+  include the required YAML document markers.
 
 ### Changed
 
