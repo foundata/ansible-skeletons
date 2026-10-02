@@ -18,9 +18,9 @@ authors:
 readme: "README.md"
 description: {{ description | to_json(ensure_ascii=False) }}
 repository: {{ repository | to_json(ensure_ascii=False) }}
-#documentation: "{{ documentation }}"
-#issues: "{{ issues }}" # Use only if the issue tracker is separate from the repository.
-#homepage: "{{ homepage }}"
+# documentation: "{{ documentation }}"
+# issues: "{{ issues }}" # Use only if the issue tracker is separate from the repository.
+# homepage: "{{ homepage }}"
 tags:
   # FIXME Add appropriate tags. Production releases need at least one of these tags:
   # ["application", "cloud", "database", "eda", "infrastructure", "linux", "monitoring", "networking", "security", "storage", "tools", "windows"]
@@ -28,10 +28,10 @@ tags:
 
 # Collections that this collection requires to be installed.
 # Note: "*" selects the latest version available (not: "any")
-#dependencies:
+# dependencies:
   # FIXME uncomment the following for usually needed collections (remove if not needed);
-  #"ansible.utils": ">=5.1.0"
-  #"ansible.posix": ">=2.0.0"
+  # "ansible.utils": ">=5.1.0"
+  # "ansible.posix": ">=2.0.0"
 
 # List of file glob-like patterns to filter files or directories that should
 # not be included in the build artifact. Some are always filtered by

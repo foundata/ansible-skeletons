@@ -5,18 +5,18 @@
 # none right now
 
 
-#- name: "restart_example"
-#  ansible.builtin.service:
-#    name: "example"
-#    state: "restarted"
-#  when:
-#    - {{ role_name + '_service_state' }} in ['enabled', 'running']
+# - name: "restart_example"
+#   ansible.builtin.service:
+#     name: "example"
+#     state: "restarted"
+#   when:
+#     - {{ role_name + '_service_state' }} in ['enabled', 'running']
 #
-#- name: "reload_example"
-#  ansible.builtin.systemd:
-#    name: "example"
-#    enabled: true
-#    daemon_reload: true
+# - name: "reload_example"
+#   ansible.builtin.systemd:
+#     name: "example"
+#     enabled: true
+#     daemon_reload: true
 #
 # Usage Example:
 #

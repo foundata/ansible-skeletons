@@ -2,17 +2,17 @@
 
 ---
 
-#- name: "Service | Create systemd service: example.service"
-#  ansible.builtin.template:
-#    src: "example.service.j2"
-#    dest: "/etc/systemd/system/example.service"
-#  notify: "restart_example"
+# - name: "Service | Create systemd service: example.service"
+#   ansible.builtin.template:
+#     src: "example.service.j2"
+#     dest: "/etc/systemd/system/example.service"
+#   notify: "restart_example"
 #
 #
-#- name: "Service | Default | Ensure service state: example.service"
-#  ansible.builtin.service:
-#    name: "example.service"
-#    state: "{{ '{{' }} 'started' if {{ 'run_' + collection_name + '_service_state' }} in ['enabled', 'running'] else 'stopped' if {{ 'run_' + collection_name + '_service_state' }} == 'disabled' {{ '}}' }}"
-#    enabled: "{{ '{{' }} true if {{ 'run_' + collection_name + '_service_state' }} == 'enabled' else false if {{ 'run_' + collection_name + '_service_state' }} in ['disabled', 'running'] {{ '}}' }}"
-#  when:
-#    - {{ 'run_' + collection_name + '_service_state' }} != 'unmanaged'
+# - name: "Service | Default | Ensure service state: example.service"
+#   ansible.builtin.service:
+#     name: "example.service"
+#     state: "{{ '{{' }} 'started' if {{ 'run_' + collection_name + '_service_state' }} in ['enabled', 'running'] else 'stopped' if {{ 'run_' + collection_name + '_service_state' }} == 'disabled' {{ '}}' }}"
+#     enabled: "{{ '{{' }} true if {{ 'run_' + collection_name + '_service_state' }} == 'enabled' else false if {{ 'run_' + collection_name + '_service_state' }} in ['disabled', 'running'] {{ '}}' }}"
+#   when:
+#     - {{ 'run_' + collection_name + '_service_state' }} != 'unmanaged'

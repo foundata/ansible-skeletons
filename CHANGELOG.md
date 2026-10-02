@@ -11,6 +11,9 @@ and the project adheres to
 
 ### Changed
 
+- (collection|role)_default: commented-out examples in YAML files start with
+  `# `, as the `yaml[comments]` rule of `ansible-lint` requires. Multi-line
+  examples keep their indentation when an editor uncomments them.
 - Releases run through foundata's `releasing` tool for the changelog section,
   the tag, the push, the GitHub release entry and the publication checks. The
   skeleton-specific gate and its retained evidence stay in `scripts/release.py`.
