@@ -38,6 +38,8 @@
         that:
           - ansible_facts['distribution'] is ansible.builtin.defined
           - ansible_facts['os_family'] is ansible.builtin.defined
+          - ansible_distribution is not ansible.builtin.defined
+          - ansible_facts['date_time'] is not ansible.builtin.defined
           - __GATE_PREFIX_platform_filenames_most_specific_first | ansible.builtin.length > 0
 
     - name: "Check removal task outcomes"
@@ -70,3 +72,30 @@
       ansible.builtin.assert:
         that:
           - lookup('ansible.builtin.file', gate_expected_role_path ~ '/tasks/main.yml') is ansible.builtin.search('role_path')
+
+    - name: "Discard complete cached facts"
+      ansible.builtin.meta: "clear_facts"
+
+    - name: "Populate only part of the required platform facts"
+      ansible.builtin.setup:
+        gather_subset: ["!all", "!min", "distribution"]
+        filter: ["ansible_distribution"]
+
+    - name: "Verify partial fact fixture"
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['distribution'] is ansible.builtin.defined
+          - ansible_facts['os_family'] is not ansible.builtin.defined
+
+    - name: "Refresh missing role facts"
+      ansible.builtin.include_role:
+        name: "{{ gate_role }}"
+        tasks_from: "init"
+      vars:
+        GATE_PREFIX_state: "present"
+
+    - name: "Verify partial facts were completed without injection"
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['os_family'] is ansible.builtin.defined
+          - ansible_distribution is not ansible.builtin.defined

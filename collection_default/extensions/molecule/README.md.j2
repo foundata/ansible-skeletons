@@ -229,10 +229,10 @@ Molecule scenarios typically require network access to Container registries ([qu
          ansible.builtin.copy:
            dest: "/etc/apt/sources.list"
            content: |
-             # Internal mirror for  {{ '{{' }} ansible_distribution {{ '{{' }} {{ '{{' }} ansible_distribution_release {{ '{{' }}
-             deb http://internal-mirror.example.com/debian  {{ '{{' }} ansible_distribution_release {{ '{{' }} main contrib non-free
-             deb http://internal-mirror.example.com/debian  {{ '{{' }} ansible_distribution_release {{ '{{' }}-updates main contrib non-free
-             deb http://internal-mirror.example.com/debian-security  {{ '{{' }} ansible_distribution_release {{ '{{' }}-security main contrib non-free
+             # Internal mirror for {{ '{{' }} ansible_facts['distribution'] {{ '}}' }} {{ '{{' }} ansible_facts['distribution_release'] {{ '}}' }}
+             deb http://internal-mirror.example.com/debian {{ '{{' }} ansible_facts['distribution_release'] {{ '}}' }} main contrib non-free
+             deb http://internal-mirror.example.com/debian {{ '{{' }} ansible_facts['distribution_release'] {{ '}}' }}-updates main contrib non-free
+             deb http://internal-mirror.example.com/debian-security {{ '{{' }} ansible_facts['distribution_release'] {{ '}}' }}-security main contrib non-free
 
 
        - name: "Molecule | Prepare | Update apt cache"

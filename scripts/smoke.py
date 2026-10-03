@@ -185,6 +185,7 @@ def exercise_role(rendered: Rendered, *, collection: bool) -> None:
         "ANSIBLE_LIBRARY": str(ROOT / "tests/fixtures/library"),
         "ANSIBLE_CALLBACK_PLUGINS": str(ROOT / "tests/fixtures/callback_plugins"),
         "ANSIBLE_CALLBACKS_ENABLED": "gate_results",
+        "ANSIBLE_INJECT_FACT_VARS": "false",
         "SKELETONS_RESULTS": str(outcomes),
     }
     # A generic fixture supplies the dynamically named role variables in its
@@ -208,6 +209,16 @@ def exercise_role(rendered: Rendered, *, collection: bool) -> None:
         json.loads(line) for line in outcomes.read_text(encoding="utf-8").splitlines()
     ]
     packages = [row for row in results if row.get("package_state") is not None]
+    gathers = [
+        row
+        for row in results
+        if row.get("action") == "ansible.builtin.setup"
+        and row["task_path"].startswith(f"{role_path}/")
+    ]
+    if len(gathers) != 2:
+        raise GateError(
+            "Role must gather initially and after partial facts, but reuse complete cached facts"
+        )
     if [row["package_state"] for row in packages] != ["present", "present", "absent"]:
         raise GateError(
             "Package tasks did not exercise present, repeated present and absent"

@@ -7,12 +7,15 @@
 ---
 # Facts used by the role (gathered on a best-effort basis if needed), as a
 # mapping of "gather_subset" name to the ansible_facts keys it provides.
+# Cached platform facts are accepted. Callers must refresh them after platform
+# changes; the presence check in tasks/init.yml does not establish freshness.
 #
 # To identify which subset a fact belongs to during development, you can use
 # the following snippet:
 #
 # - ansible.builtin.setup:
 #     gather_subset:
+#       - '!all'
 #       - '!min'
 #       - '<subset_name, see parameter doc for details>'
 __{{ role_name }}_used_facts:

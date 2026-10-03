@@ -3,7 +3,7 @@
 ---
 - name: "Init | Gather role-specific facts"
   ansible.builtin.setup:
-    gather_subset: "{{ '{{' }} __{{ role_name }}_used_facts.keys() | ansible.builtin.list {{ '}}' }}"
+    gather_subset: "{{ '{{' }} ['!all', '!min'] + (__{{ role_name }}_used_facts.keys() | ansible.builtin.list) {{ '}}' }}"
   when:
     - not ((__{{ role_name }}_used_facts.values() | ansible.builtin.flatten)
            is ansible.builtin.subset(ansible_facts.keys()))
