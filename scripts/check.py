@@ -32,8 +32,13 @@ def default_lane() -> Lane:
 def check_static() -> None:
     """Run formatting, typing, documentation, licensing and shell checks."""
     require_tools("uv", "shfmt", "shellcheck", "checkbashisms", "sh")
-    run(["ruff", "format", "--check", "scripts", "tests"])
-    run(["ruff", "check", "scripts", "tests"])
+    sources = [
+        "scripts",
+        "tests",
+        "collection_default/noxfile.py.j2",
+    ]
+    run(["ruff", "format", "--check", "--extension", "j2:python", *sources])
+    run(["ruff", "check", "--extension", "j2:python", *sources])
     run(["mypy", "scripts", "tests"])
     run(
         [
@@ -173,7 +178,6 @@ def check(
             "-m",
             "scripts.smoke",
             "--lint",
-            *(["--require-foundata-rules"] if foundata_wheel else []),
             "--output",
             str(output / "generated-lint"),
             groups=["lint"],
@@ -243,7 +247,9 @@ def main() -> int:
     )
     parser.add_argument("--output", type=Path, help="Retain results in a new directory")
     parser.add_argument(
-        "--foundata-wheel", type=Path, help="Test the unpublished foundata extension"
+        "--foundata-wheel",
+        type=Path,
+        help="Override the released extension with a local wheel",
     )
     args = parser.parse_args()
     try:

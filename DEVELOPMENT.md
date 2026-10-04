@@ -122,9 +122,14 @@ limited to):
 - Initialization with defaults, explicit metadata, and quoted metadata.
 - Collection build contents and installation into an isolated collection path.
 - Strict production-profile Ansible linting and collection changelog linting.
+- Generated Nox checks, including stock-only `--no-venv` runs. Repository checks
+  require successful foundata rule verification.
+
+To test a future release candidate, build its wheel and override the released
+package. Example:
 
 ```sh
-./scripts/check.sh --foundata-wheel /absolute/path/to/ansible_lint_foundata-1.0.0a1-py3-none-any.whl
+./scripts/check.sh --foundata-wheel /absolute/path/to/ansible_lint_foundata-1.1.0rc1-py3-none-any.whl
 ```
 
 To retain results, including generated projects and collection archives:

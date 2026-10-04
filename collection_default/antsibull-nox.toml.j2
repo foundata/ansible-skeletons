@@ -30,16 +30,7 @@ run_no_unwanted_files = true
 [sessions.build_import_check]
 run_galaxy_importer = true
 
-[sessions.ansible_lint]
-strict = true
-# During the unpublished ansible-lint-foundata pilot, install its wheel in this
-# isolated session (installing it beside nox is not sufficient):
-# ansible_lint_package = ["ansible-lint>=26.9.0", "/absolute/path/to/foundata.whl"]
-# Collections the Molecule scenarios use, so their playbooks are linted too.
-additional_requirements_files = [
-  "extensions/molecule/default/requirements.yml",
-  "extensions/molecule/ee/requirements.yml",
-]
+# The ansible-lint session is defined in noxfile.py.
 
 [sessions.ansible_test_sanity]
 include_devel = true

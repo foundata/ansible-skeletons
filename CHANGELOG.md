@@ -11,8 +11,8 @@ and the project adheres to
 
 ### Added
 
-- (collection|role)_default: opt-in configuration for
-  `ansible-lint-foundata` rules.
+- (collection|role)_default: all foundata lint rules enabled when the extension
+  is installed. Collection Nox checks install and verify it automatically.
 - collection_default: `noxfile.py` and `antsibull-nox.toml`.
 - collection_default: `tests/config.yml`, which declares Python 3.9 as the
   lowest version for module code on managed nodes.
@@ -27,6 +27,9 @@ and the project adheres to
 
 ### Changed
 
+- (collection|role)_default: Molecule VM templates take explicit `tpl_*`
+  inputs, inventory builders keep computed state separate from their inputs,
+  and module parameters follow the guideline's order.
 - (collection|role)_default: generated changelog output is excluded from style
   linting; dedicated changelog validation remains enabled. Molecule tasks follow
   the custom rules, with a documented permission-preserving EE staging

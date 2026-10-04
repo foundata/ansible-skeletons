@@ -1,5 +1,6 @@
 """Test failure propagation, isolation and check completeness."""
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -9,8 +10,14 @@ import yaml
 
 from scripts.check import check, require_complete_tests
 from scripts.common import ROOT, GateError, Lane, isolated_environment, run, uv_command
-from scripts.render import render
-from scripts.smoke import check_fix_stability, require_rule_discovery
+from scripts.render import Rendered, render
+from scripts.smoke import (
+    check_fix_stability,
+    check_nox_lint,
+    check_tree,
+    lint_constraints,
+    lint_project,
+)
 
 
 def test_nonzero_subprocess_status_fails_gate(tmp_path: Path) -> None:
@@ -94,36 +101,118 @@ def test_missing_lint_wheel_is_rejected_before_any_checks(tmp_path: Path) -> Non
     assert not output.exists()
 
 
-@pytest.mark.parametrize("discovered", [False, True])
-def test_required_extension_cannot_silently_fall_back(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, discovered: bool
+@pytest.mark.parametrize("wheel", [False, True])
+def test_nox_constraints_follow_effective_overlay_packages(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, wheel: bool
 ) -> None:
-    (tmp_path / ".ansible-lint").write_text(
-        'enable_list: ["foundata-condition-list"]\n', encoding="utf-8"
-    )
-
-    def listing(*args: object, **kwargs: object) -> str:
-        return (
-            "- foundata-condition-list Use lists.\n" if discovered else "- yaml YAML.\n"
+    for version in ("1.0.0", "1.1.0"):
+        site = tmp_path / version
+        metadata = site / f"gate_fixture-{version}.dist-info"
+        metadata.mkdir(parents=True)
+        (metadata / "METADATA").write_text(
+            f"Metadata-Version: 2.1\nName: Gate_Fixture\nVersion: {version}\n",
+            encoding="utf-8",
         )
+        monkeypatch.syspath_prepend(str(site))
+    url = "file:///tmp/gate_fixture-1.1.0-py3-none-any.whl"
+    if wheel:
+        (metadata / "direct_url.json").write_text(
+            json.dumps({"url": url, "archive_info": {}}), encoding="utf-8"
+        )
+    constraints = lint_constraints().splitlines()
+    assert [line for line in constraints if line.startswith("gate-fixture")] == [
+        f"gate-fixture @ {url}" if wheel else "gate-fixture==1.1.0"
+    ]
 
-    monkeypatch.setattr("scripts.smoke.run", listing)
-    if discovered:
-        require_rule_discovery(tmp_path, {})
+
+def test_nox_gate_isolates_stock_passthrough(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    rendered = Rendered(
+        tmp_path, tmp_path / "role", tmp_path / "collection", {"PATH": "/outer/bin"}
+    )
+    nox_runs = []
+
+    def run(command: list[str], **kwargs: object) -> str:
+        if command[0] == "nox":
+            nox_runs.append(command)
+            assert "--no-venv" not in command
+            return "Verified discovery and execution of 17 foundata rules.\n"
+        if command[:3] == [str(tmp_path / "stock-lint/bin/python"), "-m", "nox"]:
+            nox_runs.append(command)
+            assert "--no-venv" in command
+            env = kwargs["env"]
+            assert isinstance(env, dict)
+            assert env["PATH"].split(os.pathsep)[0] == str(tmp_path / "stock-lint/bin")
+            assert env["VIRTUAL_ENV"] == str(tmp_path / "stock-lint")
+            return "ansible-lint-foundata is not installed; running stock rules only.\n"
+        return ""
+
+    monkeypatch.setattr("scripts.smoke.run", run)
+    monkeypatch.setattr("scripts.smoke.lint_constraints", lambda: "")
+    check_nox_lint(rendered)
+    assert len(nox_runs) == 2
+
+
+@pytest.mark.parametrize("failure", [None, "verification", "lint"])
+def test_repository_lint_requires_successful_verification(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: str | None
+) -> None:
+    calls = []
+    env = {"ANSIBLE_CONFIG": "/expected/ansible.cfg"}
+
+    def run(command: list[str], **kwargs: object) -> str:
+        calls.append(command)
+        assert command[:2] == [sys.executable, "-m"]
+        assert kwargs == {"cwd": tmp_path, "env": env}
+        stage = "verification" if command[2] == "ansible_lint_foundata.cli" else "lint"
+        if stage == failure:
+            raise GateError(stage)
+        return ""
+
+    monkeypatch.setattr("scripts.smoke.run", run)
+    if failure:
+        with pytest.raises(GateError, match=failure):
+            lint_project(tmp_path, env)
     else:
-        with pytest.raises(GateError, match="not discovered: foundata-condition-list"):
-            require_rule_discovery(tmp_path, {})
+        lint_project(tmp_path, env)
+    assert calls[0][2:] == [
+        "ansible_lint_foundata.cli",
+        "verify",
+        "--project-dir",
+        str(tmp_path),
+    ]
+    assert len(calls) == (1 if failure == "verification" else 2)
+
+
+@pytest.mark.parametrize("name", ["scripts", "pyproject.toml"])
+def test_generated_projects_have_no_repository_tooling(
+    tmp_path: Path, name: str
+) -> None:
+    path = tmp_path / name
+    if name == "scripts":
+        path.mkdir()
+    else:
+        path.touch()
+    with pytest.raises(GateError, match="repository tooling"):
+        check_tree(ROOT / "collection_default", tmp_path)
 
 
 def test_skeleton_lint_configurations_stay_in_sync() -> None:
-    for name in (".ansible-lint", ".yamllint"):
+    for name in (
+        ".ansible-lint.j2",
+        ".yamllint.j2",
+    ):
         assert (ROOT / "role_default" / name).read_bytes() == (
             ROOT / "collection_default" / name
         ).read_bytes()
+    for skeleton in ("role_default", "collection_default"):
+        assert not (ROOT / skeleton / "pyproject.toml").exists()
+        assert not (ROOT / skeleton / "scripts").exists()
     config = yaml.safe_load((ROOT / "collection_default/.ansible-lint.j2").read_text())
     assert (
         len([rule for rule in config["enable_list"] if rule.startswith("foundata-")])
-        == 7
+        == 17
     )
     assert config["exclude_paths"] == [
         ".cache/",
@@ -136,6 +225,8 @@ def test_skeleton_lint_configurations_stay_in_sync() -> None:
         "changelogs/changelog.yaml",
     ]
     yaml_config = yaml.safe_load((ROOT / "collection_default/.yamllint.j2").read_text())
+    assert "foundata-string-quotes" in config["enable_list"]
+    assert "foundata-parameter-order" in config["enable_list"]
     assert yaml_config["rules"]["empty-lines"] == {
         "max": 2,
         "max-start": 0,

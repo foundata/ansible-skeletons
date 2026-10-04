@@ -173,6 +173,10 @@ a `run` role in an Ansible collection. It includes:
   scenario using [Podman](https://podman.io/docs/installation) and several
   [integration test targets](https://github.com/orgs/foundata/repositories?q=oci-*-itt).
 
+Nox installs and verifies `ansible-lint-foundata` in its lint environment.
+With `nox --no-venv`, a missing extension produces a warning and only stock
+rules run.
+
 
 
 ### `role_default`<a id="role_default"></a>

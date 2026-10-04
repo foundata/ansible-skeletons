@@ -5,11 +5,13 @@
 
 import os
 import sys
+from pathlib import Path
 
 import nox
 
 try:
     import antsibull_nox
+    import antsibull_nox.sessions
 except ImportError:
     print("Install antsibull-nox in the same Python environment as nox.")
     sys.exit(1)
@@ -20,6 +22,68 @@ except ImportError:
 os.environ.setdefault("ANTSIBULL_NOX_CONTAINER_ENGINE", "auto-prefer-podman")
 
 antsibull_nox.load_antsibull_nox_toml()
+
+
+@nox.session(name="ansible-lint", default=True)
+@antsibull_nox.sessions.install_packages(packages=["ansible-lint-foundata"])
+def ansible_lint(session: nox.Session) -> None:
+    """Lint with foundata rule verification when the extension is installed."""
+    env = {}
+    if session.virtualenv.is_sandboxed:
+        requirements: list[str | os.PathLike[str]] = [
+            path
+            for path in (
+                "requirements.yml",
+                "tests/requirements.yml",
+                "tests/integration/requirements.yml",
+                "extensions/molecule/default/requirements.yml",
+                "extensions/molecule/ee/requirements.yml",
+            )
+            if Path(path).is_file()
+        ]
+        prepared = antsibull_nox.sessions.prepare_collections(
+            session,
+            install_in_site_packages=False,
+            install_out_of_tree=True,
+            extra_deps_files=requirements,
+        )
+        if prepared is None:
+            session.error("Collection dependency preparation failed")
+        env["ANSIBLE_COLLECTIONS_PATH"] = str(prepared.current_place)
+    installed = session.run(
+        "python",
+        "-c",
+        "from importlib.util import find_spec; "
+        "print(find_spec('ansible_lint_foundata') is not None)",
+        silent=True,
+        env=env,
+    )
+    if installed == "True\n":
+        session.run(
+            "python",
+            "-m",
+            "ansible_lint_foundata.cli",
+            "verify",
+            "--project-dir",
+            ".",
+            env=env,
+        )
+    elif installed == "False\n":
+        session.warn(
+            "ansible-lint-foundata is not installed; running stock rules only."
+        )
+    else:
+        session.error("Could not determine whether ansible-lint-foundata is installed")
+    session.run(
+        "python",
+        "-m",
+        "ansiblelint",
+        "--offline",
+        "--strict",
+        *session.posargs,
+        env=env,
+    )
+
 
 if __name__ == "__main__":
     nox.main()

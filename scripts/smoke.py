@@ -3,10 +3,13 @@
 import argparse
 import importlib.metadata
 import json
+import os
+import re
 import subprocess
 import sys
 import tarfile
 import tomllib
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import yaml
@@ -17,6 +20,9 @@ from scripts.render import Rendered, example_metadata, render
 
 def check_tree(source: Path, destination: Path) -> None:
     """Verify every skeleton file survives one rendering pass and data parses."""
+    for name in ("scripts", "pyproject.toml"):
+        if (destination / name).exists():
+            raise GateError(f"Generated project contains repository tooling: {name}")
     for original in source.rglob("*"):
         if not original.is_file():
             continue
@@ -115,8 +121,12 @@ def build_collection(rendered: Rendered) -> Path:
                 ".rumdl.toml",
                 ".ansible-lint",
                 ".yamllint",
+                "pyproject.toml",
+                "uv.lock",
+                "noxfile.py",
+                "antsibull-nox.toml",
                 "CODE_OF_CONDUCT.md",
-            ) or name.startswith("extensions/molecule/"):
+            ) or name.startswith(("extensions/molecule/", "scripts/")):
                 raise GateError(
                     f"Collection artifact includes repository-only file: {name}"
                 )
@@ -257,9 +267,112 @@ def exercise_role(rendered: Rendered, *, collection: bool) -> None:
         )
 
 
-def smoke(
-    output: Path, *, lint: bool = False, require_foundata_rules: bool = False
-) -> None:
+def check_molecule_contract(rendered: Rendered) -> None:
+    """Render VM inputs and compose inventory without creating containers or VMs."""
+    for project, relative in (
+        (rendered.role, "molecule"),
+        (rendered.collection, "extensions/molecule"),
+    ):
+        shared = project / relative / "shared"
+        work = rendered.work / f"molecule-contract-{project.name}"
+        (work / "inventory").mkdir(parents=True)
+        public_key = "ssh-ed25519 AAAATEST fixture"
+        (work / "id_ed25519.pub").write_text(public_key + "\n", encoding="utf-8")
+        inventory_path = work / "inventory/molecule_inventory.yml"
+        inventory_path.write_text(
+            "all:\n  children:\n    molecule:\n      hosts:\n        existing: {}\n",
+            encoding="utf-8",
+        )
+        vm = {
+            "name": "fixture-vm",
+            "type": "libvirt",
+            "ssh_port": 2244,
+            "memory": 1536,
+            "vcpus": 3,
+            "extra_disks": [{"serial": "data", "size": "1G"}],
+        }
+        (work / "vm" / str(vm["name"])).mkdir(parents=True)
+        platforms = [vm, {"name": "fixture-container", "image": "example"}]
+        plays = []
+        for backend in ("podman", "libvirt", "podman"):
+            source = yaml.safe_load(
+                (shared / f"playbooks/create-{backend}.yml").read_text(encoding="utf-8")
+            )[0]
+            initial = source["pre_tasks"][0]
+            if initial.get("ansible.builtin.set_fact") != {
+                "__testing_inventory": "{{ molecule_inventory }}"
+            }:
+                raise GateError("Missing computed-inventory initialization")
+            tasks = [initial]
+            tasks.extend(
+                task
+                for task in source["tasks"]
+                if task["name"].endswith(
+                    (
+                        " | Create inventory data, add container to groups",
+                        " | Create inventory data, add instances to groups",
+                        " | Store inventory data as molecule_inventory.yml",
+                    )
+                )
+            )
+            if len(tasks) != 3:
+                raise GateError("Missing inventory composition tasks")
+            if backend == "libvirt":
+                templates = [
+                    task
+                    for task in source["tasks"]
+                    if "ansible.builtin.template" in task
+                ]
+                if len(templates) != 2:
+                    raise GateError("Expected cloud-init and libvirt templates")
+                tasks.extend(templates)
+            plays.append(
+                {
+                    "name": f"Check {backend} inputs",
+                    "hosts": "localhost",
+                    "connection": "local",
+                    "gather_facts": False,
+                    "vars": {
+                        **source["vars"],
+                        "molecule_ephemeral_directory": str(work),
+                        "molecule_yml": {"platforms": platforms},
+                        "ansible_python_interpreter": sys.executable,
+                    },
+                    "tasks": tasks,
+                }
+            )
+        playbook = shared / "playbooks/gate-contract.yml"
+        playbook.write_text(yaml.safe_dump(plays, sort_keys=False), encoding="utf-8")
+        try:
+            run(
+                ["ansible-playbook", "--inventory", "localhost,", str(playbook)],
+                cwd=project,
+                env=rendered.env,
+            )
+        finally:
+            playbook.unlink()
+        inventory = yaml.safe_load(inventory_path.read_text(encoding="utf-8"))
+        hosts = inventory["all"]["children"]["molecule"]["hosts"]
+        if set(hosts) != {"existing", "fixture-container", "fixture-vm"}:
+            raise GateError("Mixed-backend inventory lost or added hosts")
+        if hosts["fixture-vm"]["ansible_port"] != 2244:
+            raise GateError("VM inventory lost the SSH port")
+        user_data = yaml.safe_load(
+            (work / "vm/fixture-vm/user-data").read_text(encoding="utf-8")
+        )
+        if user_data["users"][0]["ssh_authorized_keys"] != [public_key]:
+            raise GateError("Cloud-init lost the explicit SSH key input")
+        domain = ET.parse(work / "vm/fixture-vm/domain.xml").getroot()
+        if (
+            domain.findtext("name") != "fixture-vm"
+            or domain.findtext("memory") != "1536"
+            or domain.findtext("vcpu") != "3"
+            or domain.findtext("devices/disk/serial") != "data"
+        ):
+            raise GateError("Domain template lost platform settings")
+
+
+def smoke(output: Path, *, lint: bool = False) -> None:
     """Run a complete rendering and consumer smoke test in the current lane."""
     output.mkdir(parents=True, exist_ok=False)
     for case, metadata in (
@@ -275,7 +388,8 @@ def smoke(
         if case != "explicit":
             continue
         if lint:
-            lint_resources(rendered, require_foundata_rules=require_foundata_rules)
+            lint_resources(rendered)
+        check_molecule_contract(rendered)
         build_collection(rendered)
         exercise_role(rendered, collection=False)
         exercise_role(rendered, collection=True)
@@ -285,41 +399,15 @@ def smoke(
             "python": sys.version,
             "ansible-core": importlib.metadata.version("ansible-core"),
             "PyYAML": importlib.metadata.version("PyYAML"),
-            "foundata-rules-required": require_foundata_rules,
+            "foundata-rules-required": lint,
             "ansible-lint-foundata": (
-                importlib.metadata.version("ansible-lint-foundata")
-                if require_foundata_rules
-                else None
+                importlib.metadata.version("ansible-lint-foundata") if lint else None
             ),
         },
     )
 
 
-def require_rule_discovery(project: Path, env: dict[str, str]) -> None:
-    """Reject silent fallback when a check explicitly requires the extension."""
-    config = yaml.safe_load((project / ".ansible-lint").read_text(encoding="utf-8"))
-    expected = {rule for rule in config["enable_list"] if rule.startswith("foundata-")}
-    if not expected:
-        raise GateError("No foundata rules enabled in the generated configuration")
-    output = run(
-        ["ansible-lint", "--list-rules", "--format", "brief"],
-        cwd=project,
-        env=env,
-        capture=True,
-    )
-    available = {
-        words[1]
-        for line in output.splitlines()
-        if len(words := line.split()) >= 2 and words[0] == "-"
-    }
-    missing = expected - available
-    if missing:
-        raise GateError(
-            f"foundata rules were not discovered: {', '.join(sorted(missing))}"
-        )
-
-
-def lint_resources(rendered: Rendered, *, require_foundata_rules: bool = False) -> None:
+def lint_resources(rendered: Rendered) -> None:
     """Lint generated resources, Molecule included, with their own configuration."""
     # The syntax check of the Molecule playbooks needs the collections they use.
     run(
@@ -335,22 +423,133 @@ def lint_resources(rendered: Rendered, *, require_foundata_rules: bool = False) 
         env=rendered.env,
     )
     for project in (rendered.role, rendered.collection):
-        if require_foundata_rules:
-            require_rule_discovery(project, rendered.env)
-        run(
-            ["ansible-lint", "--strict", "--project-dir", str(project)],
-            cwd=project,
-            env=rendered.env,
-        )
-        if require_foundata_rules:
-            check_fix_stability(project, rendered.env)
+        lint_project(project, rendered.env)
+        check_fix_stability(project, rendered.env)
         run(["reuse", "lint"], cwd=project, env=rendered.env)
+    check_nox_lint(rendered)
     run(["antsibull-changelog", "lint"], cwd=rendered.collection, env=rendered.env)
     run(
         ["antsibull-changelog", "lint-changelog-yaml", "changelogs/changelog.yaml"],
         cwd=rendered.collection,
         env=rendered.env,
     )
+
+
+def lint_project(project: Path, env: dict[str, str]) -> None:
+    """Require the installed extension before checking a generated project."""
+    run(
+        [
+            sys.executable,
+            "-m",
+            "ansible_lint_foundata.cli",
+            "verify",
+            "--project-dir",
+            str(project),
+        ],
+        cwd=project,
+        env=env,
+    )
+    run(
+        [sys.executable, "-m", "ansiblelint", "--offline", "--strict"],
+        cwd=project,
+        env=env,
+    )
+
+
+def lint_constraints() -> str:
+    """Pin effective distributions, including local wheels in uv overlays."""
+    names = {
+        re.sub(r"[-_.]+", "-", distribution.metadata["Name"]).lower()
+        for distribution in importlib.metadata.distributions()
+    }
+    requirements = []
+    for name in sorted(names):
+        distribution = importlib.metadata.distribution(name)
+        source = json.loads(distribution.read_text("direct_url.json") or "{}")
+        requirements.append(
+            f"{name} @ {source['url']}"
+            if "archive_info" in source
+            else f"{name}=={distribution.version}"
+        )
+    return "\n".join(requirements) + "\n"
+
+
+def check_nox_lint(rendered: Rendered) -> None:
+    """Check managed installation and stock-only passthrough in generated Nox."""
+    constraints = rendered.work / "lint-constraints.txt"
+    constraints.write_text(lint_constraints(), encoding="utf-8")
+    # Antsibull's collection setup needs repository metadata for the staged copy.
+    run(["git", "init", "--quiet"], cwd=rendered.collection)
+    run(["git", "add", "."], cwd=rendered.collection)
+    environment = rendered.work / "nox"
+    command = [
+        "nox",
+        "--session",
+        "ansible-lint",
+        "--force-python",
+        f"{sys.version_info.major}.{sys.version_info.minor}",
+        "--default-venv-backend",
+        "uv",
+        "--envdir",
+        str(environment),
+    ]
+    env = {
+        **rendered.env,
+        "UV_CONSTRAINT": str(constraints),
+        "PIP_CONSTRAINT": str(constraints),
+    }
+    output = run(
+        command,
+        cwd=rendered.collection,
+        env=env,
+        timeout=1200,
+        capture=True,
+    )
+    print(output, end="")
+    if "Verified discovery and execution of 17 foundata rules." not in output:
+        raise GateError("Nox session did not verify the adopted foundata rules")
+
+    stock = rendered.work / "stock-lint"
+    run(["uv", "venv", "--python", sys.executable, str(stock)], env=env)
+    run(
+        [
+            "uv",
+            "pip",
+            "install",
+            "--python",
+            str(stock / "bin/python"),
+            "--constraint",
+            str(constraints),
+            "ansible-lint",
+            "antsibull-nox",
+            "nox",
+        ],
+        env=env,
+    )
+    output = run(
+        [
+            str(stock / "bin/python"),
+            "-m",
+            "nox",
+            "--session",
+            "ansible-lint",
+            "--no-venv",
+        ],
+        cwd=rendered.collection,
+        env={
+            **env,
+            "PATH": os.pathsep.join((str(stock / "bin"), env["PATH"])),
+            "VIRTUAL_ENV": str(stock),
+        },
+        timeout=1200,
+        capture=True,
+    )
+    print(output, end="")
+    if (
+        "ansible-lint-foundata is not installed; running stock rules only."
+        not in output
+    ):
+        raise GateError("Stock-only Nox passthrough did not warn about missing rules")
 
 
 def check_fix_stability(project: Path, env: dict[str, str]) -> None:
@@ -384,15 +583,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--lint", action="store_true")
-    parser.add_argument("--require-foundata-rules", action="store_true")
     args = parser.parse_args()
-    if args.require_foundata_rules and not args.lint:
-        parser.error("--require-foundata-rules needs --lint")
     try:
         smoke(
             args.output.resolve(),
             lint=args.lint,
-            require_foundata_rules=args.require_foundata_rules,
         )
     except (GateError, OSError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
