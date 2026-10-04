@@ -1,18 +1,17 @@
 <!--
   libvirt domain definition of a Molecule test instance. Rendered per platform
-  by the create-libvirt.yml playbook ("item" is the platform dict from
-  molecule.yml, "libvirt_cache_dir" and "molecule_ephemeral_directory" are
-  play variables).
+  by the create-libvirt.yml playbook. tpl_platform contains the platform dict
+  from molecule.yml; tpl_ephemeral_directory locates this scenario's files.
 
   Networking: passt user networking with a TCP port forward from
   127.0.0.1:<ssh_port> on the host to port 22 of the instance. This works
   with a session libvirt daemon and does not need any privileges.
 -->
-{{ '{%' }} set __testing_vm_dir = molecule_ephemeral_directory ~ '/vm/' ~ item['name'] {{ '%}' }}
+{{ '{%' }} set __testing_vm_dir = tpl_ephemeral_directory ~ '/vm/' ~ tpl_platform['name'] {{ '%}' }}
 <domain type='kvm'>
-  <name>{{ '{{' }} item['name'] {{ '}}' }}</name>
-  <memory unit='MiB'>{{ '{{' }} item['memory'] | ansible.builtin.default(2048) {{ '}}' }}</memory>
-  <vcpu>{{ '{{' }} item['vcpus'] | ansible.builtin.default(2) {{ '}}' }}</vcpu>
+  <name>{{ '{{' }} tpl_platform['name'] {{ '}}' }}</name>
+  <memory unit='MiB'>{{ '{{' }} tpl_platform['memory'] | ansible.builtin.default(2048) {{ '}}' }}</memory>
+  <vcpu>{{ '{{' }} tpl_platform['vcpus'] | ansible.builtin.default(2) {{ '}}' }}</vcpu>
   <os>
     <type arch='x86_64' machine='q35'>hvm</type>
   </os>
@@ -30,7 +29,7 @@
     </disk>
     <!-- additional blank disks (platform key "extra_disks"); the serial makes
          them addressable as /dev/disk/by-id/virtio-<serial> -->
-    {{ '{%' }} for disk in item['extra_disks'] | ansible.builtin.default([]) {{ '%}' }}
+    {{ '{%' }} for disk in tpl_platform['extra_disks'] | ansible.builtin.default([]) {{ '%}' }}
     <disk type='file' device='disk'>
       <driver name='qemu' type='qcow2'/>
       <source file='{{ '{{' }} __testing_vm_dir {{ '}}' }}/extra-{{ '{{' }} disk['serial'] {{ '}}' }}.qcow2'/>
@@ -55,7 +54,7 @@
     <interface type='user'>
       <backend type='passt'/>
       <portForward proto='tcp' address='127.0.0.1'>
-        <range start='{{ '{{' }} item['ssh_port'] {{ '}}' }}' to='22'/>
+        <range start='{{ '{{' }} tpl_platform['ssh_port'] {{ '}}' }}' to='22'/>
       </portForward>
       <model type='virtio'/>
       <!-- passt advertises a very large MTU (65520) via DHCP. Instances that

@@ -39,6 +39,10 @@
           'molecule_linux': {'hosts': {} }, 'molecule_windows': {'hosts': {} } } } }, true)
       {{ '}}' }}
   pre_tasks:
+    - name: "Molecule | Create (Podman) | Initialize computed inventory"
+      ansible.builtin.set_fact:
+        __testing_inventory: "{{ '{{' }} molecule_inventory {{ '}}' }}"
+
     - name: "Molecule | Create (Podman) | Restore __testing_state (if any) from YAML file from localhost"
       ansible.builtin.set_fact:
         __testing_state: >-
@@ -136,16 +140,16 @@
       block:
         - name: "Molecule | Create (Podman) | Print failed container info"
           ansible.builtin.debug:
-            verbosity: 0
             msg: "{{ '{{' }} __testing_failed_containers {{ '}}' }}"
+            verbosity: 0
           when:
             # Skip if already displayed by previous debug tasks with "verbosity: 3"
             - (ansible_verbosity is ansible.builtin.defined) and ansible_verbosity < 3
 
         - name: "Molecule | Create (Podman) | Print failed container's non-zero exit codes"
           ansible.builtin.debug:
-            verbosity: 0
             msg: "{{ '{{' }} __fail_item['container']['Name'] {{ '}}' }}: {{ '{{' }} __fail_item['container']['State']['ExitCode'] {{ '}}' }}"
+            verbosity: 0
           when:
             - __fail_item['container'] is ansible.builtin.defined
             - __fail_item['container']['State'] is ansible.builtin.defined
@@ -158,8 +162,8 @@
 
         - name: "Molecule | Create (Podman) | Print the failed container's non-running states"
           ansible.builtin.debug:
-            verbosity: 0
             msg: "{{ '{{' }} __fail_item['container']['Name'] {{ '}}' }}: {{ '{{' }} __fail_item['container']['State']['Status'] {{ '}}' }}"
+            verbosity: 0
           when:
             - __fail_item['container'] is ansible.builtin.defined
             - __fail_item['container']['State'] is ansible.builtin.defined
@@ -173,9 +177,9 @@
 
         - name: "Molecule | Create (Podman) | Show cleanup hints"
           ansible.builtin.debug:
-            verbosity: 0
             # split() to improve readability for humans
             msg: "{{ '{{' }} __testing_failcleanhint_msg.split('\n') {{ '}}' }}"
+            verbosity: 0
           vars:
             __testing_failcleanhint_msg: |-
               Container creation failed. You can manually remove the container(s) with:
@@ -243,8 +247,8 @@
     #     os_family: "windows"  # or "linux", explicit override
     - name: "Molecule | Create (Podman) | Create inventory data, add container to groups"
       ansible.builtin.set_fact:
-        molecule_inventory: >
-          {{ '{{' }} molecule_inventory | ansible.builtin.combine(__testing_inventory_partial_yaml | ansible.builtin.from_yaml, recursive=true) {{ '}}' }}
+        __testing_inventory: >
+          {{ '{{' }} __testing_inventory | ansible.builtin.combine(__testing_inventory_partial_yaml | ansible.builtin.from_yaml, recursive=true) {{ '}}' }}
       vars:
         __testing_inventory_is_windows: >-
           {{ '{{' }}
@@ -272,7 +276,7 @@
     - name: "Molecule | Create (Podman) | Store inventory data as molecule_inventory.yml"
       ansible.builtin.copy:
         content: |
-          {{ '{{' }} molecule_inventory | ansible.builtin.to_nice_yaml {{ '}}' }}
+          {{ '{{' }} __testing_inventory | ansible.builtin.to_nice_yaml {{ '}}' }}
         dest: "{{ '{{' }} molecule_ephemeral_directory }}/inventory/molecule_inventory.yml"
         mode: "u=rw,g=,o=" # 0600
 

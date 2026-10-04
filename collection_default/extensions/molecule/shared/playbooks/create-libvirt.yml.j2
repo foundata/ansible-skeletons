@@ -52,6 +52,10 @@
           'molecule_linux': {'hosts': {} }, 'molecule_windows': {'hosts': {} } } } }, true)
       {{ '}}' }}
   pre_tasks:
+    - name: "Molecule | Create (libvirt) | Initialize computed inventory"
+      ansible.builtin.set_fact:
+        __testing_inventory: "{{ '{{' }} molecule_inventory {{ '}}' }}"
+
     - name: "Molecule | Create (libvirt) | Restore __testing_state (if any) from YAML file from localhost"
       ansible.builtin.set_fact:
         __testing_state: >-
@@ -266,6 +270,8 @@
         src: "{{ '{{' }} playbook_dir | ansible.builtin.dirname {{ '}}' }}/templates/cloud_init_user_data.yml.j2"
         dest: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/vm/{{ '{{' }} item['name'] {{ '}}' }}/user-data"
         mode: "u=rw,g=,o=" # 0600
+      vars:
+        tpl_ssh_public_key: "{{ '{{' }} lookup('ansible.builtin.file', molecule_ephemeral_directory ~ '/id_ed25519.pub') {{ '}}' }}"
       loop: "{{ '{{' }} libvirt_platforms {{ '}}' }}"
       loop_control:
         label: "{{ '{{' }} item['name'] {{ '}}' }}"
@@ -346,6 +352,9 @@
         src: "{{ '{{' }} playbook_dir | ansible.builtin.dirname {{ '}}' }}/templates/libvirt_domain.xml.j2"
         dest: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/vm/{{ '{{' }} item['name'] {{ '}}' }}/domain.xml"
         mode: "u=rw,g=,o=" # 0600
+      vars:
+        tpl_platform: "{{ '{{' }} item {{ '}}' }}"
+        tpl_ephemeral_directory: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}"
       loop: "{{ '{{' }} libvirt_platforms {{ '}}' }}"
       loop_control:
         label: "{{ '{{' }} item['name'] {{ '}}' }}"
@@ -488,9 +497,9 @@
 
         - name: "Molecule | Create (libvirt) | Show failure analysis and cleanup hints"
           ansible.builtin.debug:
-            verbosity: 0
             # split() to improve readability for humans
             msg: "{{ '{{' }} __testing_failhint_msg.split('\n') {{ '}}' }}"
+            verbosity: 0
           vars:
             __testing_failhint_msg: |-
               At least one instance did not become reachable via SSH.
@@ -554,8 +563,8 @@
     # based on name/os_family detection.
     - name: "Molecule | Create (libvirt) | Create inventory data, add instances to groups"
       ansible.builtin.set_fact:
-        molecule_inventory: >
-          {{ '{{' }} molecule_inventory | ansible.builtin.combine(__testing_inventory_partial_yaml | ansible.builtin.from_yaml, recursive=true) {{ '}}' }}
+        __testing_inventory: >
+          {{ '{{' }} __testing_inventory | ansible.builtin.combine(__testing_inventory_partial_yaml | ansible.builtin.from_yaml, recursive=true) {{ '}}' }}
       vars:
         __testing_inventory_is_windows: >
           {{ '{{' }}
@@ -587,7 +596,7 @@
     - name: "Molecule | Create (libvirt) | Store inventory data as molecule_inventory.yml"
       ansible.builtin.copy:
         content: |
-          {{ '{{' }} molecule_inventory | ansible.builtin.to_nice_yaml {{ '}}' }}
+          {{ '{{' }} __testing_inventory | ansible.builtin.to_nice_yaml {{ '}}' }}
         dest: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/inventory/molecule_inventory.yml"
         mode: "u=rw,g=,o=" # 0600
 

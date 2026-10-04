@@ -7,7 +7,7 @@ users:
     shell: "/bin/bash"
     sudo: "ALL=(ALL) NOPASSWD:ALL"
     ssh_authorized_keys:
-      - "{{ '{{' }} lookup('ansible.builtin.file', molecule_ephemeral_directory ~ '/id_ed25519.pub') {{ '}}' }}"
+      - "{{ '{{' }} tpl_ssh_public_key {{ '}}' }}"
 ssh_pwauth: false
 package_update: true
 packages:

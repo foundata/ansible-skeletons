@@ -52,7 +52,6 @@
     - name: "Molecule | Converge | Write Execution Environment definition for EE test builds with collection"
       ansible.builtin.copy:
         dest: "{{ '{{' }} __testing_state['build_dir_path'] {{ '}}' }}/molecule-ee-test.yml"
-        mode: "u=rw,g=r,o=r" # 0644
         content: |
           # Build definition for the Molecule EE image.
           #
@@ -101,6 +100,7 @@
 
           options:
             package_manager_path: "/usr/bin/dnf5"
+        mode: "u=rw,g=r,o=r" # 0644
 
 # Role specific tasks
 - name: "Molecule | Converge | Build role artifact"
@@ -139,7 +139,6 @@
     - name: "Molecule | Converge | Write Execution Environment definition for EE test builds with role"
       ansible.builtin.copy:
         dest: "{{ '{{' }} __testing_state['build_dir_path'] {{ '}}' }}/molecule-ee-test.yml"
-        mode: "u=rw,g=r,o=r" # 0644
         content: |
           # Build definition for the Molecule EE image
 
@@ -182,6 +181,7 @@
 
           options:
             package_manager_path: "/usr/bin/dnf5"
+        mode: "u=rw,g=r,o=r" # 0644
 
 - name: "Molecule | Converge | Build Execution Environment (EE) image"
   # The command or shell module is used intentionally: Ansible provides no
