@@ -37,6 +37,8 @@ and the project adheres to
 
 ### Changed
 
+- (collection|role)_default: every skeleton file is a `.j2` template, including
+  the lint, nox, DocSmith and Molecule inventory files.
 - (collection|role)_default: the README links to the licensing files start
   with `./`, as the Markdown guide requires.
 - (collection|role)_default: the three base options declare their default in
