@@ -16,6 +16,12 @@ and the project adheres to
 - checks: distinct-identity rendering and installed module checks for
   collection_modules_grid; the full matrix includes its ansible-test lanes.
 
+### Fixed
+
+- (collection|role)_default: the ansible-core requirement is checked before
+  the first templated task, so an older core reports the role's message
+  instead of a Jinja load error.
+
 
 ## [2.9.0] - 2026-10-05
 

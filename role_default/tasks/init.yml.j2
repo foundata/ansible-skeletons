@@ -1,12 +1,6 @@
 # Initialization: Manage internal role setup and the Ansible environment.
 
 ---
-- name: "Init | Gather role-specific facts"
-  ansible.builtin.setup:
-    gather_subset: "{{ '{{' }} ['!all', '!min'] + (__{{ role_name }}_used_facts.keys() | ansible.builtin.list) {{ '}}' }}"
-  when:
-    - not ((__{{ role_name }}_used_facts.values() | ansible.builtin.flatten) is ansible.builtin.subset(ansible_facts.keys()))
-
 - name: "Init | Include role meta data"
   ansible.builtin.include_vars:
     file: "../meta/main.yml"
@@ -19,6 +13,12 @@
       or higher. You are currently running Ansible {{ '{{' }} ansible_version['full'] {{ '}}' }} .
   when:
     - ansible_version['full'] is ansible.builtin.version(__{{ role_name }}_meta['galaxy_info']['min_ansible_version'], "<")
+
+- name: "Init | Gather role-specific facts"
+  ansible.builtin.setup:
+    gather_subset: "{{ '{{' }} ['!all', '!min'] + (__{{ role_name }}_used_facts.keys() | ansible.builtin.list) {{ '}}' }}"
+  when:
+    - not ((__{{ role_name }}_used_facts.values() | ansible.builtin.flatten) is ansible.builtin.subset(ansible_facts.keys()))
 
 - name: "Init | Notify when platform support check is not possible"
   ansible.builtin.debug:
