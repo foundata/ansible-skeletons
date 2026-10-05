@@ -27,6 +27,9 @@ and the project adheres to
 
 ### Changed
 
+- (collection|role)_default: `ansible-lint --fix` leaves a fresh render
+  unchanged. Short `or` conditions are on one line, the long one is a folded
+  scalar, and comments after the last list item start at column one.
 - (collection|role)_default: Molecule VM templates take explicit `tpl_*`
   inputs, inventory builders keep computed state separate from their inputs,
   and module parameters follow the guideline's order.

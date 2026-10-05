@@ -5,8 +5,7 @@
   ansible.builtin.setup:
     gather_subset: "{{ '{{' }} ['!all', '!min'] + (__{{ role_name }}_used_facts.keys() | ansible.builtin.list) {{ '}}' }}"
   when:
-    - not ((__{{ role_name }}_used_facts.values() | ansible.builtin.flatten)
-           is ansible.builtin.subset(ansible_facts.keys()))
+    - not ((__{{ role_name }}_used_facts.values() | ansible.builtin.flatten) is ansible.builtin.subset(ansible_facts.keys()))
 
 - name: "Init | Include role meta data"
   ansible.builtin.include_vars:
@@ -28,7 +27,8 @@
       or distribution facts are missing.
     verbosity: 1
   when:
-    - ansible_facts['os_family'] is not ansible.builtin.defined or
+    - >-
+      ansible_facts['os_family'] is not ansible.builtin.defined or
       ansible_facts['distribution'] is not ansible.builtin.defined or
       ansible_facts['distribution_version'] is not ansible.builtin.defined or
       ansible_facts['distribution_major_version'] is not ansible.builtin.defined or

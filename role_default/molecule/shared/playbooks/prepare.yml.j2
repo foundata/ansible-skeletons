@@ -110,8 +110,7 @@
         gather_subset:
           - "distribution"
       when:
-        - ansible_facts['distribution'] is not ansible.builtin.defined or
-          ansible_facts['os_family'] is not ansible.builtin.defined
+        - ansible_facts['distribution'] is not ansible.builtin.defined or ansible_facts['os_family'] is not ansible.builtin.defined
 
     # Container cleanup task like "rm -rf /var/lib/apt/lists/*" change the mtime
     # of the directory, causing ansible.builtin.apt installs to fail due to
