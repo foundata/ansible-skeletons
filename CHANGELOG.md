@@ -34,6 +34,10 @@ and the project adheres to
 
 ### Changed
 
+- (collection|role)_default: the three base options declare their default in
+  `meta/argument_specs.yml` instead of `required: true`. Role argument
+  validation never enforced the requirement, because `defaults/main.yml`
+  supplies the values, and the generated documentation now shows them.
 - (collection|role)_default: `ansible-lint --fix` leaves a fresh render
   unchanged. Short `or` conditions are on one line, the long one is a folded
   scalar, and comments after the last list item start at column one.

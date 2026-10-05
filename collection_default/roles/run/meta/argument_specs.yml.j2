@@ -22,7 +22,7 @@ argument_specs:
           `absent` reverts changes as much as possible, such as removing packages,
           deleting created users, stopping services, restoring modified settings, ...
         type: "str"
-        required: true
+        default: "present"
         choices:
           - "present"
           - "absent"
@@ -33,7 +33,7 @@ argument_specs:
           run (e.g., when the package provider detects a newer version than the
           currently installed one).
         type: "bool"
-        required: true
+        default: false
 
       run_{{ collection_name }}_service_state:
         description: |
@@ -51,7 +51,7 @@ argument_specs:
 
           The defined status applies to all services if the role manages several.
         type: "str"
-        required: true
+        default: "enabled"
         choices:
           - "enabled"
           - "disabled"

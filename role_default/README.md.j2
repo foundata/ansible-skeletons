@@ -88,11 +88,11 @@ FIXME Describe what this entry point manages.
 The following variables can be configured for this role:
 
 {% set __docsmith_width = ('`' ~ role_name ~ '_service_state`') | length %}
-| {{ ' ' * ((__docsmith_width - 8) // 2) }}Variable{{ ' ' * (__docsmith_width - 8 - (__docsmith_width - 8) // 2) }} |  Type  | Required | Default | Description (abstract) |
-| {{ '-' * __docsmith_width }} | ------ | -------- | ------- | ---------------------- |
-| {{ ('`' ~ role_name ~ '_state`').ljust(__docsmith_width) }} | `str`  | Yes      | N/A     | Determines whether the managed resources should be `present` or `absent`.<br><br>`present` ensures that required components, such as software packages, are installed and configured.<br><br>`absent` reverts changes as much as possible, such as […](#variable-{{ role_name }}_state) |
-| {{ ('`' ~ role_name ~ '_autoupgrade`').ljust(__docsmith_width) }} | `bool` | Yes      | N/A     | If set to `true`, all managed packages will be upgraded during each Ansible run (e.g., when the package provider detects a newer version than the currently installed one). |
-| {{ ('`' ~ role_name ~ '_service_state`').ljust(__docsmith_width) }} | `str`  | Yes      | N/A     | Defines the status of the service(s). Possible values:<br><br>- `enabled`: Service is running and will start automatically at boot. - `disabled`: Service is stopped and will not start automatically at boot. - `running`: Service is running but will […](#variable-{{ role_name }}_service_state) |
+| {{ ' ' *((__docsmith_width - 8) // 2) }}Variable{{ ' '* (__docsmith_width - 8 - (__docsmith_width - 8) // 2) }} |  Type  | Required |   Default   | Description (abstract) |
+| {{ '-' * __docsmith_width }} | ------ | -------- | ----------- | ---------------------- |
+| {{ ('`' ~ role_name ~ '_state`').ljust(__docsmith_width) }} | `str`  | No       | `"present"` | Determines whether the managed resources should be `present` or `absent`.<br><br>`present` ensures that required components, such as software packages, are installed and configured.<br><br>`absent` reverts changes as much as possible, such as […](#variable-{{ role_name }}_state) |
+| {{ ('`' ~ role_name ~ '_autoupgrade`').ljust(__docsmith_width) }} | `bool` | No       | `false`     | If set to `true`, all managed packages will be upgraded during each Ansible run (e.g., when the package provider detects a newer version than the currently installed one). |
+| {{ ('`' ~ role_name ~ '_service_state`').ljust(__docsmith_width) }} | `str`  | No       | `"enabled"` | Defines the status of the service(s). Possible values:<br><br>- `enabled`: Service is running and will start automatically at boot. - `disabled`: Service is stopped and will not start automatically at boot. - `running`: Service is running but will […](#variable-{{ role_name }}_service_state) |
 
 ### `{{ role_name }}_state`<a id="variable-{{ role_name }}_state"></a>
 
@@ -107,7 +107,8 @@ installed and configured.
 deleting created users, stopping services, restoring modified settings, ...
 
 - **Type**: `str`
-- **Required**: Yes
+- **Required**: No
+- **Default**: `"present"`
 - **Choices**: `present`, `absent`
 
 
@@ -121,7 +122,8 @@ run (e.g., when the package provider detects a newer version than the
 currently installed one).
 
 - **Type**: `bool`
-- **Required**: Yes
+- **Required**: No
+- **Default**: `false`
 
 
 
@@ -144,7 +146,8 @@ Defines the status of the service(s). Possible values:
 The defined status applies to all services if the role manages several.
 
 - **Type**: `str`
-- **Required**: Yes
+- **Required**: No
+- **Default**: `"enabled"`
 - **Choices**: `enabled`, `disabled`, `running`, `unmanaged`
 
 

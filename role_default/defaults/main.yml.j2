@@ -16,7 +16,8 @@
 # deleting created users, stopping services, restoring modified settings, ...
 #
 # - Type: str
-# - Required: Yes
+# - Required: No
+# - Default: present
 # - Choices: present, absent
 {{ role_name }}_state: "present"
 
@@ -25,7 +26,8 @@
 # currently installed one).
 #
 # - Type: bool
-# - Required: Yes
+# - Required: No
+# - Default: false
 {{ role_name }}_autoupgrade: false
 
 # Defines the status of the service(s). Possible values:
@@ -43,7 +45,8 @@
 # The defined status applies to all services if the role manages several.
 #
 # - Type: str
-# - Required: Yes
+# - Required: No
+# - Default: enabled
 # - Choices: enabled, disabled, running, unmanaged
 {{ role_name }}_service_state: "enabled"
 

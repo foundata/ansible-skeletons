@@ -16,7 +16,8 @@
 # deleting created users, stopping services, restoring modified settings, ...
 #
 # - Type: str
-# - Required: Yes
+# - Required: No
+# - Default: present
 # - Choices: present, absent
 run_{{ collection_name }}_state: "present"
 
@@ -25,7 +26,8 @@ run_{{ collection_name }}_state: "present"
 # currently installed one).
 #
 # - Type: bool
-# - Required: Yes
+# - Required: No
+# - Default: false
 run_{{ collection_name }}_autoupgrade: false
 
 # Defines the status of the service(s). Possible values:
@@ -43,7 +45,8 @@ run_{{ collection_name }}_autoupgrade: false
 # The defined status applies to all services if the role manages several.
 #
 # - Type: str
-# - Required: Yes
+# - Required: No
+# - Default: enabled
 # - Choices: enabled, disabled, running, unmanaged
 run_{{ collection_name }}_service_state: "enabled"
 
