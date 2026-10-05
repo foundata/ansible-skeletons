@@ -9,6 +9,11 @@ and the project adheres to
 
 ## [Unreleased]
 
+- Nothing worth mentioning right now.
+
+
+## [2.8.0] - 2026-10-05
+
 ### Added
 
 - (collection|role)_default: `.ansible-docsmith.toml`, which lets DocSmith
@@ -379,7 +384,8 @@ and the project adheres to
 - All functionality and files, `role_default`
 
 
-[unreleased]: https://github.com/foundata/ansible-skeletons/compare/v2.7.0...HEAD
+[unreleased]: https://github.com/foundata/ansible-skeletons/compare/v2.8.0...HEAD
+[2.8.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.8.0
 [2.7.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.7.0
 [2.6.2]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.6.2
 [2.6.1]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.6.1
