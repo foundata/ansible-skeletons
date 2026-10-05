@@ -30,6 +30,12 @@ and the project adheres to
 - (collection|role)_default: `ansible-lint --fix` leaves a fresh render
   unchanged. Short `or` conditions are on one line, the long one is a folded
   scalar, and comments after the last list item start at column one.
+- (collection|role)_default: the role README carries the documentation
+  DocSmith generates from `meta/argument_specs.yml`, formatted by rumdl, with
+  the variables table padded for the role's name. `defaults/main.yml` carries
+  the generated comments.
+- (collection|role)_default: the Markdown templates follow the shipped
+  `.rumdl.toml`; `FIXME.md` links to `roles/run/meta/main.yml`.
 - (collection|role)_default: Molecule VM templates take explicit `tpl_*`
   inputs, inventory builders keep computed state separate from their inputs,
   and module parameters follow the guideline's order.

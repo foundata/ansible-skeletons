@@ -6,35 +6,45 @@
 # and how it fits into the role's functionality.
 
 ---
-# String. Determines whether the managed resources should be "present" or
-# "absent". Defaults to "present". Possible values:
+
+# Determines whether the managed resources should be `present` or `absent`.
 #
-# - "present": Ensures that required components, such as software packages,
-#   are installed and configured.
-# - "absent": Reverts changes as much as possible, such as removing packages,
-#   deleting created users, stopping services, restoring modified settings, …
+# `present` ensures that required components, such as software packages, are
+# installed and configured.
+#
+# `absent` reverts changes as much as possible, such as removing packages,
+# deleting created users, stopping services, restoring modified settings, ...
+#
+# - Type: str
+# - Required: Yes
+# - Choices: present, absent
 {{ role_name }}_state: "present"
 
-# Boolean. If set to true, all managed packages will be upgraded during each
-# Ansible run (e.g., when the package provider detects a newer version than
-# the currently installed one). Defaults to false.
+# If set to `true`, all managed packages will be upgraded during each Ansible
+# run (e.g., when the package provider detects a newer version than the
+# currently installed one).
+#
+# - Type: bool
+# - Required: Yes
 {{ role_name }}_autoupgrade: false
 
-# String. Defines the status of the service(s). Defaults to "enabled".
-# Possible values:
+# Defines the status of the service(s). Possible values:
 #
-# - "enabled": Service is running and will start automatically at boot.
-# - "disabled": Service is stopped and will not start automatically at boot.
-# - "running": Service is running but will not start automatically at boot.
-#   This can be used to start a service on the first Ansible run without
-#   enabling it for boot.
-# - "unmanaged": Ansible does not manage the service at all: both the
-#   running state and the boot (enablement) state are left exactly as they
-#   are. This is primarily useful when services are monitored and managed
-#   by systems other than Ansible.
+# - `enabled`: Service is running and will start automatically at boot.
+# - `disabled`: Service is stopped and will not start automatically at boot.
+# - `running`: Service is running but will not start automatically at boot. This
+#   can be used to start a service on the first Ansible run without enabling it
+#   for boot.
+# - `unmanaged`: Ansible does not manage the service at all: both the running
+#   state and the boot (enablement) state are left exactly as they are. This is
+#   primarily useful when services are monitored and managed by systems other
+#   than Ansible.
 #
-# The singular form ("service") is used for simplicity. However, the defined
-# status applies to all services if multiple are being managed by this role.
+# The defined status applies to all services if the role manages several.
+#
+# - Type: str
+# - Required: Yes
+# - Choices: enabled, disabled, running, unmanaged
 {{ role_name }}_service_state: "enabled"
 
 # FIXME Description of a very important example parameter. Do not forget to

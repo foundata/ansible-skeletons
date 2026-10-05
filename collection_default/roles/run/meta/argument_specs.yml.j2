@@ -46,7 +46,8 @@ argument_specs:
             enabling it for boot.
           - `unmanaged`: Ansible does not manage the service at all: both the
             running state and the boot (enablement) state are left exactly as they
-            are.
+            are. This is primarily useful when services are monitored and managed
+            by systems other than Ansible.
 
           The defined status applies to all services if the role manages several.
         type: "str"
