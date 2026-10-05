@@ -6,7 +6,7 @@ from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from typing import cast
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock
 
 import pytest
 
@@ -14,14 +14,15 @@ from scripts.common import ROOT, GateError
 
 
 @pytest.fixture
-def lint_session(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> Callable[[Mock], None]:
+def noxfile(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, object]:
+    """Load the generated noxfile with nox and antsibull-nox replaced by stubs."""
+    installed_packages: list[object] = []
+
     def decorator(
         **kwargs: object,
     ) -> Callable[[Callable[[Mock], None]], Callable[[Mock], None]]:
         if "packages" in kwargs:
-            assert kwargs["packages"] == ["ansible-lint-foundata"]
+            installed_packages.append(kwargs["packages"])
         return lambda function: function
 
     nox = ModuleType("nox")
@@ -35,11 +36,18 @@ def lint_session(
     )
     antsibull.sessions = sessions  # type: ignore[attr-defined]
     antsibull.load_antsibull_nox_toml = Mock()  # type: ignore[attr-defined]
+    antsibull.IN_CI = False  # type: ignore[attr-defined]
     for module in (nox, antsibull, sessions):
         monkeypatch.setitem(sys.modules, module.__name__, module)
     monkeypatch.chdir(tmp_path)
     loaded = runpy.run_path(str(ROOT / "collection_default/noxfile.py.j2"))
-    return cast(Callable[[Mock], None], loaded["ansible_lint"])
+    assert ["ansible-lint-foundata"] in installed_packages
+    return loaded
+
+
+@pytest.fixture
+def lint_session(noxfile: dict[str, object]) -> Callable[[Mock], None]:
+    return cast(Callable[[Mock], None], noxfile["ansible_lint"])
 
 
 @pytest.mark.parametrize("installed", [False, True])
@@ -138,3 +146,66 @@ def test_failed_collection_preparation_is_not_a_stock_fallback(
         lint_session(session)
     session.run.assert_not_called()
     session.warn.assert_not_called()
+
+
+SCENARIO = """---
+platforms:
+  - name: "molecule-debian13"
+    type: "podman"
+  - name: "molecule-debian12"
+"""
+
+
+@pytest.mark.parametrize(
+    ("posargs", "serial", "machines", "expected"),
+    [
+        ([], None, False, [["test", "--scenario-name", "default"]]),
+        (["list"], None, False, [["list"]]),
+        (
+            [],
+            None,
+            True,
+            [
+                ["test", "--scenario-name", "default", "--platform-name", name]
+                for name in ("molecule-debian13", "molecule-debian12", "molecule-vm")
+            ],
+        ),
+        ([], "false", True, [["test", "--scenario-name", "default"]]),
+        (
+            [],
+            "true",
+            False,
+            [
+                ["test", "--scenario-name", "default", "--platform-name", name]
+                for name in ("molecule-debian13", "molecule-debian12")
+            ],
+        ),
+    ],
+)
+def test_molecule_session_runs_machines_one_at_a_time(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    noxfile: dict[str, object],
+    posargs: list[str],
+    serial: str | None,
+    machines: bool,
+    expected: list[list[str]],
+) -> None:
+    scenario = tmp_path / "extensions/molecule/default/molecule.yml"
+    scenario.parent.mkdir(parents=True)
+    extra = '  - name: "molecule-vm"\n    type: "libvirt"\n' if machines else ""
+    scenario.write_text(SCENARIO + extra, encoding="utf-8")
+    monkeypatch.delenv("MOLECULE_SERIAL", raising=False)
+    monkeypatch.delenv("MOLECULE_PLATFORM_NAME", raising=False)
+    if serial is not None:
+        monkeypatch.setenv("MOLECULE_SERIAL", serial)
+    session = MagicMock()
+    session.posargs = posargs
+    molecule = cast(Callable[[MagicMock], None], noxfile["molecule"])
+    molecule(session)
+    calls = [list(call.args[1:]) for call in session.run.call_args_list]
+    assert [call.args[0] for call in session.run.call_args_list] == ["molecule"] * len(
+        expected
+    )
+    assert calls == expected
+    session.chdir.assert_called_once_with("extensions")

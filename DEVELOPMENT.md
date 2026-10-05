@@ -121,9 +121,11 @@ limited to):
 
 - Initialization with defaults, explicit metadata, and quoted metadata.
 - Collection build contents and installation into an isolated collection path.
-- Strict production-profile Ansible linting and collection changelog linting.
-- Generated Nox checks, including stock-only `--no-venv` runs. Repository checks
-  require successful foundata rule verification.
+- Strict production-profile Ansible linting of both renders, and a second
+  autofix pass that must not change anything.
+- The rendered collection's default Nox sessions in check-only mode, with tool
+  versions pinned to the check environment, plus a stock-only `--no-venv` run.
+  Repository checks require successful foundata rule verification.
 
 To test a future release candidate, build its wheel and override the released
 package. Example:

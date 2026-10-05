@@ -43,6 +43,12 @@ and the project adheres to
   the generated comments.
 - (collection|role)_default: the Markdown templates follow the shipped
   `.rumdl.toml`; `FIXME.md` links to `roles/run/meta/main.yml`.
+- Repository checks run the rendered collection's default `nox` sessions in
+  check-only mode under constraints from the check environment, after
+  `antsibull-nox lint-config`. The Galaxy import session runs unpinned,
+  because `galaxy-importer` pins an older `ansible-lint` than the foundata
+  rules need. The `docs` session is skipped until DocSmith formats its output
+  with rumdl.
 - (collection|role)_default: Molecule VM templates take explicit `tpl_*`
   inputs, inventory builders keep computed state separate from their inputs,
   and module parameters follow the guideline's order.

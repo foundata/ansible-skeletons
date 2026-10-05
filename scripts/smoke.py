@@ -425,14 +425,9 @@ def lint_resources(rendered: Rendered) -> None:
     for project in (rendered.role, rendered.collection):
         lint_project(project, rendered.env)
         check_fix_stability(project, rendered.env)
-        run(["reuse", "lint"], cwd=project, env=rendered.env)
-    check_nox_lint(rendered)
-    run(["antsibull-changelog", "lint"], cwd=rendered.collection, env=rendered.env)
-    run(
-        ["antsibull-changelog", "lint-changelog-yaml", "changelogs/changelog.yaml"],
-        cwd=rendered.collection,
-        env=rendered.env,
-    )
+    # The role has no nox; the collection's remaining checks run through its nox.
+    run(["reuse", "lint"], cwd=rendered.role, env=rendered.env)
+    check_nox_gate(rendered)
 
 
 def lint_project(project: Path, env: dict[str, str]) -> None:
@@ -474,18 +469,48 @@ def lint_constraints() -> str:
     return "\n".join(requirements) + "\n"
 
 
-def check_nox_lint(rendered: Rendered) -> None:
-    """Check managed installation and stock-only passthrough in generated Nox."""
+def default_sessions(listing: str) -> list[str]:
+    """Return the sessions a plain ``nox`` would run, from ``nox --list`` output."""
+    return [
+        line.split()[1]
+        for line in listing.splitlines()
+        if line.startswith("* ") and len(line.split()) > 1
+    ]
+
+
+def check_nox_gate(rendered: Rendered) -> None:
+    """Run the generated collection's default nox sessions in check-only mode.
+
+    Tool versions are pinned to this environment through constraints. The
+    ``docs`` session is skipped until DocSmith formats its output with rumdl;
+    the templates already carry that formatted output.
+    """
     constraints = rendered.work / "lint-constraints.txt"
     constraints.write_text(lint_constraints(), encoding="utf-8")
     # Antsibull's collection setup needs repository metadata for the staged copy.
     run(["git", "init", "--quiet"], cwd=rendered.collection)
     run(["git", "add", "."], cwd=rendered.collection)
+    run(["antsibull-nox", "lint-config"], cwd=rendered.collection, env=rendered.env)
     environment = rendered.work / "nox"
+    listing = run(
+        ["nox", "--list"], cwd=rendered.collection, env=rendered.env, capture=True
+    )
+    # galaxy-importer caps ansible-lint below what the foundata rules need
+    # (26.8 at galaxy-importer 0.4.43), so the import check runs unpinned in a
+    # second invocation. Once its cap includes 26.9, add galaxy-importer to the
+    # "lint" group in pyproject.toml and drop this exception.
+    unpinned = {"build-import-check"}
+    sessions = [
+        name
+        for name in default_sessions(listing)
+        if name != "docs" and name not in unpinned
+    ]
+    if not sessions:
+        raise GateError("The generated noxfile lists no default session")
     command = [
         "nox",
-        "--session",
-        "ansible-lint",
+        "--sessions",
+        *sessions,
         "--force-python",
         f"{sys.version_info.major}.{sys.version_info.minor}",
         "--default-venv-backend",
@@ -495,6 +520,7 @@ def check_nox_lint(rendered: Rendered) -> None:
     ]
     env = {
         **rendered.env,
+        "CI": "true",
         "UV_CONSTRAINT": str(constraints),
         "PIP_CONSTRAINT": str(constraints),
     }
@@ -502,12 +528,23 @@ def check_nox_lint(rendered: Rendered) -> None:
         command,
         cwd=rendered.collection,
         env=env,
-        timeout=1200,
+        timeout=1800,
         capture=True,
     )
     print(output, end="")
     if "Verified discovery and execution of 17 foundata rules." not in output:
         raise GateError("Nox session did not verify the adopted foundata rules")
+    run(
+        [
+            "nox",
+            "--sessions",
+            *sorted(unpinned),
+            *command[command.index("--force-python") :],
+        ],
+        cwd=rendered.collection,
+        env={**rendered.env, "CI": "true"},
+        timeout=1800,
+    )
 
     stock = rendered.work / "stock-lint"
     run(["uv", "venv", "--python", sys.executable, str(stock)], env=env)

@@ -19,7 +19,14 @@ dev = [
 core219 = ["ansible-core>=2.19,<2.20"]
 core220 = ["ansible-core>=2.20,<2.21"]
 core221 = ["ansible-core>=2.21,<2.22"]
-lint = ["ansible-lint-foundata>=1.0.0", "antsibull-changelog", "antsibull-nox", "nox>=2025.02.09"]
+lint = [
+  "ansible-docsmith",
+  "ansible-lint-foundata>=1.1.0",
+  "antsibull-changelog",
+  "antsibull-docs",
+  "antsibull-nox",
+  "nox>=2025.02.09",
+]
 integration = ["molecule", "ansible-builder", "pycdlib"]
 
 [tool.uv]

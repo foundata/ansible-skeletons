@@ -13,8 +13,9 @@ from scripts.common import ROOT, GateError, Lane, isolated_environment, run, uv_
 from scripts.render import Rendered, render
 from scripts.smoke import (
     check_fix_stability,
-    check_nox_lint,
+    check_nox_gate,
     check_tree,
+    default_sessions,
     lint_constraints,
     lint_project,
 )
@@ -132,11 +133,33 @@ def test_nox_gate_isolates_stock_passthrough(
         tmp_path, tmp_path / "role", tmp_path / "collection", {"PATH": "/outer/bin"}
     )
     nox_runs = []
+    config_lints = []
 
     def run(command: list[str], **kwargs: object) -> str:
+        if command[0] == "antsibull-nox":
+            config_lints.append(command)
+            return ""
+        if command[:2] == ["nox", "--list"]:
+            return (
+                "Sessions defined in noxfile.py:\n\n"
+                "* docs-check -> Run 'antsibull-docs lint-collection-docs'\n"
+                "* build-import-check -> Run build and import checkers\n"
+                "* ansible-lint -> ansible-lint with the foundata rules\n"
+                "* docs -> Role documentation with DocSmith\n"
+                "- molecule -> Molecule\n\n"
+                "sessions marked with * are selected, sessions marked with - are skipped.\n"
+            )
         if command[0] == "nox":
             nox_runs.append(command)
             assert "--no-venv" not in command
+            env = kwargs["env"]
+            assert isinstance(env, dict)
+            assert env["CI"] == "true"
+            if command[1:3] == ["--sessions", "build-import-check"]:
+                assert "PIP_CONSTRAINT" not in env
+                return ""
+            assert command[1:4] == ["--sessions", "docs-check", "ansible-lint"]
+            assert env["PIP_CONSTRAINT"] == str(tmp_path / "lint-constraints.txt")
             return "Verified discovery and execution of 17 foundata rules.\n"
         if command[:3] == [str(tmp_path / "stock-lint/bin/python"), "-m", "nox"]:
             nox_runs.append(command)
@@ -150,8 +173,9 @@ def test_nox_gate_isolates_stock_passthrough(
 
     monkeypatch.setattr("scripts.smoke.run", run)
     monkeypatch.setattr("scripts.smoke.lint_constraints", lambda: "")
-    check_nox_lint(rendered)
-    assert len(nox_runs) == 2
+    check_nox_gate(rendered)
+    assert len(nox_runs) == 3
+    assert config_lints == [["antsibull-nox", "lint-config"]]
 
 
 @pytest.mark.parametrize("failure", [None, "verification", "lint"])
@@ -254,3 +278,14 @@ def test_second_fix_must_not_change_yaml(
             check_fix_stability(tmp_path, {})
     else:
         check_fix_stability(tmp_path, {})
+
+
+def test_default_sessions_come_from_the_starred_listing() -> None:
+    listing = (
+        "Sessions defined in noxfile.py:\n\n"
+        "* license-check -> Run license checker: reuse\n"
+        "- ansible-test-sanity-2.16 -> Run sanity tests\n"
+        "* changelog -> Changelog fragments\n\n"
+        "sessions marked with * are selected, sessions marked with - are skipped.\n"
+    )
+    assert default_sessions(listing) == ["license-check", "changelog"]
