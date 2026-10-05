@@ -18,7 +18,7 @@ Run every check from the collection root, inside its Git repository:
 uv run noxfile.py                 # rewrite, then check: lint, docs, Markdown, changelog, build
 CI=true uv run noxfile.py         # check only; fails on anything a rewrite would change
 uv run noxfile.py -l              # list all sessions
-uv run noxfile.py -t sanity       # ansible-test sanity, one session per ansible-core version
+uv run noxfile.py -s ansible-test-sanity  # ansible-test sanity, one session per ansible-core version
 uv run noxfile.py -s molecule     # Molecule, "default" scenario
 uv run noxfile.py -s molecule -- test --platform-name molecule-debian13
 ```

@@ -169,9 +169,10 @@ a `run` role in an Ansible collection. It includes:
 - [`antsibull-changelog`](https://docs.ansible.com/projects/antsibull-changelog/changelogs/)
   support.
 - [`antsibull-nox`](https://docs.ansible.com/projects/antsibull-nox/) checks:
-  `nox` rewrites and checks, `CI=true nox` only checks, `nox -t sanity` runs
-  `ansible-test` sanity per `ansible-core` version, `nox -s molecule` runs
-  Molecule. `DEVELOPMENT.md` in the collection explains them.
+  `nox` rewrites and checks, `CI=true nox` only checks,
+  `nox -s ansible-test-sanity` runs `ansible-test` sanity per `ansible-core`
+  version, `nox -s molecule` runs Molecule. `DEVELOPMENT.md` in the collection
+  explains them.
 - [Molecule](https://docs.ansible.com/projects/molecule/) support with a default
   scenario using [Podman](https://podman.io/docs/installation) and several
   [integration test targets](https://github.com/orgs/foundata/repositories?q=oci-*-itt).

@@ -15,6 +15,9 @@ and the project adheres to
   pytest and rumdl caches, the Ruff and mypy configuration and `tests/output`,
   which `ansible-test` writes. `DEVELOPMENT.md` notes the `docs-check`
   failure under Python 3.14 in deep checkouts.
+- collection_default: `DEVELOPMENT.md` and the README select the sanity
+  sessions by name (`nox -s ansible-test-sanity`); the tag form selects
+  nothing with antsibull-nox.
 
 ### Fixed
 
