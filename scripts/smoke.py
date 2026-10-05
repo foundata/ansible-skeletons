@@ -481,9 +481,7 @@ def default_sessions(listing: str) -> list[str]:
 def check_nox_gate(rendered: Rendered) -> None:
     """Run the generated collection's default nox sessions in check-only mode.
 
-    Tool versions are pinned to this environment through constraints. The
-    ``docs`` session is skipped until DocSmith formats its output with rumdl;
-    the templates already carry that formatted output.
+    Tool versions are pinned to this environment through constraints.
     """
     constraints = rendered.work / "lint-constraints.txt"
     constraints.write_text(lint_constraints(), encoding="utf-8")
@@ -500,11 +498,7 @@ def check_nox_gate(rendered: Rendered) -> None:
     # second invocation. Once its cap includes 26.9, add galaxy-importer to the
     # "lint" group in pyproject.toml and drop this exception.
     unpinned = {"build-import-check"}
-    sessions = [
-        name
-        for name in default_sessions(listing)
-        if name != "docs" and name not in unpinned
-    ]
+    sessions = [name for name in default_sessions(listing) if name not in unpinned]
     if not sessions:
         raise GateError("The generated noxfile lists no default session")
     command = [

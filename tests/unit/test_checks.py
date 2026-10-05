@@ -158,7 +158,7 @@ def test_nox_gate_isolates_stock_passthrough(
             if command[1:3] == ["--sessions", "build-import-check"]:
                 assert "PIP_CONSTRAINT" not in env
                 return ""
-            assert command[1:4] == ["--sessions", "docs-check", "ansible-lint"]
+            assert command[1:5] == ["--sessions", "docs-check", "ansible-lint", "docs"]
             assert env["PIP_CONSTRAINT"] == str(tmp_path / "lint-constraints.txt")
             return "Verified discovery and execution of 17 foundata rules.\n"
         if command[:3] == [str(tmp_path / "stock-lint/bin/python"), "-m", "nox"]:

@@ -266,7 +266,7 @@ wheels = [
 
 [[package]]
 name = "ansible-docsmith"
-version = "2.2.0"
+version = "2.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "antsibull-docs-parser" },
@@ -277,9 +277,9 @@ dependencies = [
     { name = "typer" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/72/2a/bcd58b80eb2de17af75514b81834ddde7176437935f178de5da515ca60c4/ansible_docsmith-2.2.0.tar.gz", hash = "sha256:e643174f5d682dc20c9a776097b53db4e82225256d5530899d68e8caf8362f34", size = 69122, upload-time = "2026-07-26T13:02:42.586Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a2/0c/5bd56da4de28a752f88ddda6fffbd7274fc04c30bef41f383caddf91fe21/ansible_docsmith-2.3.0.tar.gz", hash = "sha256:f03509b1a1a8f5e6bf8a40cf3a80e048f0643d54bf6a9ba32747811129578375", size = 84912, upload-time = "2026-10-05T02:25:38.36Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/bc/9a/92023f27e898dfe6685c52469783ab84a25c6c155cf0f1621fc1ab413dde/ansible_docsmith-2.2.0-py3-none-any.whl", hash = "sha256:2f553178bb72fe64164e4d163e4e00acc237308675790fa8c3ec4f130b5bc9e1", size = 73583, upload-time = "2026-07-26T13:02:41.166Z" },
+    { url = "https://files.pythonhosted.org/packages/13/e8/b16ef2bc2e11fe42b7bd7e274ea3f49f9c42aa5f5fe3dc8284443edeccd0/ansible_docsmith-2.3.0-py3-none-any.whl", hash = "sha256:ad4aba2988cb229941a8317b8b533ada1f355f3bfb519176b160404cae6ddbb6", size = 86892, upload-time = "2026-10-05T02:25:36.48Z" },
 ]
 
 [[package]]
@@ -398,7 +398,7 @@ integration = [
     { name = "pycdlib" },
 ]
 lint = [
-    { name = "ansible-docsmith" },
+    { name = "ansible-docsmith", specifier = ">=2.3.0" },
     { name = "ansible-lint-foundata", specifier = ">=1.1.0" },
     { name = "antsibull-changelog" },
     { name = "antsibull-docs" },
