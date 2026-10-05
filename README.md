@@ -110,7 +110,7 @@ Some collections built using these skeletons:
       --extra-var "repository='https://FIXME.example.com/repo/'" \
       --extra-var "issues='https://FIXME.example.com/repo/issues/'" \
       --extra-var "homepage='https://FIXME.example.com'" \
-      --extra-var "min_ansible_version='2.16.0'" \
+      --extra-var "min_ansible_version='2.19.0'" \
       --extra-var "version='0.1.0'" \
       "namespace.new_collection"
 
@@ -124,7 +124,7 @@ Some collections built using these skeletons:
       --extra-var "repository_url='https://FIXME.example.com/repo/'" \
       --extra-var "issue_tracker_url='https://FIXME.example.com/repo/issues/'" \
       --extra-var "homepage_url='https://FIXME.example.com'" \
-      --extra-var "min_ansible_version='2.16.0'" \
+      --extra-var "min_ansible_version='2.19.0'" \
       "new_role"
    ```
 
@@ -221,10 +221,10 @@ The matrix is defined in `pyproject.toml`; see
 infrastructure coverage. It is reviewed against the
 [upstream support matrix](https://docs.ansible.com/ansible/latest/reference_appendices/release_and_maintenance.html#ansible-core-support-matrix).
 
-Older Ansible core versions from 2.16 may work, but are outside the required
-release matrix. Historical manual checks included core 2.18. The development
-helpers require Python 3.12 or newer; consumers only need Ansible and its
-supported Python runtime.
+ansible-core before 2.19 cannot run the rendered content: the templates write
+Jinja's own filters and tests as `ansible.builtin.<name>`, which ansible-core
+resolves from 2.19. The development helpers require Python 3.12 or newer;
+consumers only need Ansible and its supported Python runtime.
 
 The following versions are known to be problematic:
 

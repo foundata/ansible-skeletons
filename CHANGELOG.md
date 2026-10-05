@@ -18,6 +18,10 @@ and the project adheres to
 - collection_default: `DEVELOPMENT.md` and the README select the sanity
   sessions by name (`nox -s ansible-test-sanity`); the tag form selects
   nothing with antsibull-nox.
+- (collection|role)_default: the default ansible-core minimum is 2.19. The
+  templates write Jinja's own filters and tests as `ansible.builtin.<name>`,
+  which ansible-core resolves from 2.19; older cores never ran the rendered
+  content. The `ansible-test` lanes below 2.19 disappear with the floor.
 
 ### Fixed
 

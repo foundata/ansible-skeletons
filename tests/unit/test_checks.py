@@ -284,7 +284,7 @@ def test_default_sessions_come_from_the_starred_listing() -> None:
     listing = (
         "Sessions defined in noxfile.py:\n\n"
         "* license-check -> Run license checker: reuse\n"
-        "- ansible-test-sanity-2.16 -> Run sanity tests\n"
+        "- ansible-test-sanity-2.19 -> Run sanity tests\n"
         "* changelog -> Changelog fragments\n\n"
         "sessions marked with * are selected, sessions marked with - are skipped.\n"
     )
