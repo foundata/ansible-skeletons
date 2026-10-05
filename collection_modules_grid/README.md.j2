@@ -1,0 +1,164 @@
+# Ansible collection: `{{ namespace }}.{{ collection_name }}`
+
+Resource modules for {{ product | mandatory('Missing required variable: product') }}. FIXME Replace the
+invented fixture contract below after qualifying the first product resource.
+
+
+
+## Table of contents<a id="toc"></a>
+
+- [Included content](#content)
+- [Dependencies](#dependencies)
+- [Collection contract](#collection-contract)
+- [Example](#example)
+- [Compatibility](#compatibility)
+- [Licensing, copyright](#licensing-copyright)
+- [Author information](#author-information)
+
+
+
+## Included content<a id="content"></a>
+
+<!-- BEGIN MODULE TABLE -->
+|     Module      | Purpose |
+| --------------- | ------- |
+| `fixture`       | Converge one saved record |
+| `fixture_info`  | Read its public saved state |
+| `fixture_apply` | Activate the fixture family and verify named records |
+<!-- END MODULE TABLE -->
+
+This table is maintained by hand. Module documentation is authoritative:
+`ansible-doc {{ namespace }}.{{ collection_name }}.fixture`.
+
+
+
+## Dependencies<a id="dependencies"></a>
+
+See `dependencies` in [`galaxy.yml`](./galaxy.yml).
+
+The fixture uses `foundata.utils >=1.0.0`, which is currently unpublished.
+Additional Python packages belong in [`requirements.txt`](./requirements.txt);
+the fixture requires none.
+
+
+
+## Collection contract
+
+### Execution
+
+Modules run on the execution host against an existing API endpoint. Use
+`connection: local` or an authorized delegate. Installation, bootstrap,
+credentials and TLS trust are caller prerequisites.
+
+### Identity
+
+An exact immutable name identifies one record. A rename creates another record;
+duplicate and internal identities fail. Absence requires a complete listing.
+
+### Ownership
+
+Only declared fields are managed. Omitted and null options stay unmanaged;
+empty values clear fields. Deletion removes only the named object. Coordinate
+writers, including inventory aliases that address the same endpoint.
+
+### Activation
+
+Resource writes save state. Run `fixture_apply` with `activate: auto` and a
+`verify` list on every workflow execution. It consumes all pending changes in
+the family, compares only the named objects, and waits for observed convergence.
+`always` forces activation.
+
+### Check and diff mode
+
+Check mode performs reads with zero writes and returns `verified: predicted`;
+the info module always reports observed state. Predicted creations have no
+identifier. Diffs contain public managed fields only, on request.
+
+### Failures
+
+Failures report `error_category`, `error_code`, `http_status`, `operation`,
+`changed` and `outcome` (`unchanged`, `changed` or `unknown`). Lost responses
+are reconciled by identity; creations are never blindly retried. Results and
+errors exclude secrets, including secrets returned in listings.
+
+### Version check
+
+A read-only probe precedes writes. Untested series warn once and proceed;
+evidence-backed operation exclusions fail before writing.
+
+
+
+## Example
+
+```yaml
+---
+- name: "Configure a fixture endpoint"
+  hosts: "product_api"
+  connection: "local"
+  gather_facts: false
+  become: false
+  module_defaults:
+    group/{{ namespace }}.{{ collection_name }}.api:
+      url: "{% raw %}{{ product_url }}{% endraw %}"
+      api_key: "{% raw %}{{ product_api_key }}{% endraw %}"
+      api_secret: "{% raw %}{{ product_api_secret }}{% endraw %}"
+  tasks:
+    - name: "Save the record"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        name: "example"
+        value: "ready"
+
+    - name: "Converge active state"
+      {{ namespace }}.{{ collection_name }}.fixture_apply:
+        activate: "auto"
+        verify: ["example"]
+```
+
+
+
+## Compatibility<a id="compatibility"></a>
+
+The controller needs ansible-core {{ min_ansible_version | default('2.19.0') }}
+or newer. Execution hosts need Python 3.9+, API access and the endpoint's CA
+trust.
+
+| Collection release | Product series (tested release) | ansible-core |
+| ------------------ | ------------------------------- | ------------ |
+{% set initial_version = version | default('1.0.0') %}
+{% set core_floor = min_ansible_version | default('2.19.0') %}
+| {{ initial_version.ljust(18) }} | Invented fixture 1.0 (1.0.0)    | {{ ('>=' ~ core_floor).ljust(12) }} |
+
+The fixture tests make no support claim for a real product. See
+[development](DEVELOPMENT.md) and [architecture](docs/architecture.md).
+
+
+
+## Licensing, copyright<a id="licensing-copyright"></a>
+
+<!--REUSE-IgnoreStart-->
+Copyright (c) {{ '%Y' | strftime }} {{ company | default('FIXME your organization') }}
+
+This project is licensed under the GNU General Public License v3.0 or later
+(SPDX-License-Identifier: `GPL-3.0-or-later`), see
+[`LICENSES/GPL-3.0-or-later.txt`](./LICENSES/GPL-3.0-or-later.txt) for the full
+text.
+
+The [`REUSE.toml`](./REUSE.toml) file provides detailed licensing and copyright
+information in a human- and machine-readable format. This includes parts that
+may be subject to different licensing or usage terms, such as third-party
+components. The repository conforms to the
+[REUSE specification](https://reuse.software/spec/). You can use
+[`reuse spdx`](https://reuse.readthedocs.io/en/latest/readme.html#cli) to create
+an
+[SPDX software bill of materials (SBOM)](https://en.wikipedia.org/wiki/Software_Package_Data_Exchange).
+<!--REUSE-IgnoreEnd-->
+
+
+
+## Author information<a id="author-information"></a>
+
+This project was created and is maintained by {{ company | default('FIXME your organization') }}.
+
+Initially based on an
+[Ansible skeleton](https://foundata.com/en/projects/ansible-skeletons/)
+developed by [foundata](https://foundata.com/).

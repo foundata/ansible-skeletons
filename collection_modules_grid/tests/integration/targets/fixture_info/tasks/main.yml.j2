@@ -1,0 +1,92 @@
+# FIXME Replace this read-only contract with qualified product reads.
+---
+- name: "Exercise read-only fixture queries"
+  module_defaults:
+    group/{{ namespace }}.{{ collection_name }}.api: "{% raw %}{{ fixture_fake_connection }}{% endraw %}"
+  block:
+    - name: "Read an absent fixture in check mode"
+      {{ namespace }}.{{ collection_name }}.fixture_info:
+        name: "integration_info"
+      check_mode: true
+      register: __fixture_info_absent
+
+    - name: "Create a readable fixture"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        name: "integration_info"
+        value: "observed"
+
+    - name: "Read the fixture"
+      {{ namespace }}.{{ collection_name }}.fixture_info:
+        name: "integration_info"
+      register: __fixture_info_read
+
+    - name: "Verify public state"
+      ansible.builtin.assert:
+        that:
+          - __fixture_info_absent['fixture'] is ansible.builtin.none
+          - __fixture_info_absent is not ansible.builtin.changed
+          - __fixture_info_read is not ansible.builtin.changed
+          - __fixture_info_read['verified'] == 'observed'
+          - __fixture_info_read['fixture']['value'] == 'observed'
+          - __fixture_info_read['fixture']['password'] is not ansible.builtin.defined
+
+    - name: "Reject a wrong read credential"
+      {{ namespace }}.{{ collection_name }}.fixture_info:
+        name: "integration_info"
+        api_secret: "WRONG-SYNTHETIC-SECRET"
+      ignore_errors: true
+      register: __fixture_info_denied
+
+    - name: "Verify the read failure"
+      ansible.builtin.assert:
+        that:
+          - __fixture_info_denied is ansible.builtin.failed
+          - __fixture_info_denied['outcome'] == 'unchanged'
+
+    - name: "Reject an invalid read identity"
+      {{ namespace }}.{{ collection_name }}.fixture_info:
+        name: "invalid/name"
+      ignore_errors: true
+      register: __fixture_info_invalid
+
+    - name: "Update the saved fixture with diff"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        name: "integration_info"
+        value: "updated"
+      diff: true
+      register: __fixture_info_update
+
+    - name: "Read the updated fixture twice"
+      {{ namespace }}.{{ collection_name }}.fixture_info:
+        name: "integration_info"
+      loop: [1, 2]
+      register: __fixture_info_repeated
+
+    - name: "Delete the fixture twice"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        name: "integration_info"
+        state: "absent"
+      loop: [1, 2]
+      register: __fixture_info_deleted
+
+    - name: "Read the deleted fixture"
+      {{ namespace }}.{{ collection_name }}.fixture_info:
+        name: "integration_info"
+      register: __fixture_info_final
+
+    - name: "Verify read lifecycle and validation"
+      ansible.builtin.assert:
+        that:
+          - __fixture_info_invalid is ansible.builtin.failed
+          - __fixture_info_invalid['outcome'] == 'unchanged'
+          - __fixture_info_update['diff']['after']['value'] == 'updated'
+          - __fixture_info_repeated is not ansible.builtin.changed
+          - __fixture_info_repeated['results'][1]['fixture']['value'] == 'updated'
+          - __fixture_info_deleted['results'][0] is ansible.builtin.changed
+          - __fixture_info_deleted['results'][1] is not ansible.builtin.changed
+          - __fixture_info_final['fixture'] is ansible.builtin.none
+  always:
+    - name: "Stop the fake endpoint"
+      ansible.builtin.include_role:
+        name: "setup_fixture_fake"
+        tasks_from: "stop"

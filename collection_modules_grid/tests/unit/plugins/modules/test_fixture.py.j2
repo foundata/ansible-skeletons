@@ -1,0 +1,287 @@
+"""Exercise the resource lifecycle through real argument parsing."""
+# FIXME Replace fixture cases with qualified product lifecycle cases.
+
+from __future__ import annotations
+
+import json
+from dataclasses import replace
+
+import pytest
+from ansible.module_utils.basic import AnsibleModule
+
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils import (
+    _compat,
+)
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._definitions import (
+    FIXTURE,
+)
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._engine import (
+    Field,
+    Key,
+    Reference,
+    build_spec,
+    run_resource,
+)
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.modules import (
+    fixture,
+)
+
+from ..conftest import (
+    OLD_SECRET,
+    SECRET,
+    FakeProduct,
+    Response,
+    RunModule,
+    lost_response,
+)
+
+
+def test_identity_validation_precedes_requests(
+    fake: FakeProduct, run_module: RunModule
+) -> None:
+    result = run_module(fixture.main, name="example\n")
+    assert result["failed"] and result["error_code"] == "validation_failed"
+    assert result["outcome"] == "unchanged" and not fake.requests
+
+
+def test_lifecycle(fake: FakeProduct, run_module: RunModule) -> None:
+    created = run_module(fixture.main, name="example", value="first", enabled=False)
+    assert created["changed"] and created["verified"] == "observed"
+    assert created["changed_fields"] == []
+    key = created["fixture"]["uuid"]
+    assert fake.grids["fixture"][key]["enabled"] == "0"
+    assert not run_module(fixture.main, name="example", value="first", enabled=False)[
+        "changed"
+    ]
+    updated = run_module(
+        fixture.main, name="example", value="second", _ansible_diff=True
+    )
+    assert updated["changed_fields"] == ["value"]
+    assert updated["diff"] == {
+        "before": {"value": "first"},
+        "after": {"value": "second"},
+    }
+    assert fake.writes()[-1][2] == {"fixture": {"value": "second"}}
+    assert fake.grids["fixture"][key]["enabled"] == "0"
+    deleted = run_module(fixture.main, name="example", state="absent")
+    assert deleted["fixture"] is None and deleted["changed_fields"] == []
+    assert not run_module(fixture.main, name="example", state="absent")["changed"]
+    assert fake.grids["fixture"] == {}
+
+
+@pytest.mark.parametrize("exists", [False, True])
+@pytest.mark.parametrize("state", ["present", "absent"])
+@pytest.mark.parametrize("diff", [False, True])
+def test_check_mode(
+    fake: FakeProduct, run_module: RunModule, exists: bool, state: str, diff: bool
+) -> None:
+    if exists:
+        fake.add(value="old")
+    result = run_module(
+        fixture.main,
+        name="example",
+        value="new",
+        state=state,
+        _ansible_check_mode=True,
+        _ansible_diff=diff,
+    )
+    assert result["verified"] == "predicted"
+    assert result["changed"] == (state == "present" or exists)
+    assert ("diff" in result) == (diff and result["changed"])
+    if not exists and state == "present":
+        assert "uuid" not in result["fixture"]
+    assert not fake.writes()
+
+
+def test_omission_null_empty_and_sets(fake: FakeProduct, run_module: RunModule) -> None:
+    key = fake.add(value="keep", labels="a,b")
+    assert not run_module(fixture.main, name="example", value=None, labels=["b", "a"])[
+        "changed"
+    ]
+    assert run_module(fixture.main, name="example", labels=[])["changed"]
+    assert fake.grids["fixture"][key]["value"] == "keep"
+    assert fake.grids["fixture"][key]["labels"] == ""
+
+
+@pytest.mark.parametrize("action", ["add_item", "set_item", "del_item"])
+def test_lost_response_reconciles_once(
+    fake: FakeProduct, run_module: RunModule, action: str
+) -> None:
+    if action != "add_item":
+        fake.add()
+    fake.after_write[action] = lost_response
+    result = run_module(
+        fixture.main,
+        name="example",
+        value="new",
+        state="absent" if action == "del_item" else "present",
+    )
+    assert result["changed"] and result["verified"] == "observed"
+    assert not result.get("failed") and len(fake.writes()) == 1
+
+
+def test_complete_paginated_lookup(fake: FakeProduct, run_module: RunModule) -> None:
+    for index in range(5):
+        fake.add(name=f"item{index}")
+    result = run_module(fixture.main, name="item4")
+    assert not result["changed"]
+    assert len([row for row in fake.requests if row[1].endswith("search_item")]) == 3
+
+
+@pytest.mark.parametrize(
+    "fault,code",
+    [
+        ("ambiguous", "ambiguous"),
+        ("truncated", "incomplete_listing"),
+        ("internal", "internal_object"),
+    ],
+)
+def test_identity_refuses_writes(
+    fake: FakeProduct, run_module: RunModule, fault: str, code: str
+) -> None:
+    key = fake.add()
+    if fault == "ambiguous":
+        fake.add()
+    elif fault == "truncated":
+        fake.total_offset = 1
+    else:
+        fake.grids["fixture"]["builtin"] = fake.grids["fixture"].pop(key)
+    result = run_module(fixture.main, name="example", value="new")
+    assert result["failed"] and result["error_code"] == code
+    assert result["outcome"] == "unchanged" and not fake.writes()
+
+
+def test_validation_is_unchanged(fake: FakeProduct, run_module: RunModule) -> None:
+    result = run_module(fixture.main, name="example", value="INVALID")
+    assert result["failed"] and result["error_code"] == "validation_failed"
+    assert not result["changed"] and result["outcome"] == "unchanged"
+    assert not fake.grids["fixture"]
+
+
+def test_unsupported_series_warns_once(
+    fake: FakeProduct, run_module: RunModule
+) -> None:
+    fake.version = "9.0.0"
+    result = run_module(fixture.main, name="example")
+    assert result["changed"] and len(result["warnings"]) == 1
+    assert "1.0" in str(result["warnings"])
+
+
+def test_excluded_build_has_no_write(
+    fake: FakeProduct, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        _compat, "EXCLUSIONS", {"fixture:present": (("1.0.0", "synthetic defect"),)}
+    )
+    result = run_module(fixture.main, name="example")
+    assert result["failed"] and result["error_code"] == "ineligible"
+    assert not fake.writes()
+
+
+@pytest.mark.parametrize("failed", [False, True])
+def test_no_secrets_in_serialized_result(
+    fake: FakeProduct, run_module: RunModule, failed: bool
+) -> None:
+    fake.add()
+    fake.auth_ok = not failed
+    result = run_module(fixture.main, name="example", value="new", _ansible_diff=True)
+    # Controller-only secret registration metadata is removed before displaying results.
+    result.pop("_ansible_new_secrets", None)
+    serialized = json.dumps(result)
+    assert SECRET not in serialized and OLD_SECRET not in serialized
+    assert result.get("failed", False) == failed
+
+
+@pytest.mark.parametrize(
+    "raw,code", [(b"\xff", "invalid_utf8"), (b"{", "invalid_json")]
+)
+def test_bad_wire_response(
+    fake: FakeProduct, run_module: RunModule, raw: bytes, code: str
+) -> None:
+    fake.faults["/fixture/search_item"] = lambda: Response(200, {}, raw=raw)
+    result = run_module(fixture.main, name="example")
+    assert result["failed"] and result["error_code"] == code
+    assert not fake.writes()
+
+
+def test_unknown_write_outcome(fake: FakeProduct, run_module: RunModule) -> None:
+    def lose_and_hide() -> None:
+        fake.grids["fixture"].clear()
+        lost_response()
+
+    fake.after_write["add_item"] = lose_and_hide
+    result = run_module(fixture.main, name="example")
+    assert result["failed"] and result["changed"] and result["outcome"] == "unknown"
+    assert len(fake.writes()) == 1
+
+
+def test_invalid_integer_response(fake: FakeProduct, run_module: RunModule) -> None:
+    definition = replace(
+        FIXTURE,
+        fields=(Field("value", "int", "Integer value"), *FIXTURE.fields[1:]),
+    )
+    key = fake.add()
+
+    def main() -> None:
+        module = AnsibleModule(
+            argument_spec=build_spec(definition), supports_check_mode=True
+        )
+        run_resource(module, definition)
+
+    for raw in ("--2", "\u00b2", "1.2"):
+        fake.grids["fixture"][key]["value"] = raw
+        result = run_module(main, name="example")
+        assert result["failed"] and result["error_code"] == "schema"
+        assert result["outcome"] == "unchanged" and not fake.writes()
+
+
+def test_composite_identity_and_references(
+    fake: FakeProduct, run_module: RunModule
+) -> None:
+    linked = fake.add(grid="other", name="parent")
+    definition = replace(
+        FIXTURE,
+        keys=(*FIXTURE.keys, Key("scope", "Scope", r"[a-z]+\Z", default="local")),
+        fields=(
+            *FIXTURE.fields,
+            Field("links", "set", "Names", reference=Reference("/other", "name")),
+        ),
+    )
+
+    def main() -> None:
+        module = AnsibleModule(
+            argument_spec=build_spec(definition), supports_check_mode=True
+        )
+        run_resource(module, definition)
+
+    result = run_module(main, name="example", links=["parent"])
+    assert not result.get("failed")
+    assert result["fixture"]["links"] == ["parent"]
+    assert next(iter(fake.grids["fixture"].values()))["links"] == linked
+    assert not run_module(main, name="example", links=["parent"])["changed"]
+
+
+@pytest.mark.parametrize("duplicate", [False, True])
+def test_invalid_reference_precedes_write(
+    fake: FakeProduct, run_module: RunModule, duplicate: bool
+) -> None:
+    if duplicate:
+        fake.add(grid="other", name="parent")
+        fake.add(grid="other", name="parent")
+    definition = replace(
+        FIXTURE,
+        fields=(
+            *FIXTURE.fields,
+            Field("links", "set", "Names", reference=Reference("/other", "name")),
+        ),
+    )
+
+    def main() -> None:
+        module = AnsibleModule(
+            argument_spec=build_spec(definition), supports_check_mode=True
+        )
+        run_resource(module, definition)
+
+    result = run_module(main, name="example", links=["parent"])
+    assert result["error_category"] == "reference"
+    assert not fake.writes()

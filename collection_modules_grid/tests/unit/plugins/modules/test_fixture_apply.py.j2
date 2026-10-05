@@ -1,0 +1,79 @@
+"""Activation converges and recovers pending work independently of resource writes."""
+# FIXME Replace the fixture comparison with the product's effective-state evidence.
+
+from __future__ import annotations
+
+import json
+
+import pytest
+
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils import (
+    _activation,
+)
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.modules import (
+    fixture_apply,
+)
+
+from ..conftest import SECRET, FakeProduct, RunModule, lost_response
+
+
+def test_activation_converges(fake: FakeProduct, run_module: RunModule) -> None:
+    key = fake.add(value="saved")
+    applied = run_module(fixture_apply.main, verify=["example"])
+    assert applied["changed"] and applied["activated"]
+    assert applied["verified"] == "observed" and applied["verification"] == {
+        "example": "in_sync"
+    }
+    assert fake.active[key]["value"] == "saved"
+    assert not run_module(fixture_apply.main, verify=["example"])["changed"]
+    assert run_module(fixture_apply.main, verify=["example"], activate="always")[
+        "changed"
+    ]
+    fake.grids["fixture"].clear()
+    assert run_module(fixture_apply.main, verify=["example"])["changed"]
+    assert not fake.active
+    assert not run_module(fixture_apply.main, verify=["example"])["changed"]
+
+
+def test_check_predicts_without_write(fake: FakeProduct, run_module: RunModule) -> None:
+    fake.add()
+    result = run_module(
+        fixture_apply.main, verify=["example"], _ansible_check_mode=True
+    )
+    assert (
+        result["changed"] and result["activated"] and result["verified"] == "predicted"
+    )
+    assert result["verification"] == {"example": "drift"} and not fake.writes()
+
+
+def test_lost_apply_response_is_settled(
+    fake: FakeProduct, run_module: RunModule
+) -> None:
+    fake.add()
+    fake.after_write["reconfigure"] = lost_response
+    result = run_module(fixture_apply.main, verify=["example"])
+    assert result["verified"] == "observed" and len(fake.writes()) == 1
+
+
+def test_accepted_but_not_effective_fails(
+    fake: FakeProduct, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake.add()
+    fake.activate_ok = False
+    monkeypatch.setattr(_activation, "SETTLE_SECONDS", 0.0)
+    result = run_module(fixture_apply.main, verify=["example"])
+    assert result["failed"] and result["error_code"] == "not_effective"
+    assert result["changed"] and result["outcome"] == "changed"
+
+
+def test_no_verification_is_invalid(fake: FakeProduct, run_module: RunModule) -> None:
+    result = run_module(fixture_apply.main, verify=[])
+    assert result["failed"] and not result["changed"] and not fake.writes()
+
+
+def test_secret_failure_is_sanitized(fake: FakeProduct, run_module: RunModule) -> None:
+    fake.auth_ok = False
+    result = run_module(fixture_apply.main, verify=["example"])
+    assert result["failed"] and not result["changed"]
+    result.pop("_ansible_new_secrets", None)
+    assert SECRET not in json.dumps(result)

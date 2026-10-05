@@ -1,0 +1,10 @@
+"""Internal resource registry; definitions live in _definitions."""
+# FIXME Register the researched resources replacing FIXTURE.
+
+from __future__ import annotations
+
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._definitions import (
+    FIXTURE,
+)
+
+RESOURCES = (FIXTURE,)

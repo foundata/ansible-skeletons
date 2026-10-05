@@ -1,0 +1,111 @@
+# FIXME Replace fixture activation with product effective-state assertions.
+---
+- name: "Exercise fixture activation"
+  module_defaults:
+    group/{{ namespace }}.{{ collection_name }}.api: "{% raw %}{{ fixture_fake_connection }}{% endraw %}"
+  block:
+    - name: "Save pending work"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        name: "integration_apply"
+        value: "pending"
+
+    - name: "Predict activation"
+      {{ namespace }}.{{ collection_name }}.fixture_apply:
+        verify: ["integration_apply"]
+      check_mode: true
+      register: __fixture_apply_prediction
+
+    - name: "Activate the family"
+      {{ namespace }}.{{ collection_name }}.fixture_apply:
+        activate: "auto"
+        verify: ["integration_apply"]
+      register: __fixture_apply_first
+
+    - name: "Repeat activation"
+      {{ namespace }}.{{ collection_name }}.fixture_apply:
+        verify: ["integration_apply"]
+      register: __fixture_apply_second
+
+    - name: "Verify activation converges"
+      ansible.builtin.assert:
+        that:
+          - __fixture_apply_prediction['verified'] == 'predicted'
+          - __fixture_apply_prediction['verification']['integration_apply'] == 'drift'
+          - __fixture_apply_first is ansible.builtin.changed
+          - __fixture_apply_first['activated']
+          - __fixture_apply_first['verification']['integration_apply'] == 'in_sync'
+          - __fixture_apply_second is not ansible.builtin.changed
+
+    - name: "Reject empty verification"
+      {{ namespace }}.{{ collection_name }}.fixture_apply:
+        verify: []
+      ignore_errors: true
+      register: __fixture_apply_invalid
+
+    - name: "Reject a wrong activation credential"
+      {{ namespace }}.{{ collection_name }}.fixture_apply:
+        verify: ["integration_apply"]
+        api_secret: "WRONG-SYNTHETIC-SECRET"
+      ignore_errors: true
+      register: __fixture_apply_denied
+
+    - name: "Update saved work with diff"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        name: "integration_apply"
+        value: "updated"
+      diff: true
+      register: __fixture_apply_update
+
+    - name: "Activate the update"
+      {{ namespace }}.{{ collection_name }}.fixture_apply:
+        verify: ["integration_apply"]
+      register: __fixture_apply_updated
+
+    - name: "Verify failures and update"
+      ansible.builtin.assert:
+        that:
+          - __fixture_apply_invalid is ansible.builtin.failed
+          - __fixture_apply_invalid['outcome'] == 'unchanged'
+          - __fixture_apply_denied is ansible.builtin.failed
+          - __fixture_apply_denied['outcome'] == 'unchanged'
+          - __fixture_apply_update['diff']['after']['value'] == 'updated'
+          - __fixture_apply_updated is ansible.builtin.changed
+          - __fixture_apply_updated['verification']['integration_apply'] == 'in_sync'
+
+    - name: "Delete the saved fixture"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        name: "integration_apply"
+        state: "absent"
+
+    - name: "Activate deletion"
+      {{ namespace }}.{{ collection_name }}.fixture_apply:
+        verify: ["integration_apply"]
+      register: __fixture_apply_deleted
+
+    - name: "Verify deletion became effective"
+      ansible.builtin.assert:
+        that:
+          - __fixture_apply_deleted is ansible.builtin.changed
+          - __fixture_apply_deleted['verification']['integration_apply'] == 'in_sync'
+
+    - name: "Repeat saved deletion"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        name: "integration_apply"
+        state: "absent"
+      register: __fixture_apply_delete_again
+
+    - name: "Repeat deletion activation"
+      {{ namespace }}.{{ collection_name }}.fixture_apply:
+        verify: ["integration_apply"]
+      register: __fixture_apply_settled
+
+    - name: "Verify repeated deletion is unchanged"
+      ansible.builtin.assert:
+        that:
+          - __fixture_apply_delete_again is not ansible.builtin.changed
+          - __fixture_apply_settled is not ansible.builtin.changed
+  always:
+    - name: "Stop the fake endpoint"
+      ansible.builtin.include_role:
+        name: "setup_fixture_fake"
+        tasks_from: "stop"

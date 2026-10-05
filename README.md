@@ -43,6 +43,7 @@ The skeletons follow these style guides:
 - [Usage](#usage)
 - [Description of provided skeletons](#content)
   - [`collection_default`](#collection_default)
+  - [`collection_modules_grid`](#collection_modules_grid)
   - [`role_default`](#role_default)
 - [Compatibility](#compatibility)
 - [Contributing](#contributing)
@@ -146,6 +147,7 @@ Some collections built using these skeletons:
 Each skeleton has its own subdirectory. The source files contain
 [Jinja](https://palletsprojects.com/p/jinja/) expressions that
 `ansible-galaxy [collection|role]` renders when generating a project.
+Edit each skeleton directly; none is generated from another.
 
 
 ### `collection_default`<a id="collection_default"></a>
@@ -181,6 +183,32 @@ Nox installs and verifies `ansible-lint-foundata` in its lint environment.
 With `nox --no-venv`, a missing extension produces a warning and only stock
 rules run.
 
+
+
+### `collection_modules_grid`<a id="collection_modules_grid"></a>
+
+A module-first skeleton with a replaceable resource, info and activation module,
+a product-owned engine, fake API tests and an external-endpoint Molecule
+scenario. It contains no deployment role.
+
+Its fixture speaks a grid API with UUID identifiers, paginated `search_item`
+listings with a declared total, `add_item`, `set_item` and `del_item` actions,
+string-encoded values and fixed response envelopes. A REST product replaces
+the client, the fake server and the identifier type.
+
+Render with the metadata from the usage example and the product's display name:
+
+```sh
+ansible-galaxy collection init \
+  --collection-skeleton ./collection_modules_grid \
+  --extra-vars @metadata.json \
+  --extra-vars "skeleton_revision=$(git describe --tags --always)" \
+  --extra-vars '{"product": "Example Grid"}' namespace.product
+```
+
+`version` defaults to `1.0.0`; the core floor defaults to `2.19.0`.
+The fixture imports the currently unpublished `foundata.utils >=1.0.0`.
+Follow the rendered `FIXME.md` to adapt the fixture.
 
 
 ### `role_default`<a id="role_default"></a>

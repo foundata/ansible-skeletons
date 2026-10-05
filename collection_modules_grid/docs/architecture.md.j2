@@ -1,0 +1,81 @@
+# Architecture and rationale
+
+FIXME Replace the invented fixture decisions with evidence for
+{{ product | default('Example Grid') }} in `{{ namespace }}.{{ collection_name }}`.
+Stable release, edition, channel and source tag: unknown; record dated primary
+links. Research started: FIXME UTC timestamp.
+
+Skeleton: `collection_modules_grid`, revision
+`{{ skeleton_revision | default('unknown; record the skeleton commit or tag') }}`.
+Sources inspected: FIXME guide revisions, skeleton commit and dirty state,
+utility revision and local differences, specification dialect, API version,
+tag, retrieval time and content hash.
+
+Evidence labels: **D** documented, **S** read in matching release source,
+**I** inferred (name the premises), **unknown** (name the question and next
+experiment). Add **spike-tested** or **integration-tested** only with linked
+evidence. Fixture behavior is source-defined, not product qualification.
+
+## Decision sheet
+
+|         Decision          |                   Fixture starting point                    | Product evidence and next experiment |
+| ------------------------- | ----------------------------------------------------------- | ------------------------------------ |
+| Deployment ownership      | Configure only; caller supplies endpoint and credentials    | unknown: T01, T02, T26, T27; P14, P15 |
+| Transport and privilege   | HTTP on the execution host                                  | unknown: T05, T06; P2, P3, P16       |
+| Identity and refused rows | Unique exact name; UUID read-back; refuse internal IDs      | unknown: T10, T11; P4, P5            |
+| Absence                   | Paginated listing with verified total and unique IDs        | unknown: T08, T10; P4                |
+| Field ownership           | Declared fields only; omitted/null unmanaged                | unknown: T04, T13, T14; P6, P7       |
+| References                | Resolve names before writing                                | unknown: T11, T12; P8                |
+| Activation                | Family-wide apply; compare named saved/active records       | unknown: T19 to T23; P10, P12        |
+| Writer coordination       | Caller serializes writers; no lock promised                 | unknown: T16, T17; P13               |
+| Secrets                   | Allowlist public fields; listings may carry secrets         | unknown: T24, T25; P3, P9            |
+| Version probe             | Read-only version endpoint; warn outside supported series   | unknown: T28, T29; P1                |
+| Exclusions                | Operation to release/evidence pairs                         | unknown: T09, T28; P17, P18          |
+| Lab                       | External endpoint in Molecule; loopback fake in integration | unknown: P15 provisioning, P17 lifecycle |
+
+## Research record
+
+|                           Dimension                            | Decision and rationale | Evidence, label and date | Spike and result | Remaining issue |
+| -------------------------------------------------------------- | ---------------------- | ------------------------ | ---------------- | --------------- |
+| T01 to T04 stores, editing boundary, precedence, ownership     | FIXME                  | unknown                  | FIXME            | FIXME           |
+| T05 to T08 surfaces, authentication, descriptions and coverage | FIXME                  | unknown                  | P2, P3, P16, P18 | FIXME           |
+| T09 scope and extensions                                       | FIXME                  | unknown                  | P1               | FIXME           |
+| T10 to T12 identity, rename, collection structure              | FIXME                  | unknown                  | P4, P5, P8       | FIXME           |
+| T13 to T15 granularity, omission, null, validation             | FIXME                  | unknown                  | P6, P7           | FIXME           |
+| T16 to T18 conflicts, atomicity, deletion                      | FIXME                  | unknown                  | P13              | FIXME           |
+| T19 to T23 activation, completion, observation, reachability   | FIXME                  | unknown                  | P10 to P13       | FIXME           |
+| T24, T25 secrets and rotation                                  | FIXME                  | unknown                  | P9               | FIXME           |
+| T26, T27 bootstrap and first-run detection                     | FIXME                  | unknown                  | P14              | FIXME           |
+| T28, T29 version identity and stability                        | FIXME                  | unknown                  | P1               | FIXME           |
+| T30 existing automation                                        | FIXME                  | unknown                  | FIXME            | FIXME           |
+| Lab provisioning                                               | FIXME                  | unknown                  | P15, P17         | FIXME           |
+
+Representative trace: FIXME record a complete identity lookup, supplied and
+omitted fields, validation, persistence, secrets, activation and recovery.
+
+Execution boundaries: the product owns its engine and definitions;
+`foundata.utils` owns byte transport, deadlines, JSON decoding and safe error
+translation. The fixture speaks a conventional grid/CRUD style protocol (UUID
+identifiers, paginated search with a declared total, add, set and delete
+actions); FIXME state the product's protocol and what replaced the client,
+the fake server and the identifier type.
+Inventory evidence is development-only. The core floor is 2.19 because the
+shared playbooks use FQCN Jinja builtins; payload Python remains 3.9.
+
+## Resources
+
+|    Resource     |    Kind     |    Identity    |         Ownership          |           Activation           | Reason |
+| --------------- | ----------- | -------------- | -------------------------- | ------------------------------ | ------ |
+| `fixture`       | resource    | exact name     | declared public fields     | `fixture_apply`                | Replaceable engine example |
+| `fixture_info`  | info        | exact name     | read-only                  | none                           | Public saved-state projection |
+| `fixture_apply` | operational | fixture family | all pending family changes | auto, named-state verification | Converging activation example |
+
+Further resources: FIXME select from the inventory, with unresolved identity or
+activation questions; move planned work to issues at publication.
+
+Skeleton adaptations: `collection_modules_grid` supplies the role-free layout,
+checks, API scenario and research scaffolds. FIXME record product-specific
+changes.
+
+Timing evidence: FIXME record lab start, inventory, resource choice, first
+resource P17, checks, further resources, active time, wall time and waits.

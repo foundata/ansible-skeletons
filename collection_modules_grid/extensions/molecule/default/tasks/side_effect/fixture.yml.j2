@@ -1,0 +1,23 @@
+# FIXME Qualify update, diff and recovery for the replacement resource.
+---
+- name: "Exercise a fixture update"
+  module_defaults:
+    group/{{ namespace }}.{{ collection_name }}.api: "{% raw %}{{ product_connection }}{% endraw %}"
+  block:
+    - name: "Save a changed value"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        name: "molecule_fixture_example"
+        value: "updated"
+      diff: true
+      register: __testing_fixture_updated
+
+    - name: "Activate the update"
+      {{ namespace }}.{{ collection_name }}.fixture_apply:
+        verify: ["molecule_fixture_example"]
+      register: __testing_fixture_activated
+
+    - name: "Assert the update became effective"
+      ansible.builtin.assert:
+        that:
+          - __testing_fixture_updated['changed_fields'] == ['value']
+          - __testing_fixture_activated['verification']['molecule_fixture_example'] == 'in_sync'

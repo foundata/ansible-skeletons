@@ -1,0 +1,24 @@
+"""Connection options shared by the product modules."""
+# FIXME Replace the synthetic credential pair with the product authentication contract.
+
+from __future__ import annotations
+
+
+class ModuleDocFragment:
+    DOCUMENTATION = r"""
+---
+options:
+  api_key:
+    description: API key, treated as secret input.
+    type: str
+    required: true
+  api_secret:
+    description: API secret, never returned in results or diagnostics.
+    type: str
+    required: true
+notes:
+  - "Runs on the execution host; delegate to an authorized host or use C(connection: local)."
+  - "The endpoint must already exist, with credentials authorized for the requested operations."
+  - "Checks the product version before writes; an unsupported series warns and proceeds. Known exclusions fail first."
+  - "Use C(group/{{ namespace }}.{{ collection_name }}.api) in C(module_defaults) for connection options."
+"""

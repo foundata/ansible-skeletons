@@ -1,0 +1,55 @@
+"""Read-only public projection and failure behavior."""
+# FIXME Replace these reads with the researched resource's info contract.
+
+from __future__ import annotations
+
+import json
+
+import pytest
+
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.modules import (
+    fixture_info,
+)
+
+from ..conftest import OLD_SECRET, SECRET, FakeProduct, RunModule
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_observed_read_and_absence(
+    fake: FakeProduct, run_module: RunModule, check_mode: bool
+) -> None:
+    absent = run_module(
+        fixture_info.main, name="example", _ansible_check_mode=check_mode
+    )
+    assert absent["fixture"] is None and not absent["changed"]
+    key = fake.add(value="read")
+    result = run_module(
+        fixture_info.main, name="example", _ansible_check_mode=check_mode
+    )
+    assert result["fixture"] == {
+        "uuid": key,
+        "name": "example",
+        "value": "read",
+        "enabled": True,
+        "labels": [],
+    }
+    assert result["verified"] == "observed" and "changed_fields" not in result
+    assert not result["changed"] and not fake.writes()
+    result.pop("_ansible_new_secrets", None)
+    assert OLD_SECRET not in json.dumps(result) and SECRET not in json.dumps(result)
+
+
+def test_ambiguous_read_fails(fake: FakeProduct, run_module: RunModule) -> None:
+    fake.add()
+    fake.add()
+    result = run_module(fixture_info.main, name="example")
+    assert result["failed"] and result["error_code"] == "ambiguous"
+    assert not fake.writes()
+
+
+def test_read_auth_failure(fake: FakeProduct, run_module: RunModule) -> None:
+    fake.auth_ok = False
+    result = run_module(fixture_info.main, name="example")
+    assert result["failed"] and result["outcome"] == "unchanged"
+    result.pop("_ansible_new_secrets", None)
+    assert SECRET not in json.dumps(result)

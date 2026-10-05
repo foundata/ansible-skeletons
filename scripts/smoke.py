@@ -81,13 +81,23 @@ def check_metadata(rendered: Rendered, metadata: dict[str, object]) -> None:
 
 def build_collection(rendered: Rendered) -> Path:
     """Build, inspect and install a collection without consulting Galaxy."""
-    excluded = (
+    excluded: tuple[str, ...] = (
         ".ansible/cache",
         ".github/test.yml",
         ".vscode/settings.json",
         "AGENTS.md",
         "stale.tar.gz",
     )
+    if rendered.profile == "collection_modules_grid":
+        excluded += (
+            "docs/inventory/sentinel.yml",
+            "tools/sentinel.py",
+            "tests/output/sentinel",
+            ".cache/sentinel",
+            ".venv/sentinel",
+            ".mypy_cache/sentinel",
+            ".ruff_cache/sentinel",
+        )
     for relative in excluded:
         path = rendered.collection / relative
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -105,10 +115,22 @@ def build_collection(rendered: Rendered) -> Path:
     archive = archives[0]
     with tarfile.open(archive) as bundle:
         names = {member.name.removeprefix("./") for member in bundle.getmembers()}
+        payload = (
+            ("roles/run/tasks/main.yml",)
+            if rendered.profile == "collection_default"
+            else (
+                "plugins/modules/fixture.py",
+                "plugins/modules/fixture_info.py",
+                "plugins/modules/fixture_apply.py",
+                "docs/architecture.md",
+                "CHANGELOG.rst",
+                "tests/unit/plugins/conftest.py",
+            )
+        )
         for required in (
             "MANIFEST.json",
             "FILES.json",
-            "roles/run/tasks/main.yml",
+            *payload,
             "meta/runtime.yml",
             "README.md",
             "LICENSES/GPL-3.0-or-later.txt",
@@ -116,17 +138,46 @@ def build_collection(rendered: Rendered) -> Path:
             if required not in names:
                 raise GateError(f"Collection artifact omitted {required}")
         for name in names:
-            if name in (
-                *excluded,
-                ".rumdl.toml",
-                ".ansible-lint",
-                ".yamllint",
-                "pyproject.toml",
-                "uv.lock",
-                "noxfile.py",
-                "antsibull-nox.toml",
-                "CODE_OF_CONDUCT.md",
-            ) or name.startswith(("extensions/molecule/", "scripts/")):
+            if (
+                name
+                in (
+                    *excluded,
+                    ".rumdl.toml",
+                    ".ansible-lint",
+                    ".yamllint",
+                    "pyproject.toml",
+                    "uv.lock",
+                    "noxfile.py",
+                    "antsibull-nox.toml",
+                    "CODE_OF_CONDUCT.md",
+                )
+                or name.startswith(("extensions/molecule/", "scripts/"))
+                or (
+                    rendered.profile == "collection_modules_grid"
+                    and (
+                        name.startswith(
+                            (
+                                "docs/inventory",
+                                "tools/",
+                                "tests/output",
+                                ".cache/",
+                                ".venv/",
+                            )
+                        )
+                        or any(
+                            part
+                            in {
+                                "__pycache__",
+                                ".mypy_cache",
+                                ".ruff_cache",
+                                ".pytest_cache",
+                                ".nox",
+                            }
+                            for part in Path(name).parts
+                        )
+                    )
+                )
+            ):
                 raise GateError(
                     f"Collection artifact includes repository-only file: {name}"
                 )
@@ -151,6 +202,215 @@ def build_collection(rendered: Rendered) -> Path:
         env=rendered.env,
     )
     return archive
+
+
+def install_utils(rendered: Rendered, source: Path) -> None:
+    """Build the explicitly supplied unpublished dependency into the isolated tree."""
+    if not (source / "galaxy.yml").is_file():
+        raise GateError("--utils-source must be the foundata.utils source collection")
+    metadata = yaml.safe_load((source / "galaxy.yml").read_text(encoding="utf-8"))
+    if (metadata.get("namespace"), metadata.get("name")) != ("foundata", "utils"):
+        raise GateError("Expected the foundata.utils dependency")
+    artifacts = rendered.work / "dependency-artifacts"
+    artifacts.mkdir()
+    run(
+        ["ansible-galaxy", "collection", "build", "--output-path", str(artifacts)],
+        cwd=source,
+        env=rendered.env,
+    )
+    archive = artifacts / f"foundata-utils-{metadata['version']}.tar.gz"
+    run(
+        [
+            "ansible-galaxy",
+            "collection",
+            "install",
+            "--no-deps",
+            "-p",
+            rendered.env["ANSIBLE_COLLECTIONS_PATH"],
+            str(archive),
+        ],
+        env=rendered.env,
+    )
+
+
+def exercise_modules(rendered: Rendered) -> None:
+    """Resolve docs and run the installed fixture payload against its loopback server."""
+    namespace, name = rendered.collection.parent.name, rendered.collection.name
+    installed = (
+        Path(rendered.env["ANSIBLE_COLLECTIONS_PATH"])
+        / "ansible_collections"
+        / namespace
+        / name
+    )
+    for module in ("fixture", "fixture_info", "fixture_apply"):
+        docs = run(
+            ["ansible-doc", "--json", f"{namespace}.{name}.{module}"],
+            cwd=rendered.work,
+            env=rendered.env,
+            capture=True,
+        )
+        document = json.loads(docs)[f"{namespace}.{name}.{module}"]["doc"]
+        if not Path(document["filename"]).is_relative_to(installed):
+            raise GateError("ansible-doc resolved outside the installed artifact")
+    play = rendered.work / "module-artifact.yml"
+    write_json(
+        play,
+        [
+            {
+                "name": "Exercise installed fixture modules",
+                "hosts": "localhost",
+                "connection": "local",
+                "gather_facts": False,
+                "become": False,
+                "vars": {"ansible_python_interpreter": sys.executable},
+                "roles": [role],
+            }
+            for role in ("fixture", "fixture_info", "fixture_apply")
+        ],
+    )
+    run(
+        ["ansible-playbook", "-i", "localhost,", str(play)],
+        cwd=rendered.work,
+        env={
+            **rendered.env,
+            "ANSIBLE_ROLES_PATH": str(installed / "tests/integration/targets"),
+        },
+    )
+
+
+def module_smoke(output: Path, *, utils_source: Path, full: bool = False) -> None:
+    """Render distinct identities and exercise the installed module skeleton."""
+    output.mkdir(parents=True, exist_ok=False)
+    missing = run(
+        [
+            "ansible-galaxy",
+            "collection",
+            "init",
+            "--collection-skeleton",
+            str(ROOT / "collection_modules_grid"),
+            "--init-path",
+            str(output / "missing-metadata"),
+            "missing.metadata",
+        ],
+        capture=True,
+        allowed_exit_codes=(1,),
+    )
+    if "product" not in missing:
+        raise GateError(
+            "Name-only initialization did not identify the missing product variable"
+        )
+    for index, (namespace, name) in enumerate(
+        (("skeleton_test", "module_fixture"), ("alternate_ns", "other_product"))
+    ):
+        metadata = example_metadata(punctuation=bool(index))
+        metadata["product"] = "Example Grid" if index == 0 else "Other Product"
+        if index == 0:
+            metadata.pop("version")
+            metadata.pop("min_ansible_version")
+        else:
+            metadata["version"] = "2.3.0"
+            metadata["min_ansible_version"] = "2.19.1"
+        metadata["skeleton_revision"] = os.environ.get("SKELETONS_REVISION") or (
+            run(["git", "describe", "--tags", "--always"], capture=True).strip()
+            if (ROOT / ".git").exists()
+            else "source archive"
+        )
+        rendered = render(
+            output / name,
+            namespace=namespace,
+            collection_name=name,
+            metadata=metadata,
+            profile="collection_modules_grid",
+        )
+        check_tree(ROOT / "collection_modules_grid", rendered.collection)
+        for package in (rendered.collection / "tests/unit").rglob("__init__.py"):
+            if package.stat().st_size:
+                raise GateError(f"Unit package marker is not empty: {package}")
+        galaxy = yaml.safe_load((rendered.collection / "galaxy.yml").read_text())
+        if galaxy["dependencies"] != {"foundata.utils": ">=1.0.0"}:
+            raise GateError("Module profile omitted the utility dependency")
+        if galaxy["version"] != metadata.get("version", "1.0.0"):
+            raise GateError("Module profile changed the collection version")
+        client = (rendered.collection / "plugins/module_utils/_client.py").read_text()
+        if f'USER_AGENT = "{namespace}.{name}/{galaxy["version"]}"' not in client:
+            raise GateError(
+                "Module user agent must identify the collection and its version"
+            )
+        architecture = (rendered.collection / "docs/architecture.md").read_text()
+        if f"`{metadata['skeleton_revision']}`" not in architecture:
+            raise GateError("Architecture omitted the supplied skeleton revision")
+        scenario = rendered.collection / "extensions/molecule/default"
+        molecule = yaml.safe_load((scenario / "molecule.yml").read_text())
+        inventory = scenario / molecule["provisioner"]["inventory"]["links"]["hosts"]
+        if inventory.name != "hosts.yml" or "{{ ansible_playbook_python }}" not in (
+            inventory.read_text()
+        ):
+            raise GateError(
+                "Molecule inventory changed its filename or runtime expressions"
+            )
+        runtime = yaml.safe_load((rendered.collection / "meta/runtime.yml").read_text())
+        if runtime["requires_ansible"] != ">=" + str(
+            metadata.get("min_ansible_version", "2.19.0")
+        ):
+            raise GateError("Module profile changed the core floor")
+        for removed in (
+            "roles",
+            "meta/execution-environment.yml",
+            ".ansible-docsmith.toml",
+            "extensions/molecule/ee",
+        ):
+            if (rendered.collection / removed).exists():
+                raise GateError(f"Module profile retained {removed}")
+        if any(
+            path.is_dir() and not any(path.iterdir())
+            for path in rendered.collection.rglob("*")
+        ):
+            raise GateError("Module render contains empty directories")
+        with (rendered.collection / "REUSE.toml").open("rb") as stream:
+            reuse = tomllib.load(stream)
+        if reuse["SPDX-PackageSupplier"] != metadata["company"]:
+            raise GateError("REUSE metadata changed company")
+        install_utils(rendered, utils_source)
+        run(["git", "init", "--quiet"], cwd=rendered.collection)
+        run(["git", "add", "."], cwd=rendered.collection)
+        if full:
+            env = {**rendered.env, "CI": "true"}
+            newest = ".".join(importlib.metadata.version("ansible-core").split(".")[:2])
+            with (rendered.collection / "antsibull-nox.toml").open("rb") as stream:
+                config = tomllib.load(stream)
+            validation_lanes = [
+                f"ansible-test-sanity-{series}"
+                for series in config["sessions"]["ansible_test_units"][
+                    "core_python_versions"
+                ]
+                if series not in {"2.19", newest}
+            ]
+            for sessions in (
+                [],
+                ["ansible-test-sanity-2.19", f"ansible-test-sanity-{newest}"],
+                [*validation_lanes, "--", "--test", "validate-modules"],
+                ["ansible-test-units"],
+                ["ansible-test-integration"],
+            ):
+                run(
+                    [
+                        "uv",
+                        "run",
+                        "--python",
+                        "3.13",
+                        "noxfile.py",
+                        *(["-s", *sessions] if sessions else []),
+                    ],
+                    cwd=rendered.collection,
+                    env=env,
+                    timeout=7200,
+                )
+        build_collection(rendered)
+        exercise_modules(rendered)
+    write_json(
+        output / "profile.json",
+        {"profile": "collection_modules_grid", "full": full},
+    )
 
 
 def exercise_role(rendered: Rendered, *, collection: bool) -> None:
@@ -614,12 +874,27 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--lint", action="store_true")
+    parser.add_argument(
+        "--profile",
+        choices=["collection_default", "collection_modules_grid"],
+        default="collection_default",
+    )
+    parser.add_argument("--utils-source", type=Path)
+    parser.add_argument("--ansible-tests", action="store_true")
     args = parser.parse_args()
     try:
-        smoke(
-            args.output.resolve(),
-            lint=args.lint,
-        )
+        if args.profile == "collection_modules_grid":
+            if args.utils_source is None:
+                raise GateError(
+                    "collection_modules_grid checks need --utils-source for unpublished foundata.utils"
+                )
+            module_smoke(
+                args.output.resolve(),
+                utils_source=args.utils_source.resolve(),
+                full=args.ansible_tests,
+            )
+        else:
+            smoke(args.output.resolve(), lint=args.lint)
     except (GateError, OSError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

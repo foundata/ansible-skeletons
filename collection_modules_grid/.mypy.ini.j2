@@ -1,0 +1,10 @@
+[mypy]
+check_untyped_defs = True
+disallow_untyped_defs = True
+strict_equality = True
+strict_bytes = True
+warn_redundant_casts = True
+warn_unreachable = True
+
+[mypy-ansible.*]
+follow_untyped_imports = True

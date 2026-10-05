@@ -1,0 +1,271 @@
+"""Internal fixture product API client; not a public interface.
+
+Authentication, JSON encoding, the application status of a response,
+pagination and the version probe live here, on top of the bounded byte
+transport of ``foundata.utils``. Nothing a product returns reaches an
+exception message: failures carry local categories and codes only.
+"""
+# FIXME Replace the fixture authentication, routes and response schema with the product contract.
+
+from __future__ import annotations
+
+import base64
+import json
+import re
+from typing import Any
+
+from ansible_collections.foundata.utils.plugins.module_utils import (
+    deadline as deadline_util,
+)
+from ansible_collections.foundata.utils.plugins.module_utils import (
+    http_client as http_util,
+)
+from ansible_collections.foundata.utils.plugins.module_utils.deadline import Deadline
+from ansible_collections.foundata.utils.plugins.module_utils.errors import (
+    ApiError,
+    ErrorSchema,
+    merge_error_codes,
+)
+from ansible_collections.foundata.utils.plugins.module_utils.http_client import (
+    HttpClient,
+    decode_json,
+)
+
+USER_AGENT = "{{ namespace }}.{{ collection_name }}/{{ version | default('1.0.0') }}"
+PAGE_SIZE = 500
+MAX_PAGES = 200
+UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+VERSION = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
+_SEGMENT = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$")
+
+ERROR_CODES: dict[str, frozenset[str | None]] = {
+    "internal": frozenset({None}),
+    "auth": frozenset({"unauthenticated", "forbidden"}),
+    "product": frozenset(
+        {
+            "endpoint_not_found",
+            "rejected",
+            "unexpected_status",
+            "validation_failed",
+            "not_found",
+            "activation_failed",
+        }
+    ),
+    # The decoding codes invalid_utf8 and invalid_json come from foundata.utils.
+    "response": frozenset({"response_type", "schema"}),
+    "identity": frozenset({"ambiguous", "incomplete_listing", "internal_object"}),
+    "reference": frozenset({"not_found", "ambiguous"}),
+    "verification": frozenset(
+        {
+            "missing_after_write",
+            "not_persisted",
+            "still_present",
+            "create_unknown",
+            "not_effective",
+        }
+    ),
+    "compatibility": frozenset({"version_unknown", "ineligible"}),
+}
+"""Categories and codes this collection raises besides the shared ones."""
+
+
+def _bounded_text(value: object) -> str:
+    if not isinstance(value, str) or not 0 < len(value) <= 128:
+        raise ValueError("expected a short string")
+    return value
+
+
+def _field_names(value: object) -> list[str]:
+    if not isinstance(value, list) or len(value) > 64:
+        raise ValueError("expected a short list")
+    names = []
+    for item in value:
+        if not isinstance(item, str) or not re.match(r"^[a-z_][a-z0-9_.]{0,63}$", item):
+            raise ValueError("expected field names")
+        names.append(item)
+    return names
+
+
+def _object_names(value: object) -> list[str]:
+    if not isinstance(value, list) or len(value) > 256:
+        raise ValueError("expected a bounded list")
+    for item in value:
+        if not isinstance(item, str) or not re.match(r"^[A-Za-z0-9_*.-]{1,253}$", item):
+            raise ValueError("expected object names")
+    return list(value)
+
+
+SCHEMA = ErrorSchema(
+    codes_by_category=merge_error_codes(
+        http_util.ERROR_CODES, deadline_util.ERROR_CODES, ERROR_CODES
+    ),
+    fallback=("internal", None),
+    field_validators={
+        "operation": _bounded_text,
+        "resource": _bounded_text,
+        "name": _bounded_text,
+        "fields": _field_names,
+        "series": _bounded_text,
+        "not_effective": _object_names,
+    },
+)
+"""The public error schema of this collection's modules."""
+
+
+class ProductError(ApiError):
+    """A failure reported or detected by the fixture product client.
+
+    ``fields`` names product fields involved, for example those a validation
+    rejected. The names come from the resource definition, never from text.
+    """
+
+    def __init__(
+        self,
+        message: str = "fixture product operation failed",
+        *,
+        category: str = "product",
+        code: str | None = None,
+        status: int | None = None,
+        fields: list[str] | None = None,
+    ) -> None:
+        super().__init__(message, category=category, code=code, status=status)
+        self.fields = fields or []
+
+
+def api_argument_spec() -> dict[str, Any]:
+    """Return a fresh specification of the connection options."""
+    spec = http_util.http_argument_spec()
+    spec["api_key"] = {"type": "str", "required": True, "no_log": True}
+    spec["api_secret"] = {"type": "str", "required": True, "no_log": True}
+    return spec
+
+
+def segment(value: str) -> str:
+    """Validate a value used as one URL path segment, such as a UUID or name."""
+    if not isinstance(value, str) or not _SEGMENT.match(value):
+        raise ProductError(
+            "Invalid path segment", category="request", code="invalid_path"
+        )
+    return value
+
+
+class Client:
+    """One authenticated fixture product API endpoint for one module invocation."""
+
+    def __init__(self, params: dict[str, Any]) -> None:
+        self._http = HttpClient(
+            params["url"],
+            user_agent=USER_AGENT,
+            validate_certs=params["validate_certs"],
+            ca_path=params["ca_path"],
+            use_proxy=params["use_proxy"],
+            timeout=params["timeout"],
+        )
+        self.deadline = Deadline(params["deadline"])
+        token = f"{params['api_key']}:{params['api_secret']}".encode()
+        self._authorization = "Basic " + base64.b64encode(token).decode("ascii")
+        self.writes = 0
+        self._version: tuple[str, str] | None = None
+        self.compatibility_warned = False
+
+    def read(self, method: str, path: str, body: dict[str, Any] | None = None) -> Any:
+        """Call an operation that only reads; fixture product also reads through POST."""
+        return self._request(method, path, body)
+
+    def write(self, path: str, body: dict[str, Any] | None = None) -> Any:
+        """Call a mutating operation; every attempt is counted in ``writes``."""
+        self.writes += 1
+        return self._request("POST", path, body if body is not None else {})
+
+    def _request(self, method: str, path: str, body: dict[str, Any] | None) -> Any:
+        """Send one request and return the decoded JSON document.
+
+        Raises:
+            ProductError: For authentication, HTTP and application failures
+                and malformed responses.
+            ApiError: For transport failures from ``foundata.utils``.
+        """
+        headers = {"Authorization": self._authorization, "Accept": "application/json"}
+        data = None
+        if body is not None:
+            data = json.dumps(body).encode("utf-8")
+            headers["Content-Type"] = "application/json"
+        response = self._http.request(
+            method, path, deadline=self.deadline, headers=headers, body=data
+        )
+        status = response.status
+        if status == 401:
+            raise ProductError(category="auth", code="unauthenticated", status=status)
+        if status == 403:
+            raise ProductError(category="auth", code="forbidden", status=status)
+        if 300 <= status < 400:
+            raise ProductError(category="auth", code="unauthenticated", status=status)
+        if status == 404:
+            raise ProductError(code="endpoint_not_found", status=status)
+        payload = decode_json(response.body)
+        if status >= 400:
+            # A UserException: the product refused the request, for example a
+            # deletion of an object still referenced elsewhere.
+            raise ProductError(code="rejected", status=status)
+        if status != 200:
+            raise ProductError(code="unexpected_status", status=status)
+        if isinstance(payload, dict) and payload.get("status") == "failed":
+            raise ProductError(code="rejected", status=status)
+        return payload
+
+    def search(self, route: str, action: str = "search_item") -> list[dict[str, Any]]:
+        """Return every row of a grid listing, reading all pages.
+
+        A listing whose rows do not add up to its declared total is an
+        error, never a short result.
+        """
+        rows: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        total = None
+        for page in range(1, MAX_PAGES + 1):
+            payload = self.read(
+                "POST",
+                f"{route}/{action}",
+                {"current": page, "rowCount": PAGE_SIZE, "searchPhrase": ""},
+            )
+            if not isinstance(payload, dict):
+                raise ProductError(category="response", code="response_type")
+            page_rows = payload.get("rows")
+            declared = payload.get("total")
+            if (
+                not isinstance(page_rows, list)
+                or not isinstance(declared, int)
+                or isinstance(declared, bool)
+                or declared < 0
+                or payload.get("current") != page
+            ):
+                raise ProductError(category="response", code="schema")
+            if total is None:
+                total = declared
+            elif declared != total:
+                raise ProductError(category="identity", code="incomplete_listing")
+            for row in page_rows:
+                if not isinstance(row, dict) or not isinstance(row.get("uuid"), str):
+                    raise ProductError(category="response", code="schema")
+                if row["uuid"] in seen:
+                    raise ProductError(category="identity", code="incomplete_listing")
+                seen.add(row["uuid"])
+                rows.append(row)
+            if len(rows) >= total or not page_rows:
+                break
+        if total is None or len(rows) != total:
+            raise ProductError(category="identity", code="incomplete_listing")
+        return rows
+
+    def version(self) -> tuple[str, str]:
+        """Return the series and release from the read-only version endpoint."""
+        if self._version is None:
+            payload = self.read("GET", "/system/version")
+            first = payload.get("version") if isinstance(payload, dict) else None
+            match = VERSION.match(first) if isinstance(first, str) else None
+            if match is None:
+                raise ProductError(category="compatibility", code="version_unknown")
+            major, minor, patch = match.groups()
+            series = f"{major}.{minor}"
+            self._version = (series, f"{series}.{patch}" if patch else series)
+        return self._version

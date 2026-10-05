@@ -120,7 +120,9 @@ def export_revision(
         bundle.extractall(destination, filter="data")
 
 
-def check_release(version: str, output: Path, root: Path = ROOT) -> None:
+def check_release(
+    version: str, output: Path, root: Path = ROOT, *, utils_source: Path | None = None
+) -> None:
     """Validate one clean commit; retain evidence without tagging or publishing."""
     revision, base, backends = release_inputs(version, root)
     output = output.resolve()
@@ -145,6 +147,8 @@ def check_release(version: str, output: Path, root: Path = ROOT) -> None:
         ]
         for backend in backends:
             command.extend(["--integration", backend])
+        if utils_source is not None:
+            command.extend(["--utils-source", str(utils_source.resolve())])
         env = {
             key: value
             for key, value in os.environ.items()
@@ -166,6 +170,7 @@ def check_release(version: str, output: Path, root: Path = ROOT) -> None:
                 "RUFF_NO_CACHE": "true",
                 "MYPY_CACHE_DIR": str(Path(temporary) / "mypy-cache"),
                 "UV_LINK_MODE": "copy",
+                "SKELETONS_REVISION": revision,
             }
         )
         log = output / "check.log"
@@ -327,7 +332,9 @@ def create_tag(path: Path, root: Path = ROOT) -> None:
     print(f"Created local tag v{version}; nothing was pushed or published")
 
 
-def verify_publication(path: Path, root: Path = ROOT) -> None:
+def verify_publication(
+    path: Path, root: Path = ROOT, *, utils_source: Path | None = None
+) -> None:
     """Check the remote tag, forge release and fresh clone's consumer workflow."""
     report = validate_report(path, root, tagged=True)
     version, revision = str(report["version"]), str(report["revision"])
@@ -365,6 +372,26 @@ def verify_publication(path: Path, root: Path = ROOT) -> None:
             cwd=source,
             timeout=1800,
         )
+        if utils_source is None:
+            raise GateError(
+                "Publication checks need --utils-source for the module profile"
+            )
+        run(
+            uv_command(
+                default_lane(),
+                "python",
+                "-m",
+                "scripts.smoke",
+                "--profile",
+                "collection_modules_grid",
+                "--utils-source",
+                str(utils_source.resolve()),
+                "--output",
+                str(Path(temporary) / "modules"),
+            ),
+            cwd=source,
+            timeout=1800,
+        )
     print(f"Published v{version} verified")
 
 
@@ -375,17 +402,26 @@ def main() -> int:
     check_parser = subparsers.add_parser("check", help="Validate a committed release")
     check_parser.add_argument("version")
     check_parser.add_argument("--output", required=True, type=Path)
+    check_parser.add_argument(
+        "--utils-source", type=Path, default=os.environ.get("SKELETONS_UTILS_SOURCE")
+    )
     for command in ("tag", "verify"):
         child = subparsers.add_parser(command)
         child.add_argument("report", type=Path)
+        if command == "verify":
+            child.add_argument(
+                "--utils-source",
+                type=Path,
+                default=os.environ.get("SKELETONS_UTILS_SOURCE"),
+            )
     args = parser.parse_args()
     try:
         if args.command == "check":
-            check_release(args.version, args.output)
+            check_release(args.version, args.output, utils_source=args.utils_source)
         elif args.command == "tag":
             create_tag(args.report)
         else:
-            verify_publication(args.report)
+            verify_publication(args.report, utils_source=args.utils_source)
     except (GateError, OSError, ValueError, subprocess.TimeoutExpired) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

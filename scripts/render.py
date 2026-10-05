@@ -17,6 +17,7 @@ class Rendered:
     role: Path
     collection: Path
     env: dict[str, str]
+    profile: str = "collection_default"
 
 
 def render(
@@ -27,6 +28,7 @@ def render(
     collection_name: str = "example_app",
     role_name: str = "example_role",
     metadata: dict[str, object] | None = None,
+    profile: str = "collection_default",
 ) -> Rendered:
     """Render real Galaxy resources, refusing to merge with existing output.
 
@@ -37,7 +39,9 @@ def render(
         if not re.fullmatch(r"[a-z][a-z0-9_]*", name):
             raise GateError(f"Invalid resource name: {name!r}")
     source, output = source.resolve(), output.resolve()
-    for skeleton in ("role_default", "collection_default"):
+    if profile not in ("collection_default", "collection_modules_grid"):
+        raise GateError(f"Unknown collection profile: {profile}")
+    for skeleton in ("role_default", profile):
         if not (source / skeleton).is_dir():
             raise GateError(f"Missing skeleton directory: {source / skeleton}")
     output.mkdir(parents=True, exist_ok=False)
@@ -72,7 +76,7 @@ def render(
             "collection",
             "init",
             "--collection-skeleton",
-            str(source / "collection_default"),
+            str(source / profile),
             "--init-path",
             str(collections),
             *extras,
@@ -82,7 +86,11 @@ def render(
         env=env,
     )
     return Rendered(
-        output, roles / role_name, collections / namespace / collection_name, env
+        output,
+        roles / role_name,
+        collections / namespace / collection_name,
+        env,
+        profile,
     )
 
 
@@ -107,6 +115,7 @@ def example_metadata(*, punctuation: bool = False) -> dict[str, object]:
         "homepage_url": "https://example.com",
         "min_ansible_version": "2.19.0",
         "version": "1.0.0",
+        "product": "Example Grid",
     }
 
 
@@ -116,12 +125,18 @@ def main() -> int:
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--source", type=Path, default=ROOT)
     parser.add_argument("--defaults", action="store_true")
+    parser.add_argument(
+        "--profile",
+        choices=["collection_default", "collection_modules_grid"],
+        default="collection_default",
+    )
     args = parser.parse_args()
     try:
         rendered = render(
             args.output,
             source=args.source,
             metadata=None if args.defaults else example_metadata(),
+            profile=args.profile,
         )
     except (GateError, OSError) as exc:
         print(f"error: {exc}", file=sys.stderr)

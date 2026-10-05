@@ -3,6 +3,7 @@
 import argparse
 import importlib.metadata
 import json
+import os
 import platform
 import sys
 import tempfile
@@ -36,6 +37,7 @@ def check_static() -> None:
         "scripts",
         "tests",
         "collection_default/noxfile.py.j2",
+        "collection_modules_grid/noxfile.py.j2",
     ]
     run(["ruff", "format", "--check", "--extension", "j2:python", *sources])
     run(["ruff", "check", "--extension", "j2:python", *sources])
@@ -113,6 +115,7 @@ def required_checks(*, full: bool, backends: list[str]) -> list[str]:
         *[f"unit-python{python}" for python in pythons],
         *[lane.name for lane in lanes],
         "generated-lint",
+        "collection-modules",
         *[f"integration-{backend}" for backend in backends],
     ]
 
@@ -123,6 +126,7 @@ def check(
     full: bool = False,
     backends: list[str] | None = None,
     foundata_wheel: Path | None = None,
+    utils_source: Path | None = None,
 ) -> None:
     """Run required stages and emit a complete report only after all succeed."""
     selected = backends or []
@@ -131,6 +135,10 @@ def check(
     ):
         raise GateError("--foundata-wheel must name an existing wheel file")
     packages = [str(foundata_wheel.resolve())] if foundata_wheel else []
+    if utils_source is None:
+        raise GateError(
+            "Module profile checks need --utils-source for unpublished foundata.utils"
+        )
     output.mkdir(parents=True, exist_ok=False)
     checks: list[str] = []
     check_static()
@@ -186,6 +194,23 @@ def check(
         timeout=1800,
     )
     checks.append("generated-lint")
+    run(
+        uv_command(
+            default_lane(),
+            "python",
+            "-m",
+            "scripts.smoke",
+            "--profile",
+            "collection_modules_grid",
+            "--utils-source",
+            str(utils_source.resolve()),
+            "--output",
+            str(output / "collection-modules"),
+            *(["--ansible-tests"] if full else []),
+        ),
+        timeout=21600,
+    )
+    checks.append("collection-modules")
     for backend in selected:
         run(
             uv_command(
@@ -207,7 +232,7 @@ def check(
         raise GateError("Incomplete check run")
     artifacts = {
         str(path.relative_to(output)): digest(path)
-        for path in output.glob("*/explicit/artifacts/*.tar.gz")
+        for path in output.rglob("artifacts/*.tar.gz")
     }
     write_json(
         output / "checks.json",
@@ -251,6 +276,12 @@ def main() -> int:
         type=Path,
         help="Override the released extension with a local wheel",
     )
+    parser.add_argument(
+        "--utils-source",
+        type=Path,
+        default=os.environ.get("SKELETONS_UTILS_SOURCE"),
+        help="Local source of unpublished foundata.utils",
+    )
     args = parser.parse_args()
     try:
         if args.output:
@@ -259,6 +290,7 @@ def main() -> int:
                 full=args.matrix,
                 backends=args.integration,
                 foundata_wheel=args.foundata_wheel,
+                utils_source=args.utils_source,
             )
         else:
             with tempfile.TemporaryDirectory(
@@ -269,6 +301,7 @@ def main() -> int:
                     full=args.matrix,
                     backends=args.integration,
                     foundata_wheel=args.foundata_wheel,
+                    utils_source=args.utils_source,
                 )
     except (GateError, OSError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)

@@ -122,6 +122,8 @@ def isolated_environment(work: Path) -> dict[str, str]:
     }
     home = work / "ansible-home"
     home.mkdir(parents=True, exist_ok=True)
+    for directory in ("home", "cache"):
+        (work / directory).mkdir(exist_ok=True)
     config = work / "ansible.cfg"
     config.write_text(
         "[defaults]\n"
@@ -141,6 +143,8 @@ def isolated_environment(work: Path) -> dict[str, str]:
             "ANSIBLE_NOCOLOR": "true",
             "PYTHONNOUSERSITE": "1",
             "UV_LINK_MODE": "copy",
+            "HOME": str(work / "home"),
+            "XDG_CACHE_HOME": str(work / "cache"),
         }
     )
     for kind in (

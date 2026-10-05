@@ -1,0 +1,98 @@
+#!/usr/bin/python
+# GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
+# FIXME Replace this family activation with the researched scope and effective-state probe.
+
+from __future__ import annotations
+
+DOCUMENTATION = r"""
+---
+module: fixture_apply
+short_description: Activate the fixture family
+description:
+  - "Compares saved and active state of O(verify) and activates the family on drift or with O(activate=always)."
+  - "Call on every workflow execution, including when resource tasks report no changes, to recover pending work."
+  - "Activation consumes all pending changes in the fixture family. Coordinate writers; verification covers only the named objects."
+  - "After activation, polls the active state within the shared deadline. Failure to observe convergence fails the module."
+version_added: "1.0.0"
+author:
+{% for author in authors %}
+  - {{ (author if '(@' in author or '!UNKNOWN' in author else author ~ ' !UNKNOWN') | to_json }}
+{% endfor %}
+extends_documentation_fragment:
+  - {{ namespace }}.{{ collection_name }}.api
+  - foundata.utils.http_client
+attributes:
+  check_mode:
+    description: Predicts whether activation is needed without activating.
+    support: full
+  diff_mode:
+    description: Reports per-object verification rather than a field diff.
+    support: none
+options:
+  activate:
+    description: Activate on a difference, or unconditionally.
+    type: str
+    default: auto
+    choices: [auto, always]
+  verify:
+    description: Nonempty list of exact fixture names to compare, including deleted records.
+    type: list
+    elements: str
+    required: true
+"""
+
+EXAMPLES = r"""
+---
+- name: "Activate saved fixture changes"
+  {{ namespace }}.{{ collection_name }}.fixture_apply:
+    url: "https://example.invalid/api"
+    api_key: "{% raw %}{{ fixture_api_key }}{% endraw %}"
+    api_secret: "{% raw %}{{ fixture_api_secret }}{% endraw %}"
+    activate: "auto"
+    verify: ["example"]
+"""
+
+RETURN = r"""
+---
+activated:
+  description: Whether activation happened, or would happen in check mode.
+  returned: success
+  type: bool
+verified:
+  description: V(observed), V(predicted) in check mode, or V(unverifiable) when effective state cannot be compared.
+  returned: success
+  type: str
+verification:
+  description: Mapping from each requested name to V(in_sync), V(drift), or V(unverifiable).
+  returned: success
+  type: dict
+  sample: {example: in_sync}
+"""
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils import (
+    _activation,
+)
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._definitions import (
+    FIXTURE,
+)
+
+
+def main() -> None:
+    module = AnsibleModule(
+        argument_spec=_activation.argument_spec(), supports_check_mode=True
+    )
+    _activation.run(
+        module,
+        operation_id="fixture_apply",
+        label="fixture family",
+        name_pattern=FIXTURE.keys[0].pattern,
+        compare=_activation.compare_fixture,
+        apply=_activation.apply_fixture,
+        settle=_activation.settle_fixture,
+    )
+
+
+if __name__ == "__main__":
+    main()

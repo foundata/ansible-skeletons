@@ -1,0 +1,15 @@
+# FIXME Replace the fixture workflow, keeping activation on every execution.
+---
+- name: "Converge the fixture and its active state"
+  module_defaults:
+    group/{{ namespace }}.{{ collection_name }}.api: "{% raw %}{{ product_connection }}{% endraw %}"
+  block:
+    - name: "Save the scenario fixture"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        name: "molecule_fixture_example"
+        value: "ready"
+
+    - name: "Converge active state"
+      {{ namespace }}.{{ collection_name }}.fixture_apply:
+        activate: "auto"
+        verify: ["molecule_fixture_example"]

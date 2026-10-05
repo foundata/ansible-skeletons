@@ -1,0 +1,19 @@
+# FIXME Adapt these endpoint and credential inputs to the product.
+{% raw %}
+---
+all:
+  children:
+    molecule:
+      hosts:
+        product-api:
+          ansible_connection: "local"
+          ansible_become: false
+          ansible_python_interpreter: "{{ ansible_playbook_python }}"
+          product_connection:
+            url: "{{ lookup('ansible.builtin.env', 'MOLECULE_PRODUCT_URL') }}"
+            api_key: "{{ __product_credentials['key'] }}"
+            api_secret: "{{ __product_credentials['secret'] }}"
+            validate_certs: "{{ lookup('ansible.builtin.env', 'MOLECULE_PRODUCT_VALIDATE_CERTS', default='true') | ansible.builtin.bool }}"
+          __product_credentials: >-
+            {{ lookup('ansible.builtin.file', lookup('ansible.builtin.env', 'MOLECULE_PRODUCT_CREDENTIALS')) | ansible.builtin.from_json }}
+{% endraw %}

@@ -1,0 +1,95 @@
+# Collection meta data for Galaxy (needed to to build a collection artifact)
+
+---
+namespace: "{{ namespace }}"
+name: "{{ collection_name }}"
+version: "{{ version | default('1.0.0') }}"
+license:
+  # See https://spdx.org/licenses/ for valid IDs and syntax. The project's
+  # REUSE.toml file provides detailed licensing and copyright information
+  # in a human- and machine-readable format.
+  - "GPL-3.0-or-later"
+authors:
+{% for author in authors %}
+  - {{ author | to_json(ensure_ascii=False) }}
+{% endfor %}
+
+readme: "README.md"
+description: {{ description | to_json(ensure_ascii=False) }}
+repository: {{ repository | to_json(ensure_ascii=False) }}
+# documentation: "{{ documentation }}"
+# issues: "{{ issues }}" # Use only if the issue tracker is separate from the repository.
+# homepage: "{{ homepage }}"
+tags:
+  # FIXME Add appropriate tags. Production releases need at least one of these tags:
+  # ["application", "cloud", "database", "eda", "infrastructure", "linux", "monitoring", "networking", "security", "storage", "tools", "windows"]
+  - "application"
+
+dependencies:
+  "foundata.utils": ">=1.0.0"
+
+# List of file glob-like patterns to filter files or directories that should
+# not be included in the build artifact. Some are always filtered by
+# _build_files_manifest_walk(), e.g. galaxy.yml, *.pyc, *.retry, and .git
+build_ignore:
+  - ".cache"
+  - ".venv"
+  - "docs/inventory"
+  - "tools"
+  # Build artifacts, Ansible
+  - "*.tar.gz"
+  - ".ansible"
+  # Parts of the collection itself
+  - "changelogs/.plugin-cache.yaml"
+  - "changelogs/fragments/00-fragment-template.txt"
+  - "changelogs/fragments/archive"
+  - "extensions/molecule"
+  - "CODE_OF_CONDUCT.md"
+  - "CONTRIBUTING.md"
+  - "DEVELOPMENT.md"
+  # Development tooling
+  - ".ansible-docsmith.toml"
+  - ".ansible-lint"
+  - ".gitattributes"
+  - ".gitignore"
+  - ".mypy.ini"
+  - ".mypy_cache"
+  - ".nox"
+  - ".pytest_cache"
+  - ".ruff_cache"
+  - ".releasing.toml"
+  - ".rumdl.toml"
+  - ".rumdl_cache"
+  - ".yamllint"
+  - "antsibull-nox.toml"
+  - "scripts"
+  - "noxfile.py"
+  - "pyproject.toml"
+  - "uv.lock"
+  - "releasing.toml"
+  - "ruff.toml"
+  - "rumdl.toml"
+  - "tests/output"
+  # Repository hosting
+  - ".github"
+  - ".gitlab"
+  # Editor / IDE configuration
+  - ".idea"
+  - ".vscode"
+  # Coding agents
+  - ".aider.conf.yml"
+  - ".aiderignore"
+  - ".claude"
+  - ".continue"
+  - ".cursor"
+  - ".cursorrules"
+  - ".windsurf"
+  - ".windsurfrules"
+  - "AGENTS.md"
+  - "CLAUDE.md"
+  - "GEMINI.md"
+  # OS metadata
+  - ".DS_Store"
+  - "Desktop.ini"
+  - "Thumbs.db"
+  - "Thumbs.db:encryptable"

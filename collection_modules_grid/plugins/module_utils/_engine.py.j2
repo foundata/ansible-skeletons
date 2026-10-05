@@ -1,0 +1,532 @@
+"""Internal resource engine of this collection; not a public interface.
+
+The engine converges one keyed record of a fixture grid from a resource
+definition: identity resolution over a
+complete listing by one or more key fields, normalization, a minimal write of
+the declared fields, read-back, check and diff mode, references by name, and
+reconciliation after an ambiguous write. Activation is a separate
+operational module.
+"""
+# FIXME Adapt wire normalization and persistence to the researched product, keeping one lifecycle.
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass
+from typing import Any
+
+from ansible_collections.foundata.utils.plugins.module_utils import errors
+
+# Keep dependency and local imports stable across rendered namespace ordering.
+# isort: split
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils import (
+    _compat,
+)
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._client import (
+    SCHEMA,
+    UUID,
+    Client,
+    ProductError,
+    api_argument_spec,
+    segment,
+)
+
+MISSING = object()
+
+
+@dataclass(frozen=True)
+class Reference:
+    """A field that stores UUIDs of another grid and is declared by names."""
+
+    route: str
+    key: str
+
+
+@dataclass(frozen=True)
+class Field:
+    """One managed field. The module option has the product field's name.
+
+    ``kind`` is ``str``, ``bool``, ``int``, ``choice`` or ``set``. A set is
+    unordered: it is compared as a set and written in the caller's order,
+    joined by ``separator``.
+    """
+
+    name: str
+    kind: str
+    description: str
+    choices: tuple[str, ...] = ()
+    separator: str = ","
+    reference: Reference | None = None
+    version_added: str = "1.0.0"
+
+
+@dataclass(frozen=True)
+class Key:
+    """One identity field: matched exactly, written on creation, never changed.
+
+    ``pattern`` validates the value before any request. A key with a
+    ``default`` is optional in the module and takes the product's default.
+    """
+
+    name: str
+    description: str
+    pattern: str
+    choices: tuple[str, ...] = ()
+    default: str | None = None
+
+
+@dataclass(frozen=True)
+class Actions:
+    """Names of the grid actions under the resource's route."""
+
+    search: str = "search_item"
+    get: str = "get_item"
+    add: str = "add_item"
+    set: str = "set_item"
+    delete: str = "del_item"
+
+
+@dataclass(frozen=True)
+class Resource:
+    """Definition of one fixture product grid resource for the engine.
+
+    ``keys`` together identify one object; the product declares no
+    uniqueness for some of them, so more than one match is refused as
+    ambiguous. ``exclude_rows`` drops listing rows that are not objects of
+    this resource, by field value.
+    """
+
+    name: str
+    route: str
+    post_key: str
+    keys: tuple[Key, ...]
+    fields: tuple[Field, ...]
+    result_key: str
+    activation: str | None = None
+    actions: Actions = Actions()
+    exclude_rows: tuple[tuple[str, Any], ...] = ()
+
+    def get_field(self, name: str) -> Field:
+        for item in self.fields:
+            if item.name == name:
+                return item
+        raise KeyError(name)
+
+
+def build_spec(resource: Resource) -> dict[str, Any]:
+    """Return a fresh argument specification for a resource module."""
+    spec = api_argument_spec()
+    for key in resource.keys:
+        spec[key.name] = {"type": "str"}
+        if key.default is None:
+            spec[key.name]["required"] = True
+        else:
+            spec[key.name]["default"] = key.default
+        if key.choices:
+            spec[key.name]["choices"] = list(key.choices)
+    for item in resource.fields:
+        if item.kind == "set":
+            spec[item.name] = {"type": "list", "elements": "str"}
+            if item.choices:
+                spec[item.name]["choices"] = list(item.choices)
+        elif item.kind == "choice":
+            spec[item.name] = {"type": "str"}
+            if item.choices:
+                spec[item.name]["choices"] = list(item.choices)
+        else:
+            spec[item.name] = {"type": item.kind}
+    spec["state"] = {
+        "type": "str",
+        "default": "present",
+        "choices": ["present", "absent"],
+    }
+    return spec
+
+
+def _selected(raw: Any) -> list[str] | None:
+    """Return the selected keys of an option map from ``get_item``."""
+    if isinstance(raw, dict) and all(isinstance(v, dict) for v in raw.values()):
+        keys = []
+        for key, option in raw.items():
+            selected = option.get("selected")
+            if selected in (1, "1", True):
+                keys.append(str(key))
+            elif selected not in (0, "0", False, None):
+                return None
+        return keys
+    return None
+
+
+def normalize(item: Field, raw: Any) -> Any:
+    """Turn a ``get_item`` value into the field's public value.
+
+    Raises:
+        ProductError: With category ``response`` and code ``schema`` when
+            the value does not have the shape the definition expects.
+    """
+    selected = _selected(raw)
+    if item.kind == "set":
+        if selected is not None:
+            return selected
+        if isinstance(raw, list) and all(isinstance(v, str) for v in raw):
+            return list(raw)
+        if isinstance(raw, str):
+            return [v for v in raw.split(item.separator) if v != ""]
+    elif item.kind == "choice":
+        if selected is not None and len(selected) <= 1:
+            return selected[0] if selected else ""
+        if isinstance(raw, str):
+            return raw
+    elif item.kind == "bool":
+        if raw in ("1", "0", ""):
+            return raw == "1"
+    elif item.kind == "int":
+        if isinstance(raw, str) and (raw == "" or raw.lstrip("-").isdigit()):
+            try:
+                return int(raw) if raw else None
+            except ValueError:
+                pass
+    elif isinstance(raw, str):
+        return raw
+    raise ProductError(category="response", code="schema", fields=[item.name])
+
+
+def encode(item: Field, value: Any) -> str:
+    """Encode a public value for a ``set_item`` or ``add_item`` request."""
+    if item.kind == "bool":
+        return "1" if value else "0"
+    if item.kind == "set":
+        return item.separator.join(value)
+    if item.kind == "int":
+        return str(value)
+    return str(value)
+
+
+def equal(item: Field, current: Any, desired: Any) -> bool:
+    if item.kind == "set":
+        return current is not MISSING and sorted(set(current)) == sorted(set(desired))
+    return bool(current == desired)
+
+
+class Engine:
+    """Converge one resource for one module invocation."""
+
+    def __init__(self, module: Any, resource: Resource, client: Client) -> None:
+        self.module = module
+        self.resource = resource
+        self.client = client
+        self._reference_maps: dict[Reference, dict[str, str]] = {}
+
+    def reference_map(self, ref: Reference) -> dict[str, str]:
+        """Map names to UUIDs of a referenced grid, read once per invocation."""
+        if ref not in self._reference_maps:
+            mapping: dict[str, str] = {}
+            duplicates = set()
+            for row in self.client.search(ref.route):
+                name = row.get(ref.key)
+                if not isinstance(name, str):
+                    raise ProductError(category="response", code="schema")
+                if name in mapping:
+                    duplicates.add(name)
+                mapping[name] = row["uuid"]
+            for name in duplicates:
+                mapping.pop(name)
+                mapping[f"\0{name}"] = ""
+            self._reference_maps[ref] = mapping
+        return self._reference_maps[ref]
+
+    def to_uuids(self, item: Field, names: list[str]) -> list[str]:
+        if item.reference is None:
+            raise ValueError("The field has no reference")
+        mapping = self.reference_map(item.reference)
+        uuids = []
+        for name in names:
+            if f"\0{name}" in mapping:
+                raise ProductError(
+                    category="reference", code="ambiguous", fields=[item.name]
+                )
+            if name not in mapping:
+                raise ProductError(
+                    category="reference", code="not_found", fields=[item.name]
+                )
+            uuids.append(mapping[name])
+        return uuids
+
+    def to_names(self, item: Field, uuids: list[str]) -> list[str]:
+        if item.reference is None:
+            raise ValueError("The field has no reference")
+        if not uuids:
+            return []
+        reverse = {v: k for k, v in self.reference_map(item.reference).items() if v}
+        names = []
+        for uuid in uuids:
+            if uuid not in reverse:
+                raise ProductError(
+                    category="reference", code="not_found", fields=[item.name]
+                )
+            names.append(reverse[uuid])
+        return names
+
+    def find(self, ident: dict[str, str]) -> tuple[str, dict[str, Any]] | None:
+        """Return the UUID and public state of the identified object, or ``None``.
+
+        Absence is concluded only from a complete listing.
+        """
+        actions = self.resource.actions
+        matches = [
+            row
+            for row in self.client.search(self.resource.route, actions.search)
+            if all(row.get(key) == value for key, value in ident.items())
+            and not any(row.get(f) == v for f, v in self.resource.exclude_rows)
+        ]
+        if not matches:
+            return None
+        if len(matches) > 1:
+            raise ProductError(category="identity", code="ambiguous")
+        uuid = matches[0]["uuid"]
+        if not UUID.match(uuid):
+            raise ProductError(category="identity", code="internal_object")
+        payload = self.client.read(
+            "GET", f"{self.resource.route}/{actions.get}/{segment(uuid)}"
+        )
+        record = (
+            payload.get(self.resource.post_key) if isinstance(payload, dict) else None
+        )
+        if not isinstance(record, dict):
+            raise ProductError(category="response", code="schema")
+        if any(record.get(key) != value for key, value in ident.items()):
+            raise ProductError(category="verification", code="not_persisted")
+        state: dict[str, Any] = {}
+        for item in self.resource.fields:
+            if item.name not in record:
+                raise ProductError(
+                    category="response", code="schema", fields=[item.name]
+                )
+            value = normalize(item, record[item.name])
+            if item.reference is not None:
+                value = self.to_names(item, value)
+            state[item.name] = value
+        return uuid, state
+
+    def desired(self) -> dict[str, Any]:
+        params = self.module.params
+        return {
+            item.name: params[item.name]
+            for item in self.resource.fields
+            if params.get(item.name) is not None
+        }
+
+    def payload(
+        self, values: dict[str, Any], ident: dict[str, str] | None = None
+    ) -> dict[str, Any]:
+        body: dict[str, str] = dict(ident or {})
+        for key, value in values.items():
+            item = self.resource.get_field(key)
+            if item.reference is not None:
+                value = self.to_uuids(item, value)
+            body[key] = encode(item, value)
+        return {self.resource.post_key: body}
+
+    def submit(self, action: str, body: dict[str, Any]) -> dict[str, Any]:
+        result = self.client.write(f"{self.resource.route}/{action}", body)
+        if not isinstance(result, dict):
+            raise ProductError(category="response", code="response_type")
+        if result.get("result") == "failed":
+            validations = result.get("validations")
+            names = []
+            if isinstance(validations, dict):
+                known = {k.name for k in self.resource.keys} | {
+                    i.name for i in self.resource.fields
+                }
+                for key in validations:
+                    short = str(key).split(".", 1)[-1]
+                    names.append(short if short in known else "other")
+            raise ProductError(code="validation_failed", fields=sorted(set(names)))
+        if result.get("result") != "saved":
+            raise ProductError(code="rejected")
+        return result
+
+    def verify(
+        self, ident: dict[str, str], desired: dict[str, Any]
+    ) -> tuple[str, dict[str, Any]]:
+        found = self.find(ident)
+        if found is None:
+            raise ProductError(category="verification", code="missing_after_write")
+        mismatch = [
+            key
+            for key, value in desired.items()
+            if not equal(
+                self.resource.get_field(key), found[1].get(key, MISSING), value
+            )
+        ]
+        if mismatch:
+            raise ProductError(
+                category="verification", code="not_persisted", fields=sorted(mismatch)
+            )
+        return found
+
+
+def run_resource(module: Any, resource: Resource) -> None:
+    """Converge the resource the module's parameters declare and exit."""
+    params = module.params
+    ident = {key.name: params[key.name] for key in resource.keys}
+    name = "/".join(ident.values())
+    state = params["state"]
+    actions = resource.actions
+    operation = "validate"
+    write_attempted = False
+    write_confirmed = False
+    try:
+        invalid = [
+            k.name for k in resource.keys if not re.fullmatch(k.pattern, ident[k.name])
+        ]
+        if invalid:
+            raise ProductError(code="validation_failed", fields=invalid)
+        client = Client(params)
+        engine = Engine(module, resource, client)
+        operation = "compatibility"
+        _compat.check(module, client, f"{resource.name}:{state}")
+        desired = engine.desired()
+        operation = "find"
+        found = engine.find(ident)
+        operation = "references"
+        if state == "present":
+            for key, value in desired.items():
+                if engine.resource.get_field(key).reference is not None:
+                    engine.to_uuids(engine.resource.get_field(key), value)
+        current: dict[str, Any] = found[1] if found else {}
+        if state == "absent":
+            changed = found is not None
+            delta: dict[str, Any] = {}
+        elif found is None:
+            changed = True
+            delta = dict(desired)
+        else:
+            delta = {
+                key: value
+                for key, value in desired.items()
+                if not equal(resource.get_field(key), current.get(key, MISSING), value)
+            }
+            changed = bool(delta)
+
+        result: dict[str, Any] = {
+            "changed": changed,
+            "changed_fields": sorted(delta) if found and state == "present" else [],
+            "verified": "predicted" if module.check_mode else "observed",
+        }
+        if module._diff and changed:
+            if state == "absent":
+                before, after = dict(current), {}
+            elif found is None:
+                before, after = {}, dict(delta)
+            else:
+                before = {key: current[key] for key in delta}
+                after = dict(delta)
+            result["diff"] = {"before": before, "after": after}
+        if module.check_mode or not changed:
+            if state == "absent":
+                result[resource.result_key] = None
+            else:
+                # Observed state, or a prediction in check mode; a creation
+                # has no UUID before it happens.
+                predicted = dict(current)
+                predicted.update(delta)
+                if found is not None:
+                    predicted["uuid"] = found[0]
+                result[resource.result_key] = {**ident, **predicted}
+            module.exit_json(**result)
+
+        write_attempted = True
+        if state == "absent":
+            if found is None:
+                raise ValueError("Nothing to delete")
+            operation = "delete"
+            try:
+                response = client.write(
+                    f"{resource.route}/{actions.delete}/{segment(found[0])}"
+                )
+            except errors.TransportTimeout:
+                operation = "reconcile"
+                if engine.find(ident) is not None:
+                    raise ProductError(
+                        category="verification", code="still_present"
+                    ) from None
+                response = {"result": "deleted"}
+            except ProductError as error:
+                # The appliance refuses, for example, to delete an object in
+                # use. Read again: if the object is unchanged, nothing was written.
+                if error.code != "rejected":
+                    raise
+                operation = "reconcile"
+                still = engine.find(ident)
+                if still is not None and still[0] == found[0]:
+                    write_attempted = False
+                operation = "delete"
+                raise
+            if not isinstance(response, dict) or response.get("result") not in (
+                "deleted",
+                "not found",
+            ):
+                raise ProductError(code="rejected")
+            write_confirmed = response.get("result") == "deleted"
+            operation = "verify"
+            if engine.find(ident) is not None:
+                raise ProductError(category="verification", code="still_present")
+            result[resource.result_key] = None
+        elif found is None:
+            operation = "create"
+            try:
+                response = engine.submit(actions.add, engine.payload(desired, ident))
+                write_confirmed = True
+                uuid = response.get("uuid")
+                if not isinstance(uuid, str) or not UUID.match(uuid):
+                    raise ProductError(category="response", code="schema")
+            except errors.TransportTimeout:
+                # Reconcile by identity; never repeat a creation blindly.
+                operation = "reconcile"
+                if engine.find(ident) is None:
+                    raise ProductError(
+                        category="verification", code="create_unknown"
+                    ) from None
+            operation = "verify"
+            verified = engine.verify(ident, desired)
+            write_confirmed = True
+            result[resource.result_key] = {**ident, **verified[1], "uuid": verified[0]}
+        else:
+            operation = "update"
+            try:
+                engine.submit(
+                    f"{actions.set}/{segment(found[0])}", engine.payload(delta)
+                )
+                write_confirmed = True
+            except errors.TransportTimeout:
+                operation = "reconcile"
+            operation = "verify"
+            verified = engine.verify(ident, desired)
+            write_confirmed = True
+            result[resource.result_key] = {**ident, **verified[1], "uuid": verified[0]}
+        module.exit_json(**result)
+    except errors.ApiError as error:
+        fields: dict[str, Any] = {"operation": operation, "resource": resource.name}
+        if isinstance(name, str) and 0 < len(name) <= 128:
+            fields["name"] = name
+        if isinstance(error, ProductError) and error.fields:
+            fields["fields"] = error.fields
+        if not write_attempted:
+            changed, outcome = False, "unchanged"
+        elif isinstance(error, ProductError) and error.code == "validation_failed":
+            # The appliance validates before it saves; nothing was written.
+            changed, outcome = False, "unchanged"
+        elif write_confirmed:
+            changed, outcome = True, "changed"
+        else:
+            changed, outcome = True, "unknown"
+        errors.fail_from(
+            module,
+            error,
+            schema=SCHEMA,
+            msg=f"Converging the {resource.name.replace('_', ' ')} failed during {operation}",
+            changed=changed,
+            outcome=outcome,
+            fields=fields,
+        )

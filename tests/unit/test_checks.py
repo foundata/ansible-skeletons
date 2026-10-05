@@ -44,6 +44,9 @@ def test_ambient_ansible_configuration_is_not_inherited(
     assert env["ANSIBLE_CONFIG"] == str(tmp_path / "ansible.cfg")
     assert env["ANSIBLE_ROLES_PATH"] == str(tmp_path / "roles")
     assert "ANSIBLE_EXTRA_VARS" not in env
+    assert Path(env["HOME"]) == tmp_path / "home"
+    assert Path(env["HOME"]).is_dir()
+    assert Path(env["XDG_CACHE_HOME"]).is_dir()
     assert os.environ["ANSIBLE_CONFIG"] == "/unexpected/ansible.cfg"
 
 
@@ -230,6 +233,49 @@ def test_skeleton_lint_configurations_stay_in_sync() -> None:
         assert (ROOT / "role_default" / name).read_bytes() == (
             ROOT / "collection_default" / name
         ).read_bytes()
+    # Explicit paths keep missing or changed shared files in the comparison.
+    for name in (
+        ".gitattributes.j2",
+        ".gitignore.j2",
+        ".rumdl.toml.j2",
+        ".yamllint.j2",
+        "CHANGELOG.rst.j2",
+        "CODE_OF_CONDUCT.md.j2",
+        "REUSE.toml.j2",
+        "changelogs/changelog.yaml.j2",
+        "changelogs/config.yaml.j2",
+        "changelogs/fragments/00-fragment-template.txt.j2",
+        "extensions/molecule/default/requirements.yml.j2",
+        "extensions/molecule/shared/playbooks/cleanup.yml.j2",
+        "extensions/molecule/shared/playbooks/converge.yml.j2",
+        "extensions/molecule/shared/playbooks/create-dispatch.yml.j2",
+        "extensions/molecule/shared/playbooks/create-libvirt.yml.j2",
+        "extensions/molecule/shared/playbooks/create-podman.yml.j2",
+        "extensions/molecule/shared/playbooks/create.yml.j2",
+        "extensions/molecule/shared/playbooks/destroy-dispatch.yml.j2",
+        "extensions/molecule/shared/playbooks/destroy-libvirt.yml.j2",
+        "extensions/molecule/shared/playbooks/destroy-podman.yml.j2",
+        "extensions/molecule/shared/playbooks/destroy.yml.j2",
+        "extensions/molecule/shared/playbooks/prepare.yml.j2",
+        "extensions/molecule/shared/playbooks/side_effect.yml.j2",
+        "extensions/molecule/shared/playbooks/verify.yml.j2",
+        "extensions/molecule/shared/tasks/state_update.yml.j2",
+        "extensions/molecule/shared/templates/cloud_init_user_data.yml.j2.j2",
+        "extensions/molecule/shared/templates/libvirt_domain.xml.j2.j2",
+        "requirements.txt.j2",
+        "tests/config.yml.j2",
+    ):
+        assert (ROOT / "collection_default" / name).read_bytes() == (
+            ROOT / "collection_modules_grid" / name
+        ).read_bytes(), name
+    # These static files only acquire a template suffix in the module skeleton.
+    for name in (
+        "LICENSES/GPL-3.0-or-later.txt",
+        "changelogs/fragments/archive/.gitkeep",
+    ):
+        assert (ROOT / "collection_default" / name).read_bytes() == (
+            ROOT / "collection_modules_grid" / f"{name}.j2"
+        ).read_bytes(), name
     for skeleton in ("role_default", "collection_default"):
         assert not (ROOT / skeleton / "pyproject.toml").exists()
         assert not (ROOT / skeleton / "scripts").exists()

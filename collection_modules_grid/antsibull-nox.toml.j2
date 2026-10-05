@@ -1,0 +1,70 @@
+# Built-in antsibull-nox sessions of this collection. The sessions foundata
+# defines, and the usage, are in noxfile.py and DEVELOPMENT.md; "nox -l" lists
+# all of them. Reference: https://docs.ansible.com/projects/antsibull-nox/config-file/
+#
+# ansible-core versions are derived from "requires_ansible" in meta/runtime.yml.
+# Run nox inside the collection's Git repository: the license check honors
+# .gitignore only there.
+
+version = 1
+
+[collection]
+# Python versions of module code are read from tests/config.yml.
+min_python_version = "ansible-test-config"
+
+[sessions.docs_check]
+validate_collection_refs = "all"
+
+[sessions.license_check]
+# REUSE.toml states the licensing; files carry no license header of their own.
+run_license_check = false
+
+[sessions.extra_checks]
+run_no_unwanted_files = true
+run_action_groups = true
+
+[[sessions.extra_checks.action_groups_config]]
+name = "api"
+pattern = "^.*$"
+doc_fragment = "{{ namespace }}.{{ collection_name }}.api"
+exclusions = []
+
+[sessions.build_import_check]
+run_galaxy_importer = true
+
+# The ansible-lint session is defined in noxfile.py.
+
+[sessions.ansible_test_sanity]
+include_devel = true
+# changelog: changelogs/fragments also holds the fragment template and the
+# archive, which this test rejects. Use "antsibull-changelog lint" instead.
+# no-smart-quotes: the license text in LICENSES/ uses typographic quotes.
+skip_tests = ["changelog", "no-smart-quotes"]
+
+# The molecule session is defined in noxfile.py.
+
+[sessions.lint]
+run_isort = false
+run_black = false
+run_ruff_format = true
+run_ruff_autofix = true
+ruff_autofix_select = ["I"]
+run_ruff_check = true
+run_flake8 = false
+run_pylint = false
+run_yamllint = true
+yamllint_config_plugins = ".yamllint"
+yamllint_config_plugins_examples = ".yamllint"
+run_mypy = true
+mypy_config = ".mypy.ini"
+
+# max_version can omit the next series: antsibull-nox knows it before PyPI
+# publishes it and installs that lane from the stable GitHub branch.
+[sessions.ansible_test_units]
+include_devel = true
+split_by_python_version = true
+core_python_versions = { "2.19" = ["3.9", "3.13"], "2.20" = ["3.9", "3.14"], "2.21" = ["3.9", "3.14"], "2.22" = ["3.9", "3.14"], "devel" = ["3.10", "3.14"] }
+
+[sessions.ansible_test_integration_w_default_container]
+include_devel = true
+core_python_versions = { "2.19" = ["3.9", "3.13"], "2.20" = ["3.9", "3.14"], "2.21" = ["3.9", "3.14"], "2.22" = ["3.9", "3.14"], "devel" = ["3.10", "3.14"] }

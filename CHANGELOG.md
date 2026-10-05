@@ -9,7 +9,12 @@ and the project adheres to
 
 ## [Unreleased]
 
-- Nothing worth mentioning right now.
+### Added
+
+- collection_modules_grid: an independent module-only skeleton with a grid-API
+  fixture, a replaceable resource engine, API tests and research scaffolds.
+- checks: distinct-identity rendering and installed module checks for
+  collection_modules_grid; the full matrix includes its ansible-test lanes.
 
 
 ## [2.9.0] - 2026-10-05

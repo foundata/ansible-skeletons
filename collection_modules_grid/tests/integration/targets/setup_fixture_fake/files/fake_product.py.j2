@@ -1,0 +1,125 @@
+"""Loopback-only invented product API. Usage: fake_product.py STATE_DIR LIFETIME."""
+# FIXME Replace fixture routes, validation and activation with qualified product behavior.
+
+from __future__ import annotations
+
+import base64
+import copy
+import json
+import re
+import sys
+import threading
+import uuid
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
+from typing import Any
+
+
+class Handler(BaseHTTPRequestHandler):
+    credentials = ""
+    records: dict[str, dict[str, str]] = {}
+    active: dict[str, dict[str, str]] = {}
+
+    def log_message(self, format: str, *args: Any) -> None:
+        pass
+
+    def send_json(self, status: int, payload: Any) -> None:
+        body = json.dumps(payload).encode()
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def dispatch(self) -> None:
+        expected = "Basic " + base64.b64encode(self.credentials.encode()).decode()
+        if self.headers.get("Authorization") != expected:
+            self.send_json(401, {"status": "failed"})
+            return
+        size = int(self.headers.get("Content-Length", "0"))
+        data = json.loads(self.rfile.read(size)) if size else {}
+        if self.path == "/api/shutdown":
+            self.send_json(200, {"status": "ok"})
+            threading.Thread(target=self.server.shutdown, daemon=True).start()
+            return
+        if self.path == "/api/system/version":
+            self.send_json(200, {"product": {{ product | default('Example Grid') | to_json }}, "version": "1.0.0"})
+            return
+        if self.path == "/api/fixture/reconfigure":
+            type(self).active = copy.deepcopy(self.records)
+            self.send_json(200, {"status": "ok"})
+            return
+        if self.path in ("/api/fixture/search_item", "/api/fixture/active/search_item"):
+            records = self.active if "/active/" in self.path else self.records
+            rows = [{"uuid": key, **row} for key, row in records.items()]
+            page, page_size = data["current"], min(2, data["rowCount"])
+            self.send_json(
+                200,
+                {
+                    "current": page,
+                    "total": len(rows),
+                    "rows": rows[(page - 1) * page_size : page * page_size],
+                },
+            )
+            return
+        match = re.fullmatch(
+            r"/api/fixture/(get_item|add_item|set_item|del_item)(?:/([^/]+))?",
+            self.path,
+        )
+        if match is None:
+            self.send_json(404, {})
+            return
+        action, key = match.groups()
+        if action == "get_item":
+            self.send_json(200, {"fixture": self.records.get(key, {})})
+        elif action == "del_item":
+            removed = self.records.pop(key, None)
+            self.send_json(200, {"result": "deleted" if removed else "not found"})
+        else:
+            row = (
+                dict(self.records[key])
+                if key in self.records
+                else {
+                    "name": "",
+                    "value": "",
+                    "enabled": "1",
+                    "labels": "",
+                    "password": "SYNTHETIC-OLD-SECRET",
+                }
+            )
+            row.update(data["fixture"])
+            if row["value"] == "INVALID" or any(
+                other["name"] == row["name"]
+                for identity, other in self.records.items()
+                if identity != key
+            ):
+                self.send_json(
+                    200, {"result": "failed", "validations": {"value": "invalid"}}
+                )
+                return
+            key = key or str(uuid.uuid4())
+            self.records[key] = row
+            self.send_json(200, {"result": "saved", "uuid": key})
+
+    do_GET = dispatch
+    do_POST = dispatch
+
+
+def main() -> None:
+    state = Path(sys.argv[1])
+    Handler.credentials = (state / "credentials").read_text().strip()
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    (state / "port.tmp").write_text(str(server.server_port))
+    (state / "port.tmp").replace(state / "port")
+    timer = threading.Timer(float(sys.argv[2]), server.shutdown)
+    timer.daemon = True
+    timer.start()
+    try:
+        server.serve_forever()
+    finally:
+        timer.cancel()
+        server.server_close()
+
+
+if __name__ == "__main__":
+    main()

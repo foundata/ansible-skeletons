@@ -1,0 +1,26 @@
+"""Internal curated resource definitions; not a public interface."""
+# FIXME Replace this invented resource with the first researched product definition.
+
+from __future__ import annotations
+
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._engine import (
+    Field,
+    Key,
+    Resource,
+)
+
+FIXTURE = Resource(
+    name="fixture",
+    route="/fixture",
+    post_key="fixture",
+    keys=(
+        Key("name", "Exact immutable fixture name", r"[A-Za-z][A-Za-z0-9_]{0,63}\Z"),
+    ),
+    fields=(
+        Field("value", "str", "Stored public value"),
+        Field("enabled", "bool", "Whether the fixture is enabled"),
+        Field("labels", "set", "Unordered public labels"),
+    ),
+    result_key="fixture",
+    activation="fixture_apply",
+)

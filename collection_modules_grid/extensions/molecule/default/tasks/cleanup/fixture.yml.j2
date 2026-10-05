@@ -1,0 +1,14 @@
+# FIXME Remove only scenario-owned records and verify effective deletion.
+---
+- name: "Clean up the scenario fixture"
+  module_defaults:
+    group/{{ namespace }}.{{ collection_name }}.api: "{% raw %}{{ product_connection }}{% endraw %}"
+  block:
+    - name: "Delete the scenario fixture"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        name: "molecule_fixture_example"
+        state: "absent"
+
+    - name: "Activate deletion"
+      {{ namespace }}.{{ collection_name }}.fixture_apply:
+        verify: ["molecule_fixture_example"]
