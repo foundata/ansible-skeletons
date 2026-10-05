@@ -9,7 +9,12 @@ and the project adheres to
 
 ## [Unreleased]
 
-- Nothing worth mentioning right now.
+### Changed
+
+- collection_default: `build_ignore` and `.gitignore` cover the Ruff, mypy,
+  pytest and rumdl caches, the Ruff and mypy configuration and `tests/output`,
+  which `ansible-test` writes. `DEVELOPMENT.md` notes the `docs-check`
+  failure under Python 3.14 in deep checkouts.
 
 
 ## [2.8.0] - 2026-10-05

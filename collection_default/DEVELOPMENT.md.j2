@@ -31,6 +31,10 @@ With `CI=true` every session only checks. Arguments after `--` go to the
 session's tool unchanged. `noxfile.py` documents each session; the built-in
 sessions are configured in `antsibull-nox.toml`.
 
+If `docs-check` fails with `AF_UNIX path too long` under Python 3.14, run nox
+with Python 3.13 or from a shorter checkout path: `antsibull-docs` starts
+worker processes whose socket path includes the checkout.
+
 ## Releases<a id="releases"></a>
 
 FIXME Describe what a release of this collection consists of and the steps to
