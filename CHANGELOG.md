@@ -16,6 +16,11 @@ and the project adheres to
   which `ansible-test` writes. `DEVELOPMENT.md` notes the `docs-check`
   failure under Python 3.14 in deep checkouts.
 
+### Fixed
+
+- collection_default: `noxfile.py` names its unused loop variables `_name`
+  and `_kind`; `ansible-test sanity` rejected `_` (pylint `disallowed-name`).
+
 
 ## [2.8.0] - 2026-10-05
 

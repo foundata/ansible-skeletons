@@ -169,12 +169,12 @@ def molecule(session: nox.Session) -> None:
         serial = os.environ.get("MOLECULE_SERIAL", "").lower() in ("1", "true")
         if "MOLECULE_SERIAL" not in os.environ:
             # Virtual machines are heavy: one at a time unless told otherwise.
-            serial = any(kind == "libvirt" for _, kind in platforms)
+            serial = any(kind == "libvirt" for _name, kind in platforms)
         if os.environ.get("MOLECULE_PLATFORM_NAME") or not serial:
             # molecule test --scenario-name default
             session.run("molecule", "test", "--scenario-name", "default", env=env)
             return
-        for name, _ in platforms:
+        for name, _kind in platforms:
             # molecule test --scenario-name default --platform-name <name>, per platform
             session.run(
                 "molecule",
