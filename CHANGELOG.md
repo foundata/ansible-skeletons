@@ -34,6 +34,8 @@ and the project adheres to
 
 ### Changed
 
+- (collection|role)_default: the README links to the licensing files start
+  with `./`, as the Markdown guide requires.
 - (collection|role)_default: the three base options declare their default in
   `meta/argument_specs.yml` instead of `required: true`. Role argument
   validation never enforced the requirement, because `defaults/main.yml`
