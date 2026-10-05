@@ -116,19 +116,15 @@ def ansible_lint(session: nox.Session) -> None:
 
 
 @nox.session(name="docs", default=True)
-@antsibull_nox.sessions.install_packages(packages=["ansible-docsmith"])
+@antsibull_nox.sessions.install_packages(packages=["ansible-docsmith>=2.3.0", "rumdl"])
 def docs(session: nox.Session) -> None:
     """Role documentation with DocSmith; regenerates it unless CI=true."""
-    for spec in sorted(Path("roles").glob("*/meta/argument_specs.yml")):
-        role = spec.parent.parent
-        # ansible-docsmith validate <role>; ansible-docsmith generate <role> [--check]
-        session.run("ansible-docsmith", "validate", str(role))
-        session.run(
-            "ansible-docsmith",
-            "generate",
-            str(role),
-            *(["--check"] if CHECK_ONLY else []),
-        )
+    # ansible-docsmith validate .; ansible-docsmith generate . [--check]
+    # .ansible-docsmith.toml formats the READMEs with rumdl before comparing.
+    session.run("ansible-docsmith", "validate", ".")
+    session.run(
+        "ansible-docsmith", "generate", ".", *(["--check"] if CHECK_ONLY else [])
+    )
 
 
 @nox.session(name="markdown", default=True)

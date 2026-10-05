@@ -11,6 +11,9 @@ and the project adheres to
 
 ### Added
 
+- (collection|role)_default: `.ansible-docsmith.toml`, which lets DocSmith
+  2.3.0 format the READMEs with rumdl before it compares or writes. The
+  collection README carries the role table of contents DocSmith generates.
 - (collection|role)_default: all foundata lint rules enabled when the extension
   is installed. Collection Nox checks install and verify it automatically.
 - collection_default: `noxfile.py` and `antsibull-nox.toml`. A plain `nox`

@@ -25,7 +25,8 @@ uv run noxfile.py -s molecule -- test --platform-name molecule-debian13
 
 With nox installed, `nox` replaces `uv run noxfile.py`. A plain run applies
 the project's own rewrites before checking: `ansible-lint --fix`, role
-documentation generated from `meta/argument_specs.yml`, Markdown formatting.
+documentation generated from `meta/argument_specs.yml` and formatted as
+`.ansible-docsmith.toml` configures, Markdown formatting.
 With `CI=true` every session only checks. Arguments after `--` go to the
 session's tool unchanged. `noxfile.py` documents each session; the built-in
 sessions are configured in `antsibull-nox.toml`.
