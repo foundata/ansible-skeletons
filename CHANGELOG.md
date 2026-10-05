@@ -13,7 +13,14 @@ and the project adheres to
 
 - (collection|role)_default: all foundata lint rules enabled when the extension
   is installed. Collection Nox checks install and verify it automatically.
-- collection_default: `noxfile.py` and `antsibull-nox.toml`.
+- collection_default: `noxfile.py` and `antsibull-nox.toml`. A plain `nox`
+  applies the project's rewrites and then checks; `CI=true nox` only checks.
+  Own sessions: `ansible-lint` with the foundata rules, `docs` with DocSmith,
+  `markdown` with rumdl, `changelog` with antsibull-changelog, and `molecule`,
+  which passes arguments after `--` to Molecule and otherwise runs the
+  `default` scenario, virtual machines one at a time.
+- collection_default: `DEVELOPMENT.md` with the prerequisites and the `nox`
+  commands, and a "Through nox" section in the Molecule README.
 - collection_default: `tests/config.yml`, which declares Python 3.9 as the
   lowest version for module code on managed nodes.
 - (collection|role)_default: `.ansible-lint` with the `production` profile and

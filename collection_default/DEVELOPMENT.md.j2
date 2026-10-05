@@ -1,0 +1,36 @@
+# Development
+
+## Prerequisites<a id="prerequisites"></a>
+
+- [uv](https://docs.astral.sh/uv/), or [nox](https://nox.thea.codes/) with
+  [antsibull-nox](https://docs.ansible.com/projects/antsibull-nox/) in one
+  Python environment.
+- [Podman](https://podman.io/) for the `ansible-test` sanity sessions and the
+  container platforms of Molecule. See
+  [`extensions/molecule/README.md`](./extensions/molecule/README.md) for
+  virtual machines and the execution environment scenario.
+
+## Checks<a id="checks"></a>
+
+Run every check from the collection root, inside its Git repository:
+
+```bash
+uv run noxfile.py                 # rewrite, then check: lint, docs, Markdown, changelog, build
+CI=true uv run noxfile.py         # check only; fails on anything a rewrite would change
+uv run noxfile.py -l              # list all sessions
+uv run noxfile.py -t sanity       # ansible-test sanity, one session per ansible-core version
+uv run noxfile.py -s molecule     # Molecule, "default" scenario
+uv run noxfile.py -s molecule -- test --platform-name molecule-debian13
+```
+
+With nox installed, `nox` replaces `uv run noxfile.py`. A plain run applies
+the project's own rewrites before checking: `ansible-lint --fix`, role
+documentation generated from `meta/argument_specs.yml`, Markdown formatting.
+With `CI=true` every session only checks. Arguments after `--` go to the
+session's tool unchanged. `noxfile.py` documents each session; the built-in
+sessions are configured in `antsibull-nox.toml`.
+
+## Releases<a id="releases"></a>
+
+FIXME Describe what a release of this collection consists of and the steps to
+make one.

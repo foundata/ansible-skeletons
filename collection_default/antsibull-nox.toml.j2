@@ -1,15 +1,10 @@
-# Checks of this collection, run by antsibull-nox:
-# https://docs.ansible.com/projects/antsibull-nox/config-file/
-#
-#   nox              default checks (no containers or VMs needed)
-#   nox -t sanity    ansible-test sanity in a container, for each supported
-#                    ansible-core version
-#   nox -s molecule  Molecule scenario "default" from extensions/molecule
+# Built-in antsibull-nox sessions of this collection. The sessions foundata
+# defines, and the usage, are in noxfile.py and DEVELOPMENT.md; "nox -l" lists
+# all of them. Reference: https://docs.ansible.com/projects/antsibull-nox/config-file/
 #
 # ansible-core versions are derived from "requires_ansible" in meta/runtime.yml.
 # Run nox inside the collection's Git repository: the license check honors
-# .gitignore only there. noxfile.py prefers Podman over Docker when both are
-# installed.
+# .gitignore only there.
 
 version = 1
 
@@ -39,4 +34,4 @@ include_devel = true
 # no-smart-quotes: the license text in LICENSES/ uses typographic quotes.
 skip_tests = ["changelog", "no-smart-quotes"]
 
-[sessions.molecule]
+# The molecule session is defined in noxfile.py.
