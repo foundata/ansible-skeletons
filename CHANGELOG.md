@@ -21,6 +21,8 @@ and the project adheres to
 - (collection|role)_default: the ansible-core requirement is checked before
   the first templated task, so an older core reports the role's message
   instead of a Jinja load error.
+- (collection|role)_default: the README licensing section says "an SPDX
+  software bill of materials" instead of "a SPDX".
 
 
 ## [2.9.0] - 2026-10-05
