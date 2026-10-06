@@ -18,6 +18,10 @@ and the project adheres to
 
 ### Fixed
 
+- collection_default, collection_modules_grid: `changelogs/changelog.yaml`
+  starts with no release entry. The placeholder 1.0.0 summary made the first
+  `release_summary` fragment fail as a second summary; the example stays as a
+  comment.
 - (collection|role)_default: the ansible-core requirement is checked before
   the first templated task, so an older core reports the role's message
   instead of a Jinja load error.

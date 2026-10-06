@@ -69,16 +69,20 @@
 
 ---
 ancestor: null # Set to null or the last version that used a different changelog mechanism than changelog.yml.
-releases:
-  1.0.0: # X.Y.Z, follow semantic versioning: https://semver.org/spec/v2.0.0.html
-    release_date: "{{ '%Y-%m-%d' | strftime }}" # YYYY-MM-DD
-    changes:
-      release_summary: |
-        This section is a string (not a list), optional but recommended.
-
-        Example template sentences:
-
-        - Initial release adding all files and functionality. Have fun!
-        - Major release supporting the latest features of Foo version X. There are breaking changes, so please review the changelog carefully.
-        - Small feature release with minor improvements.
-        - Maintenance release with bug fixes and internal optimizations.
+releases: {}
+# antsibull-changelog adds each release from the fragments. An entry looks like
+# this; write the summary as a release_summary fragment, never here:
+#
+# releases:
+#   1.0.0: # X.Y.Z, follow semantic versioning: https://semver.org/spec/v2.0.0.html
+#     release_date: "YYYY-MM-DD"
+#     changes:
+#       release_summary: |
+#         This section is a string (not a list), optional but recommended.
+#
+#         Example template sentences:
+#
+#         - Initial release adding all files and functionality. Have fun!
+#         - Major release supporting the latest features of Foo version X. There are breaking changes, so please review the changelog carefully.
+#         - Small feature release with minor improvements.
+#         - Maintenance release with bug fixes and internal optimizations.
