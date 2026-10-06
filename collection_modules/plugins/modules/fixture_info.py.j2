@@ -1,0 +1,128 @@
+#!/usr/bin/python
+# GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
+# FIXME Replace the fixture read with the researched resource's public state.
+
+from __future__ import annotations
+
+DOCUMENTATION = r"""
+---
+module: fixture_info
+short_description: Read one fixture record
+description:
+  - "Reads the unique saved record named by O(name), without activation or any write, including in check mode."
+  - "A documented by-name 404 establishes absence; ambiguous identities fail. Product secrets are never published."
+version_added: "1.0.0"
+author:
+{% for author in authors %}
+  - {{ (author if '(@' in author or '!UNKNOWN' in author else author ~ ' !UNKNOWN') | to_json }}
+{% endfor %}
+extends_documentation_fragment:
+  - {{ namespace }}.{{ collection_name }}.api
+  - foundata.utils.http_client
+attributes:
+  check_mode:
+    description: Performs the same read without any write.
+    support: full
+  diff_mode:
+    description: Does not change state or produce a diff.
+    support: none
+options:
+  name:
+    description: Immutable name matched ignoring case, starting with a letter and containing only letters, digits and underscores; at most 64 characters.
+    type: str
+    required: true
+"""
+
+EXAMPLES = r"""
+---
+- name: "Read a fixture record"
+  {{ namespace }}.{{ collection_name }}.fixture_info:
+    url: "https://example.invalid/api"
+    api_key: "{% raw %}{{ fixture_api_key }}{% endraw %}"
+    api_secret: "{% raw %}{{ fixture_api_secret }}{% endraw %}"
+    name: "example"
+"""
+
+RETURN = r"""
+---
+fixture:
+  description: Public saved state, or null when the by-name read establishes absence.
+  returned: success
+  type: dict
+  contains:
+    name:
+      description: Immutable name.
+      type: str
+    id:
+      description: Product identifier.
+      type: int
+    value:
+      description: Stored public value.
+      type: str
+    enabled:
+      description: Whether enabled.
+      type: bool
+    labels:
+      description: Unordered labels.
+      type: list
+      elements: str
+    parent:
+      description: Resolved parent name, or an empty string.
+      type: str
+verified:
+  description: Always V(observed), including in check mode.
+  returned: success
+  type: str
+"""
+
+import re
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ansible_collections.foundata.utils.plugins.module_utils import errors
+
+# Keep dependency and local imports stable across rendered namespace ordering.
+# isort: split
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._client import (
+    SCHEMA,
+    Client,
+    ProductError,
+    api_argument_spec,
+)
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._definitions import (
+    FIXTURE,
+)
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._engine import (
+    Engine,
+)
+
+
+def main() -> None:
+    spec = api_argument_spec()
+    spec["name"] = {"type": "str", "required": True}
+    module = AnsibleModule(argument_spec=spec, supports_check_mode=True)
+    operation = "validate"
+    try:
+        name = module.params["name"]
+        if not re.fullmatch(FIXTURE.keys[0].pattern, name):
+            raise ProductError(code="validation_failed", fields=["name"])
+        client = Client(module.params)
+        operation = "find"
+        engine = Engine(module, FIXTURE, client)
+        found = engine.find({"name": name})
+        public = engine.project(found) if found else None
+        module.exit_json(changed=False, fixture=public, verified="observed")
+    except errors.ApiError as error:
+        errors.fail_from(
+            module,
+            error,
+            schema=SCHEMA,
+            msg="Reading the fixture failed",
+            changed=False,
+            outcome="unchanged",
+            fields={"operation": operation},
+        )
+
+
+if __name__ == "__main__":
+    main()

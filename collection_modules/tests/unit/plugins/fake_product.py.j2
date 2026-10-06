@@ -1,0 +1,70 @@
+"""REST transport adapter over the same stateful model as integration."""
+# FIXME Replace the fixture model with observed product behavior.
+
+from __future__ import annotations
+
+from typing import Any
+
+import pytest
+
+from ansible_collections.foundata.utils.plugins.module_utils import errors
+
+# isort: split
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils import (
+    _client,
+)
+from ansible_collections.{{ namespace }}.{{ collection_name }}.tests.integration.targets.setup_fixture_fake.files.fake_product import (
+    KEY,
+    OLD_SECRET,
+    SECRET,
+    FakeProduct,
+    Response,
+)
+
+__all__ = (
+    "KEY",
+    "OLD_SECRET",
+    "SECRET",
+    "FakeProduct",
+    "Response",
+    "connection",
+    "fake",
+    "lost_response",
+)
+
+
+class FakeHttpClient:
+    def __init__(self, fake: FakeProduct, base_url: str, **kwargs: Any) -> None:
+        self.fake = fake
+
+    def request(
+        self,
+        method: str,
+        path: str,
+        *,
+        deadline: Any,
+        headers: dict[str, str],
+        body: bytes | None = None,
+    ) -> Response:
+        deadline.remaining()
+        return self.fake.request(method, path, body, headers)
+
+
+@pytest.fixture
+def fake(monkeypatch: pytest.MonkeyPatch) -> FakeProduct:
+    instance = FakeProduct()
+    monkeypatch.setattr(
+        _client,
+        "HttpClient",
+        lambda base_url, **kwargs: FakeHttpClient(instance, base_url, **kwargs),
+    )
+    return instance
+
+
+@pytest.fixture
+def connection() -> dict[str, Any]:
+    return {"url": "https://fixture.invalid/api", "api_key": KEY, "api_secret": SECRET}
+
+
+def lost_response() -> None:
+    raise errors.TransportTimeout(code="socket_timeout")

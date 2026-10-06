@@ -1,0 +1,17 @@
+# API scenario
+
+FIXME Adapt the environment names and resource tasks to the product.
+Prepare an authorized endpoint and a JSON credentials file containing `key`
+and `secret`. The scenario owns only records prefixed `molecule_fixture_`.
+
+```sh
+export MOLECULE_PRODUCT_URL=https://lab.example.invalid/api
+export MOLECULE_PRODUCT_CREDENTIALS=/path/to/credentials.json
+uv run noxfile.py -s molecule
+```
+
+Use a run-owned `ANSIBLE_HOME`, `XDG_CACHE_HOME` and collection path. The
+scenario runs locally against the supplied endpoint; it performs no host
+preparation. It verifies saved and active state, checks a changed value and
+removes its records. The shared provisioning playbooks remain available for
+a lab that owns its target; see the alternative in `default/molecule.yml`.

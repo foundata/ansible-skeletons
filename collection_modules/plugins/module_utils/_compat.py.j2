@@ -1,0 +1,46 @@
+"""Internal compatibility definition of this collection; not a public interface.
+
+One place declares the supported fixture product series and the operations excluded
+on particular builds. Every module checks both before its first write.
+"""
+# FIXME Replace the invented fixture series and add evidence-backed operation exclusions.
+
+from __future__ import annotations
+
+from typing import Any
+
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._client import (
+    Client,
+    ProductError,
+)
+
+SUPPORTED_SERIES = ("1.0",)
+"""Series the integration tests passed on; see docs/architecture.md."""
+
+EXCLUSIONS: dict[str, tuple[tuple[str, str], ...]] = {}
+"""Operation name to (release, evidence) pairs on which it is ineligible.
+
+No exclusion is known for the supported series yet.
+"""
+
+
+def check(module: Any, client: Client, operation: str) -> tuple[str, str]:
+    """Detect the target version, warn outside the supported series, refuse exclusions.
+
+    Returns the detected series and release.
+
+    Raises:
+        ProductError: With category ``compatibility`` when the version cannot
+            be detected or the operation is excluded on the detected release.
+    """
+    series, release = client.version()
+    if series not in SUPPORTED_SERIES and not client.compatibility_warned:
+        client.compatibility_warned = True
+        module.warn(
+            f"fixture product {series} is not a supported series of this collection release "
+            f"(supported: {', '.join(SUPPORTED_SERIES)}); proceeding."
+        )
+    for excluded_release, _evidence in EXCLUSIONS.get(operation, ()):
+        if release == excluded_release:
+            raise ProductError(category="compatibility", code="ineligible")
+    return series, release

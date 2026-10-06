@@ -1,0 +1,131 @@
+#!/usr/bin/python
+# GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
+# FIXME Replace the fixture interface and examples with the first researched resource.
+
+from __future__ import annotations
+
+DOCUMENTATION = r"""
+---
+module: fixture
+short_description: Manage one fixture record
+description:
+  - "Adopts the unique record with O(name); a rename creates a different record. Ambiguous and internal identities are refused."
+  - "Only declared fields are managed. Omitted and null options are unmanaged; empty values clear a field."
+  - "Writes take effect immediately; no apply module is needed. Deletion is refused while a dependent record refers to this fixture."
+  - "O(state=absent) deletes only the named record. Writers must coordinate access to this family."
+version_added: "1.0.0"
+author:
+{% for author in authors %}
+  - {{ (author if '(@' in author or '!UNKNOWN' in author else author ~ ' !UNKNOWN') | to_json }}
+{% endfor %}
+extends_documentation_fragment:
+  - {{ namespace }}.{{ collection_name }}.api
+  - foundata.utils.http_client
+attributes:
+  check_mode:
+    description: Predicts from a real read, without assigning an identifier on creation.
+    support: full
+  diff_mode:
+    description: Returns only public managed fields that change.
+    support: full
+options:
+  name:
+    description: Immutable name matched ignoring case, starting with a letter and containing only letters, digits and underscores; at most 64 characters.
+    type: str
+    required: true
+  value:
+    description: Public value to store, trimmed and lowercased. Omission and null leave it unmanaged.
+    type: str
+  enabled:
+    description: Whether the record is enabled. Omission and null leave it unmanaged.
+    type: bool
+  labels:
+    description: Unordered labels. An empty list clears the labels; omission and null leave them unmanaged.
+    type: list
+    elements: str
+  parent:
+    description: Parent name resolved before writes. An empty string clears the reference; omission and null leave it unmanaged.
+    type: str
+  password:
+    description: Write-only password. Never returned; successful writes are unverifiable without an independent acceptance probe.
+    type: str
+  update_password:
+    description: Set the password only on creation, or write it on every invocation. An always write is not idempotent.
+    type: str
+    default: on_create
+    choices: [on_create, always]
+  state:
+    description: Whether the named record exists.
+    type: str
+    default: present
+    choices: [present, absent]
+"""
+
+EXAMPLES = r"""
+---
+- name: "Save a fixture record"
+  {{ namespace }}.{{ collection_name }}.fixture:
+    url: "https://example.invalid/api"
+    api_key: "{% raw %}{{ fixture_api_key }}{% endraw %}"
+    api_secret: "{% raw %}{{ fixture_api_secret }}{% endraw %}"
+    name: "example"
+    value: "ready"
+    enabled: true
+    labels: ["managed"]
+"""
+
+RETURN = r"""
+---
+fixture:
+  description: Public observed state, predicted in check mode; null after deletion. No product secrets are returned.
+  returned: success
+  type: dict
+  contains:
+    name:
+      description: Immutable name.
+      type: str
+    id:
+      description: Product identifier, omitted for a creation in check mode.
+      type: int
+    value:
+      description: Stored public value; only declared fields are predicted on creation in check mode.
+      type: str
+    enabled:
+      description: Whether enabled.
+      type: bool
+    labels:
+      description: Unordered labels.
+      type: list
+      elements: str
+    parent:
+      description: Resolved parent name, or an empty string.
+      type: str
+changed_fields:
+  description: Managed options that differed, empty for creation and deletion.
+  returned: success
+  type: list
+  elements: str
+verified:
+  description: V(observed) after read-back or a no-op; V(predicted) in check mode; V(unverifiable) after a write-only password write.
+  returned: success
+  type: str
+"""
+
+from ansible.module_utils.basic import AnsibleModule
+
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._definitions import (
+    FIXTURE,
+)
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._engine import (
+    build_spec,
+    run_resource,
+)
+
+
+def main() -> None:
+    module = AnsibleModule(argument_spec=build_spec(FIXTURE), supports_check_mode=True)
+    run_resource(module, FIXTURE)
+
+
+if __name__ == "__main__":
+    main()

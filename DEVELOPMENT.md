@@ -74,6 +74,7 @@ variables. The helper refuses to overwrite an existing directory.
 | `role_default/`             | Standalone role skeleton |
 | `collection_default/`       | Collection skeleton, including its `run` role |
 | `collection_modules_grid/`  | Module-only collection skeleton |
+| `collection_modules/`       | REST module-only collection skeleton |
 | `scripts/render.py`         | Render a role and the selected collection skeleton with Galaxy |
 | `scripts/smoke.py`          | Validate rendering, artifacts and role behavior |
 | `scripts/check.sh`          | Local quality-check entry point |
@@ -90,9 +91,11 @@ instructions and `.yml.example` files are intentional parts of the product.
 Do not reject all remaining Jinja expressions or placeholders as render errors.
 
 Edit each skeleton directly in its own directory.
-`scripts.render --profile collection_modules_grid` selects the module skeleton.
-Full matrix checks add its default nox, sanity, unit and integration sessions,
-one chain at a time.
+`scripts.render --profile collection_modules_grid` or
+`--profile collection_modules` selects a module skeleton. Both variants run
+through the render and release gates; the unit tests enforce their shared-file
+list without a composition layer. Full matrix checks add their default nox,
+sanity, unit and integration sessions, one chain at a time.
 
 
 ## Development standards<a id="development-standards"></a>

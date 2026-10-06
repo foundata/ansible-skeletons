@@ -1,0 +1,178 @@
+# /// script
+# dependencies = ["nox>=2025.02.09", "antsibull-nox"]
+# ///
+"""Checks of this collection. ``nox -l`` lists them, DEVELOPMENT.md explains them.
+
+A plain ``nox`` runs the default sessions. They apply the project's own
+rewrites first, such as lint fixes, generated documentation and Markdown
+formatting, and then check. With ``CI=true`` in the environment every session
+only checks and fails on what a rewrite would have changed.
+
+Arguments after ``--`` go to the session's tool unchanged, for example
+``nox -s molecule -- test --platform-name molecule-debian13``.
+
+Sessions defined here are foundata's own. The others come from antsibull-nox
+and are configured in antsibull-nox.toml.
+"""
+
+import os
+import sys
+from pathlib import Path
+
+import nox
+
+try:
+    import antsibull_nox
+    import antsibull_nox.sessions
+except ImportError:
+    print("Install antsibull-nox in the same Python environment as nox.")
+    sys.exit(1)
+
+import yaml  # a dependency of antsibull-nox
+
+# Prefer Podman when both Podman and Docker are installed. Docker is still used
+# when it is the only one. Override through the environment, for example with
+# ANTSIBULL_NOX_CONTAINER_ENGINE=auto-prefer-docker.
+os.environ.setdefault("ANTSIBULL_NOX_CONTAINER_ENGINE", "auto-prefer-podman")
+
+antsibull_nox.load_antsibull_nox_toml()
+
+# True when CI=true is set: check only, never rewrite. Same switch as antsibull-nox.
+CHECK_ONLY = antsibull_nox.IN_CI
+
+# Collections the content under test needs. Molecule scenarios bring their own.
+REQUIREMENT_FILES = [
+    "requirements.yml",
+    "tests/requirements.yml",
+    "tests/integration/requirements.yml",
+    "extensions/molecule/default/requirements.yml",
+]
+
+# Absolute: the molecule session changes into "extensions" before it runs.
+MOLECULE_SCENARIO = Path("extensions/molecule/default/molecule.yml").resolve()
+
+
+def _prepare(session: nox.Session) -> dict[str, str]:
+    """Install the collection and its dependencies into a temporary tree."""
+    requirements: list[str | os.PathLike[str]] = [
+        path for path in REQUIREMENT_FILES if Path(path).is_file()
+    ]
+    prepared = antsibull_nox.sessions.prepare_collections(
+        session,
+        install_in_site_packages=False,
+        install_out_of_tree=True,
+        extra_deps_files=requirements,
+    )
+    if prepared is None:
+        session.error("Collection dependency preparation failed")
+    return {"ANSIBLE_COLLECTIONS_PATH": str(prepared.current_place)}
+
+
+@nox.session(name="ansible-lint", default=True)
+@antsibull_nox.sessions.install_packages(packages=["ansible-lint-foundata"])
+def ansible_lint(session: nox.Session) -> None:
+    """ansible-lint with the foundata rules; fixes what it can unless CI=true."""
+    env = _prepare(session) if session.virtualenv.is_sandboxed else {}
+    installed = session.run(
+        "python",
+        "-c",
+        "from importlib.util import find_spec; "
+        "print(find_spec('ansible_lint_foundata') is not None)",
+        silent=True,
+        env=env,
+    )
+    if installed == "True\n":
+        # ansible-lint-foundata verify --project-dir .
+        session.run(
+            "python",
+            "-m",
+            "ansible_lint_foundata.cli",
+            "verify",
+            "--project-dir",
+            ".",
+            env=env,
+        )
+    elif installed == "False\n":
+        session.warn(
+            "ansible-lint-foundata is not installed; running stock rules only."
+        )
+    else:
+        session.error("Could not determine whether ansible-lint-foundata is installed")
+    # ansible-lint --offline --strict [--fix]
+    # Exit status 8 means "fixed something", which is fine in rewrite mode.
+    fix = [] if CHECK_ONLY or "--fix" in session.posargs else ["--fix"]
+    session.run(
+        "python",
+        "-m",
+        "ansiblelint",
+        "--offline",
+        "--strict",
+        *fix,
+        *session.posargs,
+        env=env,
+        success_codes=[0] if CHECK_ONLY else [0, 8],
+    )
+
+
+@nox.session(name="markdown", default=True)
+@antsibull_nox.sessions.install_packages(packages=["rumdl"])
+def markdown(session: nox.Session) -> None:
+    """Markdown style with rumdl; formats unless CI=true."""
+    if not CHECK_ONLY:
+        # rumdl fmt --config .rumdl.toml .
+        session.run("rumdl", "fmt", "--config", ".rumdl.toml", ".")
+    # rumdl check --config .rumdl.toml .
+    session.run("rumdl", "check", "--config", ".rumdl.toml", ".")
+
+
+@nox.session(name="changelog", default=True)
+@antsibull_nox.sessions.install_packages(packages=["antsibull-changelog"])
+def changelog(session: nox.Session) -> None:
+    """Changelog fragments and changelog.yaml with antsibull-changelog."""
+    # antsibull-changelog lint; antsibull-changelog lint-changelog-yaml changelogs/changelog.yaml
+    session.run("antsibull-changelog", "lint")
+    session.run(
+        "antsibull-changelog", "lint-changelog-yaml", "changelogs/changelog.yaml"
+    )
+
+
+def _platforms() -> list[tuple[str, str]]:
+    """Platform names and types of the default scenario, in file order."""
+    data = yaml.safe_load(MOLECULE_SCENARIO.read_text(encoding="utf-8"))
+    return [(p["name"], p.get("type", "podman")) for p in data.get("platforms", [])]
+
+
+@nox.session(name="molecule", default=False)
+@antsibull_nox.sessions.install_packages(packages=["molecule"])
+def molecule(session: nox.Session) -> None:
+    """Molecule: full "default" scenario, or any Molecule command after "--"."""
+    env = _prepare(session)
+    with session.chdir("extensions"):
+        if session.posargs:
+            # molecule <arguments as given>
+            session.run("molecule", *session.posargs, env=env)
+            return
+        platforms = _platforms()
+        serial = os.environ.get("MOLECULE_SERIAL", "").lower() in ("1", "true")
+        if "MOLECULE_SERIAL" not in os.environ:
+            # Virtual machines are heavy: one at a time unless told otherwise.
+            serial = any(kind == "libvirt" for _name, kind in platforms)
+        if os.environ.get("MOLECULE_PLATFORM_NAME") or not serial:
+            # molecule test --scenario-name default
+            session.run("molecule", "test", "--scenario-name", "default", env=env)
+            return
+        for name, _kind in platforms:
+            # molecule test --scenario-name default --platform-name <name>, per platform
+            session.run(
+                "molecule",
+                "test",
+                "--scenario-name",
+                "default",
+                "--platform-name",
+                name,
+                env=env,
+            )
+
+
+if __name__ == "__main__":
+    nox.main()

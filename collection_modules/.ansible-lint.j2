@@ -1,0 +1,53 @@
+# ansible-lint config implementing foundata's guideline. Details, reasoning:
+# https://foundata.com/en/guidelines/ansible-playbooks/
+
+---
+profile: "production"
+strict: true
+
+# Molecule links this as inventory; it is not an ansible.builtin.template input.
+kinds:
+  - inventory: "extensions/molecule/**/inventory/*.yml.j2"
+
+enable_list:
+  - "jinja-template-extension"
+  - "loop-var-prefix"
+  - "foundata-condition-list"
+  - "foundata-condition-bool"
+  - "foundata-fact-vars"
+  - "foundata-notify"
+  - "foundata-loop-collision"
+  - "foundata-set-fact"
+  - "foundata-handler-listen"
+  - "foundata-task-order"
+  - "foundata-file-mode"
+  - "foundata-debug-verbosity"
+  - "foundata-no-end-play"
+  - "foundata-task-name"
+  - "foundata-jinja-fqcn"
+  - "foundata-template-inputs"
+  - "foundata-command-argv"
+  - "foundata-string-quotes"
+  - "foundata-parameter-order"
+
+loop_var_prefix: "^__{role}_[a-z0-9_]+_item$"
+
+skip_list:
+  - "use-loop"
+
+exclude_paths:
+  - "docs/inventory/"
+  - "tools/"
+  # Explicit exclusions replace ansible-lint's defaults.
+  - ".cache/"
+  - ".git/"
+  - ".hg/"
+  - ".svn/"
+  - ".tox/"
+  - ".nox/"
+  - ".venv/"
+  # Generator-owned output; validate separately with antsibull-changelog.
+  - "changelogs/changelog.yaml"
+  - "changelogs/.plugin-cache.yaml"
+
+# YAML formatting is configured in the adjacent .yamllint file.

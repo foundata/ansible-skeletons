@@ -1,0 +1,112 @@
+# /// script
+# dependencies = ["PyYAML"]
+# ///
+"""Inventory stub: supply fixed source bytes and retrieval time for reproducibility.
+
+Example: uv run tools/inventory/extract.py --source SOURCE --series 1.0
+--release 1.0.0 --retrieved 2026-01-01T00:00:00Z --output docs/inventory/1.0.yml
+
+Rerun twice and compare bytes; never hand-edit generated inventory. This stub
+records provenance only and makes no coverage claim. FIXME Parse the product's
+specification with its format's parser, preserving references and coverage gaps.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+
+class InventoryDumper(yaml.SafeDumper):
+    def increase_indent(self, flow: bool = False, indentless: bool = False) -> Any:
+        return super().increase_indent(flow, False)
+
+
+def quoted(dumper: yaml.SafeDumper, value: str) -> yaml.ScalarNode:
+    return dumper.represent_scalar("tag:yaml.org,2002:str", value, style='"')
+
+
+InventoryDumper.add_representer(str, quoted)
+
+
+def tree_hash(root: Path) -> tuple[str, int]:
+    """Hash sorted relative paths and content hashes; omit Git internals."""
+    digest = hashlib.sha256()
+    paths = sorted(
+        path
+        for path in root.rglob("*")
+        if path.is_file() and ".git" not in path.relative_to(root).parts
+    )
+    for path in paths:
+        digest.update(path.relative_to(root).as_posix().encode())
+        digest.update(b"\0")
+        digest.update(hashlib.sha256(path.read_bytes()).hexdigest().encode())
+        digest.update(b"\n")
+    return digest.hexdigest(), len(paths)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--source", type=Path, required=True)
+    parser.add_argument("--series", required=True)
+    parser.add_argument("--release", required=True)
+    parser.add_argument("--retrieved", required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--source-url", default="unknown")
+    parser.add_argument("--commit", default="unknown")
+    parser.add_argument("--dialect", default="unknown")
+    parser.add_argument("--api-version", default="unknown")
+    args = parser.parse_args()
+    source = args.source.resolve(strict=True)
+    if args.output.resolve().is_relative_to(source):
+        parser.error(
+            "Output must be outside the input tree to keep its hash reproducible"
+        )
+    checksum, count = (
+        tree_hash(source)
+        if source.is_dir()
+        else (hashlib.sha256(source.read_bytes()).hexdigest(), 1)
+    )
+    document = {
+        "product": {{ product | default('Example Grid') | to_json }},
+        "series": args.series,
+        "release": args.release,
+        "source": {
+            "url": args.source_url,
+            "tag": args.release,
+            "commit": args.commit,
+            "dialect": args.dialect,
+            "api_version": args.api_version,
+            "retrieved": args.retrieved,
+            "sha256": checksum,
+            "sha256_scope": "sorted (relative path, sha256)"
+            if source.is_dir()
+            else "original bytes",
+        },
+        "extractor": {
+            "sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+            "dependencies": ["PyYAML"],
+        },
+        "coverage": {
+            "covered": [],
+            "excluded": ["All product semantics until the parser is implemented"],
+            "counting_unit": "input file",
+        },
+        "counts": {"input_files": count, "resources": 0},
+        "objects": {},
+    }
+    body = yaml.dump(document, Dumper=InventoryDumper, sort_keys=False, width=120)
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(
+        "# Generated provenance stub; rerun, do not edit.\n---\n" + body,
+        encoding="utf-8",
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,618 @@
+"""Product-owned lifecycle over curated definitions; not a public interface.
+
+Client contract (exercised by tests/unit/plugins/modules/test_contract.py):
+``list(definition)`` returns a complete listing or raises; ``lookup(definition,
+keys)`` permits absence only under that definition's documented by-key rule.
+``get(definition, identifier)`` reads one object, never infers absence from a
+write response. ``create``, ``update`` and ``delete`` perform at most one write;
+update preserves unmanaged fields. Their responses remain private. ``encode``
+and ``decode`` translate individual field values, not lifecycle decisions.
+``probe`` is read-only. ``version`` discovers once per client and caches.
+
+Clients classify failures by status before parsing any body. Listing rows,
+lookup records and mutation responses can contain secrets: only project()
+publishes reviewed fields. After a possible mutation, a failure remains unknown
+until independent read-back establishes the outcome. No blind write retry.
+"""
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass
+from typing import Any, Callable
+
+from ansible_collections.foundata.utils.plugins.module_utils import errors
+
+# Keep dependency and local imports stable across rendered namespace ordering.
+# isort: split
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils import (
+    _compat,
+)
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._client import (
+    SCHEMA,
+    Client,
+    ProductError,
+    api_argument_spec,
+)
+
+MISSING = object()
+
+
+@dataclass(frozen=True)
+class Key:
+    """Immutable identity or server identifier with a reviewed type and case rule."""
+
+    name: str
+    description: str
+    pattern: str = r"[^\x00-\x1f]{1,150}"
+    kind: str = "str"
+    canonical: str = ""
+    choices: tuple[str, ...] = ()
+    default: str | None = None
+    follows_field: str = ""
+    minimum: int | None = None
+
+
+@dataclass(frozen=True)
+class Actions:
+    """Opaque operation selectors interpreted only by the client."""
+
+    search: str = ""
+    get: str = ""
+    add: str = ""
+    set: str = ""
+    delete: str = ""
+
+
+@dataclass(frozen=True)
+class Reference:
+    """Names resolved from a complete listing into a field association."""
+
+    route: str
+    key: str
+    identifier: Key
+    wire: str = ""
+    canonical: str = ""
+    actions: Actions = Actions()
+
+
+@dataclass(frozen=True)
+class Field:
+    """A public field or write-only secret; wire translation belongs to the client."""
+
+    name: str
+    kind: str
+    description: str
+    choices: tuple[str, ...] = ()
+    reference: Reference | None = None
+    separator: str = ""
+    limit: int = 5000
+    canonical: str = ""
+    normalizer: Callable[[str], str] | None = None
+    pattern: str = ""
+    minimum_items: int = 0
+
+
+@dataclass(frozen=True)
+class DeletionGuard:
+    """Recheck reverse references rather than trusting a cached expanded list."""
+
+    field: str
+    route: str
+    foreign_key: str
+    identifier: Key
+    actions: Actions = Actions()
+    post_key: str = ""
+
+
+@dataclass(frozen=True)
+class Resource:
+    """Reviewed identity, lookup strategy, ownership and mutation eligibility."""
+
+    name: str
+    route: str
+    keys: tuple[Key, ...]
+    fields: tuple[Field, ...]
+    result_key: str
+    identifier: Key
+    lookup: str = "listing"
+    lookup_route: str = ""
+    absence_status: int | None = None
+    post_key: str = ""
+    actions: Actions = Actions()
+    exclude_rows: tuple[tuple[str, Any], ...] = ()
+    activation: str | None = None
+    delete: bool = True
+    permission_probe: str | None = None
+    refuse_delete_when: tuple[DeletionGuard, ...] = ()
+    protected_ids: tuple[str | int, ...] = ()
+    prerequisites: tuple[tuple[str, str, str], ...] = ()
+
+    def get_field(self, name: str) -> Field:
+        return next(field for field in self.fields if field.name == name)
+
+
+def build_spec(resource: Resource) -> dict[str, Any]:
+    """Fresh specs; mutable fields have no defaults."""
+    spec = api_argument_spec()
+    for key in resource.keys:
+        spec[key.name] = {"type": key.kind}
+        if key.default is None:
+            spec[key.name]["required"] = True
+        else:
+            spec[key.name]["default"] = key.default
+        if key.choices:
+            spec[key.name]["choices"] = list(key.choices)
+    for field in resource.fields:
+        kind = {
+            "set": "list",
+            "names": "list",
+            "map": "dict",
+            "ref": "str",
+            "choice": "str",
+            "secret": "str",
+        }.get(field.kind, field.kind)
+        spec[field.name] = {"type": kind}
+        if kind == "list":
+            spec[field.name]["elements"] = "str"
+        if field.choices and kind != "dict":
+            spec[field.name]["choices"] = list(field.choices)
+        if field.kind == "secret":
+            spec[field.name]["no_log"] = True
+    if any(field.kind == "secret" for field in resource.fields):
+        spec["update_password"] = {
+            "type": "str",
+            "choices": ["on_create", "always"],
+            "default": "on_create",
+            "no_log": False,
+        }
+    spec["state"] = {
+        "type": "str",
+        "default": "present",
+        "choices": ["present", "absent"] if resource.delete else ["present"],
+    }
+    return spec
+
+
+def canonical(value: str, mode: str) -> str:
+    if mode == "lower":
+        return value.strip().lower()
+    if mode == "casefold":
+        return value.casefold()
+    return value
+
+
+def identifier(key: Key, value: Any) -> str | int:
+    valid = (
+        (
+            isinstance(value, int)
+            and not isinstance(value, bool)
+            and (key.minimum is None or value >= key.minimum)
+        )
+        if key.kind == "int"
+        else (isinstance(value, str) and bool(re.fullmatch(key.pattern, value)))
+    )
+    if not valid:
+        raise ProductError(category="identity", code="internal_object")
+    return value
+
+
+def normalize(field: Field, raw: Any, *, input_value: bool = False) -> Any:
+    """Validate native public values; clients decode their wire values first."""
+    invalid = ProductError(
+        category="argument" if input_value else "response",
+        code="invalid_field" if input_value else "schema",
+        fields=[field.name],
+    )
+    if raw is None and not input_value:
+        return "" if field.kind == "ref" else None
+    if field.kind in ("str", "choice", "ref", "secret"):
+        if not isinstance(raw, str) or len(raw) > field.limit:
+            raise invalid
+        if field.kind == "secret" and not raw:
+            raise invalid
+        if field.pattern and not re.fullmatch(field.pattern, raw):
+            raise invalid
+        if field.choices and raw not in field.choices:
+            raise invalid
+        value = canonical(raw, field.canonical)
+        return field.normalizer(value) if field.normalizer else value
+    if field.kind == "bool" and isinstance(raw, bool):
+        return raw
+    if field.kind == "int" and isinstance(raw, int) and not isinstance(raw, bool):
+        return raw
+    if field.kind in ("set", "names"):
+        if not isinstance(raw, list) or len(raw) > 256:
+            raise invalid
+        if input_value and len(raw) < field.minimum_items:
+            raise invalid
+        if any(not isinstance(v, str) or not 0 < len(v) <= 150 for v in raw):
+            raise invalid
+        if field.pattern and any(not re.fullmatch(field.pattern, v) for v in raw):
+            raise invalid
+        return list(dict.fromkeys(raw))
+    if field.kind == "map":
+        if not isinstance(raw, dict) or len(raw) > 256:
+            raise invalid
+        result = {}
+        for key, rights in raw.items():
+            if (
+                not isinstance(key, str)
+                or not 0 < len(key) <= 150
+                or not isinstance(rights, list)
+            ):
+                raise invalid
+            if any(not isinstance(v, str) or v not in field.choices for v in rights):
+                raise invalid
+            result[key] = sorted(set(rights))
+        return result
+    raise invalid
+
+
+def equal(field: Field, current: Any, desired: Any) -> bool:
+    if field.kind in ("set", "names"):
+        return (
+            current is not MISSING
+            and current is not None
+            and set(current) == set(desired)
+        )
+    return bool(current == desired)
+
+
+class Engine:
+    """Plan one minimal write and recover by the declared lookup, never by retry."""
+
+    def __init__(self, module: Any, resource: Resource, client: Client) -> None:
+        self.module, self.resource, self.client = module, resource, client
+        self._reference_maps: dict[Reference, dict[str, str | int | None]] = {}
+        self.operation = "validate"
+        self.write_attempted = False
+        self.confirmed = False
+
+    def reference_map(self, ref: Reference) -> dict[str, str | int | None]:
+        if ref not in self._reference_maps:
+            mapping: dict[str, str | int | None] = {}
+            for row in self.client.list(ref):
+                name = row.get(ref.key)
+                if not isinstance(name, str):
+                    raise ProductError(category="response", code="schema")
+                name = canonical(name, ref.canonical)
+                value = identifier(ref.identifier, row.get(ref.identifier.name))
+                mapping[name] = None if name in mapping else value
+            self._reference_maps[ref] = mapping
+        return self._reference_maps[ref]
+
+    def reference_id(self, field: Field, name: str) -> str | int:
+        ref = field.reference
+        if ref is None:
+            raise ValueError("Field has no reference")
+        mapping = self.reference_map(ref)
+        name = canonical(name, ref.canonical)
+        if name not in mapping:
+            raise ProductError(
+                category="reference", code="not_found", fields=[field.name]
+            )
+        value = mapping[name]
+        if value is None:
+            raise ProductError(
+                category="reference", code="ambiguous", fields=[field.name]
+            )
+        return value
+
+    def reference_names(self, field: Field, value: Any) -> Any:
+        ref = field.reference
+        if ref is None:
+            return value
+        if field.kind == "ref" and value is None:
+            return ""
+        reverse = {v: k for k, v in self.reference_map(ref).items() if v is not None}
+
+        def name(item: Any) -> str:
+            key = identifier(ref.identifier, item)
+            if key not in reverse:
+                raise ProductError(
+                    category="reference", code="not_found", fields=[field.name]
+                )
+            return reverse[key]
+
+        if field.kind == "ref":
+            return name(value)
+        if field.kind == "map" and isinstance(value, dict):
+            return {
+                name(int(k) if ref.identifier.kind == "int" and k.isdecimal() else k): v
+                for k, v in value.items()
+            }
+        if isinstance(value, list):
+            return [name(item) for item in value]
+        raise ProductError(category="response", code="schema", fields=[field.name])
+
+    def matches(self, record: dict[str, Any], ident: dict[str, str]) -> bool:
+        for key in self.resource.keys:
+            value = record.get(key.name)
+            if not isinstance(value, str):
+                raise ProductError(category="response", code="schema")
+            if canonical(value, key.canonical) != canonical(
+                ident[key.name], key.canonical
+            ):
+                return False
+        return True
+
+    def project(self, record: dict[str, Any]) -> dict[str, Any]:
+        resource = self.resource
+        public = {
+            resource.identifier.name: identifier(
+                resource.identifier, record.get(resource.identifier.name)
+            )
+        }
+        for key in resource.keys:
+            value = record.get(key.name)
+            if not isinstance(value, str) or not re.fullmatch(key.pattern, value):
+                raise ProductError(category="response", code="schema")
+            public[key.name] = value
+        for field in resource.fields:
+            if field.kind == "secret":
+                continue
+            wire = (
+                field.reference.wire
+                if field.reference and field.reference.wire
+                else field.name
+            )
+            if wire not in record:
+                raise ProductError(
+                    category="response", code="schema", fields=[field.name]
+                )
+            value = self.client.decode(field, record[wire])
+            if field.reference is not None:
+                value = self.reference_names(field, value)
+            public[field.name] = normalize(field, value)
+        return public
+
+    def find(self, ident: dict[str, str]) -> dict[str, Any] | None:
+        resource = self.resource
+        if resource.permission_probe:
+            self.client.probe(resource.permission_probe)
+        if resource.lookup == "by_key":
+            record = self.client.lookup(resource, ident)
+        elif resource.lookup == "listing":
+            matches = [
+                row
+                for row in self.client.list(resource)
+                if not any(row.get(k) == v for k, v in resource.exclude_rows)
+                and self.matches(row, ident)
+            ]
+            if len(matches) > 1:
+                raise ProductError(category="identity", code="ambiguous")
+            if not matches:
+                return None
+            value = identifier(
+                resource.identifier, matches[0].get(resource.identifier.name)
+            )
+            record = self.client.get(resource, value)
+            if record is None:
+                raise ProductError(category="verification", code="not_persisted")
+            if record.get(resource.identifier.name) != value:
+                raise ProductError(category="response", code="schema")
+        else:
+            raise ValueError("Unknown lookup strategy")
+        if record is None:
+            return None
+        value = identifier(resource.identifier, record.get(resource.identifier.name))
+        if value in resource.protected_ids:
+            raise ProductError(category="eligibility", code="internal_object")
+        if not self.matches(record, ident):
+            raise ProductError(category="verification", code="not_persisted")
+        return record
+
+    def payload(
+        self, values: dict[str, Any], ident: dict[str, str] | None = None
+    ) -> dict[str, Any]:
+        body: dict[str, Any] = dict(ident or {})
+        for key, value in values.items():
+            field = self.resource.get_field(key)
+            wire = (
+                field.reference.wire
+                if field.reference and field.reference.wire
+                else key
+            )
+            if field.reference is not None:
+                if field.kind == "ref":
+                    value = self.reference_id(field, value) if value else None
+                elif field.kind == "map":
+                    value = {
+                        self.reference_id(field, name): rights
+                        for name, rights in value.items()
+                    }
+                else:
+                    value = [self.reference_id(field, name) for name in value]
+            body[wire] = self.client.encode(field, value)
+        return body
+
+    def verify(
+        self, record: dict[str, Any] | None, desired: dict[str, Any], absent: bool
+    ) -> None:
+        if absent:
+            if record is not None:
+                raise ProductError(category="verification", code="still_present")
+            return
+        if record is None:
+            raise ProductError(category="verification", code="missing_after_write")
+        current = self.project(record)
+        mismatch = [
+            key
+            for key, value in desired.items()
+            if self.resource.get_field(key).kind != "secret"
+            and not equal(
+                self.resource.get_field(key), current.get(key, MISSING), value
+            )
+        ]
+        if mismatch:
+            raise ProductError(
+                category="verification", code="not_persisted", fields=sorted(mismatch)
+            )
+
+    def run(self) -> dict[str, Any]:
+        params, resource = self.module.params, self.resource
+        ident = {
+            key.name: canonical(params[key.name], "lower")
+            if key.canonical == "lower"
+            else params[key.name]
+            for key in resource.keys
+        }
+        if any(not re.fullmatch(k.pattern, ident[k.name]) for k in resource.keys):
+            raise ProductError(
+                code="validation_failed", fields=[k.name for k in resource.keys]
+            )
+        desired = {
+            field.name: normalize(field, params[field.name], input_value=True)
+            for field in resource.fields
+            if params.get(field.name) is not None
+        }
+        self.operation = "find"
+        found = self.find(ident)
+        current = self.project(found) if found else {}
+        absent = params["state"] == "absent"
+        if found is not None and params.get("update_password") == "on_create":
+            desired = {
+                k: v
+                for k, v in desired.items()
+                if resource.get_field(k).kind != "secret"
+            }
+        for field, prerequisite, value in resource.prerequisites:
+            if (
+                not absent
+                and desired.get(field)
+                and value
+                not in desired.get(prerequisite, current.get(prerequisite, []))
+            ):
+                raise ProductError(
+                    category="argument",
+                    code="invalid_field",
+                    fields=[field, prerequisite],
+                )
+        if found and not absent:
+            for key in resource.keys:
+                linked = key.follows_field
+                if (
+                    linked
+                    and linked in desired
+                    and current.get(linked) == found[key.name]
+                    and desired[linked] != current[linked]
+                ):
+                    raise ProductError(
+                        category="argument", code="invalid_identity", fields=[linked]
+                    )
+        if absent and found is not None:
+            for guard in resource.refuse_delete_when:
+                refs = found.get(guard.field)
+                if not isinstance(refs, list):
+                    raise ProductError(category="response", code="schema")
+                for value in refs:
+                    record = self.client.get(guard, identifier(guard.identifier, value))
+                    if record is None:
+                        continue
+                    if guard.foreign_key not in record:
+                        raise ProductError(category="response", code="schema")
+                    if record[guard.foreign_key] == found[resource.identifier.name]:
+                        raise ProductError(category="eligibility", code="referenced")
+        self.operation = "references"
+        if not absent:
+            self.payload(desired)
+        delta = (
+            {}
+            if absent
+            else {
+                k: v
+                for k, v in desired.items()
+                if resource.get_field(k).kind == "secret"
+                or not equal(resource.get_field(k), current.get(k, MISSING), v)
+            }
+        )
+        changed = found is not None if absent else found is None or bool(delta)
+        result: dict[str, Any] = {
+            "changed": changed,
+            "changed_fields": sorted(delta) if found is not None and not absent else [],
+            "verified": "predicted" if self.module.check_mode else "observed",
+        }
+        public_delta = {
+            k: v for k, v in delta.items() if resource.get_field(k).kind != "secret"
+        }
+        if self.module._diff and changed:
+            before = (
+                current
+                if absent
+                else {k: current[k] for k in public_delta if k in current}
+            )
+            result["diff"] = {"before": before, "after": {} if absent else public_delta}
+        if changed:
+            self.operation = "compatibility"
+            _compat.check(
+                self.module, self.client, f"{resource.name}:{params['state']}"
+            )
+        if self.module.check_mode or not changed:
+            result[resource.result_key] = (
+                None if absent else {**ident, **current, **public_delta}
+            )
+            return result
+        target = found[resource.identifier.name] if found else None
+        self.operation = "delete" if absent else "create" if found is None else "update"
+        self.write_attempted = True
+        secret_write = any(resource.get_field(k).kind == "secret" for k in delta)
+        try:
+            if absent:
+                self.client.delete(resource, target)
+            elif found is None:
+                self.client.create(resource, self.payload(delta, ident))
+            else:
+                self.client.update(resource, target, self.payload(delta))
+        except errors.ApiError as failure:
+            self.operation = "reconcile"
+            observed = self.find(ident)
+            public = self.project(observed) if observed else {}
+            if failure.category not in ("transport", "timeout", "response"):
+                if not secret_write and public == current:
+                    self.write_attempted = False
+                elif public != current:
+                    self.confirmed = True
+                raise
+            self.verify(observed, desired, absent)
+            if secret_write:
+                raise ProductError(
+                    category="verification", code="create_unknown"
+                ) from None
+        else:
+            self.operation = "verify"
+            observed = self.find(ident)
+            self.verify(observed, desired, absent)
+        self.confirmed = True
+        result[resource.result_key] = self.project(observed) if observed else None
+        if secret_write:
+            result["verified"] = "unverifiable"
+        return result
+
+
+def run_resource(module: Any, resource: Resource) -> None:
+    """One sanitized operational catch boundary after real argument parsing."""
+    engine = None
+    try:
+        engine = Engine(module, resource, Client(module.params))
+        result = engine.run()
+    except errors.ApiError as failure:
+        attempted = engine is not None and engine.write_attempted
+        confirmed = engine is not None and engine.confirmed
+        fields: dict[str, Any] = {
+            "operation": engine.operation if engine else "connect",
+            "resource": resource.name,
+        }
+        if isinstance(failure, ProductError) and failure.fields:
+            fields["fields"] = failure.fields
+        errors.fail_from(
+            module,
+            failure,
+            schema=SCHEMA,
+            msg="Resource reconciliation failed; see error_category and error_code",
+            changed=attempted,
+            outcome="changed" if confirmed else "unknown" if attempted else "unchanged",
+            fields=fields,
+        )
+    else:
+        module.exit_json(**result)

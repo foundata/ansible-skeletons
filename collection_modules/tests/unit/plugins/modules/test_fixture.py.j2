@@ -1,0 +1,165 @@
+"""REST-only identities, relationships, guards and password contracts."""
+# FIXME Replace these fixture cases with qualified product behaviour.
+
+from __future__ import annotations
+
+import json
+from dataclasses import replace
+
+import pytest
+
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._definitions import (
+    FIXTURE,
+)
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.modules import (
+    fixture,
+)
+
+from ..conftest import RunModule
+from ..fake_product import OLD_SECRET, SECRET, FakeProduct, Response, lost_response
+from .test_contract import entry
+
+
+def test_by_name_case_and_normalisation(
+    fake: FakeProduct, run_module: RunModule
+) -> None:
+    created = run_module(fixture.main, name="Example", value=" READY ")
+    assert isinstance(created["fixture"]["id"], int)
+    assert not isinstance(created["fixture"]["id"], bool)
+    assert created["fixture"]["value"] == "ready"
+    assert not run_module(fixture.main, name="EXAMPLE", value="ready")["changed"]
+    assert not any("?page=" in path for _method, path, _body in fake.requests)
+
+
+@pytest.mark.parametrize("status", [200, 204, 404])
+@pytest.mark.parametrize("guard", [False, True])
+def test_absence_requires_the_documented_status(
+    fake: FakeProduct, run_module: RunModule, status: int, guard: bool
+) -> None:
+    route = "/fixtures/by-name/example"
+    if guard:
+        fake.add(dependent_ids=[5])
+        route = "/dependents/5"
+    fake.faults[route] = lambda: Response(status, None)
+    result = run_module(
+        fixture.main,
+        name="example",
+        state="absent" if guard else "present",
+        _ansible_check_mode=True,
+    )
+    assert not fake.writes()
+    if status == 404:
+        assert not result.get("failed") and result["changed"]
+    else:
+        assert result["failed"] and result["error_code"] == "schema"
+
+
+def test_reference_resolution_and_null_projection(
+    fake: FakeProduct, run_module: RunModule
+) -> None:
+    result = run_module(fixture.main, name="example", parent="parent")
+    assert result["fixture"]["parent"] == "parent"
+    assert fake.rows[result["fixture"]["id"]]["parent_id"] == 1
+    assert not run_module(fixture.main, name="example", parent=None)["changed"]
+    assert (
+        run_module(fixture.main, name="example", parent="")["fixture"]["parent"] == ""
+    )
+
+
+@pytest.mark.parametrize("duplicate", [False, True])
+def test_bad_reference_refuses_write(
+    fake: FakeProduct, run_module: RunModule, duplicate: bool
+) -> None:
+    if duplicate:
+        fake.parents[2] = {"id": 2, "name": "parent"}
+    result = run_module(
+        fixture.main, name="example", parent="parent" if duplicate else "missing"
+    )
+    assert result["error_category"] == "reference" and not fake.writes()
+
+
+@pytest.mark.parametrize("check", [False, True])
+def test_live_delete_guard_and_stale_reference(
+    fake: FakeProduct, run_module: RunModule, check: bool
+) -> None:
+    key = fake.add(dependent_ids=[5])
+    fake.dependents[5] = {"id": 5, "fixture_id": key}
+    result = run_module(
+        fixture.main, name="example", state="absent", _ansible_check_mode=check
+    )
+    assert result["error_code"] == "referenced" and not fake.writes()
+    fake.dependents.clear()
+    result = run_module(
+        fixture.main, name="example", state="absent", _ansible_check_mode=check
+    )
+    assert result["changed"] and not result.get("failed")
+
+
+def test_protected_ids_and_prerequisites(
+    fake: FakeProduct, run_module: RunModule
+) -> None:
+    key = fake.add()
+    result = run_module(
+        entry(replace(FIXTURE, protected_ids=(key,))), name="example", value="new"
+    )
+    assert result["error_code"] == "internal_object" and not fake.writes()
+    definition = replace(FIXTURE, prerequisites=(("parent", "labels", "linked"),))
+    result = run_module(
+        entry(definition), name="example", parent="parent", _ansible_check_mode=True
+    )
+    assert result["error_code"] == "invalid_field" and not fake.writes()
+    assert run_module(
+        entry(definition), name="example", parent="parent", labels=["linked"]
+    )["changed"]
+
+
+def test_write_only_password_policy(fake: FakeProduct, run_module: RunModule) -> None:
+    secret = "SYNTHETIC-password-rotation"
+    created = run_module(
+        fixture.main, name="example", password=secret, _ansible_diff=True
+    )
+    assert created["verified"] == "unverifiable"
+    key = created["fixture"]["id"]
+    assert fake.passwords[key] == secret
+    assert not run_module(fixture.main, name="example", password="SYNTHETIC-ignored")[
+        "changed"
+    ]
+    assert fake.passwords[key] == secret
+    rotated = run_module(
+        fixture.main,
+        name="example",
+        password=secret,
+        update_password="always",
+        _ansible_diff=True,
+    )
+    assert rotated["changed_fields"] == ["password"]
+    for result in (created, rotated):
+        registered = result.pop("_ansible_new_secrets", [])
+        assert set(registered) <= {SECRET, "SYNTHETIC-key", secret}
+        assert all(
+            value not in json.dumps(result) for value in (OLD_SECRET, SECRET, secret)
+        )
+        assert "password" not in result["fixture"]
+        assert "password" not in result["diff"]["after"]
+
+
+def test_lost_secret_write_cannot_be_verified(
+    fake: FakeProduct, run_module: RunModule
+) -> None:
+    fake.lose_next("create", lost_response)
+    result = run_module(fixture.main, name="example", password="SYNTHETIC-unreadable")
+    assert result["failed"] and result["outcome"] == "unknown"
+    assert len(fake.writes()) == 1
+
+
+def test_patch_and_bodyless_validation(
+    fake: FakeProduct, run_module: RunModule
+) -> None:
+    fake.add(value="first")
+    resource = replace(FIXTURE, actions=replace(FIXTURE.actions, set="PATCH"))
+    result = run_module(entry(resource), name="example", value="new")
+    assert result["changed"] and fake.writes()[-1][0] == "PATCH"
+    result = run_module(fixture.main, name="example", value="INVALID")
+    assert (
+        result["error_code"] == "validation_failed" and result["outcome"] == "unchanged"
+    )

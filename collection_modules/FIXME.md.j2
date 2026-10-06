@@ -1,0 +1,22 @@
+# Adapt this collection
+
+- Check licensing and metadata in `REUSE.toml`, `galaxy.yml` and the README's
+  licensing and author sections.
+- Check collection dependencies in `galaxy.yml`, Python packages in
+  `requirements.txt` and the README's prerequisites. Remove `requirements.txt`
+  if no additional packages are needed.
+- Check `tests/config.yml` and run the checks in `DEVELOPMENT.md`.
+- Replace the fixture definition, modules and tests with a researched resource.
+  The fixture uses REST with integer identifiers, by-name 404 absence,
+  native JSON and immediate writes. Replace the client, fake transport and
+  fake server from product evidence; keep the shared lifecycle.
+- The shared `_activation.py` is unused here. Add a scope-named apply module
+  only where saved and active state differ, with compare, apply and settle
+  probes.
+- Replace `!UNKNOWN` author handles in module documentation.
+- Adapt connection options, authentication, version probe, supported series and
+  evidence-backed exclusions.
+- Update the README contract, module table and compatibility evidence.
+- Implement the inventory extractor and fill `docs/architecture.md`.
+- Set the Molecule environment names and action-group members for the product.
+- Adapt the changelog, then remove this checklist.

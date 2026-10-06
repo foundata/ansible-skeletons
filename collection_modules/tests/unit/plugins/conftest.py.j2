@@ -1,0 +1,43 @@
+"""Generic runner over the real Ansible parser; the fake owns connection defaults."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any, Callable
+
+import pytest
+from ansible.module_utils import basic
+
+from .fake_product import connection, fake
+
+__all__ = ("RunModule", "connection", "fake")
+
+RunModule = Callable[..., dict[str, Any]]
+
+
+@pytest.fixture
+def run_module(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    connection: dict[str, Any],
+) -> RunModule:
+    def runner(main: Callable[[], None], **args: Any) -> dict[str, Any]:
+        params = {
+            **connection,
+            "_ansible_remote_tmp": str(tmp_path),
+            "_ansible_keep_remote_files": False,
+            "_ansible_tracebacks_for": ["error"],
+            **args,
+        }
+        monkeypatch.setattr(
+            basic, "_ANSIBLE_ARGS", json.dumps({"ANSIBLE_MODULE_ARGS": params}).encode()
+        )
+        if hasattr(basic, "_ANSIBLE_PROFILE"):
+            monkeypatch.setattr(basic, "_ANSIBLE_PROFILE", "legacy")
+        with pytest.raises(SystemExit):
+            main()
+        return json.loads(capsys.readouterr().out)
+
+    return runner

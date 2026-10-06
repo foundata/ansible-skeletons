@@ -1,0 +1,33 @@
+# FIXME Keep bounded teardown when replacing the protocol fixture.
+---
+- name: "Stop the fake product"
+  ansible.builtin.uri:
+    url: "{% raw %}{{ fixture_fake_connection['url'] }}{% endraw %}/shutdown"
+    method: "POST"
+    force_basic_auth: true
+    url_password: "SYNTHETIC-SECRET"
+    url_username: "SYNTHETIC-KEY"
+    use_proxy: false
+
+- name: "Wait for the fake product to exit"
+  ansible.builtin.async_status:
+    jid: "{% raw %}{{ __fixture_fake_job['ansible_job_id'] }}{% endraw %}"
+  vars:
+    ansible_async_dir: "{% raw %}{{ __fixture_fake_state['path'] }}{% endraw %}/async"
+  until:
+    - __fixture_fake_finished['finished']
+  retries: 10
+  delay: 1
+  register: __fixture_fake_finished
+
+- name: "Remove the async status"
+  ansible.builtin.async_status:
+    jid: "{% raw %}{{ __fixture_fake_job['ansible_job_id'] }}{% endraw %}"
+    mode: "cleanup"
+  vars:
+    ansible_async_dir: "{% raw %}{{ __fixture_fake_state['path'] }}{% endraw %}/async"
+
+- name: "Remove fake product state"
+  ansible.builtin.file:
+    path: "{% raw %}{{ __fixture_fake_state['path'] }}{% endraw %}"
+    state: "absent"

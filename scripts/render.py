@@ -8,6 +8,8 @@ from pathlib import Path
 
 from scripts.common import ROOT, GateError, isolated_environment, run, write_json
 
+MODULE_PROFILES = ("collection_modules_grid", "collection_modules")
+
 
 @dataclass(frozen=True)
 class Rendered:
@@ -39,7 +41,7 @@ def render(
         if not re.fullmatch(r"[a-z][a-z0-9_]*", name):
             raise GateError(f"Invalid resource name: {name!r}")
     source, output = source.resolve(), output.resolve()
-    if profile not in ("collection_default", "collection_modules_grid"):
+    if profile not in ("collection_default", *MODULE_PROFILES):
         raise GateError(f"Unknown collection profile: {profile}")
     for skeleton in ("role_default", profile):
         if not (source / skeleton).is_dir():
@@ -127,7 +129,7 @@ def main() -> int:
     parser.add_argument("--defaults", action="store_true")
     parser.add_argument(
         "--profile",
-        choices=["collection_default", "collection_modules_grid"],
+        choices=["collection_default", *MODULE_PROFILES],
         default="collection_default",
     )
     args = parser.parse_args()

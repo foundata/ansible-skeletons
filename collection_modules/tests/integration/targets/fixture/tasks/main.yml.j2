@@ -1,0 +1,165 @@
+# FIXME Replace this lifecycle with the first real resource's assertions.
+---
+- name: "Exercise the fixture lifecycle"
+  module_defaults:
+    group/{{ namespace }}.{{ collection_name }}.api: "{% raw %}{{ fixture_fake_connection }}{% endraw %}"
+  block:
+    - name: "Predict creation"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        name: "integration_fixture"
+        value: "first"
+      check_mode: true
+      register: __fixture_prediction
+
+    - name: "Confirm prediction"
+      ansible.builtin.assert:
+        that:
+          - __fixture_prediction is ansible.builtin.changed
+          - __fixture_prediction['verified'] == 'predicted'
+          - __fixture_prediction['fixture']['id'] is not ansible.builtin.defined
+
+    - name: "Create the fixture"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        name: "integration_fixture"
+        value: "first"
+      register: __fixture_created
+
+    - name: "Repeat creation"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        name: "integration_fixture"
+        value: "first"
+      register: __fixture_repeated
+
+    - name: "Update with a diff"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        name: "integration_fixture"
+        value: "second"
+      diff: true
+      register: __fixture_updated
+
+    - name: "Confirm saved changes and rerun"
+      ansible.builtin.assert:
+        that:
+          - __fixture_created is ansible.builtin.changed
+          - __fixture_created['verified'] == 'observed'
+          - __fixture_repeated is not ansible.builtin.changed
+          - __fixture_updated['changed_fields'] == ['value']
+          - __fixture_updated['diff']['before']['value'] == 'first'
+          - __fixture_updated['fixture']['value'] == 'second'
+          - __fixture_updated['fixture']['password'] is not ansible.builtin.defined
+
+    - name: "Submit invalid input"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        name: "integration_fixture"
+        value: "INVALID"
+      ignore_errors: true
+      register: __fixture_invalid
+
+    - name: "Try a wrong credential"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        name: "integration_fixture"
+        api_secret: "WRONG-SYNTHETIC-SECRET"
+      ignore_errors: true
+      register: __fixture_denied
+
+    - name: "Confirm safe failures"
+      ansible.builtin.assert:
+        that:
+          - __fixture_invalid is ansible.builtin.failed
+          - not __fixture_invalid['changed']
+          - __fixture_invalid['outcome'] == 'unchanged'
+          - __fixture_denied is ansible.builtin.failed
+          - __fixture_denied['error_category'] == 'auth'
+
+    - name: "Resolve a parent and rotate a write-only password"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        name: "INTEGRATION_FIXTURE"
+        parent: "parent"
+        password: "SYNTHETIC-REST-password"
+        update_password: "always"
+      register: __fixture_secret
+      no_log: true
+
+    - name: "Check the independent password acceptance probe"
+      ansible.builtin.uri:
+        url: "{% raw %}{{ fixture_fake_connection['url'] }}{% endraw %}/credentials/{% raw %}{{ __fixture_created['fixture']['id'] }}{% endraw %}"
+        method: "POST"
+        body:
+          password: "SYNTHETIC-REST-password"
+        body_format: "json"
+        force_basic_auth: true
+        return_content: true
+        url_password: "{% raw %}{{ fixture_fake_connection['api_secret'] }}{% endraw %}"
+        url_username: "{% raw %}{{ fixture_fake_connection['api_key'] }}{% endraw %}"
+      register: __fixture_acceptance
+      no_log: true
+
+    - name: "Confirm the public relationship and secret contract"
+      ansible.builtin.assert:
+        that:
+          - __fixture_secret['fixture']['parent'] == 'parent'
+          - __fixture_secret['verified'] == 'unverifiable'
+          - (__fixture_acceptance['content'] | ansible.builtin.from_json)['accepted']
+      no_log: true
+
+    - name: "Create a fixture dependency"
+      ansible.builtin.uri:
+        url: "{% raw %}{{ fixture_fake_connection['url'] }}{% endraw %}/dependents"
+        method: "POST"
+        body:
+          fixture_id: "{% raw %}{{ __fixture_created['fixture']['id'] }}{% endraw %}"
+        body_format: "json"
+        force_basic_auth: true
+        return_content: true
+        status_code: 201
+        url_password: "{% raw %}{{ fixture_fake_connection['api_secret'] }}{% endraw %}"
+        url_username: "{% raw %}{{ fixture_fake_connection['api_key'] }}{% endraw %}"
+      register: __fixture_dependency
+      no_log: true
+
+    - name: "Refuse deletion while referenced"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        name: "integration_fixture"
+        state: "absent"
+      ignore_errors: true
+      register: __fixture_guarded
+
+    - name: "Confirm the deletion guard"
+      ansible.builtin.assert:
+        that:
+          - __fixture_guarded is ansible.builtin.failed
+          - __fixture_guarded['error_code'] == 'referenced'
+          - not __fixture_guarded['changed']
+
+    - name: "Remove the fixture dependency"
+      ansible.builtin.uri:
+        url: "{% raw %}{{ fixture_fake_connection['url'] }}{% endraw %}/dependents/{% raw %}{{ (__fixture_dependency['content'] | ansible.builtin.from_json)['id'] }}{% endraw %}"
+        method: "DELETE"
+        force_basic_auth: true
+        url_password: "{% raw %}{{ fixture_fake_connection['api_secret'] }}{% endraw %}"
+        url_username: "{% raw %}{{ fixture_fake_connection['api_key'] }}{% endraw %}"
+      no_log: true
+
+    - name: "Delete the fixture"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        name: "integration_fixture"
+        state: "absent"
+      register: __fixture_deleted
+
+    - name: "Repeat deletion"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        name: "integration_fixture"
+        state: "absent"
+      register: __fixture_absent
+
+    - name: "Confirm absence"
+      ansible.builtin.assert:
+        that:
+          - __fixture_deleted is ansible.builtin.changed
+          - __fixture_deleted['fixture'] is ansible.builtin.none
+          - __fixture_absent is not ansible.builtin.changed
+  always:
+    - name: "Stop the fake endpoint"
+      ansible.builtin.include_role:
+        name: "setup_fixture_fake"
+        tasks_from: "stop"

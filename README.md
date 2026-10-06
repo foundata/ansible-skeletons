@@ -44,6 +44,7 @@ The skeletons follow these style guides:
 - [Description of provided skeletons](#content)
   - [`collection_default`](#collection_default)
   - [`collection_modules_grid`](#collection_modules_grid)
+  - [`collection_modules`](#collection_modules)
   - [`role_default`](#role_default)
 - [Compatibility](#compatibility)
 - [Contributing](#contributing)
@@ -193,8 +194,8 @@ scenario. It contains no deployment role.
 
 Its fixture speaks a grid API with UUID identifiers, paginated `search_item`
 listings with a declared total, `add_item`, `set_item` and `del_item` actions,
-string-encoded values and fixed response envelopes. A REST product replaces
-the client, the fake server and the identifier type.
+string-encoded values and fixed response envelopes. For REST products, use
+`collection_modules` below.
 
 Render with the metadata from the usage example and the product's display name:
 
@@ -209,6 +210,28 @@ ansible-galaxy collection init \
 `version` defaults to `1.0.0`; the core floor defaults to `2.19.0`.
 The fixture imports the currently unpublished `foundata.utils >=1.0.0`.
 Follow the rendered `FIXME.md` to adapt the fixture.
+
+
+### `collection_modules`<a id="collection_modules"></a>
+
+The REST fixture uses server-assigned integer identifiers, case-insensitive
+names, by-key 404 absence, empty-page pagination, native JSON and
+POST/PUT-or-PATCH/DELETE writes that take effect immediately.
+
+It includes a replaceable resource and info module, references, a write-only
+password and a deletion guard; no apply module. Its lifecycle, test runner and
+research scaffolds are byte-identical to the grid variant, enforced by tests.
+
+```sh
+ansible-galaxy collection init \
+  --collection-skeleton ./collection_modules \
+  --extra-vars @metadata.json \
+  --extra-vars "skeleton_revision=$(git describe --tags --always)" \
+  --extra-vars '{"product": "Example REST Product"}' namespace.product
+```
+
+The metadata defaults and `foundata.utils` prerequisite are the same as above.
+Follow the rendered `FIXME.md` to replace the fixture with product evidence.
 
 
 ### `role_default`<a id="role_default"></a>

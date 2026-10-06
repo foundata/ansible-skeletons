@@ -1,0 +1,69 @@
+# Architecture and rationale
+
+FIXME Replace these questions with decisions and evidence for
+{{ product | default('Example Product') }} in `{{ namespace }}.{{ collection_name }}`.
+
+Skeleton revision:
+`{{ skeleton_revision | default('unknown; record the skeleton commit or tag') }}`.
+Sources inspected: FIXME guide and utility revisions, specification dialect, API
+version, stable release, edition, channel, source tag, retrieval date and
+content hash. Keep session timing and adaptation measurements in the research
+record, not this maintained architecture document.
+
+Evidence labels: **D** documented, **S** read in matching release source,
+**I** inferred (name the premises), **unknown** (name the next experiment).
+Use **spike-tested** or **integration-tested** only with linked evidence.
+The fixture is source-defined test material, not product qualification.
+
+## Decision sheet
+
+|         Decision          |                            Contract and rationale                            | Evidence and next experiment |
+| ------------------------- | ---------------------------------------------------------------------------- | ---------------------------- |
+| Deployment ownership      | Configure only; caller supplies endpoint, credentials and trust              | FIXME qualify installation and bootstrap boundaries |
+| Transport and privilege   | HTTP on the execution host                                                   | FIXME authentication and permission probes |
+| Identity and refused rows | Definition-owned identifier, natural key, case rule and exclusions           | FIXME uniqueness, rename and built-in objects |
+| Absence                   | Definition selects documented by-key absence or verified complete listing    | FIXME absence response and pagination end rule |
+| Field ownership           | Declared fields; omission/null unmanaged; explicit clears                    | FIXME defaults, normalisation and partial update |
+| References                | Names resolved before writing; null foreign keys project as empty references | FIXME ambiguity and relationship ownership |
+| Activation                | Add an apply module only where saved and active state differ                 | FIXME scope, completion and observable active state |
+| Writer coordination       | Caller serializes writers; no lock promised                                  | FIXME conflicts, atomicity and partial recovery |
+| Secrets                   | Public allowlist; write-only fields need an explicit rotation contract       | FIXME listings, read-back and independent acceptance probe |
+| Version probe             | Cached read before a planned mutation, including check prediction            | FIXME version privilege, series and operation exclusions |
+| Lab                       | External endpoint in Molecule; loopback fake in integration                  | FIXME full lifecycle and cleanup evidence |
+
+## Research record
+
+|                      Dimension                       | Decision and rationale | Evidence, label and date | Remaining experiment |
+| ---------------------------------------------------- | ---------------------- | ------------------------ | -------------------- |
+| Stores, editing boundary, precedence and ownership   | FIXME                  | unknown                  | FIXME                |
+| Surfaces, descriptions, authentication and coverage  | FIXME                  | unknown                  | FIXME                |
+| Identity, rename and collection structure            | FIXME                  | unknown                  | FIXME                |
+| Granularity, omission, null and validation           | FIXME                  | unknown                  | FIXME                |
+| Conflicts, atomicity and deletion                    | FIXME                  | unknown                  | FIXME                |
+| Activation, completion, observation and reachability | FIXME                  | unknown                  | FIXME                |
+| Secrets and rotation                                 | FIXME                  | unknown                  | FIXME                |
+| Bootstrap and first-run detection                    | FIXME                  | unknown                  | FIXME                |
+| Version identity, stability and extensions           | FIXME                  | unknown                  | FIXME                |
+| Existing automation and lab qualification            | FIXME                  | unknown                  | FIXME                |
+
+Representative trace: FIXME link identity lookup, supplied and omitted fields,
+validation, persistence, secrets, activation if present, and lost-response
+recovery. State the protocol and replacements for the client, fake transport,
+fake server, definitions and identifier type.
+
+The product owns its engine and definitions. `foundata.utils` owns byte
+transport, deadlines, JSON decoding and safe error translation. Inventory is
+development-only. The core floor is 2.19 because shared playbooks use FQCN Jinja
+builtins; payload Python remains 3.9.
+
+## Resources
+
+| Resource |             Kind              | Identity | Ownership |     Activation      | Selection rationale |
+| -------- | ----------------------------- | -------- | --------- | ------------------- | ------------------- |
+| FIXME    | resource, info or operational | FIXME    | FIXME     | none or named scope | FIXME               |
+
+Further resources: select from the inventory, naming unresolved identity,
+ownership or activation questions. Move planned work to issues at publication.
+
+Skeleton adaptations: FIXME record product-specific changes; keep the shared
+lifecycle, harness and research scaffolds unless evidence requires a change.

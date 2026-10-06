@@ -1,0 +1,15 @@
+# FIXME Assert the real product's saved and effective state independently.
+---
+- name: "Verify fixture state"
+  module_defaults:
+    group/{{ namespace }}.{{ collection_name }}.api: "{% raw %}{{ product_connection }}{% endraw %}"
+  block:
+    - name: "Read the saved fixture"
+      {{ namespace }}.{{ collection_name }}.fixture_info:
+        name: "molecule_fixture_example"
+      register: __testing_fixture_saved
+
+    - name: "Assert observed state"
+      ansible.builtin.assert:
+        that:
+          - __testing_fixture_saved['fixture']['value'] == 'ready'

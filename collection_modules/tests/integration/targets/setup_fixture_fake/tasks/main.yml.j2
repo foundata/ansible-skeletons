@@ -1,0 +1,47 @@
+# FIXME Replace the fake endpoint with the product's file-only protocol fixture.
+---
+- name: "Create the fake product state directory"
+  ansible.builtin.tempfile:
+    state: "directory"
+    suffix: "-{{ namespace }}-{{ collection_name }}"
+  register: __fixture_fake_state
+
+- name: "Write synthetic credentials"
+  ansible.builtin.copy:
+    content: "SYNTHETIC-KEY:SYNTHETIC-SECRET"
+    dest: "{% raw %}{{ __fixture_fake_state['path'] }}{% endraw %}/credentials"
+    mode: "u=rw,g=,o=" # 0600
+
+- name: "Start the fake product"
+  ansible.builtin.command:
+    argv:
+      - "{% raw %}{{ ansible_python_interpreter }}{% endraw %}"
+      - "{% raw %}{{ role_path }}{% endraw %}/files/fake_product.py"
+      - "{% raw %}{{ __fixture_fake_state['path'] }}{% endraw %}"
+      - "120"
+  vars:
+    ansible_async_dir: "{% raw %}{{ __fixture_fake_state['path'] }}{% endraw %}/async"
+  async: 150
+  poll: 0
+  changed_when:
+    - false
+  register: __fixture_fake_job
+
+- name: "Wait for the fake product port"
+  ansible.builtin.wait_for:
+    path: "{% raw %}{{ __fixture_fake_state['path'] }}{% endraw %}/port"
+    timeout: 30
+
+- name: "Read the fake product port"
+  ansible.builtin.slurp:
+    src: "{% raw %}{{ __fixture_fake_state['path'] }}{% endraw %}/port"
+  register: __fixture_fake_port
+
+- name: "Publish the connection"
+  ansible.builtin.set_fact:
+    fixture_fake_connection:
+      url: "http://127.0.0.1:{% raw %}{{ __fixture_fake_port['content'] | ansible.builtin.b64decode }}{% endraw %}/api"
+      api_key: "SYNTHETIC-KEY"
+      api_secret: "SYNTHETIC-SECRET"
+      deadline: 30
+  no_log: true

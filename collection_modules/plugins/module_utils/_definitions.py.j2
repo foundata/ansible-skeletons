@@ -1,0 +1,54 @@
+"""Internal REST fixture contracts; replace with reviewed product definitions."""
+# FIXME Replace the invented family, relationships and guards with product evidence.
+
+from __future__ import annotations
+
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._engine import (
+    Actions,
+    DeletionGuard,
+    Field,
+    Key,
+    Reference,
+    Resource,
+)
+
+IDENTIFIER = Key("id", "Server-assigned positive integer", kind="int", minimum=1)
+
+FIXTURE = Resource(
+    name="fixture",
+    route="/fixtures",
+    identifier=IDENTIFIER,
+    lookup="by_key",
+    lookup_route="/fixtures/by-name/{name}",
+    absence_status=404,
+    actions=Actions(add="POST", set="PUT", delete="DELETE"),
+    keys=(
+        Key(
+            "name",
+            "Immutable name, ignoring case",
+            r"[A-Za-z][A-Za-z0-9_]{0,63}",
+            canonical="casefold",
+        ),
+    ),
+    fields=(
+        Field(
+            "value", "str", "Public value, trimmed and lowercased", canonical="lower"
+        ),
+        Field("enabled", "bool", "Whether enabled"),
+        Field("labels", "set", "Unordered public labels"),
+        Field(
+            "parent",
+            "ref",
+            "Parent name; empty clears",
+            reference=Reference("/parents", "name", IDENTIFIER, wire="parent_id"),
+        ),
+        Field(
+            "password", "secret", "Write-only password; controlled by update_password"
+        ),
+    ),
+    result_key="fixture",
+    permission_probe="/permissions",
+    refuse_delete_when=(
+        DeletionGuard("dependent_ids", "/dependents", "fixture_id", IDENTIFIER),
+    ),
+)

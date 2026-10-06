@@ -225,7 +225,8 @@ def test_generated_projects_have_no_repository_tooling(
         check_tree(ROOT / "collection_default", tmp_path)
 
 
-def test_skeleton_lint_configurations_stay_in_sync() -> None:
+@pytest.mark.parametrize("profile", ["collection_modules_grid", "collection_modules"])
+def test_skeleton_lint_configurations_stay_in_sync(profile: str) -> None:
     for name in (
         ".ansible-lint.j2",
         ".yamllint.j2",
@@ -266,7 +267,7 @@ def test_skeleton_lint_configurations_stay_in_sync() -> None:
         "tests/config.yml.j2",
     ):
         assert (ROOT / "collection_default" / name).read_bytes() == (
-            ROOT / "collection_modules_grid" / name
+            ROOT / profile / name
         ).read_bytes(), name
     # These static files only acquire a template suffix in the module skeleton.
     for name in (
@@ -274,7 +275,25 @@ def test_skeleton_lint_configurations_stay_in_sync() -> None:
         "changelogs/fragments/archive/.gitkeep",
     ):
         assert (ROOT / "collection_default" / name).read_bytes() == (
-            ROOT / "collection_modules_grid" / f"{name}.j2"
+            ROOT / profile / f"{name}.j2"
+        ).read_bytes(), name
+    for name in (
+        ".ansible-lint.j2",
+        ".mypy.ini.j2",
+        "ruff.toml.j2",
+        "antsibull-nox.toml.j2",
+        "noxfile.py.j2",
+        "galaxy.yml.j2",
+        "plugins/module_utils/_engine.py.j2",
+        "plugins/module_utils/_activation.py.j2",
+        "plugins/module_utils/_compat.py.j2",
+        "tests/unit/plugins/conftest.py.j2",
+        "tests/unit/plugins/modules/test_contract.py.j2",
+        "docs/architecture.md.j2",
+        "tools/inventory/extract.py.j2",
+    ):
+        assert (ROOT / "collection_modules_grid" / name).read_bytes() == (
+            ROOT / "collection_modules" / name
         ).read_bytes(), name
     for skeleton in ("role_default", "collection_default"):
         assert not (ROOT / skeleton / "pyproject.toml").exists()

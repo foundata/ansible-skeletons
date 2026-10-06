@@ -11,10 +11,17 @@ and the project adheres to
 
 ### Added
 
+- collection_modules: REST module skeleton derived from the Zammad lifecycle,
+  with a replaceable fixture, references and write-only password handling.
 - collection_modules_grid: an independent module-only skeleton with a grid-API
   fixture, a replaceable resource engine, API tests and research scaffolds.
 - checks: distinct-identity rendering and installed module checks for
-  collection_modules_grid; the full matrix includes its ansible-test lanes.
+  both module variants; the full matrix includes their ansible-test lanes.
+
+### Changed
+
+- collection_modules_grid: share the protocol-free lifecycle, activation
+  workflow, test runner and research scaffolds with the REST variant.
 
 ### Fixed
 

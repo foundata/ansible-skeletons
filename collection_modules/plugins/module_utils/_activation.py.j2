@@ -1,0 +1,140 @@
+"""Internal activation workflow of the ``*_apply`` modules; not a public interface.
+
+An activation module compares saved with loaded state for named objects,
+applies when they differ or when asked to, and verifies afterwards.
+"""
+
+from __future__ import annotations
+
+import re
+import time
+from typing import Any, Callable
+
+from ansible_collections.foundata.utils.plugins.module_utils import errors
+
+# Keep dependency and local imports stable across rendered namespace ordering.
+# isort: split
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils import (
+    _compat,
+)
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._client import (
+    SCHEMA,
+    Client,
+    ProductError,
+    api_argument_spec,
+)
+
+SETTLE_SECONDS = 20.0
+"""Longest wait for an applied change to become observable."""
+
+
+def settle(
+    client: Client,
+    names: list[str],
+    compare: Callable[[Client, list[str]], dict[str, str]],
+    sleep: Any = time.sleep,
+    limit: float | None = None,
+) -> dict[str, str]:
+    """Poll ``compare`` until no name drifts, within the shared deadline.
+
+    Raises:
+        ProductError: With code ``not_effective`` naming the drifting
+            objects when the wait or the deadline ends first.
+    """
+    limit = SETTLE_SECONDS if limit is None else limit
+    interval = 0.5
+    waited = 0.0
+    while True:
+        status = compare(client, names)
+        if "drift" not in status.values():
+            return status
+        remaining = min(limit - waited, client.deadline.remaining())
+        if remaining <= 0:
+            raise ProductError(
+                category="verification",
+                code="not_effective",
+                fields=sorted(n for n, s in status.items() if s == "drift"),
+            )
+        delay = min(interval, remaining)
+        sleep(delay)
+        waited += delay
+        interval = min(interval * 2, 4.0)
+
+
+def argument_spec() -> dict[str, Any]:
+    """Return a fresh specification of an activation module."""
+    spec = api_argument_spec()
+    spec["activate"] = {"type": "str", "default": "auto", "choices": ["auto", "always"]}
+    spec["verify"] = {"type": "list", "elements": "str", "required": True}
+    return spec
+
+
+def run(
+    module: Any,
+    *,
+    operation_id: str,
+    label: str,
+    name_pattern: str,
+    compare: Callable[[Client, list[str]], dict[str, str]],
+    apply: Callable[[Client], None],
+    settle: Callable[[Client, list[str]], dict[str, str]],
+) -> None:
+    """Compare, apply when needed or asked, verify, and exit the module."""
+    names: list[str] = list(dict.fromkeys(module.params["verify"] or []))
+    operation = "validate"
+    applied = False
+    try:
+        if not names or not all(re.fullmatch(name_pattern, name) for name in names):
+            raise ProductError(code="validation_failed", fields=["verify"])
+        client = Client(module.params)
+        operation = "compare"
+        before = compare(client, names)
+        needed = module.params["activate"] == "always" or "drift" in before.values()
+        result: dict[str, Any] = {
+            "changed": needed,
+            "activated": needed,
+            "verified": "predicted"
+            if module.check_mode
+            else ("unverifiable" if "unverifiable" in before.values() else "observed"),
+            "verification": before,
+        }
+        if needed:
+            operation = "compatibility"
+            _compat.check(module, client, operation_id)
+        if module.check_mode or not needed:
+            module.exit_json(**result)
+        operation = "apply"
+        try:
+            apply(client)
+            applied = True
+        except errors.TransportTimeout:
+            # The outcome is unknown; the verification below settles it.
+            pass
+        operation = "verify"
+        result["verification"] = settle(client, names)
+        result["verified"] = (
+            "unverifiable"
+            if "unverifiable" in result["verification"].values()
+            else "observed"
+        )
+        module.exit_json(**result)
+    except errors.ApiError as error:
+        fields: dict[str, Any] = {"operation": operation}
+        if isinstance(error, ProductError) and error.fields:
+            key = "not_effective" if error.code == "not_effective" else "fields"
+            fields[key] = error.fields
+        if operation not in ("apply", "verify"):
+            changed, outcome = False, "unchanged"
+        elif applied:
+            changed, outcome = True, "changed"
+        else:
+            changed, outcome = True, "unknown"
+        errors.fail_from(
+            module,
+            error,
+            schema=SCHEMA,
+            msg=f"Activating the {label} failed during {operation}",
+            changed=changed,
+            outcome=outcome,
+            fields=fields,
+        )

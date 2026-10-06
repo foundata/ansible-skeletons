@@ -1,0 +1,39 @@
+# ansible-lint YAML checks (see adjacent .ansible-lint). Details, reasoning:
+# https://foundata.com/en/guidelines/ansible-playbooks/
+
+---
+extends: "default"
+
+rules:
+  document-start:
+    present: true
+    level: "error"
+  indentation:
+    spaces: 2
+    indent-sequences: true
+  empty-lines:
+    max: 2
+    max-start: 0
+    max-end: 0
+  new-line-at-end-of-file: "enable"
+  new-lines:
+    type: "unix"
+  line-length:
+    max: 160
+  truthy:
+    allowed-values: ["true", "false"]
+    level: "error"
+  quoted-strings:
+    quote-type: "double"
+    required: false
+    allow-quoted-quotes: true
+
+  comments:
+    min-spaces-from-content: 1
+  comments-indentation: false
+  braces:
+    min-spaces-inside: 0
+    max-spaces-inside: 1
+  octal-values:
+    forbid-implicit-octal: true
+    forbid-explicit-octal: true

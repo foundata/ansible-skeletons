@@ -13,6 +13,7 @@ from pathlib import Path
 
 from scripts.check import default_lane, required_checks
 from scripts.common import ROOT, GateError, digest, run, uv_command, write_json
+from scripts.render import MODULE_PROFILES
 
 REPOSITORY = "foundata/ansible-skeletons"
 VERSION = re.compile(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)")
@@ -376,22 +377,23 @@ def verify_publication(
             raise GateError(
                 "Publication checks need --utils-source for the module profile"
             )
-        run(
-            uv_command(
-                default_lane(),
-                "python",
-                "-m",
-                "scripts.smoke",
-                "--profile",
-                "collection_modules_grid",
-                "--utils-source",
-                str(utils_source.resolve()),
-                "--output",
-                str(Path(temporary) / "modules"),
-            ),
-            cwd=source,
-            timeout=1800,
-        )
+        for profile in MODULE_PROFILES:
+            run(
+                uv_command(
+                    default_lane(),
+                    "python",
+                    "-m",
+                    "scripts.smoke",
+                    "--profile",
+                    profile,
+                    "--utils-source",
+                    str(utils_source.resolve()),
+                    "--output",
+                    str(Path(temporary) / profile),
+                ),
+                cwd=source,
+                timeout=1800,
+            )
     print(f"Published v{version} verified")
 
 

@@ -1,0 +1,222 @@
+"""Loopback REST fixture: fake_product.py STATE_DIR LIFETIME."""
+# FIXME Replace routes and responses with evidence from the product.
+
+from __future__ import annotations
+
+import base64
+import copy
+import json
+import sys
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
+from typing import Any, Callable
+from urllib.parse import parse_qs, unquote, urlsplit
+
+KEY = "SYNTHETIC-key"
+SECRET = "SYNTHETIC-secret-input"
+OLD_SECRET = "SYNTHETIC-secret-from-unmanaged-listing"
+
+
+class Response:
+    def __init__(self, status: int, payload: Any, raw: bytes | None = None) -> None:
+        self.status = status
+        self.headers: dict[str, str] = {}
+        self.body = raw if raw is not None else json.dumps(payload).encode()
+
+
+class FakeProduct:
+    """Native objects, capped pages, private secrets and independently mutable state."""
+
+    def __init__(self) -> None:
+        self.version = "1.0.0"
+        self.credentials = f"{KEY}:{SECRET}"
+        self.rows: dict[int, dict[str, Any]] = {}
+        self.parents: dict[int, dict[str, Any]] = {
+            1: {"id": 1, "name": "parent", "secret": OLD_SECRET}
+        }
+        self.dependents: dict[int, dict[str, Any]] = {}
+        self.passwords: dict[int, str] = {}
+        self.counter = 100
+        self.page_size = 2
+        self.incomplete = False
+        self.auth_ok = True
+        self.requests: list[tuple[str, str, Any]] = []
+        self.faults: dict[str, Callable[[], Response | None]] = {}
+        self.after_write: dict[str, Callable[[], None]] = {}
+
+    def add(self, **values: Any) -> int:
+        self.counter += 1
+        self.rows[self.counter] = {
+            "id": self.counter,
+            "name": "example",
+            "value": "",
+            "enabled": True,
+            "labels": [],
+            "parent_id": None,
+            "dependent_ids": [],
+            "secret": OLD_SECRET,
+            **values,
+        }
+        return self.counter
+
+    def writes(self) -> list[tuple[str, str, Any]]:
+        return [row for row in self.requests if row[0] != "GET"]
+
+    def inject_incomplete(self) -> None:
+        self.incomplete = True
+
+    def lose_next(self, operation: str, callback: Callable[[], None]) -> None:
+        self.after_write[operation] = callback
+
+    def request(
+        self, method: str, path: str, body: bytes | None, headers: dict[str, str]
+    ) -> Response:
+        data = json.loads(body) if body else {}
+        self.requests.append((method, path, data))
+        expected = "Basic " + base64.b64encode(self.credentials.encode()).decode()
+        if not self.auth_ok or headers.get("Authorization") != expected:
+            return Response(401, None, raw=SECRET.encode())
+        if path in self.faults:
+            response = self.faults[path]()
+            if response is not None:
+                return response
+        parsed = urlsplit(path)
+        pieces = parsed.path.strip("/").split("/")
+        if parsed.path == "/system/version":
+            return Response(200, {"version": self.version})
+        if parsed.path == "/permissions":
+            return Response(200, {})
+        if len(pieces) == 2 and pieces[0] == "credentials" and method == "POST":
+            return Response(
+                200,
+                {
+                    "accepted": self.passwords.get(int(pieces[1]))
+                    == data.get("password")
+                },
+            )
+        family = {
+            "fixtures": self.rows,
+            "parents": self.parents,
+            "dependents": self.dependents,
+        }.get(pieces[0])
+        if family is None:
+            return Response(404, None, raw=b"Not found")
+        if method == "GET":
+            if len(pieces) == 3 and pieces[1] == "by-name":
+                rows = [
+                    row
+                    for row in family.values()
+                    if row["name"].casefold() == unquote(pieces[2]).casefold()
+                ]
+                if len(rows) > 1:
+                    return Response(409, None, raw=b"Ambiguous identity")
+                return (
+                    Response(200, rows[0])
+                    if rows
+                    else Response(404, None, raw=b"Not found")
+                )
+            if len(pieces) == 2 and pieces[1].isdigit():
+                row = family.get(int(pieces[1]))
+                return (
+                    Response(200, row) if row else Response(404, None, raw=b"Not found")
+                )
+            query = parse_qs(parsed.query)
+            page = int(query.get("page", ["1"])[0])
+            size = min(self.page_size, int(query.get("per_page", ["100"])[0]))
+            rows = list(family.values())
+            start = 0 if self.incomplete else (page - 1) * size
+            return Response(200, rows[start : start + size])
+        identity = int(pieces[1]) if len(pieces) == 2 and pieces[1].isdigit() else None
+        if pieces[0] == "dependents" and method == "POST":
+            self.counter += 1
+            self.dependents[self.counter] = {"id": self.counter, **data}
+            self.rows[data["fixture_id"]]["dependent_ids"].append(self.counter)
+            return Response(201, self.dependents[self.counter])
+        if method == "DELETE":
+            if identity is None:
+                return Response(404, None)
+            family.pop(identity, None)
+            self.passwords.pop(identity, None)
+            response = Response(200, {})
+            operation = "delete"
+        elif method in ("POST", "PUT", "PATCH"):
+            if str(data.get("value", "")).upper() == "INVALID":
+                return Response(422, None, raw=b"<html>invalid input</html>")
+            if method == "POST":
+                identity = self.add()
+                operation = "create"
+            elif identity not in family:
+                return Response(404, None, raw=b"Not found")
+            else:
+                operation = "update"
+            row = copy.deepcopy(family[identity])
+            password = data.pop("password", None)
+            if password is not None:
+                self.passwords[identity] = password
+            row.update(data)
+            row["value"] = row["value"].strip().lower()
+            family[identity] = row
+            response = Response(201 if operation == "create" else 200, row)
+        else:
+            return Response(405, None)
+        hook = self.after_write.pop(operation, None)
+        if hook:
+            hook()
+        return response
+
+
+class Handler(BaseHTTPRequestHandler):
+    product = FakeProduct()
+
+    def log_message(self, format: str, *args: Any) -> None:
+        pass
+
+    def dispatch(self) -> None:
+        size = int(self.headers.get("Content-Length", "0"))
+        if self.path == "/api/shutdown":
+            expected = (
+                "Basic " + base64.b64encode(self.product.credentials.encode()).decode()
+            )
+            response = Response(
+                200 if self.headers.get("Authorization") == expected else 401, {}
+            )
+            if response.status == 200:
+                threading.Thread(target=self.server.shutdown, daemon=True).start()
+        else:
+            response = self.product.request(
+                self.command,
+                self.path.removeprefix("/api"),
+                self.rfile.read(size) if size else None,
+                dict(self.headers),
+            )
+        self.send_response(response.status)
+        self.send_header("Content-Length", str(len(response.body)))
+        self.end_headers()
+        self.wfile.write(response.body)
+
+    do_GET = dispatch
+    do_POST = dispatch
+    do_PUT = dispatch
+    do_PATCH = dispatch
+    do_DELETE = dispatch
+
+
+def main() -> None:
+    state = Path(sys.argv[1])
+    Handler.product.credentials = (state / "credentials").read_text().strip()
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    (state / "port.tmp").write_text(str(server.server_port))
+    (state / "port.tmp").replace(state / "port")
+    timer = threading.Timer(float(sys.argv[2]), server.shutdown)
+    timer.daemon = True
+    timer.start()
+    try:
+        server.serve_forever()
+    finally:
+        timer.cancel()
+        server.server_close()
+
+
+if __name__ == "__main__":
+    main()

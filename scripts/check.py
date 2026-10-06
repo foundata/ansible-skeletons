@@ -22,6 +22,7 @@ from scripts.common import (
     uv_command,
     write_json,
 )
+from scripts.render import MODULE_PROFILES
 
 
 def default_lane() -> Lane:
@@ -37,7 +38,7 @@ def check_static() -> None:
         "scripts",
         "tests",
         "collection_default/noxfile.py.j2",
-        "collection_modules_grid/noxfile.py.j2",
+        *[f"{profile}/noxfile.py.j2" for profile in MODULE_PROFILES],
     ]
     run(["ruff", "format", "--check", "--extension", "j2:python", *sources])
     run(["ruff", "check", "--extension", "j2:python", *sources])
@@ -115,7 +116,7 @@ def required_checks(*, full: bool, backends: list[str]) -> list[str]:
         *[f"unit-python{python}" for python in pythons],
         *[lane.name for lane in lanes],
         "generated-lint",
-        "collection-modules",
+        *MODULE_PROFILES,
         *[f"integration-{backend}" for backend in backends],
     ]
 
@@ -194,23 +195,24 @@ def check(
         timeout=1800,
     )
     checks.append("generated-lint")
-    run(
-        uv_command(
-            default_lane(),
-            "python",
-            "-m",
-            "scripts.smoke",
-            "--profile",
-            "collection_modules_grid",
-            "--utils-source",
-            str(utils_source.resolve()),
-            "--output",
-            str(output / "collection-modules"),
-            *(["--ansible-tests"] if full else []),
-        ),
-        timeout=21600,
-    )
-    checks.append("collection-modules")
+    for profile in MODULE_PROFILES:
+        run(
+            uv_command(
+                default_lane(),
+                "python",
+                "-m",
+                "scripts.smoke",
+                "--profile",
+                profile,
+                "--utils-source",
+                str(utils_source.resolve()),
+                "--output",
+                str(output / profile),
+                *(["--ansible-tests"] if full else []),
+            ),
+            timeout=21600,
+        )
+        checks.append(profile)
     for backend in selected:
         run(
             uv_command(

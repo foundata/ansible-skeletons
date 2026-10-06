@@ -15,7 +15,7 @@ from pathlib import Path
 import yaml
 
 from scripts.common import ROOT, GateError, run, write_json
-from scripts.render import Rendered, example_metadata, render
+from scripts.render import MODULE_PROFILES, Rendered, example_metadata, render
 
 
 def check_tree(source: Path, destination: Path) -> None:
@@ -88,7 +88,7 @@ def build_collection(rendered: Rendered) -> Path:
         "AGENTS.md",
         "stale.tar.gz",
     )
-    if rendered.profile == "collection_modules_grid":
+    if rendered.profile in MODULE_PROFILES:
         excluded += (
             "docs/inventory/sentinel.yml",
             "tools/sentinel.py",
@@ -121,7 +121,11 @@ def build_collection(rendered: Rendered) -> Path:
             else (
                 "plugins/modules/fixture.py",
                 "plugins/modules/fixture_info.py",
-                "plugins/modules/fixture_apply.py",
+                *(
+                    ("plugins/modules/fixture_apply.py",)
+                    if rendered.profile == "collection_modules_grid"
+                    else ()
+                ),
                 "docs/architecture.md",
                 "CHANGELOG.rst",
                 "tests/unit/plugins/conftest.py",
@@ -153,7 +157,7 @@ def build_collection(rendered: Rendered) -> Path:
                 )
                 or name.startswith(("extensions/molecule/", "scripts/"))
                 or (
-                    rendered.profile == "collection_modules_grid"
+                    rendered.profile in MODULE_PROFILES
                     and (
                         name.startswith(
                             (
@@ -242,7 +246,10 @@ def exercise_modules(rendered: Rendered) -> None:
         / namespace
         / name
     )
-    for module in ("fixture", "fixture_info", "fixture_apply"):
+    modules = ("fixture", "fixture_info") + (
+        ("fixture_apply",) if rendered.profile == "collection_modules_grid" else ()
+    )
+    for module in modules:
         docs = run(
             ["ansible-doc", "--json", f"{namespace}.{name}.{module}"],
             cwd=rendered.work,
@@ -265,7 +272,7 @@ def exercise_modules(rendered: Rendered) -> None:
                 "vars": {"ansible_python_interpreter": sys.executable},
                 "roles": [role],
             }
-            for role in ("fixture", "fixture_info", "fixture_apply")
+            for role in modules
         ],
     )
     run(
@@ -278,7 +285,13 @@ def exercise_modules(rendered: Rendered) -> None:
     )
 
 
-def module_smoke(output: Path, *, utils_source: Path, full: bool = False) -> None:
+def module_smoke(
+    output: Path,
+    *,
+    utils_source: Path,
+    profile: str = "collection_modules_grid",
+    full: bool = False,
+) -> None:
     """Render distinct identities and exercise the installed module skeleton."""
     output.mkdir(parents=True, exist_ok=False)
     missing = run(
@@ -287,7 +300,7 @@ def module_smoke(output: Path, *, utils_source: Path, full: bool = False) -> Non
             "collection",
             "init",
             "--collection-skeleton",
-            str(ROOT / "collection_modules_grid"),
+            str(ROOT / profile),
             "--init-path",
             str(output / "missing-metadata"),
             "missing.metadata",
@@ -320,14 +333,14 @@ def module_smoke(output: Path, *, utils_source: Path, full: bool = False) -> Non
             namespace=namespace,
             collection_name=name,
             metadata=metadata,
-            profile="collection_modules_grid",
+            profile=profile,
         )
-        check_tree(ROOT / "collection_modules_grid", rendered.collection)
+        check_tree(ROOT / profile, rendered.collection)
         for package in (rendered.collection / "tests/unit").rglob("__init__.py"):
             if package.stat().st_size:
                 raise GateError(f"Unit package marker is not empty: {package}")
         galaxy = yaml.safe_load((rendered.collection / "galaxy.yml").read_text())
-        if galaxy["dependencies"] != {"foundata.utils": ">=1.0.0"}:
+        if galaxy["dependencies"] != {"foundata.utils": ">=1.0.0,<2.0.0"}:
             raise GateError("Module profile omitted the utility dependency")
         if galaxy["version"] != metadata.get("version", "1.0.0"):
             raise GateError("Module profile changed the collection version")
@@ -409,7 +422,7 @@ def module_smoke(output: Path, *, utils_source: Path, full: bool = False) -> Non
         exercise_modules(rendered)
     write_json(
         output / "profile.json",
-        {"profile": "collection_modules_grid", "full": full},
+        {"profile": profile, "full": full},
     )
 
 
@@ -876,21 +889,22 @@ def main() -> int:
     parser.add_argument("--lint", action="store_true")
     parser.add_argument(
         "--profile",
-        choices=["collection_default", "collection_modules_grid"],
+        choices=["collection_default", *MODULE_PROFILES],
         default="collection_default",
     )
     parser.add_argument("--utils-source", type=Path)
     parser.add_argument("--ansible-tests", action="store_true")
     args = parser.parse_args()
     try:
-        if args.profile == "collection_modules_grid":
+        if args.profile in MODULE_PROFILES:
             if args.utils_source is None:
                 raise GateError(
-                    "collection_modules_grid checks need --utils-source for unpublished foundata.utils"
+                    "Module skeleton checks need --utils-source for unpublished foundata.utils"
                 )
             module_smoke(
                 args.output.resolve(),
                 utils_source=args.utils_source.resolve(),
+                profile=args.profile,
                 full=args.ansible_tests,
             )
         else:

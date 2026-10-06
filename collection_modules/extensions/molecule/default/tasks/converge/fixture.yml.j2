@@ -1,0 +1,10 @@
+# FIXME Replace this immediate-write workflow with the product lifecycle.
+---
+- name: "Converge the fixture"
+  module_defaults:
+    group/{{ namespace }}.{{ collection_name }}.api: "{% raw %}{{ product_connection }}{% endraw %}"
+  block:
+    - name: "Save the scenario fixture"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        name: "molecule_fixture_example"
+        value: "ready"
