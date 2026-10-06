@@ -1,0 +1,202 @@
+"""Stateful fake beneath the real product client and real module runner."""
+# FIXME Replace the invented wire behavior with qualified product responses.
+
+from __future__ import annotations
+
+import base64
+import copy
+import json
+import re
+import uuid
+from typing import Any, Callable
+
+import pytest
+
+from ansible_collections.foundata.utils.plugins.module_utils import errors
+
+# Keep dependency and local imports stable across rendered namespace ordering.
+# isort: split
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils import (
+    _client,
+)
+
+SECRET = "SYNTHETIC-secret-input"
+OLD_SECRET = "SYNTHETIC-secret-from-unmanaged-listing"
+KEY = "SYNTHETIC-key"
+
+
+class Response:
+    def __init__(self, status: int, payload: Any, raw: bytes | None = None) -> None:
+        self.status = status
+        self.headers: dict[str, str] = {}
+        self.body = raw if raw is not None else json.dumps(payload).encode()
+
+
+class FakeProduct:
+    """One endpoint with grids, pagination, validation and controlled failures."""
+
+    def __init__(self) -> None:
+        self.version = "1.0.0"
+        self.grids: dict[str, dict[str, dict[str, str]]] = {"fixture": {}}
+        self.active: dict[str, dict[str, str]] = {}
+        self.requests: list[tuple[str, str, Any]] = []
+        self.page_size = 2
+        self.total_offset = 0
+        self.auth_ok = True
+        self.activate_ok = True
+        self.faults: dict[str, Callable[[], Response | None]] = {}
+        self.after_write: dict[str, Callable[[], None]] = {}
+
+    def add(self, grid: str = "fixture", **values: str) -> str:
+        key = str(uuid.uuid4())
+        self.grids.setdefault(grid, {})[key] = {
+            "name": "example",
+            "value": "",
+            "enabled": "1",
+            "labels": "",
+            "password": OLD_SECRET,
+            **values,
+        }
+        return key
+
+    def writes(self) -> list[tuple[str, str, Any]]:
+        return [
+            row
+            for row in self.requests
+            if re.search(r"/(add_item|set_item|del_item|reconfigure)(/|$)", row[1])
+        ]
+
+    @property
+    def rows(self) -> dict[str, dict[str, str]]:
+        return self.grids["fixture"]
+
+    def inject_incomplete(self) -> None:
+        self.total_offset = 1
+
+    def lose_next(self, operation: str, callback: Callable[[], None]) -> None:
+        self.after_write[
+            {"create": "add_item", "update": "set_item", "delete": "del_item"}[
+                operation
+            ]
+        ] = callback
+
+    def request(
+        self, method: str, path: str, body: bytes | None, headers: dict[str, str]
+    ) -> Response:
+        data = json.loads(body) if body else {}
+        self.requests.append((method, path, data))
+        if path in self.faults:
+            response = self.faults[path]()
+            if response is not None:
+                return response
+        expected = "Basic " + base64.b64encode(f"{KEY}:{SECRET}".encode()).decode()
+        if not self.auth_ok or headers.get("Authorization") != expected:
+            return Response(401, {"message": SECRET})
+        if path == "/system/version":
+            return Response(200, {"version": self.version})
+        if path == "/fixture/reconfigure":
+            if self.activate_ok:
+                self.active = copy.deepcopy(self.grids["fixture"])
+            response = Response(200, {"status": "ok"})
+            hook = self.after_write.pop("reconfigure", None)
+            if hook:
+                hook()
+            return response
+        if path == "/fixture/active/search_item":
+            return self.listing(self.active, data)
+        match = re.fullmatch(
+            r"/([a-z_]+)/(search_item|get_item|add_item|set_item|del_item)(?:/([^/]+))?",
+            path,
+        )
+        if match is None:
+            return Response(404, {})
+        grid, action, key = match.groups()
+        items = self.grids.setdefault(grid, {})
+        if action == "search_item":
+            return self.listing(items, data)
+        if action == "get_item":
+            return Response(200, {grid: items.get(key, {})})
+        if action == "del_item":
+            removed = items.pop(key, None)
+            response = Response(200, {"result": "deleted" if removed else "not found"})
+        else:
+            record = (
+                dict(items[key])
+                if action == "set_item" and key in items
+                else {
+                    "name": "",
+                    "value": "",
+                    "enabled": "1",
+                    "labels": "",
+                    "password": OLD_SECRET,
+                }
+            )
+            record.update(data.get(grid, {}))
+            if record["value"] == "INVALID" or any(
+                row["name"] == record["name"]
+                for identity, row in items.items()
+                if identity != key
+            ):
+                return Response(
+                    200, {"result": "failed", "validations": {"value": SECRET}}
+                )
+            key = key or str(uuid.uuid4())
+            items[key] = record
+            response = Response(200, {"result": "saved", "uuid": key})
+        hook = self.after_write.pop(action, None)
+        if hook:
+            hook()
+        return response
+
+    def listing(
+        self, items: dict[str, dict[str, str]], data: dict[str, Any]
+    ) -> Response:
+        rows = [{"uuid": key, **record} for key, record in items.items()]
+        size = min(data["rowCount"], self.page_size)
+        page = data["current"]
+        return Response(
+            200,
+            {
+                "current": page,
+                "total": len(rows) + self.total_offset,
+                "rows": rows[(page - 1) * size : page * size],
+            },
+        )
+
+
+class FakeHttpClient:
+    def __init__(self, fake: FakeProduct, base_url: str, **kwargs: Any) -> None:
+        self.fake = fake
+
+    def request(
+        self,
+        method: str,
+        path: str,
+        *,
+        deadline: Any,
+        headers: dict[str, str],
+        body: bytes | None = None,
+    ) -> Response:
+        deadline.remaining()
+        return self.fake.request(method, path, body, headers)
+
+
+@pytest.fixture
+def fake(monkeypatch: pytest.MonkeyPatch) -> FakeProduct:
+    instance = FakeProduct()
+    monkeypatch.setattr(
+        _client,
+        "HttpClient",
+        lambda base_url, **kwargs: FakeHttpClient(instance, base_url, **kwargs),
+    )
+    return instance
+
+
+def lost_response() -> None:
+    """Called once after persistence; the next identity read sees the write."""
+    raise errors.TransportTimeout(code="socket_timeout")
+
+
+@pytest.fixture
+def connection() -> dict[str, Any]:
+    return {"url": "https://fixture.invalid/api", "api_key": KEY, "api_secret": SECRET}

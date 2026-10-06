@@ -73,6 +73,7 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils import (
     _activation,
+    _fixture_activation,
 )
 from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._definitions import (
     FIXTURE,
@@ -88,9 +89,9 @@ def main() -> None:
         operation_id="fixture_apply",
         label="fixture family",
         name_pattern=FIXTURE.keys[0].pattern,
-        compare=_activation.compare_fixture,
-        apply=_activation.apply_fixture,
-        settle=_activation.settle_fixture,
+        compare=_fixture_activation.compare_fixture,
+        apply=_fixture_activation.apply_fixture,
+        settle=_fixture_activation.settle_fixture,
     )
 
 

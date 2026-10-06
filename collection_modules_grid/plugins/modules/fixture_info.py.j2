@@ -80,9 +80,6 @@ from ansible_collections.foundata.utils.plugins.module_utils import errors
 
 # Keep dependency and local imports stable across rendered namespace ordering.
 # isort: split
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils import (
-    _compat,
-)
 from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._client import (
     SCHEMA,
     Client,
@@ -107,11 +104,10 @@ def main() -> None:
         if not re.fullmatch(FIXTURE.keys[0].pattern, name):
             raise ProductError(code="validation_failed", fields=["name"])
         client = Client(module.params)
-        operation = "compatibility"
-        _compat.check(module, client, "fixture_info")
         operation = "find"
-        found = Engine(module, FIXTURE, client).find({"name": name})
-        public = {"name": name, "uuid": found[0], **found[1]} if found else None
+        engine = Engine(module, FIXTURE, client)
+        found = engine.find({"name": name})
+        public = engine.project(found) if found else None
         module.exit_json(changed=False, fixture=public, verified="observed")
     except errors.ApiError as error:
         errors.fail_from(

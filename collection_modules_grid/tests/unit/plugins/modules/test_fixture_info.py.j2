@@ -7,11 +7,15 @@ import json
 
 import pytest
 
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._definitions import (
+    FIXTURE,
+)
 from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.modules import (
     fixture_info,
 )
 
-from ..conftest import OLD_SECRET, SECRET, FakeProduct, RunModule
+from ..conftest import RunModule
+from ..fake_product import OLD_SECRET, SECRET, FakeProduct
 
 
 @pytest.mark.parametrize("check_mode", [False, True])
@@ -27,7 +31,7 @@ def test_observed_read_and_absence(
         fixture_info.main, name="example", _ansible_check_mode=check_mode
     )
     assert result["fixture"] == {
-        "uuid": key,
+        FIXTURE.identifier.name: key,
         "name": "example",
         "value": "read",
         "enabled": True,

@@ -1,0 +1,239 @@
+"""Behavioural client/engine contract, identical across the protocol variants."""
+
+from __future__ import annotations
+
+import json
+from dataclasses import replace
+from typing import Any, Callable
+
+import pytest
+from ansible.module_utils.basic import AnsibleModule
+
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils import (
+    _compat,
+)
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._client import (
+    Client,
+    ProductError,
+)
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._definitions import (
+    FIXTURE,
+)
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._engine import (
+    Engine,
+    Key,
+    Resource,
+    build_spec,
+    run_resource,
+)
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.modules import (
+    fixture,
+    fixture_info,
+)
+
+from ..conftest import RunModule
+from ..fake_product import OLD_SECRET, SECRET, FakeProduct, Response, lost_response
+
+
+def entry(resource: Resource) -> Callable[[], None]:
+    def main() -> None:
+        module = AnsibleModule(
+            argument_spec=build_spec(resource), supports_check_mode=True
+        )
+        run_resource(module, resource)
+
+    return main
+
+
+def test_lifecycle_preserves_unmanaged_fields(
+    fake: FakeProduct, run_module: RunModule
+) -> None:
+    created = run_module(fixture.main, name="example", value="first", enabled=False)
+    identity = created["fixture"][FIXTURE.identifier.name]
+    assert created["changed_fields"] == [] and created["verified"] == "observed"
+    fake.rows[identity]["unmanaged"] = OLD_SECRET
+    assert not run_module(fixture.main, name="example", value="first")["changed"]
+    changed = run_module(
+        fixture.main, name="example", value="second", _ansible_diff=True
+    )
+    assert changed["changed_fields"] == ["value"]
+    assert changed["fixture"]["enabled"] is False
+    assert changed["diff"] == {
+        "before": {"value": "first"},
+        "after": {"value": "second"},
+    }
+    assert fake.rows[identity]["unmanaged"] == OLD_SECRET
+    assert run_module(fixture.main, name="example", state="absent")["fixture"] is None
+    count = len(fake.writes())
+    assert not run_module(fixture.main, name="example", state="absent")["changed"]
+    assert len(fake.writes()) == count
+
+
+def test_definition_can_allow_an_empty_identity_component(
+    fake: FakeProduct, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    resource = replace(FIXTURE, keys=(Key("name", "Optional component", r".*"),))
+    monkeypatch.setattr(Engine, "find", lambda self, ident: None)
+    result = run_module(entry(resource), name="", _ansible_check_mode=True)
+    assert not result.get("failed") and result["fixture"]["name"] == ""
+    assert not fake.writes()
+
+
+@pytest.mark.parametrize("incomplete", [False, True])
+def test_listing_is_complete_or_fails(
+    fake: FakeProduct, run_module: RunModule, incomplete: bool
+) -> None:
+    for index in range(5):
+        fake.add(name=f"item{index}")
+    if incomplete:
+        fake.inject_incomplete()
+    result = run_module(entry(replace(FIXTURE, lookup="listing")), name="item4")
+    assert bool(result.get("failed")) == incomplete
+    assert not fake.writes()
+    if incomplete:
+        assert result["error_code"] == "incomplete_listing"
+    else:
+        assert result["fixture"]["name"] == "item4"
+
+
+def test_ambiguous_listing_refuses_write(
+    fake: FakeProduct, run_module: RunModule
+) -> None:
+    fake.add()
+    fake.add()
+    result = run_module(
+        entry(replace(FIXTURE, lookup="listing")), name="example", value="new"
+    )
+    assert result["error_code"] == "ambiguous" and not fake.writes()
+
+
+@pytest.mark.parametrize("operation", ["create", "update", "delete"])
+def test_lost_response_never_repeats_write(
+    fake: FakeProduct, run_module: RunModule, operation: str
+) -> None:
+    if operation != "create":
+        fake.add()
+    fake.lose_next(operation, lost_response)
+    result = run_module(
+        fixture.main,
+        name="example",
+        value="new",
+        state="absent" if operation == "delete" else "present",
+    )
+    assert not result.get("failed") and result["verified"] == "observed"
+    assert len(fake.writes()) == 1
+
+
+def test_possible_write_then_failed_read_is_unknown(
+    fake: FakeProduct, run_module: RunModule
+) -> None:
+    def fail_read() -> None:
+        fake.auth_ok = False
+        lost_response()
+
+    fake.lose_next("create", fail_read)
+    result = run_module(fixture.main, name="example")
+    assert result["failed"] and result["changed"] and result["outcome"] == "unknown"
+    assert len(fake.rows) == 1 and len(fake.writes()) == 1
+
+
+def test_delete_acknowledgement_does_not_prove_absence(
+    fake: FakeProduct, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake.add()
+    monkeypatch.setattr(Client, "delete", lambda self, resource, identity: None)
+    result = run_module(fixture.main, name="example", state="absent")
+    assert result["failed"] and result["error_code"] == "still_present"
+    assert result["changed"] and result["outcome"] == "unknown"
+    assert len(fake.rows) == 1
+
+
+@pytest.mark.parametrize(
+    "status,category,code",
+    [
+        (401, "auth", "unauthenticated"),
+        (403, "auth", "forbidden"),
+        (422, "product", "validation_failed"),
+        (500, "product", "rejected"),
+    ],
+)
+def test_status_classification_needs_no_json(
+    fake: FakeProduct, run_module: RunModule, status: int, category: str, code: str
+) -> None:
+    fake.faults["/system/version"] = lambda: Response(
+        status, None, raw=b"<html>private upstream error</html>"
+    )
+    result = run_module(fixture.main, name="example")
+    assert (result["error_category"], result["error_code"]) == (category, code)
+    assert not fake.writes()
+
+
+@pytest.mark.parametrize("state", ["present", "absent"])
+@pytest.mark.parametrize("exists", [False, True])
+@pytest.mark.parametrize("diff", [False, True])
+def test_check_mode_and_secrets(
+    fake: FakeProduct, run_module: RunModule, state: str, exists: bool, diff: bool
+) -> None:
+    if exists:
+        fake.add()
+    result = run_module(
+        fixture.main,
+        name="example",
+        value="new",
+        state=state,
+        _ansible_check_mode=True,
+        _ansible_diff=diff,
+    )
+    assert not fake.writes() and result["verified"] == "predicted"
+    if not exists and state == "present":
+        assert FIXTURE.identifier.name not in result["fixture"]
+    secrets = result.pop("_ansible_new_secrets", [])
+    assert set(secrets) <= {SECRET, "SYNTHETIC-key"}
+    assert OLD_SECRET not in json.dumps(result) and SECRET not in json.dumps(result)
+
+
+def test_read_and_noop_do_not_discover_version(
+    fake: FakeProduct, run_module: RunModule
+) -> None:
+    fake.add()
+    assert not run_module(fixture_info.main, name="example")["changed"]
+    assert not run_module(fixture.main, name="example")["changed"]
+    assert not any(path == "/system/version" for _method, path, _body in fake.requests)
+
+
+def test_check_prediction_validates_eligibility(
+    fake: FakeProduct, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        _compat, "EXCLUSIONS", {"fixture:present": (("1.0.0", "synthetic exclusion"),)}
+    )
+    result = run_module(fixture.main, name="example", _ansible_check_mode=True)
+    assert result["error_code"] == "ineligible" and not fake.writes()
+
+
+def test_version_is_cached_but_each_operation_is_checked(
+    fake: FakeProduct, connection: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    params = {
+        **connection,
+        "validate_certs": True,
+        "ca_path": None,
+        "use_proxy": False,
+        "timeout": 10,
+        "deadline": 30,
+    }
+    client = Client(params)
+
+    class Module:
+        def warn(self, message: str) -> None:
+            raise AssertionError(message)
+
+    _compat.check(Module(), client, "first")
+    monkeypatch.setattr(
+        _compat, "EXCLUSIONS", {"second": (("1.0.0", "synthetic exclusion"),)}
+    )
+    with pytest.raises(ProductError, match="operation failed"):
+        _compat.check(Module(), client, "second")
+    assert (
+        len([p for _method, p, _body in fake.requests if p == "/system/version"]) == 1
+    )

@@ -14,7 +14,8 @@ from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.modules i
     fixture_apply,
 )
 
-from ..conftest import SECRET, FakeProduct, RunModule, lost_response
+from ..conftest import RunModule
+from ..fake_product import SECRET, FakeProduct, lost_response
 
 
 def test_activation_converges(fake: FakeProduct, run_module: RunModule) -> None:

@@ -9,8 +9,9 @@
 - Replace the fixture definition, modules and tests with a researched resource.
   The fixture speaks a conventional grid/CRUD style protocol (UUID identifiers,
   paginated search with a declared total, add, set and delete actions); a REST
-  product replaces the client, the fake server and the identifier type and
-  keeps the engine's lifecycle.
+  product should start from `collection_modules` instead.
+- Keep a scope-named apply module only where saved and active state differ;
+  adapt `_fixture_activation.py` and keep the shared `_activation.py` workflow.
 - Replace `!UNKNOWN` author handles in module documentation.
 - Adapt connection options, authentication, version probe, supported series and
   evidence-backed exclusions.

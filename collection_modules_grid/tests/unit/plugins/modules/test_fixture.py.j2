@@ -26,12 +26,12 @@ from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.modules i
     fixture,
 )
 
-from ..conftest import (
+from ..conftest import RunModule
+from ..fake_product import (
     OLD_SECRET,
     SECRET,
     FakeProduct,
     Response,
-    RunModule,
     lost_response,
 )
 
@@ -48,7 +48,7 @@ def test_lifecycle(fake: FakeProduct, run_module: RunModule) -> None:
     created = run_module(fixture.main, name="example", value="first", enabled=False)
     assert created["changed"] and created["verified"] == "observed"
     assert created["changed_fields"] == []
-    key = created["fixture"]["uuid"]
+    key = created["fixture"][FIXTURE.identifier.name]
     assert fake.grids["fixture"][key]["enabled"] == "0"
     assert not run_module(fixture.main, name="example", value="first", enabled=False)[
         "changed"
@@ -89,7 +89,7 @@ def test_check_mode(
     assert result["changed"] == (state == "present" or exists)
     assert ("diff" in result) == (diff and result["changed"])
     if not exists and state == "present":
-        assert "uuid" not in result["fixture"]
+        assert FIXTURE.identifier.name not in result["fixture"]
     assert not fake.writes()
 
 
@@ -244,7 +244,12 @@ def test_composite_identity_and_references(
         keys=(*FIXTURE.keys, Key("scope", "Scope", r"[a-z]+\Z", default="local")),
         fields=(
             *FIXTURE.fields,
-            Field("links", "set", "Names", reference=Reference("/other", "name")),
+            Field(
+                "links",
+                "set",
+                "Names",
+                reference=Reference("/other", "name", FIXTURE.identifier),
+            ),
         ),
     )
 
@@ -272,7 +277,12 @@ def test_invalid_reference_precedes_write(
         FIXTURE,
         fields=(
             *FIXTURE.fields,
-            Field("links", "set", "Names", reference=Reference("/other", "name")),
+            Field(
+                "links",
+                "set",
+                "Names",
+                reference=Reference("/other", "name", FIXTURE.identifier),
+            ),
         ),
     )
 

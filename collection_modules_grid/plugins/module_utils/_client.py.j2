@@ -40,6 +40,8 @@ _SEGMENT = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$")
 
 ERROR_CODES: dict[str, frozenset[str | None]] = {
     "internal": frozenset({None}),
+    "argument": frozenset({"invalid_field", "invalid_identity"}),
+    "eligibility": frozenset({"referenced", "internal_object"}),
     "auth": frozenset({"unauthenticated", "forbidden"}),
     "product": frozenset(
         {
@@ -202,13 +204,15 @@ class Client:
             raise ProductError(category="auth", code="unauthenticated", status=status)
         if status == 404:
             raise ProductError(code="endpoint_not_found", status=status)
-        payload = decode_json(response.body)
         if status >= 400:
             # A UserException: the product refused the request, for example a
             # deletion of an object still referenced elsewhere.
-            raise ProductError(code="rejected", status=status)
+            raise ProductError(
+                code="validation_failed" if status == 422 else "rejected", status=status
+            )
         if status != 200:
             raise ProductError(code="unexpected_status", status=status)
+        payload = decode_json(response.body)
         if isinstance(payload, dict) and payload.get("status") == "failed":
             raise ProductError(code="rejected", status=status)
         return payload
@@ -269,3 +273,112 @@ class Client:
             series = f"{major}.{minor}"
             self._version = (series, f"{series}.{patch}" if patch else series)
         return self._version
+
+    def probe(self, route: str) -> None:
+        self.read("GET", route)
+
+    def lookup(self, resource: Any, ident: dict[str, str]) -> dict[str, Any] | None:
+        raise ValueError("The fixture grid has no documented by-key absence response")
+
+    def get(self, resource: Any, identity: str | int) -> dict[str, Any] | None:
+        payload = self.read(
+            "GET",
+            f"{resource.route}/{resource.actions.get or 'get_item'}/{segment(str(identity))}",
+        )
+        record = payload.get(resource.post_key) if isinstance(payload, dict) else None
+        if not isinstance(record, dict) or not record:
+            raise ProductError(category="response", code="schema")
+        return {**record, resource.identifier.name: identity}
+
+    def submit(self, resource: Any, path: str, body: dict[str, Any]) -> Any:
+        response = self.write(path, {resource.post_key: body})
+        if not isinstance(response, dict):
+            raise ProductError(category="response", code="response_type")
+        if response.get("result") == "failed":
+            validations = response.get("validations", {})
+            known = {key.name for key in resource.keys} | {
+                field.name for field in resource.fields
+            }
+            fields = (
+                sorted(
+                    {
+                        str(key).rsplit(".", maxsplit=1)[-1]
+                        if str(key).rsplit(".", maxsplit=1)[-1] in known
+                        else "other"
+                        for key in validations
+                    }
+                )
+                if isinstance(validations, dict)
+                else []
+            )
+            raise ProductError(code="validation_failed", fields=fields)
+        if response.get("result") != "saved":
+            raise ProductError(code="rejected")
+        return response
+
+    def create(self, resource: Any, body: dict[str, Any]) -> None:
+        response = self.submit(
+            resource, f"{resource.route}/{resource.actions.add}", body
+        )
+        if not isinstance(response.get("uuid"), str) or not UUID.fullmatch(
+            response["uuid"]
+        ):
+            raise ProductError(category="response", code="schema")
+
+    def update(self, resource: Any, identity: Any, body: dict[str, Any]) -> None:
+        self.submit(
+            resource,
+            f"{resource.route}/{resource.actions.set}/{segment(str(identity))}",
+            body,
+        )
+
+    def delete(self, resource: Any, identity: Any) -> None:
+        response = self.write(
+            f"{resource.route}/{resource.actions.delete}/{segment(str(identity))}"
+        )
+        if not isinstance(response, dict) or response.get("result") not in (
+            "deleted",
+            "not found",
+        ):
+            raise ProductError(code="rejected")
+
+    @staticmethod
+    def encode(field: Any, value: Any) -> Any:
+        if field.kind == "bool":
+            return "1" if value else "0"
+        if field.kind in ("set", "names"):
+            return (field.separator or ",").join(value)
+        return str(value)
+
+    @staticmethod
+    def decode(field: Any, raw: Any) -> Any:
+        if isinstance(raw, dict) and all(isinstance(v, dict) for v in raw.values()):
+            selected = [
+                str(k) for k, v in raw.items() if v.get("selected") in (1, "1", True)
+            ]
+            if any(
+                v.get("selected") not in (0, "0", False, None, 1, "1", True)
+                for v in raw.values()
+            ):
+                raise ProductError(
+                    category="response", code="schema", fields=[field.name]
+                )
+            if field.kind in ("set", "names"):
+                return selected
+            if field.kind == "choice" and len(selected) <= 1:
+                return selected[0] if selected else ""
+        if field.kind in ("set", "names") and isinstance(raw, str):
+            return [v for v in raw.split(field.separator or ",") if v]
+        if field.kind == "bool" and raw in ("1", "0", ""):
+            return raw == "1"
+        if field.kind == "int" and isinstance(raw, str):
+            try:
+                return int(raw) if raw else None
+            except ValueError:
+                raise ProductError(
+                    category="response", code="schema", fields=[field.name]
+                ) from None
+        return raw
+
+    def list(self, resource: Any) -> list[dict[str, Any]]:
+        return self.search(resource.route, resource.actions.search or "search_item")

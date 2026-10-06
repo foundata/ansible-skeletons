@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._engine import (
+    Actions,
     Field,
     Key,
     Resource,
@@ -22,5 +23,9 @@ FIXTURE = Resource(
         Field("labels", "set", "Unordered public labels"),
     ),
     result_key="fixture",
+    identifier=Key(
+        "uuid", "Server identifier", r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}"
+    ),
+    actions=Actions("search_item", "get_item", "add_item", "set_item", "del_item"),
     activation="fixture_apply",
 )
