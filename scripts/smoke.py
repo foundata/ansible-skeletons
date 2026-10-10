@@ -386,8 +386,10 @@ def module_smoke(
         install_utils(rendered, utils_source)
         run(["git", "init", "--quiet"], cwd=rendered.collection)
         run(["git", "add", "."], cwd=rendered.collection)
+        # Every check runs the default sessions (lint, docs, licenses, Markdown,
+        # changelog) in check-only mode; the full matrix adds the ansible-test lanes.
+        session_sets: list[list[str]] = [[]]
         if full:
-            env = {**rendered.env, "CI": "true"}
             newest = ".".join(importlib.metadata.version("ansible-core").split(".")[:2])
             with (rendered.collection / "antsibull-nox.toml").open("rb") as stream:
                 config = tomllib.load(stream)
@@ -398,26 +400,26 @@ def module_smoke(
                 ]
                 if series not in {"2.19", newest}
             ]
-            for sessions in (
-                [],
+            session_sets += [
                 ["ansible-test-sanity-2.19", f"ansible-test-sanity-{newest}"],
                 [*validation_lanes, "--", "--test", "validate-modules"],
                 ["ansible-test-units"],
                 ["ansible-test-integration"],
-            ):
-                run(
-                    [
-                        "uv",
-                        "run",
-                        "--python",
-                        "3.13",
-                        "noxfile.py",
-                        *(["-s", *sessions] if sessions else []),
-                    ],
-                    cwd=rendered.collection,
-                    env=env,
-                    timeout=7200,
-                )
+            ]
+        for sessions in session_sets:
+            run(
+                [
+                    "uv",
+                    "run",
+                    "--python",
+                    "3.13",
+                    "noxfile.py",
+                    *(["-s", *sessions] if sessions else []),
+                ],
+                cwd=rendered.collection,
+                env={**rendered.env, "CI": "true"},
+                timeout=7200,
+            )
         build_collection(rendered)
         exercise_modules(rendered)
     write_json(

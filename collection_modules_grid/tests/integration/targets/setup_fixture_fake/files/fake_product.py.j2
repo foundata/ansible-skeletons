@@ -12,13 +12,14 @@ import threading
 import uuid
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 
 class Handler(BaseHTTPRequestHandler):
     credentials = ""
-    records: dict[str, dict[str, str]] = {}
-    active: dict[str, dict[str, str]] = {}
+    # Shared by all requests: the server creates one handler per request.
+    records: ClassVar[dict[str, dict[str, str]]] = {}
+    active: ClassVar[dict[str, dict[str, str]]] = {}
 
     def log_message(self, format: str, *args: Any) -> None:
         pass

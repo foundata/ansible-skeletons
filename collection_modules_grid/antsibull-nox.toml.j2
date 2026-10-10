@@ -44,6 +44,8 @@ skip_tests = ["changelog", "no-smart-quotes"]
 # The molecule session is defined in noxfile.py.
 
 [sessions.lint]
+# Also the Python of the integration targets, such as the fake product.
+extra_code_files = ["tests/integration"]
 run_isort = false
 run_black = false
 run_ruff_format = true

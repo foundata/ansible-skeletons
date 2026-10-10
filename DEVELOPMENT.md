@@ -94,8 +94,9 @@ Edit each skeleton directly in its own directory.
 `scripts.render --profile collection_modules_grid` or
 `--profile collection_modules` selects a module skeleton. Both variants run
 through the render and release gates; the unit tests enforce their shared-file
-list without a composition layer. Full matrix checks add their default nox,
-sanity, unit and integration sessions, one chain at a time.
+list without a composition layer. Quick checks run their default nox sessions
+in check-only mode; full matrix checks add the sanity, unit and integration
+sessions, one chain at a time.
 
 
 ## Development standards<a id="development-standards"></a>
@@ -140,6 +141,9 @@ limited to):
 - The rendered collection's default Nox sessions in check-only mode, with tool
   versions pinned to the check environment, plus a stock-only `--no-venv` run.
   Repository checks require successful foundata rule verification.
+- Both module skeletons under two identities: their default Nox sessions in
+  check-only mode (Ruff and mypy including the integration targets' Python),
+  a build, and the installed fixture modules.
 
 To test a future release candidate, build its wheel and override the released
 package. Example:
