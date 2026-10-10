@@ -145,7 +145,7 @@ def lint_molecule(molecule: Path, rendered: Rendered) -> None:
 
 
 def integration(backend: str, output: Path) -> None:
-    """Run both generated projects, preserving failures and always destroying targets."""
+    """Run both generated projects; keep failures and always destroy the targets."""
     require_tools("molecule", "ansible-galaxy", "ansible-lint")
     if backend in ("podman", "ee"):
         require_tools("podman")

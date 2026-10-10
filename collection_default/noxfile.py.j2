@@ -142,7 +142,8 @@ def markdown(session: nox.Session) -> None:
 @antsibull_nox.sessions.install_packages(packages=["antsibull-changelog"])
 def changelog(session: nox.Session) -> None:
     """Changelog fragments and changelog.yaml with antsibull-changelog."""
-    # antsibull-changelog lint; antsibull-changelog lint-changelog-yaml changelogs/changelog.yaml
+    # antsibull-changelog lint
+    # antsibull-changelog lint-changelog-yaml changelogs/changelog.yaml
     session.run("antsibull-changelog", "lint")
     session.run(
         "antsibull-changelog", "lint-changelog-yaml", "changelogs/changelog.yaml"

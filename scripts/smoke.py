@@ -238,7 +238,7 @@ def install_utils(rendered: Rendered, source: Path) -> None:
 
 
 def exercise_modules(rendered: Rendered) -> None:
-    """Resolve docs and run the installed fixture payload against its loopback server."""
+    """Resolve docs; run the installed fixture payload against its loopback server."""
     namespace, name = rendered.collection.parent.name, rendered.collection.name
     installed = (
         Path(rendered.env["ANSIBLE_COLLECTIONS_PATH"])

@@ -5,7 +5,7 @@ pagination and the version probe live here, on top of the bounded byte
 transport of ``foundata.utils``. Nothing a product returns reaches an
 exception message: failures carry local categories and codes only.
 """
-# FIXME Replace the fixture authentication, routes and response schema with the product contract.
+# FIXME Replace fixture authentication, routes and responses with the product contract.
 
 from __future__ import annotations
 
@@ -171,7 +171,7 @@ class Client:
         self.compatibility_warned = False
 
     def read(self, method: str, path: str, body: dict[str, Any] | None = None) -> Any:
-        """Call an operation that only reads; fixture product also reads through POST."""
+        """Call a read-only operation; the fixture product also reads through POST."""
         return self._request(method, path, body)
 
     def write(self, path: str, body: dict[str, Any] | None = None) -> Any:
