@@ -5,15 +5,16 @@ FIXME Replace these questions with decisions and evidence for
 
 Skeleton revision:
 `{{ skeleton_revision | default('unknown; record the skeleton commit or tag') }}`.
-Sources inspected: FIXME guide and utility revisions, specification dialect, API
-version, stable release, edition, channel, source tag, retrieval date and
-content hash. Keep session timing and adaptation measurements in the research
-record, not this maintained architecture document.
+Research record: `{{ collection_name }}/research.md` in foundata's internal
+designs repository (sources with revisions and hashes, the research rows, the
+representative trace, timing evidence, skeleton adaptations). This document
+carries structure, decisions and scope only.
 
 Evidence labels: **D** documented, **S** read in matching release source,
-**I** inferred (name the premises), **unknown** (name the next experiment).
-Use **spike-tested** or **integration-tested** only with linked evidence.
-The fixture is source-defined test material, not product qualification.
+**I** inferred (name the premises), **O** observed on a lab target with its
+run and trace, **unknown** (name the next experiment). Use **spike-tested**
+or **integration-tested** only with linked evidence. The fixture is
+source-defined test material, not product qualification.
 
 ## Decision sheet
 
@@ -31,25 +32,7 @@ The fixture is source-defined test material, not product qualification.
 | Version probe             | Cached read before a planned mutation, including check prediction            | FIXME version privilege, series and operation exclusions |
 | Lab                       | External endpoint in Molecule; loopback fake in integration                  | FIXME full lifecycle and cleanup evidence |
 
-## Research record
-
-|                      Dimension                       | Decision and rationale | Evidence, label and date | Remaining experiment |
-| ---------------------------------------------------- | ---------------------- | ------------------------ | -------------------- |
-| Stores, editing boundary, precedence and ownership   | FIXME                  | unknown                  | FIXME                |
-| Surfaces, descriptions, authentication and coverage  | FIXME                  | unknown                  | FIXME                |
-| Identity, rename and collection structure            | FIXME                  | unknown                  | FIXME                |
-| Granularity, omission, null and validation           | FIXME                  | unknown                  | FIXME                |
-| Conflicts, atomicity and deletion                    | FIXME                  | unknown                  | FIXME                |
-| Activation, completion, observation and reachability | FIXME                  | unknown                  | FIXME                |
-| Secrets and rotation                                 | FIXME                  | unknown                  | FIXME                |
-| Bootstrap and first-run detection                    | FIXME                  | unknown                  | FIXME                |
-| Version identity, stability and extensions           | FIXME                  | unknown                  | FIXME                |
-| Existing automation and lab qualification            | FIXME                  | unknown                  | FIXME                |
-
-Representative trace: FIXME link identity lookup, supplied and omitted fields,
-validation, persistence, secrets, activation if present, and lost-response
-recovery. State the protocol and replacements for the client, fake transport,
-fake server, definitions and identifier type.
+## Structure and boundaries
 
 The product owns its engine and definitions. `foundata.utils` owns byte
 transport, deadlines, JSON decoding and safe error translation. Inventory is
@@ -62,8 +45,30 @@ builtins; payload Python remains 3.9.
 | -------- | ----------------------------- | -------- | --------- | ------------------- | ------------------- |
 | FIXME    | resource, info or operational | FIXME    | FIXME     | none or named scope | FIXME               |
 
-Further resources: select from the inventory, naming unresolved identity,
-ownership or activation questions. Move planned work to issues at publication.
+## Scope
 
-Skeleton adaptations: FIXME record product-specific changes; keep the shared
-lifecycle, harness and research scaffolds unless evidence requires a change.
+Context: <deployment paths foundata runs or will run; who operates the
+product; their first-week and first-month tasks; hard exclusions>
+
+Deployment ownership per path:
+
+|                 Path                 |         Owner          |        Role         | Reserves |
+| ------------------------------------ | ---------------------- | ------------------- | -------- |
+| <official image, package, appliance> | <collection or caller> | <role name or none> | <settings and files the deployment owns> |
+
+Candidates, ranked by operator value. One row per administration task, not
+per inventory object:
+
+| Rank | Administration task | Inventory objects  |              Value              |                              Risk class                              |  Evidence cost  | Status |
+| ---- | ------------------- | ------------------ | ------------------------------- | -------------------------------------------------------------------- | --------------- | ------ |
+| 1    | <task>              | <objects it needs> | <first week, first month, rare> | <none, management connection, secrets, global activation, data loss> | <spikes needed> | <planned for X; qualified; shipped in X; blocked by <gate>; excluded because <reason>> |
+
+Cuts: MVP <the two resources chosen for engine evidence, and why>; 1.0.0
+<every essential administration task from the intake; evidence-blocked tasks
+returned to the owner with their evidence>; later <the non-essential, in
+order>. Approved by the owner on <date>; re-approved on <date> where the picture
+changed (the approval is a commit of its own whose subject starts with
+`scope: approve`).
+
+Exclusions with guard decisions: <each excluded task: its risk, the guard
+options considered, the decision, and the evidence that would lift it>

@@ -20,6 +20,14 @@ and the project adheres to
 
 ### Changed
 
+- collection_modules, collection_modules_grid: the architecture template
+  carries structure, decisions and scope only; the research record table,
+  sources and skeleton adaptations belong to the research record in
+  foundata's designs repository, and the evidence labels gain O (observed).
+- collection_modules, collection_modules_grid: the architecture template's
+  "Further resources" becomes the Scope section the module guide defines:
+  deployment ownership per path, administration tasks ranked by operator
+  value, the cuts and the exclusions with guard decisions.
 - collection_modules_grid: share the protocol-free lifecycle, activation
   workflow, test runner and research scaffolds with the REST variant.
 
