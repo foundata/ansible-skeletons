@@ -155,6 +155,12 @@ def test_definition_can_allow_an_empty_identity_component(
     assert not fake.writes()
 
 
+def test_identity_keys_are_strings() -> None:
+    resource = replace(subject.RESOURCE, keys=(Key("tag", "VLAN tag", kind="int"),))
+    with pytest.raises(ValueError, match="identity keys are strings"):
+        build_spec(resource)
+
+
 @pytest.mark.parametrize("incomplete", [False, True])
 def test_listing_is_complete_or_fails(
     fake: FakeProduct, run_module: RunModule, incomplete: bool

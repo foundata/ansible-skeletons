@@ -138,9 +138,16 @@ class Resource:
 
 
 def build_spec(resource: Resource) -> dict[str, Any]:
-    """Fresh specs; mutable fields have no defaults."""
+    """Fresh specs; mutable fields have no defaults.
+
+    Raises:
+        ValueError: If an identity key is not a string; the engine matches
+            identities as text.
+    """
     spec = api_argument_spec()
     for key in resource.keys:
+        if key.kind != "str":
+            raise ValueError("identity keys are strings; use kind='str' with a pattern")
         spec[key.name] = {"type": key.kind}
         if key.default is None:
             spec[key.name]["required"] = True
