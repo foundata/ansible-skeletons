@@ -67,9 +67,31 @@ def test_accepted_but_not_effective_fails(
     assert result["changed"] and result["outcome"] == "changed"
 
 
-def test_no_verification_is_invalid(fake: FakeProduct, run_module: RunModule) -> None:
+def test_lost_always_response_on_in_sync_state_is_unknown(
+    fake: FakeProduct, run_module: RunModule
+) -> None:
+    fake.add(value="saved")
+    assert run_module(fixture_apply.main, verify=["example"])["changed"]
+    fake.after_write["reconfigure"] = lost_response
+    result = run_module(fixture_apply.main, verify=["example"], activate="always")
+    assert result["failed"] and result["changed"] and result["outcome"] == "unknown"
+
+
+def test_no_verification_is_invalid_for_auto(
+    fake: FakeProduct, run_module: RunModule
+) -> None:
     result = run_module(fixture_apply.main, verify=[])
     assert result["failed"] and not result["changed"] and not fake.writes()
+
+
+def test_always_without_verification_is_unverifiable(
+    fake: FakeProduct, run_module: RunModule
+) -> None:
+    fake.add()
+    result = run_module(fixture_apply.main, verify=[], activate="always")
+    assert result["changed"] and result["activated"]
+    assert result["verified"] == "unverifiable" and result["verification"] == {}
+    assert len(fake.writes()) == 1
 
 
 def test_secret_failure_is_sanitized(fake: FakeProduct, run_module: RunModule) -> None:

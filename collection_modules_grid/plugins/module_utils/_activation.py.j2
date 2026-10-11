@@ -65,7 +65,7 @@ def argument_spec() -> dict[str, Any]:
     """Return a fresh specification of an activation module."""
     spec = api_argument_spec()
     spec["activate"] = {"type": "str", "default": "auto", "choices": ["auto", "always"]}
-    spec["verify"] = {"type": "list", "elements": "str", "required": True}
+    spec["verify"] = {"type": "list", "elements": "str"}
     return spec
 
 
@@ -84,7 +84,9 @@ def run(
     operation = "validate"
     applied = False
     try:
-        if not names or not all(re.fullmatch(name_pattern, name) for name in names):
+        if (module.params["activate"] == "auto" and not names) or not all(
+            re.fullmatch(name_pattern, name) for name in names
+        ):
             raise ProductError(code="validation_failed", fields=["verify"])
         client = Client(module.params)
         operation = "compare"
@@ -95,7 +97,11 @@ def run(
             "activated": needed,
             "verified": "predicted"
             if module.check_mode
-            else ("unverifiable" if "unverifiable" in before.values() else "observed"),
+            else (
+                "unverifiable"
+                if not before or "unverifiable" in before.values()
+                else "observed"
+            ),
             "verification": before,
         }
         if needed:
@@ -108,13 +114,15 @@ def run(
             apply(client)
             applied = True
         except errors.TransportTimeout:
-            # The outcome is unknown; the verification below settles it.
-            pass
+            # An already matching state cannot establish that this apply ran.
+            if "drift" not in before.values():
+                raise
         operation = "verify"
         result["verification"] = settle(client, names)
         result["verified"] = (
             "unverifiable"
-            if "unverifiable" in result["verification"].values()
+            if not result["verification"]
+            or "unverifiable" in result["verification"].values()
             else "observed"
         )
         module.exit_json(**result)
