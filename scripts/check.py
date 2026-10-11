@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Run local quality checks, optionally expanding to the release matrix."""
 
 import argparse

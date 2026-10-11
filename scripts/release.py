@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Validate a committed release, create its local tag, or verify publication."""
 
 import argparse

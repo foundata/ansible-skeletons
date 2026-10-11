@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Shared process, configuration and filesystem operations for local gates."""
 
 import hashlib

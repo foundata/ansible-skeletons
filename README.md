@@ -1,5 +1,10 @@
 # Ansible (Galaxy) Skeletons
 
+<!--
+SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 Opinionated blueprints for `ansible-galaxy role|collection init`.
 
 Ansible Skeletons help you start new
@@ -312,10 +317,8 @@ during periods with few repository updates.
 ## Licensing, copyright<a id="licensing-copyright"></a>
 
 <!--REUSE-IgnoreStart-->
-<!-- rumdl-disable MD034 --><!-- should match SPDX-PackageSupplier -->
-Copyright (c) 2020, 2023-2026, [foundata GmbH](https://foundata.com/)
-(https://foundata.com)
-<!-- rumdl-enable MD034 -->
+<!-- should match SPDX-PackageSupplier -->
+Copyright (c) 2020, 2023-2026, foundata GmbH <https://foundata.com>
 
 This project is licensed under the GNU General Public License v3.0 or later
 (SPDX-License-Identifier: `GPL-3.0-or-later`), see

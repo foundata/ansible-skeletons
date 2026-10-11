@@ -1,5 +1,10 @@
 # Development
 
+<!--
+SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 This repository ships skeletons for `ansible-galaxy`. Before a release, the
 checks generate projects from all four skeletons, run their roles, and build
 and install the generated collections.

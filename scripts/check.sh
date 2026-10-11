@@ -1,5 +1,8 @@
 #!/usr/bin/env sh
 # Run the repository checks from any working directory.
+#
+# SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 set -u
 

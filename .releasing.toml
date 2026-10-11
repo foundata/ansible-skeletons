@@ -1,6 +1,9 @@
 # How this repository is released, read by foundata's `release` command:
 # https://github.com/foundata/releasing/blob/main/docs/source-repositories.md
 #
+# SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
 # The skeletons are used from the tagged source repository. Nothing is built
 # or uploaded, and the version lives in CHANGELOG.md and the tag; the
 # development-only pyproject.toml is not a version site.

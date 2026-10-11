@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Check generated Nox behavior without requiring Nox in the unit environment."""
 
 import runpy
