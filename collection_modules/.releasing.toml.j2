@@ -1,0 +1,11 @@
+# How this collection is released, read by foundata's `release` command:
+# https://github.com/foundata/releasing/blob/main/docs/ansible-collections.md
+#
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The version lives in galaxy.yml, antsibull-changelog owns the changelog and
+# the artifact is one tarball on Ansible Galaxy. galaxy.yml lists this file
+# under build_ignore so that it never ships.
+repository = {{ release_repository | default('FIXME owner/repository, for example foundata/ansible-collection-' ~ collection_name) | to_json(ensure_ascii=False) }}
+ecosystem = "ansible-collection"

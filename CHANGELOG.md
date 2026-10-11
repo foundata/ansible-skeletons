@@ -16,6 +16,10 @@ and the project adheres to
 
 ### Added
 
+- collection_default, collection_modules, collection_modules_grid: a
+  `.releasing.toml` declaration for foundata's `release` command (ecosystem
+  `ansible-collection`, `repository` to set before the first release), kept
+  out of the archive by `build_ignore`.
 - collection_modules: a module-only skeleton for REST products: integer
   identifiers, by-name 404 absence, empty-page pagination, native JSON and
   immediate writes, with a replaceable fixture that exercises a reference, a

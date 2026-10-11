@@ -240,6 +240,7 @@ def test_skeleton_lint_configurations_stay_in_sync(profile: str) -> None:
     for name in (
         ".gitattributes.j2",
         ".gitignore.j2",
+        ".releasing.toml.j2",
         ".rumdl.toml.j2",
         ".yamllint.j2",
         "CHANGELOG.rst.j2",
