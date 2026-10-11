@@ -66,6 +66,13 @@ def requested(fake: FakeProduct, path: str) -> int:
     return sum(1 for _method, request, _body in fake.requests if request == path)
 
 
+def add_dependent(fake: FakeProduct, identity: Any) -> None:
+    """Make a dependent record refer to the record ``identity``."""
+    fake.counter += 1
+    fake.dependents[fake.counter] = {"id": fake.counter, "fixture_id": identity}
+    fake.rows[identity]["dependent_ids"].append(fake.counter)
+
+
 def stored_set(values: list[str]) -> Any:
     """A set field value as the fake stores it."""
     return list(values)

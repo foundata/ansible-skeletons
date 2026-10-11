@@ -25,6 +25,7 @@ from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_ut
     Engine,
     Field,
     Key,
+    Reference,
     Resource,
     build_spec,
     normalize,
@@ -159,6 +160,23 @@ def test_identity_keys_are_strings() -> None:
     resource = replace(subject.RESOURCE, keys=(Key("tag", "VLAN tag", kind="int"),))
     with pytest.raises(ValueError, match="identity keys are strings"):
         build_spec(resource)
+
+
+def test_deletion_guard_refuses_a_referenced_object(
+    fake: FakeProduct, run_module: RunModule
+) -> None:
+    identity = subject.add(fake)
+    subject.add_dependent(fake, identity)
+    refused = run_module(subject.main, name="example", state="absent")
+    assert refused["failed"] and refused["error_code"] == "referenced"
+    assert not refused["changed"] and refused["outcome"] == "unchanged"
+    assert not fake.writes() and identity in subject.rows(fake)
+
+
+def test_clients_decode_integer_map_keys() -> None:
+    reference = Reference("/owners", "name", Key("id", "Owner", kind="int", minimum=1))
+    field = Field("rights", "map", "Rights", choices=("read",), reference=reference)
+    assert Client.decode(field, {"7": ["read"]}) == {7: ["read"]}
 
 
 @pytest.mark.parametrize("incomplete", [False, True])

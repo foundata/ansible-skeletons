@@ -108,6 +108,7 @@ class DeletionGuard:
     identifier: Key
     actions: Actions = Actions()
     post_key: str = ""
+    kind: str = "set"
 
 
 @dataclass(frozen=True)
@@ -350,10 +351,7 @@ class Engine:
         if field.kind == "ref":
             return name(value)
         if field.kind == "map" and isinstance(value, dict):
-            return {
-                name(int(k) if ref.identifier.kind == "int" and k.isdecimal() else k): v
-                for k, v in value.items()
-            }
+            return {name(k): v for k, v in value.items()}
         if isinstance(value, list):
             return [name(item) for item in value]
         raise ProductError(category="response", code="schema", fields=[field.name])
@@ -535,7 +533,9 @@ class Engine:
                     )
         if absent and found is not None:
             for guard in resource.refuse_delete_when:
-                refs = found.get(guard.field)
+                refs = self.client.decode(
+                    Field(guard.field, guard.kind, guard.field), found.get(guard.field)
+                )
                 if not isinstance(refs, list):
                     raise ProductError(category="response", code="schema")
                 for value in refs:

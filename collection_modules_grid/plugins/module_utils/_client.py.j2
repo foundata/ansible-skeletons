@@ -383,6 +383,18 @@ class Client:
                 raise ProductError(
                     category="response", code="schema", fields=[field.name]
                 ) from None
+        reference = getattr(field, "reference", None)
+        if (
+            field.kind == "map"
+            and isinstance(raw, dict)
+            and reference is not None
+            and reference.identifier.kind == "int"
+        ):
+            # JSON object keys are text; integer identifiers become numbers again.
+            return {
+                int(key) if isinstance(key, str) and key.isdecimal() else key: rights
+                for key, rights in raw.items()
+            }
         return raw
 
     def list(self, resource: Any) -> list[dict[str, Any]]:

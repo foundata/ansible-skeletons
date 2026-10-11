@@ -194,7 +194,8 @@ scenario. It contains no deployment role.
 
 Its fixture speaks a grid API with UUID identifiers, paginated `search_item`
 listings with a declared total, `add_item`, `set_item` and `del_item` actions,
-string-encoded values and fixed response envelopes. For REST products, use
+string-encoded values and fixed response envelopes; deletion is refused while a
+dependent record refers to the fixture. For REST products, use
 `collection_modules` below.
 
 Render with the metadata from the usage example and the product's display name:

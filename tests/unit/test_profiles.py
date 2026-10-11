@@ -185,6 +185,26 @@ def test_engine_contains_no_protocol_literals(profile: str) -> None:
         and node.attr in {"read", "write", "search", "_request"}
         for node in ast.walk(tree)
     )
+    # Product limits belong to definitions: numbers other than 0 and 1 may
+    # appear only as dataclass defaults.
+    defaults = {
+        id(constant)
+        for cls in ast.walk(tree)
+        if isinstance(cls, ast.ClassDef)
+        for statement in cls.body
+        if isinstance(statement, ast.AnnAssign) and statement.value is not None
+        for constant in ast.walk(statement.value)
+    }
+    numbers = [
+        node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant)
+        and isinstance(node.value, (int, float))
+        and not isinstance(node.value, bool)
+        and node.value not in (0, 1)
+        and id(node) not in defaults
+    ]
+    assert not numbers
 
 
 def test_rest_fixture_has_no_activation_surface() -> None:

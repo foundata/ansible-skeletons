@@ -5,10 +5,13 @@ from __future__ import annotations
 
 from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._engine import (
     Actions,
+    DeletionGuard,
     Field,
     Key,
     Resource,
 )
+
+UUID = r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}"
 
 FIXTURE = Resource(
     name="fixture",
@@ -23,9 +26,17 @@ FIXTURE = Resource(
         Field("labels", "set", "Unordered public labels"),
     ),
     result_key="fixture",
-    identifier=Key(
-        "uuid", "Server identifier", r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}"
-    ),
+    identifier=Key("uuid", "Server identifier", UUID),
     actions=Actions("search_item", "get_item", "add_item", "set_item", "del_item"),
     activation="fixture_apply",
+    refuse_delete_when=(
+        DeletionGuard(
+            "dependents",
+            "/dependent",
+            "fixture",
+            Key("uuid", "Dependent identifier", UUID),
+            actions=Actions(get="get_item"),
+            post_key="dependent",
+        ),
+    ),
 )

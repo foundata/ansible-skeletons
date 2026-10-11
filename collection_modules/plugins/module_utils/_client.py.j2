@@ -284,6 +284,18 @@ class Client:
 
     @staticmethod
     def decode(field: Any, value: Any) -> Any:
+        reference = getattr(field, "reference", None)
+        if (
+            field.kind == "map"
+            and isinstance(value, dict)
+            and reference is not None
+            and reference.identifier.kind == "int"
+        ):
+            # JSON object keys are text; integer identifiers become numbers again.
+            return {
+                int(key) if isinstance(key, str) and key.isdecimal() else key: rights
+                for key, rights in value.items()
+            }
         return value
 
     def probe(self, route: str) -> None:
