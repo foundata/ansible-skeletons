@@ -81,6 +81,9 @@ def required_backends(changed: list[str], *, initial: bool = False) -> list[str]
     ):
         backends.update(("libvirt", "ee"))
     for path in changed:
+        # Module skeleton scenarios run against their fake in the matrix check.
+        if not path.startswith(("role_default/", "collection_default/")):
+            continue
         if "/molecule/shared/" in path or "/molecule/default/" in path:
             backends.add("libvirt")
         if (

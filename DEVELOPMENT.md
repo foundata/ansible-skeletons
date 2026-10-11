@@ -1,10 +1,10 @@
 # Development
 
 This repository ships skeletons for `ansible-galaxy`. Before a release, the
-checks generate projects from all three skeletons, run their roles, and build
-and install the generated collection.
+checks generate projects from all four skeletons, run their roles, and build
+and install the generated collections.
 
-The module skeleton also renders two identities and exercises installed fixture
+Both module skeletons also render two identities and exercise installed fixture
 modules. While `foundata.utils` is unpublished, pass
 `--utils-source /path/to/utils` to checks and release checks, or set
 `SKELETONS_UTILS_SOURCE`.
@@ -96,7 +96,8 @@ Edit each skeleton directly in its own directory.
 through the render and release gates; the unit tests enforce their shared-file
 list without a composition layer. Quick checks run their default nox sessions
 in check-only mode; full matrix checks add the sanity, unit and integration
-sessions, one chain at a time.
+sessions, one chain at a time, and the Molecule scenario against the first
+identity's own fake product.
 
 
 ## Development standards<a id="development-standards"></a>
@@ -267,8 +268,9 @@ skeleton-specific gate (`scripts/release.py check`).
 
    ```sh
    evidence="../ansible-skeletons-release-${version}"
+   utils_source="../foundata.utils"  # while foundata.utils is unpublished
    uv run --locked python -m scripts.release check "${version}" \
-     --output "${evidence}"
+     --output "${evidence}" --utils-source "${utils_source}"
    ```
 
    Inspect `check.log` while the gate runs. A successful run creates
@@ -304,7 +306,8 @@ skeleton-specific gate (`scripts/release.py check`).
 8. Verify the published tag, the latest release and a fresh public clone:
 
    ```sh
-   uv run --locked python -m scripts.release verify "${evidence}/report.json"
+   uv run --locked python -m scripts.release verify "${evidence}/report.json" \
+     --utils-source "${utils_source}"
    ```
 
    `release verify` checks that the remote holds the tag and that the forge

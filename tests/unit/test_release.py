@@ -236,6 +236,16 @@ def test_subprocess_failure_leaves_no_passing_report(
             ["podman", "libvirt"],
         ),
         (["role_default/molecule/ee/tasks/verify/ee.yml.j2"], ["podman", "ee"]),
+        (
+            ["collection_modules/extensions/molecule/default/molecule.yml.j2"],
+            ["podman"],
+        ),
+        (
+            [
+                "collection_modules_grid/extensions/molecule/shared/playbooks/verify.yml.j2"
+            ],
+            ["podman"],
+        ),
         (["scripts/check.py"], ["podman", "libvirt", "ee"]),
     ],
 )

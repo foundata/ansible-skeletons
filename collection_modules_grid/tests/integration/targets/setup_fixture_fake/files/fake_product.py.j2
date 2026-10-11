@@ -44,7 +44,7 @@ class Handler(BaseHTTPRequestHandler):
             threading.Thread(target=self.server.shutdown, daemon=True).start()
             return
         if self.path == "/api/system/version":
-            self.send_json(200, {"product": {{ product | default('Example Grid') | to_json }}, "version": "1.0.0"})
+            self.send_json(200, {"version": "1.0.0"})
             return
         if self.path == "/api/fixture/reconfigure":
             type(self).active = copy.deepcopy(self.records)

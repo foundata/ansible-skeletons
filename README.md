@@ -201,6 +201,16 @@ dependent record refers to the fixture. For REST products, use
 Render with the metadata from the usage example and the product's display name:
 
 ```sh
+cat > metadata.json <<'EOF'
+{
+  "authors": ["FIXME User <user@example.com>"],
+  "company": "FIXME your organization",
+  "description": "Manage FIXME.",
+  "repository": "https://FIXME.example.com/repo/",
+  "issues": "https://FIXME.example.com/repo/issues/",
+  "homepage": "https://FIXME.example.com"
+}
+EOF
 ansible-galaxy collection init \
   --collection-skeleton ./collection_modules_grid \
   --extra-vars @metadata.json \
@@ -233,7 +243,8 @@ ansible-galaxy collection init \
   --extra-vars '{"product": "Example REST Product"}' namespace.product
 ```
 
-The metadata defaults and `foundata.utils` prerequisite are the same as above.
+The `metadata.json`, the defaults and the `foundata.utils` prerequisite are the
+same as above.
 Follow the rendered `FIXME.md` to replace the fixture with product evidence.
 
 
@@ -274,6 +285,8 @@ The matrix is defined in `pyproject.toml`; see
 [Development: Testing](./DEVELOPMENT.md#testing) for repeatable commands and
 infrastructure coverage. It is reviewed against the
 [upstream support matrix](https://docs.ansible.com/ansible/latest/reference_appendices/release_and_maintenance.html#ansible-core-support-matrix).
+Module skeleton checks run on the default lane; their rendered collections carry
+their own lanes.
 
 ansible-core before 2.19 cannot run the rendered content: the templates write
 Jinja's own filters and tests as `ansible.builtin.<name>`, which ansible-core

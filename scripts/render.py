@@ -1,6 +1,7 @@
 """Render both skeletons into a new directory using ansible-galaxy."""
 
 import argparse
+import os
 import re
 import sys
 from dataclasses import dataclass
@@ -9,6 +10,20 @@ from pathlib import Path
 from scripts.common import ROOT, GateError, isolated_environment, run, write_json
 
 MODULE_PROFILES = ("collection_modules_grid", "collection_modules")
+PRODUCTS = {
+    "collection_modules_grid": "Example Grid",
+    "collection_modules": "Example REST Product",
+}
+"""Product display names of the example renders of each module profile."""
+
+
+def skeleton_revision() -> str:
+    """Revision a render records: SKELETONS_REVISION, git describe or a marker."""
+    return os.environ.get("SKELETONS_REVISION") or (
+        run(["git", "describe", "--tags", "--always"], capture=True).strip()
+        if (ROOT / ".git").exists()
+        else "source archive"
+    )
 
 
 @dataclass(frozen=True)
@@ -133,11 +148,15 @@ def main() -> int:
         default="collection_default",
     )
     args = parser.parse_args()
+    metadata = None if args.defaults else example_metadata()
+    if metadata is not None and args.profile in PRODUCTS:
+        metadata["product"] = PRODUCTS[args.profile]
+        metadata["skeleton_revision"] = skeleton_revision()
     try:
         rendered = render(
             args.output,
             source=args.source,
-            metadata=None if args.defaults else example_metadata(),
+            metadata=metadata,
             profile=args.profile,
         )
     except (GateError, OSError) as exc:

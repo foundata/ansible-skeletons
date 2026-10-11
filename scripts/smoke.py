@@ -8,6 +8,7 @@ import re
 import subprocess
 import sys
 import tarfile
+import time
 import tomllib
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -15,7 +16,14 @@ from pathlib import Path
 import yaml
 
 from scripts.common import ROOT, GateError, run, write_json
-from scripts.render import MODULE_PROFILES, Rendered, example_metadata, render
+from scripts.render import (
+    MODULE_PROFILES,
+    PRODUCTS,
+    Rendered,
+    example_metadata,
+    render,
+    skeleton_revision,
+)
 
 
 def check_tree(source: Path, destination: Path) -> None:
@@ -208,6 +216,52 @@ def build_collection(rendered: Rendered) -> Path:
     return archive
 
 
+def molecule_with_fake(rendered: Rendered) -> None:
+    """Run the module Molecule scenario against the render's own fake product."""
+    state = rendered.work / "molecule-fake"
+    state.mkdir()
+    credentials = state / "credentials"
+    credentials.write_text("SYNTHETIC-KEY:SYNTHETIC-SECRET", encoding="utf-8")
+    credentials.chmod(0o600)
+    scenario_credentials = state / "credentials.json"
+    write_json(
+        scenario_credentials, {"key": "SYNTHETIC-KEY", "secret": "SYNTHETIC-SECRET"}
+    )
+    fake = (
+        rendered.collection
+        / "tests/integration/targets/setup_fixture_fake/files/fake_product.py"
+    )
+    with (state / "server.log").open("w", encoding="utf-8") as log:
+        server = subprocess.Popen(
+            [sys.executable, str(fake), str(state), "3600"],
+            stdin=subprocess.DEVNULL,
+            stdout=log,
+            stderr=subprocess.STDOUT,
+        )
+        try:
+            for _attempt in range(300):
+                if (state / "port").is_file() or server.poll() is not None:
+                    break
+                time.sleep(0.1)
+            if not (state / "port").is_file():
+                raise GateError("The fake product did not report its port")
+            port = (state / "port").read_text(encoding="utf-8").strip()
+            run(
+                ["uv", "run", "--python", "3.13", "noxfile.py", "-s", "molecule"],
+                cwd=rendered.collection,
+                env={
+                    **rendered.env,
+                    "CI": "true",
+                    "MOLECULE_PRODUCT_URL": f"http://127.0.0.1:{port}/api",
+                    "MOLECULE_PRODUCT_CREDENTIALS": str(scenario_credentials),
+                },
+                timeout=1800,
+            )
+        finally:
+            server.terminate()
+            server.wait(timeout=30)
+
+
 def install_utils(rendered: Rendered, source: Path) -> None:
     """Build the explicitly supplied unpublished dependency into the isolated tree."""
     if not (source / "galaxy.yml").is_file():
@@ -316,18 +370,17 @@ def module_smoke(
         (("skeleton_test", "module_fixture"), ("alternate_ns", "other_product"))
     ):
         metadata = example_metadata(punctuation=bool(index))
-        metadata["product"] = "Example Grid" if index == 0 else "Other Product"
+        # A double quote in the second name must survive every rendered file.
+        metadata["product"] = (
+            PRODUCTS[profile] if index == 0 else 'Other "Quoted" Product'
+        )
         if index == 0:
             metadata.pop("version")
             metadata.pop("min_ansible_version")
         else:
             metadata["version"] = "2.3.0"
             metadata["min_ansible_version"] = "2.19.1"
-        metadata["skeleton_revision"] = os.environ.get("SKELETONS_REVISION") or (
-            run(["git", "describe", "--tags", "--always"], capture=True).strip()
-            if (ROOT / ".git").exists()
-            else "source archive"
-        )
+        metadata["skeleton_revision"] = skeleton_revision()
         rendered = render(
             output / name,
             namespace=namespace,
@@ -420,6 +473,8 @@ def module_smoke(
                 env={**rendered.env, "CI": "true"},
                 timeout=7200,
             )
+        if full and index == 0:
+            molecule_with_fake(rendered)
         build_collection(rendered)
         exercise_modules(rendered)
     write_json(
