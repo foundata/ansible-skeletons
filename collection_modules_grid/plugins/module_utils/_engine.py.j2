@@ -91,6 +91,8 @@ class Field:
     normalizer: Callable[[str], str] | None = None
     pattern: str = ""
     minimum_items: int = 0
+    maximum_items: int | None = 256
+    item_limit: int | None = 150
 
 
 @dataclass(frozen=True)
@@ -197,6 +199,16 @@ def identifier(key: Key, value: Any) -> str | int:
     return value
 
 
+def within(field: Field, count: int) -> bool:
+    """Whether a set, name list or map stays within the definition's entry bound."""
+    return field.maximum_items is None or count <= field.maximum_items
+
+
+def item_within(field: Field, item: str) -> bool:
+    """Whether an entry or key is non-empty and within the definition's item limit."""
+    return bool(item) and (field.item_limit is None or len(item) <= field.item_limit)
+
+
 def normalize(field: Field, raw: Any, *, input_value: bool = False) -> Any:
     """Validate native public values; clients decode their wire values first."""
     invalid = ProductError(
@@ -222,23 +234,23 @@ def normalize(field: Field, raw: Any, *, input_value: bool = False) -> Any:
     if field.kind == "int" and isinstance(raw, int) and not isinstance(raw, bool):
         return raw
     if field.kind in ("set", "names"):
-        if not isinstance(raw, list) or len(raw) > 256:
+        if not isinstance(raw, list) or not within(field, len(raw)):
             raise invalid
         if input_value and len(raw) < field.minimum_items:
             raise invalid
-        if any(not isinstance(v, str) or not 0 < len(v) <= 150 for v in raw):
+        if any(not isinstance(v, str) or not item_within(field, v) for v in raw):
             raise invalid
         if field.pattern and any(not re.fullmatch(field.pattern, v) for v in raw):
             raise invalid
         return list(dict.fromkeys(raw))
     if field.kind == "map":
-        if not isinstance(raw, dict) or len(raw) > 256:
+        if not isinstance(raw, dict) or not within(field, len(raw)):
             raise invalid
         result = {}
         for key, rights in raw.items():
             if (
                 not isinstance(key, str)
-                or not 0 < len(key) <= 150
+                or not item_within(field, key)
                 or not isinstance(rights, list)
             ):
                 raise invalid

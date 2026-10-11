@@ -21,9 +21,11 @@ from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_ut
 )
 from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._engine import (
     Engine,
+    Field,
     Key,
     Resource,
     build_spec,
+    normalize,
     run_resource,
 )
 from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.modules import (
@@ -33,6 +35,41 @@ from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.modules i
 
 from ..conftest import RunModule
 from ..fake_product import OLD_SECRET, SECRET, FakeProduct, Response, lost_response
+
+
+@pytest.mark.parametrize("kind", ["set", "names"])
+@pytest.mark.parametrize("input_value", [False, True])
+def test_set_bounds_follow_the_definition(kind: str, input_value: bool) -> None:
+    field = Field("members", kind, "Members")
+    assert normalize(field, ["x" * 150], input_value=input_value) == ["x" * 150]
+    for values in (["x" * 151], [str(i) for i in range(257)]):
+        with pytest.raises(ProductError):
+            normalize(field, values, input_value=input_value)
+    larger = replace(field, maximum_items=300, item_limit=255)
+    values = [str(i) for i in range(257)] + ["x" * 151]
+    assert normalize(larger, values, input_value=input_value) == values
+    for values in (["x" * 256], [str(i) for i in range(301)]):
+        with pytest.raises(ProductError):
+            normalize(larger, values, input_value=input_value)
+    unbounded = replace(field, maximum_items=None, item_limit=None)
+    values = [str(i) for i in range(301)] + ["x" * 256]
+    assert normalize(unbounded, values, input_value=input_value) == values
+    for invalid in ([""], [None], "not-a-list"):
+        with pytest.raises(ProductError):
+            normalize(unbounded, invalid, input_value=input_value)
+
+
+def test_map_bounds_follow_the_definition() -> None:
+    field = Field("rights", "map", "Rights", choices=("read",))
+    assert normalize(field, {"x" * 150: ["read"]}) == {"x" * 150: ["read"]}
+    for invalid in ({"x" * 151: ["read"]}, {str(i): ["read"] for i in range(257)}):
+        with pytest.raises(ProductError):
+            normalize(field, invalid)
+    unbounded = replace(field, maximum_items=None, item_limit=None)
+    assert normalize(unbounded, {"x" * 151: ["read"]}) == {"x" * 151: ["read"]}
+    assert len(normalize(unbounded, {str(i): ["read"] for i in range(257)})) == 257
+    with pytest.raises(ProductError):
+        normalize(unbounded, {"": ["read"]})
 
 
 def entry(resource: Resource) -> Callable[[], None]:

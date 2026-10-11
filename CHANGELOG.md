@@ -37,6 +37,11 @@ and the project adheres to
   reports a lost apply reply on an already matching state as an unknown
   outcome instead of success, and `activate: always` no longer requires a
   `verify` list (found by the OPNsense expand run).
+- collection_modules, collection_modules_grid: the entry count and entry
+  length bounds of set, name list and map fields are definition-owned
+  (`maximum_items`, `item_limit`, defaults 256 and 150) so a product can
+  admit larger existing objects instead of stranding them on read and
+  delete (found by the OPNsense expand run).
 - collection_default, collection_modules_grid: `changelogs/changelog.yaml`
   starts with no release entry. The placeholder 1.0.0 summary made the first
   `release_summary` fragment fail as a second summary; the example stays as a
