@@ -650,16 +650,32 @@ def check_molecule_contract(rendered: Rendered) -> None:
 def smoke(output: Path, *, lint: bool = False) -> None:
     """Run a complete rendering and consumer smoke test in the current lane."""
     output.mkdir(parents=True, exist_ok=False)
-    for case, metadata in (
-        ("defaults", None),
-        ("explicit", example_metadata()),
-        ("punctuation", example_metadata(punctuation=True)),
+    names = ("skeleton_test", "example_app", "example_role")
+    # Long names push generated lines past the YAML and Markdown limits.
+    long_names = (
+        "zz_alternate_namespace",
+        "another_long_product_name",
+        "zz_long_role_name_for_tests",
+    )
+    for case, metadata, (namespace, collection_name, role_name) in (
+        ("defaults", None, names),
+        ("explicit", example_metadata(), names),
+        ("punctuation", example_metadata(punctuation=True), names),
+        ("long-names", example_metadata(punctuation=True), long_names),
     ):
-        rendered = render(output / case, metadata=metadata)
+        rendered = render(
+            output / case,
+            metadata=metadata,
+            namespace=namespace,
+            collection_name=collection_name,
+            role_name=role_name,
+        )
         check_tree(ROOT / "role_default", rendered.role)
         check_tree(ROOT / "collection_default", rendered.collection)
         if metadata is not None:
             check_metadata(rendered, metadata)
+        if case == "long-names" and lint:
+            lint_resources(rendered)
         if case != "explicit":
             continue
         if lint:

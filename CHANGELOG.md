@@ -16,7 +16,8 @@ and the project adheres to
 - collection_modules_grid: an independent module-only skeleton with a grid-API
   fixture, a replaceable resource engine, API tests and research scaffolds.
 - checks: distinct-identity rendering and installed module checks for
-  both module variants; the full matrix includes their ansible-test lanes.
+  both module variants; the full matrix includes their ansible-test lanes. A
+  long-name identity checks `collection_default` and `role_default`.
 
 ### Changed
 
@@ -54,6 +55,11 @@ and the project adheres to
   instead of a Jinja load error.
 - (collection|role)_default: the README licensing section says "an SPDX
   software bill of materials" instead of "a SPDX".
+- (collection|role)_default: long namespace, collection and role names no
+  longer push the commented service examples, the neutralized file content or
+  the README lines past the YAML and Markdown line limits; the written file
+  content is unchanged. The `run` role's argument specification describes the
+  entry point as "Main entry point for the run role".
 
 
 ## [2.9.0] - 2026-10-05

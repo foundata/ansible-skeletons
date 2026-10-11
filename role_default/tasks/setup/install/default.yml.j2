@@ -32,23 +32,25 @@
   ansible.builtin.copy:
     dest: "{{ '{{' }} __{{ role_name }}_neutralize_item['key'] {{ '}}' }}"
     content: |
-      {{ '{{' }} __{{ role_name }}_neutralize_item['value'] {{ '}}' }} Managed by Ansible (foundata.{{ role_name }}.run)
-      {{ '{{' }} __{{ role_name }}_neutralize_item['value'] {{ '}}' }}
-      {{ '{{' }} __{{ role_name }}_neutralize_item['value'] {{ '}}' }} Content intentionally cleared. The original distribution file conflicted
-      {{ '{{' }} __{{ role_name }}_neutralize_item['value'] {{ '}}' }} with configuration managed by the foundata.{{ role_name }}.run role.
-      {{ '{{' }} __{{ role_name }}_neutralize_item['value'] {{ '}}' }}
-      {{ '{{' }} __{{ role_name }}_neutralize_item['value'] {{ '}}' }} To restore the original file content, reinstall the owning package:
+      {{ '{%' }} set prefix = __{{ role_name }}_neutralize_item['value'] {{ '-%}' }}
+      {{ '{%' }} set path = __{{ role_name }}_neutralize_item['key'] {{ '-%}' }}
+      {{ '{{' }} prefix {{ '}}' }} Managed by Ansible (foundata.{{ role_name }}.run)
+      {{ '{{' }} prefix {{ '}}' }}
+      {{ '{{' }} prefix {{ '}}' }} Content intentionally cleared. The original distribution file conflicted
+      {{ '{{' }} prefix {{ '}}' }} with configuration managed by the foundata.{{ role_name }}.run role.
+      {{ '{{' }} prefix {{ '}}' }}
+      {{ '{{' }} prefix {{ '}}' }} To restore the original file content, reinstall the owning package:
       {{ '{%' }} if (ansible_facts['os_family'] | ansible.builtin.lower) == 'debian' {{ '%}' }}
-      {{ '{{' }} __{{ role_name }}_neutralize_item['value'] {{ '}}' }}   dpkg -S '{{ '{{' }} __{{ role_name }}_neutralize_item['key'] {{ '}}' }}'  # find the package that owns this file
-      {{ '{{' }} __{{ role_name }}_neutralize_item['value'] {{ '}}' }}   apt-get install --reinstall <package>  # reinstall it to restore the original
+      {{ '{{' }} prefix {{ '}}' }}   dpkg -S '{{ '{{' }} path {{ '}}' }}'  # find the package that owns this file
+      {{ '{{' }} prefix {{ '}}' }}   apt-get install --reinstall <package>  # reinstall it to restore the original
       {{ '{%' }} elif (ansible_facts['os_family'] | ansible.builtin.lower) == 'suse' {{ '%}' }}
-      {{ '{{' }} __{{ role_name }}_neutralize_item['value'] {{ '}}' }}   rpm -qf '{{ '{{' }} __{{ role_name }}_neutralize_item['key'] {{ '}}' }}'  # find the package that owns this file
-      {{ '{{' }} __{{ role_name }}_neutralize_item['value'] {{ '}}' }}   zypper install --force <package>  # reinstall it to restore the original
+      {{ '{{' }} prefix {{ '}}' }}   rpm -qf '{{ '{{' }} path {{ '}}' }}'  # find the package that owns this file
+      {{ '{{' }} prefix {{ '}}' }}   zypper install --force <package>  # reinstall it to restore the original
       {{ '{%' }} elif (ansible_facts['os_family'] | ansible.builtin.lower) == 'redhat' {{ '%}' }}
-      {{ '{{' }} __{{ role_name }}_neutralize_item['value'] {{ '}}' }}   rpm -qf '{{ '{{' }} __{{ role_name }}_neutralize_item['key'] {{ '}}' }}'  # find the package that owns this file
-      {{ '{{' }} __{{ role_name }}_neutralize_item['value'] {{ '}}' }}   dnf reinstall <package>  # reinstall it to restore the original
+      {{ '{{' }} prefix {{ '}}' }}   rpm -qf '{{ '{{' }} path {{ '}}' }}'  # find the package that owns this file
+      {{ '{{' }} prefix {{ '}}' }}   dnf reinstall <package>  # reinstall it to restore the original
       {{ '{%' }} else {{ '%}' }}
-      {{ '{{' }} __{{ role_name }}_neutralize_item['value'] {{ '}}' }}   Use your package manager to find the owning package and reinstall it.
+      {{ '{{' }} prefix {{ '}}' }}   Use your package manager to find the owning package and reinstall it.
       {{ '{%' }} endif {{ '%}' }}
     owner: "root"
     group: "root"

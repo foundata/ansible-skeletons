@@ -11,7 +11,15 @@
 # - name: "Service | Default | Ensure service state: example.service"
 #   ansible.builtin.service:
 #     name: "example.service"
-#     state: "{{ '{{' }} 'started' if {{ role_name + '_service_state' }} in ['enabled', 'running'] else 'stopped' if {{ role_name + '_service_state' }} == 'disabled' {{ '}}' }}"
-#     enabled: "{{ '{{' }} true if {{ role_name + '_service_state' }} == 'enabled' else false if {{ role_name + '_service_state' }} in ['disabled', 'running'] {{ '}}' }}"
+#     state: >-
+#       {{ '{{' }} 'started'
+#       if {{ role_name + '_service_state' }} in ['enabled', 'running']
+#       else 'stopped'
+#       if {{ role_name + '_service_state' }} == 'disabled' {{ '}}' }}
+#     enabled: >-
+#       {{ '{{' }} true
+#       if {{ role_name + '_service_state' }} == 'enabled'
+#       else false
+#       if {{ role_name + '_service_state' }} in ['disabled', 'running'] {{ '}}' }}
 #   when:
 #     - {{ role_name + '_service_state' }} != 'unmanaged'

@@ -1,7 +1,7 @@
 # Ansible role: `{{ namespace }}.{{ collection_name }}.run`
 
-The `{{ namespace }}.{{ collection_name }}.run` Ansible role (part of the
-`{{ namespace }}.{{ collection_name }}` Ansible collection).
+The `{{ namespace }}.{{ collection_name }}.run` Ansible role (part of
+the `{{ namespace }}.{{ collection_name }}` Ansible collection).
 
 
 
@@ -62,8 +62,8 @@ Uninstall:
 
 It might be useful and faster to only call parts of the role by using tags:
 
-- `run_{{ collection_name }}_setup`: Manage basic resources, such as packages or
-  service users.
+- `run_{{ collection_name }}_setup`: Manage basic resources, such as
+  packages or service users.
 - `run_{{ collection_name }}_config`: Manage settings, such as adapting or
   creating configuration files.
 - `run_{{ collection_name }}_service`: Manage services and daemons, such as
@@ -72,15 +72,15 @@ It might be useful and faster to only call parts of the role by using tags:
 There are also tags that are generally not intended to be called directly but
 are included for completeness and to cover edge cases:
 
-- `run_{{ collection_name }}_always`, `always`: Tasks needed by the role itself
-  for internal role setup and the Ansible environment.
+- `run_{{ collection_name }}_always`, `always`: Tasks needed by the role
+  itself for internal role setup and the Ansible environment.
 
 
 <!-- ANSIBLE DOCSMITH MAIN START -->
 
 ## Role variables<a id="variables"></a>
 
-Main entry point for the {{ namespace }}.{{ collection_name }}.run role
+Main entry point for the run role
 
 FIXME Describe what this entry point manages.
 
