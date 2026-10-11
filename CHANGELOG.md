@@ -11,45 +11,40 @@ and the project adheres to
 
 ### Added
 
-- collection_modules: REST module skeleton derived from the Zammad lifecycle,
-  with a replaceable fixture, references and write-only password handling.
-- collection_modules_grid: an independent module-only skeleton with a grid-API
-  fixture, a replaceable resource engine, API tests and research scaffolds.
-- checks: distinct-identity rendering and installed module checks for
-  both module variants; the full matrix includes their ansible-test lanes. A
-  long-name identity checks `collection_default` and `role_default`.
-
-### Changed
-
-- collection_modules, collection_modules_grid: the architecture template
-  carries structure, decisions and scope only; the research record table,
-  sources and skeleton adaptations belong to the research record in
-  foundata's designs repository, and the evidence labels gain O (observed).
-- collection_modules, collection_modules_grid: the architecture template's
-  "Further resources" becomes the Scope section the module guide defines:
-  deployment ownership per path, administration tasks ranked by operator
-  value, the cuts and the exclusions with guard decisions.
-- collection_modules_grid: share the protocol-free lifecycle, activation
-  workflow, test runner and research scaffolds with the REST variant.
+- collection_modules: a module-only skeleton for REST products: integer
+  identifiers, by-name 404 absence, empty-page pagination, native JSON and
+  immediate writes, with a replaceable fixture that exercises a reference, a
+  write-only password and a deletion guard. No apply module.
+- collection_modules_grid: a module-only skeleton for grid-style APIs: UUID
+  identifiers, paginated searches with a declared total, add, set and delete
+  actions, string-encoded values, a deletion guard and an apply module for
+  products that separate saved from active state.
+- collection_modules, collection_modules_grid: a protocol-free resource
+  lifecycle and activation workflow that every product renders unchanged,
+  contract tests that a product binds to its own resource through
+  `contract_subject.py`, fake-server integration targets, an external-endpoint
+  Molecule scenario, the module guide's architecture and Scope template and an
+  inventory extractor stub. Render with `product` (required) and
+  `skeleton_revision`; `version` defaults to 1.0.0. The collections depend on
+  `foundata.utils` `>=1.0.0,<2.0.0`, which is published together with this
+  release.
+- collection_modules, collection_modules_grid: test lanes for ansible-core
+  2.19 to 2.22 and devel; 2.22 and devel install GitHub branches and run on
+  Python 3.15 (devel's lower lane on 3.10), so both test moving targets. Set
+  `max_version` to leave out an unreleased series. Qualification is against
+  the bundled fake servers only: no product collection has been released on
+  these skeletons, and no REST product adaptation has been measured.
+- checks: both module skeletons under two identities, one with a quoted
+  product name: default sessions in quick checks, build and installed modules;
+  the full matrix adds their sanity, unit and integration lanes and the
+  Molecule scenario against the first identity's fake product. A long-name
+  identity checks `collection_default` and `role_default`.
 
 ### Fixed
 
-- collection_modules, collection_modules_grid: the shared activation workflow
-  reports a lost apply reply on an already matching state as an unknown
-  outcome instead of success, and `activate: always` no longer requires a
-  `verify` list (found by the OPNsense expand run).
-- collection_modules, collection_modules_grid: the entry count and entry
-  length bounds of set, name list and map fields are definition-owned
-  (`maximum_items`, `item_limit`, defaults 256 and 150) so a product can
-  admit larger existing objects instead of stranding them on read and
-  delete (found by the OPNsense expand run).
-- collection_modules_grid: the fixture apply module's documentation no longer
-  marks `verify` as required, matching the activation workflow (found by the
-  skeleton release review).
-- collection_default, collection_modules_grid: `changelogs/changelog.yaml`
-  starts with no release entry. The placeholder 1.0.0 summary made the first
-  `release_summary` fragment fail as a second summary; the example stays as a
-  comment.
+- collection_default: `changelogs/changelog.yaml` starts with no release
+  entry. The placeholder 1.0.0 summary made the first `release_summary`
+  fragment fail as a second summary; the example stays as a comment.
 - (collection|role)_default: the ansible-core requirement is checked before
   the first templated task, so an older core reports the role's message
   instead of a Jinja load error.
