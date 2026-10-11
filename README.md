@@ -209,7 +209,9 @@ ansible-galaxy collection init \
 
 `version` defaults to `1.0.0`; the core floor defaults to `2.19.0`.
 The fixture imports the currently unpublished `foundata.utils >=1.0.0`.
-Follow the rendered `FIXME.md` to adapt the fixture.
+Follow the rendered `FIXME.md` to adapt the fixture. The shared contract tests
+reach the fixture only through `tests/unit/plugins/modules/contract_subject.py`;
+a product binds its own resource there and keeps `test_contract.py` unchanged.
 
 
 ### `collection_modules`<a id="collection_modules"></a>

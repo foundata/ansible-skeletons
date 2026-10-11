@@ -7,6 +7,8 @@
   if no additional packages are needed.
 - Check `tests/config.yml` and run the checks in `DEVELOPMENT.md`.
 - Replace the fixture definition, modules and tests with a researched resource.
+  Bind it in `tests/unit/plugins/modules/contract_subject.py` and keep
+  `test_contract.py` unchanged.
   The fixture uses REST with integer identifiers, by-name 404 absence,
   native JSON and immediate writes. Replace the client, fake transport and
   fake server from product evidence; keep the shared lifecycle.

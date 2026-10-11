@@ -1,0 +1,66 @@
+"""Fixture bindings of the shared contract tests in ``test_contract.py``."""
+# FIXME Bind the first researched resource, its fake and its entry points here;
+# keep test_contract.py unchanged.
+
+from __future__ import annotations
+
+from typing import Any, Callable
+
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._definitions import (
+    FIXTURE,
+)
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.modules import (
+    fixture,
+    fixture_info,
+)
+
+from ..fake_product import FakeProduct, Response
+
+RESOURCE = FIXTURE
+RESULT = "fixture"
+KEY = "name"
+VALUE = "value"
+ENABLED = "enabled"
+LABELS = "labels"
+VERSION_PATH = "/system/version"
+OPERATION = f"{FIXTURE.name}:present"
+
+main: Callable[[], None] = fixture.main
+info_main: Callable[[], None] = fixture_info.main
+
+
+def rows(fake: FakeProduct) -> dict[Any, dict[str, Any]]:
+    """Stored records of the subject resource by server identifier."""
+    return fake.rows
+
+
+def add(fake: FakeProduct, **values: Any) -> Any:
+    """Store a record named ``example`` unless ``values`` say otherwise."""
+    return fake.add(**values)
+
+
+def lose_next(fake: FakeProduct, operation: str, callback: Callable[[], None]) -> None:
+    """Run ``callback`` after the next create, update or delete took effect."""
+    fake.lose_next(operation, callback)
+
+
+def make_incomplete(fake: FakeProduct) -> None:
+    """Make listings end early, so a complete listing cannot be established."""
+    fake.inject_incomplete()
+
+
+def fault(fake: FakeProduct, path: str, status: int) -> None:
+    """Answer every request to ``path`` with ``status`` and an HTML body."""
+    fake.faults[path] = lambda: Response(
+        status, None, raw=b"<html>private upstream error</html>"
+    )
+
+
+def deny(fake: FakeProduct) -> None:
+    """Refuse every later request as unauthenticated."""
+    fake.auth_ok = False
+
+
+def requested(fake: FakeProduct, path: str) -> int:
+    """How many requests reached ``path``."""
+    return sum(1 for _method, request, _body in fake.requests if request == path)
