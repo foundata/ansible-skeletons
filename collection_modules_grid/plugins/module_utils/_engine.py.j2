@@ -13,6 +13,9 @@ Clients classify failures by status before parsing any body. Listing rows,
 lookup records and mutation responses can contain secrets: only project()
 publishes reviewed fields. After a possible mutation, a failure remains unknown
 until independent read-back establishes the outcome. No blind write retry.
+
+A definition's size bounds apply to input values only; a stored object of any
+size is read, compared, deleted and reported as is.
 """
 
 from __future__ import annotations
@@ -200,17 +203,22 @@ def identifier(key: Key, value: Any) -> str | int:
 
 
 def within(field: Field, count: int) -> bool:
-    """Whether a set, name list or map stays within the definition's entry bound."""
+    """Whether an input set, name list or map stays within the entry bound."""
     return field.maximum_items is None or count <= field.maximum_items
 
 
 def item_within(field: Field, item: str) -> bool:
-    """Whether an entry or key is non-empty and within the definition's item limit."""
+    """Whether an input entry or key is non-empty and within the item limit."""
     return bool(item) and (field.item_limit is None or len(item) <= field.item_limit)
 
 
 def normalize(field: Field, raw: Any, *, input_value: bool = False) -> Any:
-    """Validate native public values; clients decode their wire values first."""
+    """Validate native public values; clients decode their wire values first.
+
+    The size bounds ``limit``, ``maximum_items`` and ``item_limit`` apply to
+    input values only. A stored value of any size is read, compared, deleted
+    and reported as is.
+    """
     invalid = ProductError(
         category="argument" if input_value else "response",
         code="invalid_field" if input_value else "schema",
@@ -219,7 +227,7 @@ def normalize(field: Field, raw: Any, *, input_value: bool = False) -> Any:
     if raw is None and not input_value:
         return "" if field.kind == "ref" else None
     if field.kind in ("str", "choice", "ref", "secret"):
-        if not isinstance(raw, str) or len(raw) > field.limit:
+        if not isinstance(raw, str) or (input_value and len(raw) > field.limit):
             raise invalid
         if field.kind == "secret" and not raw:
             raise invalid
@@ -234,23 +242,28 @@ def normalize(field: Field, raw: Any, *, input_value: bool = False) -> Any:
     if field.kind == "int" and isinstance(raw, int) and not isinstance(raw, bool):
         return raw
     if field.kind in ("set", "names"):
-        if not isinstance(raw, list) or not within(field, len(raw)):
+        if not isinstance(raw, list) or any(
+            not isinstance(v, str) or not v for v in raw
+        ):
             raise invalid
-        if input_value and len(raw) < field.minimum_items:
-            raise invalid
-        if any(not isinstance(v, str) or not item_within(field, v) for v in raw):
+        if input_value and (
+            not within(field, len(raw))
+            or len(raw) < field.minimum_items
+            or not all(item_within(field, v) for v in raw)
+        ):
             raise invalid
         if field.pattern and any(not re.fullmatch(field.pattern, v) for v in raw):
             raise invalid
         return list(dict.fromkeys(raw))
     if field.kind == "map":
-        if not isinstance(raw, dict) or not within(field, len(raw)):
+        if not isinstance(raw, dict) or (input_value and not within(field, len(raw))):
             raise invalid
         result = {}
         for key, rights in raw.items():
             if (
                 not isinstance(key, str)
-                or not item_within(field, key)
+                or not key
+                or (input_value and not item_within(field, key))
                 or not isinstance(rights, list)
             ):
                 raise invalid

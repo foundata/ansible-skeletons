@@ -40,38 +40,67 @@ from . import contract_subject as subject
 
 
 @pytest.mark.parametrize("kind", ["set", "names"])
-@pytest.mark.parametrize("input_value", [False, True])
-def test_set_bounds_follow_the_definition(kind: str, input_value: bool) -> None:
+def test_set_bounds_follow_the_definition_on_input(kind: str) -> None:
     field = Field("members", kind, "Members")
-    assert normalize(field, ["x" * 150], input_value=input_value) == ["x" * 150]
+    assert normalize(field, ["x" * 150], input_value=True) == ["x" * 150]
     for values in (["x" * 151], [str(i) for i in range(257)]):
         with pytest.raises(ProductError):
-            normalize(field, values, input_value=input_value)
+            normalize(field, values, input_value=True)
     larger = replace(field, maximum_items=300, item_limit=255)
     values = [str(i) for i in range(257)] + ["x" * 151]
-    assert normalize(larger, values, input_value=input_value) == values
+    assert normalize(larger, values, input_value=True) == values
     for values in (["x" * 256], [str(i) for i in range(301)]):
         with pytest.raises(ProductError):
-            normalize(larger, values, input_value=input_value)
+            normalize(larger, values, input_value=True)
     unbounded = replace(field, maximum_items=None, item_limit=None)
     values = [str(i) for i in range(301)] + ["x" * 256]
-    assert normalize(unbounded, values, input_value=input_value) == values
-    for invalid in ([""], [None], "not-a-list"):
+    assert normalize(unbounded, values, input_value=True) == values
+    for input_value in (False, True):
+        for invalid in ([""], [None], "not-a-list"):
+            with pytest.raises(ProductError):
+                normalize(unbounded, invalid, input_value=input_value)
+
+
+@pytest.mark.parametrize("kind", ["set", "names"])
+def test_stored_sets_are_read_beyond_the_bounds(kind: str) -> None:
+    field = Field("members", kind, "Members")
+    values = [str(i) for i in range(301)] + ["x" * 256]
+    assert normalize(field, values) == values
+
+
+def test_set_minimum_and_item_pattern_apply_to_input() -> None:
+    field = Field("members", "set", "Members", minimum_items=1, pattern=r"[a-z]+")
+    assert normalize(field, ["ab"], input_value=True) == ["ab"]
+    for invalid in ([], ["A1"]):
         with pytest.raises(ProductError):
-            normalize(unbounded, invalid, input_value=input_value)
+            normalize(field, invalid, input_value=True)
+    assert normalize(field, []) == []
+    with pytest.raises(ProductError):
+        normalize(field, ["A1"])
 
 
-def test_map_bounds_follow_the_definition() -> None:
+def test_map_bounds_follow_the_definition_on_input() -> None:
     field = Field("rights", "map", "Rights", choices=("read",))
-    assert normalize(field, {"x" * 150: ["read"]}) == {"x" * 150: ["read"]}
+    assert normalize(field, {"x" * 150: ["read"]}, input_value=True) == {
+        "x" * 150: ["read"]
+    }
     for invalid in ({"x" * 151: ["read"]}, {str(i): ["read"] for i in range(257)}):
         with pytest.raises(ProductError):
-            normalize(field, invalid)
+            normalize(field, invalid, input_value=True)
+        assert normalize(field, invalid) == invalid
     unbounded = replace(field, maximum_items=None, item_limit=None)
-    assert normalize(unbounded, {"x" * 151: ["read"]}) == {"x" * 151: ["read"]}
-    assert len(normalize(unbounded, {str(i): ["read"] for i in range(257)})) == 257
+    assert normalize(unbounded, {"x" * 151: ["read"]}, input_value=True) == {
+        "x" * 151: ["read"]
+    }
     with pytest.raises(ProductError):
         normalize(unbounded, {"": ["read"]})
+
+
+def test_stored_strings_are_read_beyond_the_limit() -> None:
+    field = Field("note", "str", "Note", limit=10)
+    assert normalize(field, "x" * 11) == "x" * 11
+    with pytest.raises(ProductError):
+        normalize(field, "x" * 11, input_value=True)
 
 
 def entry(resource: Resource) -> Callable[[], None]:
@@ -251,6 +280,22 @@ def test_failure_after_a_write_keeps_changed_and_outcome(
     else:
         assert (result["error_category"], result["error_code"]) == ("product", None)
         assert "fields" not in result and result["name"] == "example"
+
+
+def test_stored_object_beyond_the_bounds_is_read_compared_and_deleted(
+    fake: FakeProduct, run_module: RunModule
+) -> None:
+    labels = [f"label{index}" for index in range(257)] + ["x" * 151]
+    subject.add(fake, **{subject.LABELS: subject.stored_set(labels)})
+    read = run_module(subject.info_main, name="example")
+    assert not read.get("failed")
+    assert sorted(read[subject.RESULT][subject.LABELS]) == sorted(labels)
+    compared = run_module(subject.main, name="example", **{subject.VALUE: ""})
+    assert not compared.get("failed") and not compared["changed"]
+    assert sorted(compared[subject.RESULT][subject.LABELS]) == sorted(labels)
+    removed = run_module(subject.main, name="example", state="absent")
+    assert not removed.get("failed") and removed["changed"]
+    assert not subject.rows(fake)
 
 
 @pytest.mark.parametrize(

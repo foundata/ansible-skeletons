@@ -64,3 +64,8 @@ def deny(fake: FakeProduct) -> None:
 def requested(fake: FakeProduct, path: str) -> int:
     """How many requests reached ``path``."""
     return sum(1 for _method, request, _body in fake.requests if request == path)
+
+
+def stored_set(values: list[str]) -> Any:
+    """A set field value as the fake stores it."""
+    return ",".join(values)
