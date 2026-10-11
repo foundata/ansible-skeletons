@@ -104,7 +104,6 @@ SCHEMA = ErrorSchema(
     fallback=("internal", None),
     field_validators={
         "operation": _bounded_text,
-        "resource": _bounded_text,
         "name": _bounded_text,
         "fields": _field_names,
         "series": _bounded_text,

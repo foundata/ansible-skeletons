@@ -602,6 +602,20 @@ class Engine:
         return result
 
 
+def identity_fields(params: dict[str, Any], resource: Resource) -> dict[str, Any]:
+    """The caller's identity options that the error schema can publish."""
+    identity: dict[str, Any] = {}
+    for key in resource.keys:
+        validate = SCHEMA.field_validators.get(key.name)
+        if validate is None or params.get(key.name) is None:
+            continue
+        try:
+            identity[key.name] = validate(params[key.name])
+        except (TypeError, ValueError):
+            continue
+    return identity
+
+
 def run_resource(module: Any, resource: Resource) -> None:
     """One sanitized operational catch boundary after real argument parsing."""
     engine = None
@@ -613,7 +627,7 @@ def run_resource(module: Any, resource: Resource) -> None:
         confirmed = engine is not None and engine.confirmed
         fields: dict[str, Any] = {
             "operation": engine.operation if engine else "connect",
-            "resource": resource.name,
+            **identity_fields(module.params, resource),
         }
         if isinstance(failure, ProductError) and failure.fields:
             fields["fields"] = failure.fields

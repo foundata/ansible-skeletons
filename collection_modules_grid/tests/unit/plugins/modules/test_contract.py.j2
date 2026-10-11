@@ -13,6 +13,7 @@ from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_ut
     _compat,
 )
 from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._client import (
+    SCHEMA,
     Client,
     ProductError,
 )
@@ -27,6 +28,9 @@ from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_ut
     build_spec,
     normalize,
     run_resource,
+)
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._resources import (
+    RESOURCES,
 )
 from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.modules import (
     fixture,
@@ -182,7 +186,26 @@ def test_delete_acknowledgement_does_not_prove_absence(
     result = run_module(fixture.main, name="example", state="absent")
     assert result["failed"] and result["error_code"] == "still_present"
     assert result["changed"] and result["outcome"] == "unknown"
+    assert result["operation"] == "verify" and result["name"] == "example"
     assert len(fake.rows) == 1
+
+
+def test_failure_repeats_the_identity_the_schema_allows(
+    fake: FakeProduct, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for resource in RESOURCES:
+        assert {key.name for key in resource.keys} <= set(SCHEMA.field_validators)
+    fake.faults["/system/version"] = lambda: Response(500, None)
+    result = run_module(fixture.main, name="example")
+    assert result["failed"] and result["name"] == "example"
+    assert not result["changed"] and result["outcome"] == "unchanged"
+    assert "resource" not in result
+    # A value the schema cannot publish is left out; the failure stays intact.
+    resource = replace(FIXTURE, keys=(Key("name", "Optional component", r".*"),))
+    monkeypatch.setattr(Engine, "find", lambda self, ident: None)
+    result = run_module(entry(resource), name="")
+    assert result["failed"] and "name" not in result
+    assert result["outcome"] == "unchanged" and not fake.writes()
 
 
 @pytest.mark.parametrize(
