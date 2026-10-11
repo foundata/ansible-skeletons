@@ -42,6 +42,9 @@ and the project adheres to
   (`maximum_items`, `item_limit`, defaults 256 and 150) so a product can
   admit larger existing objects instead of stranding them on read and
   delete (found by the OPNsense expand run).
+- collection_modules_grid: the fixture apply module's documentation no longer
+  marks `verify` as required, matching the activation workflow (found by the
+  skeleton release review).
 - collection_default, collection_modules_grid: `changelogs/changelog.yaml`
   starts with no release entry. The placeholder 1.0.0 summary made the first
   `release_summary` fragment fail as a second summary; the example stays as a

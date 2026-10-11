@@ -75,10 +75,11 @@ have no identifier. Diffs contain public managed fields only, on request.
 
 ### Failures
 
-Failures report `error_category`, `error_code`, `http_status`, `operation`,
-`changed` and `outcome` (`unchanged`, `changed` or `unknown`). Lost responses
-are reconciled by identity; creations are never blindly retried. Results and
-errors exclude secrets, including secrets returned in listings.
+Failures report `error_category`, `error_code`, `http_status`, `operation`, the
+identity under its option names, `changed` and `outcome` (`unchanged`, `changed`
+or `unknown`). Lost responses are reconciled by identity; creations are never
+blindly retried. Results and errors exclude secrets, including secrets returned
+in listings.
 
 ### Version check
 

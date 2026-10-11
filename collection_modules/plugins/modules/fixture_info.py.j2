@@ -11,7 +11,7 @@ short_description: Read one fixture record
 description:
   - "Reads the unique saved record named by O(name), without activation or any write, including in check mode."
   - "A documented by-name 404 establishes absence; ambiguous identities fail. Product secrets are never published."
-version_added: "1.0.0"
+version_added: "{{ version | default('1.0.0') }}"
 author:
 {% for author in authors %}
   - {{ (author if '(@' in author or '!UNKNOWN' in author else author ~ ' !UNKNOWN') | to_json }}

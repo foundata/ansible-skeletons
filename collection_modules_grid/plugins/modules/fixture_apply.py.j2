@@ -13,7 +13,7 @@ description:
   - "Call on every workflow execution, including when resource tasks report no changes, to recover pending work."
   - "Activation consumes all pending changes in the fixture family. Coordinate writers; verification covers only the named objects."
   - "After activation, polls the active state within the shared deadline. Failure to observe convergence fails the module."
-version_added: "1.0.0"
+version_added: "{{ version | default('1.0.0') }}"
 author:
 {% for author in authors %}
   - {{ (author if '(@' in author or '!UNKNOWN' in author else author ~ ' !UNKNOWN') | to_json }}
@@ -35,10 +35,13 @@ options:
     default: auto
     choices: [auto, always]
   verify:
-    description: Nonempty list of exact fixture names to compare, including deleted records.
+    description:
+      - Exact fixture names to compare, including deleted records.
+      - Required with O(activate=auto). With O(activate=always) it may be
+        omitted; the activation then runs without verification and the result
+        reports RV(verified=unverifiable).
     type: list
     elements: str
-    required: true
 """
 
 EXAMPLES = r"""

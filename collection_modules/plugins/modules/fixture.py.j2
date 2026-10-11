@@ -13,7 +13,7 @@ description:
   - "Only declared fields are managed. Omitted and null options are unmanaged; empty values clear a field."
   - "Writes take effect immediately; no apply module is needed. Deletion is refused while a dependent record refers to this fixture."
   - "O(state=absent) deletes only the named record. Writers must coordinate access to this family."
-version_added: "1.0.0"
+version_added: "{{ version | default('1.0.0') }}"
 author:
 {% for author in authors %}
   - {{ (author if '(@' in author or '!UNKNOWN' in author else author ~ ' !UNKNOWN') | to_json }}
