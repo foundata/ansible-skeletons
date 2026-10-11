@@ -85,7 +85,7 @@ def test_check_mode(
         _ansible_check_mode=True,
         _ansible_diff=diff,
     )
-    assert result["verified"] == "predicted"
+    assert result["verified"] == ("predicted" if result["changed"] else "observed")
     assert result["changed"] == (state == "present" or exists)
     assert ("diff" in result) == (diff and result["changed"])
     if not exists and state == "present":

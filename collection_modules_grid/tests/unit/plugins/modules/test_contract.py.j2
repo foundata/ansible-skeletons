@@ -244,7 +244,8 @@ def test_check_mode_and_secrets(
         _ansible_check_mode=True,
         _ansible_diff=diff,
     )
-    assert not fake.writes() and result["verified"] == "predicted"
+    assert not fake.writes()
+    assert result["verified"] == ("predicted" if result["changed"] else "observed")
     if not exists and state == "present":
         assert FIXTURE.identifier.name not in result["fixture"]
     secrets = result.pop("_ansible_new_secrets", [])

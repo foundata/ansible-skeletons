@@ -47,6 +47,20 @@ def test_check_predicts_without_write(fake: FakeProduct, run_module: RunModule) 
     assert result["verification"] == {"example": "drift"} and not fake.writes()
 
 
+def test_check_on_in_sync_state_is_observed(
+    fake: FakeProduct, run_module: RunModule
+) -> None:
+    fake.add()
+    assert run_module(fixture_apply.main, verify=["example"])["changed"]
+    writes = len(fake.writes())
+    result = run_module(
+        fixture_apply.main, verify=["example"], _ansible_check_mode=True
+    )
+    assert not result["changed"] and result["verified"] == "observed"
+    assert result["verification"] == {"example": "in_sync"}
+    assert len(fake.writes()) == writes
+
+
 def test_lost_apply_response_is_settled(
     fake: FakeProduct, run_module: RunModule
 ) -> None:

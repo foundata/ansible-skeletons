@@ -543,7 +543,9 @@ class Engine:
         result: dict[str, Any] = {
             "changed": changed,
             "changed_fields": sorted(delta) if found is not None and not absent else [],
-            "verified": "predicted" if self.module.check_mode else "observed",
+            "verified": "predicted"
+            if self.module.check_mode and changed
+            else "observed",
         }
         public_delta = {
             k: v for k, v in delta.items() if resource.get_field(k).kind != "secret"

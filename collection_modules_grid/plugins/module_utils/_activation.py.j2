@@ -96,7 +96,7 @@ def run(
             "changed": needed,
             "activated": needed,
             "verified": "predicted"
-            if module.check_mode
+            if module.check_mode and needed
             else (
                 "unverifiable"
                 if not before or "unverifiable" in before.values()

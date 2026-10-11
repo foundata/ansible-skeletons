@@ -77,7 +77,7 @@ EXAMPLES = r"""
 RETURN = r"""
 ---
 fixture:
-  description: Public observed state, predicted in check mode; null after deletion. No product secrets are returned.
+  description: Public observed state, predicted where check mode skips a write; null after deletion. No product secrets are returned.
   returned: success
   type: dict
   contains:
@@ -106,7 +106,7 @@ changed_fields:
   type: list
   elements: str
 verified:
-  description: V(observed) after read-back or a no-op; V(predicted) in check mode; V(unverifiable) after a write-only password write.
+  description: V(predicted) where check mode skips a write, V(unverifiable) after a write-only password write, otherwise V(observed).
   returned: success
   type: str
 """

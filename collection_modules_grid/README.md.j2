@@ -70,9 +70,10 @@ the family, compares only the named objects, and waits for observed convergence.
 
 ### Check and diff mode
 
-Check mode performs reads with zero writes and returns `verified: predicted`;
-the info module always reports observed state. Predicted creations have no
-identifier. Diffs contain public managed fields only, on request.
+Check mode performs reads with zero writes. It returns `verified: predicted`
+where a write would follow and `verified: observed` where nothing would
+change; the info module always reports observed state. Predicted creations
+have no identifier. Diffs contain public managed fields only, on request.
 
 ### Failures
 
