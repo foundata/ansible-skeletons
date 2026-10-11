@@ -16,7 +16,9 @@ min_python_version = "ansible-test-config"
 validate_collection_refs = "all"
 
 [sessions.license_check]
-# REUSE.toml states the licensing; files carry no license header of their own.
+# REUSE.toml states the licensing and "reuse lint" checks it. Files carry no
+# SPDX lines, which this per-file check requires; modules carry only the GNU
+# line that validate-modules requires.
 run_license_check = false
 
 [sessions.extra_checks]
@@ -61,7 +63,7 @@ run_mypy = true
 mypy_config = ".mypy.ini"
 
 # max_version can omit the next series: antsibull-nox knows it before PyPI
-# publishes it and installs that lane from the stable GitHub branch.
+# publishes it and installs its lanes from the stable GitHub branch.
 [sessions.ansible_test_units]
 include_devel = true
 split_by_python_version = true
