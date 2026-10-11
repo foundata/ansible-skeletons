@@ -18,10 +18,12 @@ from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_ut
     _compat,
 )
 from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._client import (
-    SCHEMA,
     Client,
     ProductError,
     api_argument_spec,
+)
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._engine import (
+    fail,
 )
 
 SETTLE_SECONDS = 20.0
@@ -137,10 +139,9 @@ def run(
             changed, outcome = True, "changed"
         else:
             changed, outcome = True, "unknown"
-        errors.fail_from(
+        fail(
             module,
             error,
-            schema=SCHEMA,
             msg=f"Activating the {label} failed during {operation}",
             changed=changed,
             outcome=outcome,

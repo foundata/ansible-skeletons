@@ -81,6 +81,20 @@ def test_accepted_but_not_effective_fails(
     assert result["changed"] and result["outcome"] == "changed"
 
 
+def test_unreportable_not_effective_keeps_changed_and_outcome(
+    fake: FakeProduct, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    names = [f"n{index}" for index in range(257)]
+    for name in names:
+        fake.add(name=name)
+    fake.activate_ok = False
+    monkeypatch.setattr(_activation, "SETTLE_SECONDS", 0.0)
+    result = run_module(fixture_apply.main, verify=names)
+    assert result["failed"] and result["changed"] and result["outcome"] == "changed"
+    assert (result["error_category"], result["error_code"]) == ("product", None)
+    assert "not_effective" not in result and result["operation"] == "verify"
+
+
 def test_lost_always_response_on_in_sync_state_is_unknown(
     fake: FakeProduct, run_module: RunModule
 ) -> None:

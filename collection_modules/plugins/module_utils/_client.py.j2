@@ -46,6 +46,7 @@ ERROR_CODES: dict[str, frozenset[str | None]] = {
     "auth": frozenset({"unauthenticated", "forbidden"}),
     "product": frozenset(
         {
+            None,
             "endpoint_not_found",
             "rejected",
             "unexpected_status",
@@ -78,24 +79,29 @@ def _bounded_text(value: object) -> str:
     return value
 
 
-def _field_names(value: object) -> list[str]:
-    if not isinstance(value, list) or len(value) > 64:
-        raise ValueError("expected a short list")
-    names = []
-    for item in value:
-        if not isinstance(item, str) or not re.match(r"^[a-z_][a-z0-9_.]{0,63}$", item):
-            raise ValueError("expected field names")
-        names.append(item)
-    return names
+# FIXME Keep NAME_LIMIT and MAX_NAMES at least as wide as the definitions' key
+# patterns, field names and verify lists; a payload beyond them degrades to a
+# generic product error.
+NAME_LIMIT = 253
+"""Longest field, object or identity name a failure result repeats."""
+MAX_NAMES = 256
+"""Most names one failure result repeats."""
 
 
-def _object_names(value: object) -> list[str]:
-    if not isinstance(value, list) or len(value) > 256:
+def _name(value: object) -> str:
+    if (
+        not isinstance(value, str)
+        or not 0 < len(value) <= NAME_LIMIT
+        or any(ord(char) < 32 or ord(char) == 127 for char in value)
+    ):
+        raise ValueError("expected a name")
+    return value
+
+
+def _names(value: object) -> list[str]:
+    if not isinstance(value, list) or len(value) > MAX_NAMES:
         raise ValueError("expected a bounded list")
-    for item in value:
-        if not isinstance(item, str) or not re.match(r"^[A-Za-z0-9_*.-]{1,253}$", item):
-            raise ValueError("expected object names")
-    return list(value)
+    return [_name(item) for item in value]
 
 
 SCHEMA = ErrorSchema(
@@ -105,10 +111,10 @@ SCHEMA = ErrorSchema(
     fallback=("internal", None),
     field_validators={
         "operation": _bounded_text,
-        "name": _bounded_text,
-        "fields": _field_names,
+        "name": _name,
+        "fields": _names,
         "series": _bounded_text,
-        "not_effective": _object_names,
+        "not_effective": _names,
     },
 )
 """The public error schema of this collection's modules."""

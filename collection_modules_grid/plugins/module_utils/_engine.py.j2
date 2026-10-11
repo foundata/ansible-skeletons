@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any, Callable, NoReturn
 
 from ansible_collections.foundata.utils.plugins.module_utils import errors
 
@@ -604,8 +604,45 @@ class Engine:
         return result
 
 
+def fail(
+    module: Any,
+    failure: errors.ApiError,
+    *,
+    msg: str,
+    changed: bool,
+    outcome: str,
+    fields: dict[str, Any],
+) -> NoReturn:
+    """Fail through the error schema, never raising instead after a write.
+
+    A diagnostic payload the schema rejects degrades the failure to a generic
+    product error without that payload; ``changed`` and ``outcome`` stay.
+    """
+    reportable: dict[str, Any] = {}
+    for key, value in fields.items():
+        validate = SCHEMA.field_validators.get(key)
+        try:
+            if validate is None:
+                raise ValueError(key)
+            reportable[key] = validate(value)
+        except (TypeError, ValueError):
+            failure = ProductError()
+    errors.fail_from(
+        module,
+        failure,
+        schema=SCHEMA,
+        msg=msg,
+        changed=changed,
+        outcome=outcome,
+        fields=reportable,
+    )
+
+
 def identity_fields(params: dict[str, Any], resource: Resource) -> dict[str, Any]:
-    """The caller's identity options that the error schema can publish."""
+    """The caller's identity options that the error schema can publish.
+
+    An identity the schema rejects is left out; the failure stays specific.
+    """
     identity: dict[str, Any] = {}
     for key in resource.keys:
         validate = SCHEMA.field_validators.get(key.name)
@@ -633,10 +670,9 @@ def run_resource(module: Any, resource: Resource) -> None:
         }
         if isinstance(failure, ProductError) and failure.fields:
             fields["fields"] = failure.fields
-        errors.fail_from(
+        fail(
             module,
             failure,
-            schema=SCHEMA,
             msg="Resource reconciliation failed; see error_category and error_code",
             changed=attempted,
             outcome="changed" if confirmed else "unknown" if attempted else "unchanged",

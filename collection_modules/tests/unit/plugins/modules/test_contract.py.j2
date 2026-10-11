@@ -210,14 +210,47 @@ def test_failure_repeats_the_identity_the_schema_allows(
     assert result["failed"] and result["name"] == "example"
     assert not result["changed"] and result["outcome"] == "unchanged"
     assert "resource" not in result
-    # A value the schema cannot publish is left out; the failure stays intact.
+    # An identity the schema cannot publish is left out; the failure stays specific.
     resource = replace(
         subject.RESOURCE, keys=(Key("name", "Optional component", r".*"),)
     )
     monkeypatch.setattr(Engine, "find", lambda self, ident: None)
     result = run_module(entry(resource), name="")
     assert result["failed"] and "name" not in result
+    assert result["error_code"] == "rejected"
     assert result["outcome"] == "unchanged" and not fake.writes()
+
+
+@pytest.mark.parametrize(
+    "names,reported",
+    [
+        (["displayName", "a name with spaces"], True),
+        (["x" * 300], False),
+        (["line\nbreak"], False),
+        ([f"field{index}" for index in range(257)], False),
+    ],
+)
+def test_failure_after_a_write_keeps_changed_and_outcome(
+    fake: FakeProduct,
+    run_module: RunModule,
+    monkeypatch: pytest.MonkeyPatch,
+    names: list[str],
+    reported: bool,
+) -> None:
+    subject.add(fake)
+
+    def mismatch(self: Engine, *args: Any) -> None:
+        raise ProductError(category="verification", code="not_persisted", fields=names)
+
+    monkeypatch.setattr(Engine, "verify", mismatch)
+    result = run_module(subject.main, name="example", **{subject.VALUE: "new"})
+    assert result["failed"] and result["changed"] and result["outcome"] == "unknown"
+    assert result["operation"] == "verify" and len(fake.writes()) == 1
+    if reported:
+        assert result["error_code"] == "not_persisted" and result["fields"] == names
+    else:
+        assert (result["error_category"], result["error_code"]) == ("product", None)
+        assert "fields" not in result and result["name"] == "example"
 
 
 @pytest.mark.parametrize(
