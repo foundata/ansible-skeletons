@@ -87,6 +87,7 @@ def run(
     names: list[str] = list(dict.fromkeys(module.params["verify"] or []))
     operation = "validate"
     applied = False
+    reply_lost = False
     try:
         if (module.params["activate"] == "auto" and not names) or not all(
             re.fullmatch(name_pattern, name) for name in names
@@ -117,14 +118,31 @@ def run(
         try:
             apply(client)
             applied = True
-        except errors.TransportTimeout:
-            # An already matching state cannot establish that this apply ran.
-            if "drift" not in before.values():
+        except errors.ApiError as error:
+            # A reply lost after sending, by timeout, a dropped connection or an
+            # undecodable body: only the observed resolution of the drift it was
+            # run for establishes the effect. An already matching state cannot.
+            if error.category not in ("transport", "timeout", "response") or (
+                "drift" not in before.values()
+            ):
                 raise
+            reply_lost = True
         operation = "verify"
         result["verification"] = settle(client, names)
+        if reply_lost:
+            unresolved = sorted(
+                name
+                for name, status in before.items()
+                if status == "drift" and result["verification"].get(name) != "in_sync"
+            )
+            if unresolved:
+                raise ProductError(
+                    category="verification", code="not_effective", fields=unresolved
+                )
         result["verified"] = (
-            "unverifiable"
+            "observed"
+            if reply_lost
+            else "unverifiable"
             if not result["verification"]
             or "unverifiable" in result["verification"].values()
             else "observed"

@@ -85,8 +85,10 @@ have no identifier. Diffs contain public managed fields only, on request.
 Failures report `error_category`, `error_code`, `http_status`, `operation`, the
 identity under its option names, `changed` and `outcome` (`unchanged`, `changed`
 or `unknown`). Lost responses are reconciled by identity; creations are never
-blindly retried. Results and errors exclude secrets, including secrets returned
-in listings.
+blindly retried. After a lost activation reply the apply module reads the loaded
+state again: the observed resolution of the drift is success, anything else
+`outcome: unknown`. Results and errors exclude secrets, including secrets
+returned in listings.
 
 ### Version check
 

@@ -1,0 +1,100 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Shared activation workflow, including uncertain acknowledgements."""
+
+from __future__ import annotations
+
+from typing import Any
+
+import pytest
+from ansible.module_utils.basic import AnsibleModule
+
+from ansible_collections.foundata.utils.plugins.module_utils import errors
+
+# isort: split
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils import (
+    _activation,
+)
+
+from ..conftest import RunModule
+
+
+@pytest.mark.parametrize("category", ["timeout", "transport", "response"])
+@pytest.mark.parametrize(
+    "before,after,activate,success",
+    [
+        ({"one": "drift"}, {"one": "in_sync"}, "auto", True),
+        ({"one": "drift"}, {"one": "drift"}, "auto", False),
+        ({"one": "drift"}, {}, "auto", False),
+        ({"one": "drift"}, {"one": "unverifiable"}, "auto", False),
+        ({"one": "drift"}, None, "auto", False),
+        (
+            {"one": "drift", "two": "drift"},
+            {"one": "in_sync", "two": "unverifiable"},
+            "auto",
+            False,
+        ),
+        (
+            {"one": "drift", "two": "drift"},
+            {"one": "in_sync"},
+            "auto",
+            False,
+        ),
+        (
+            {"one": "drift", "two": "drift"},
+            {"one": "in_sync", "two": "in_sync"},
+            "auto",
+            True,
+        ),
+        (
+            {"one": "drift", "two": "unverifiable"},
+            {"one": "in_sync", "two": "unverifiable"},
+            "auto",
+            True,
+        ),
+        ({"one": "in_sync"}, {"one": "in_sync"}, "always", False),
+    ],
+)
+def test_lost_reply_requires_each_triggering_object_observed_in_sync(
+    run_module: RunModule,
+    monkeypatch: pytest.MonkeyPatch,
+    category: str,
+    before: dict[str, str],
+    after: dict[str, str] | None,
+    activate: str,
+    success: bool,
+) -> None:
+    monkeypatch.setattr(_activation._compat, "check", lambda *args: None)
+    writes = []
+
+    def apply(client: Any) -> None:
+        writes.append(client)
+        raise errors.ApiError(category=category)
+
+    def compare(client: Any, names: list[str]) -> dict[str, str]:
+        if after is None:
+            raise errors.ApiError(category="transport")
+        return after
+
+    def main() -> None:
+        module = AnsibleModule(
+            argument_spec=_activation.argument_spec(), supports_check_mode=True
+        )
+        _activation.run(
+            module,
+            operation_id="synthetic:apply",
+            label="synthetic state",
+            name_pattern=r"[a-z]+",
+            compare=lambda *_: before,
+            apply=apply,
+            settle=lambda client, names: _activation.settle(
+                client, names, compare, limit=0
+            ),
+        )
+
+    result = run_module(main, verify=list(before), activate=activate)
+    assert len(writes) == 1 and result["changed"]
+    if success:
+        assert not result.get("failed") and result["verified"] == "observed"
+    else:
+        assert result["failed"] and result["outcome"] == "unknown"

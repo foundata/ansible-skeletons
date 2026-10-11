@@ -6,9 +6,13 @@
 from __future__ import annotations
 
 import json
+from typing import Callable
 
 import pytest
 
+from ansible_collections.foundata.utils.plugins.module_utils import errors
+
+# isort: split
 from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils import (
     _activation,
 )
@@ -63,13 +67,63 @@ def test_check_on_in_sync_state_is_observed(
     assert len(fake.writes()) == writes
 
 
-def test_lost_apply_response_is_settled(
+LOST_REPLIES = [
+    ("timeout", "socket_timeout"),
+    ("transport", "connection_failed"),
+    ("response", "invalid_json"),
+]
+
+
+def lose(category: str, code: str) -> Callable[[], None]:
+    def callback() -> None:
+        raise errors.ApiError(
+            "reply lost after the write", category=category, code=code
+        )
+
+    return callback
+
+
+@pytest.mark.parametrize("category,code", LOST_REPLIES)
+def test_lost_apply_reply_is_settled_by_reading_back(
+    fake: FakeProduct, run_module: RunModule, category: str, code: str
+) -> None:
+    fake.add()
+    fake.after_write["reconfigure"] = lose(category, code)
+    result = run_module(fixture_apply.main, verify=["example"])
+    assert not result.get("failed") and result["changed"] and result["activated"]
+    assert result["verified"] == "observed" and len(fake.writes()) == 1
+
+
+@pytest.mark.parametrize("category,code", LOST_REPLIES)
+def test_lost_apply_reply_without_observed_resolution_is_unknown(
+    fake: FakeProduct,
+    run_module: RunModule,
+    monkeypatch: pytest.MonkeyPatch,
+    category: str,
+    code: str,
+) -> None:
+    fake.add()
+    fake.activate_ok = False
+    monkeypatch.setattr(_activation, "SETTLE_SECONDS", 0.0)
+    fake.after_write["reconfigure"] = lose(category, code)
+    result = run_module(fixture_apply.main, verify=["example"])
+    assert result["failed"] and result["changed"] and result["outcome"] == "unknown"
+    assert result["error_code"] == "not_effective" and len(fake.writes()) == 1
+
+
+def test_lost_apply_reply_with_unreadable_state_is_unknown(
     fake: FakeProduct, run_module: RunModule
 ) -> None:
     fake.add()
-    fake.after_write["reconfigure"] = lost_response
+
+    def lose_and_deny() -> None:
+        fake.auth_ok = False
+        lost_response()
+
+    fake.after_write["reconfigure"] = lose_and_deny
     result = run_module(fixture_apply.main, verify=["example"])
-    assert result["verified"] == "observed" and len(fake.writes()) == 1
+    assert result["failed"] and result["changed"] and result["outcome"] == "unknown"
+    assert result["operation"] == "verify" and result["error_category"] == "auth"
 
 
 def test_accepted_but_not_effective_fails(
