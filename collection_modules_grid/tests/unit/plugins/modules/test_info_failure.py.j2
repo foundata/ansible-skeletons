@@ -1,0 +1,54 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Info failures retain publishable identities without making writes."""
+
+from __future__ import annotations
+
+from typing import Any
+
+import pytest
+
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._engine import (
+    Engine,
+    ProductError,
+)
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.modules import (
+    fixture_info,
+)
+
+from ..conftest import RunModule
+from ..fake_product import FakeProduct
+
+
+@pytest.mark.parametrize("stage", ["auth", "find", "project"])
+def test_info_failure_keeps_valid_identity(
+    fake: FakeProduct,
+    run_module: RunModule,
+    monkeypatch: pytest.MonkeyPatch,
+    stage: str,
+) -> None:
+    fake.add()
+    if stage == "auth":
+        fake.auth_ok = False
+    else:
+
+        def reject(*args: Any) -> None:
+            raise ProductError(category="response", code="schema", fields=["value"])
+
+        monkeypatch.setattr(Engine, stage, reject)
+    result = run_module(fixture_info.main, name="example")
+    assert result["failed"] and result["name"] == "example"
+    assert not result["changed"] and result["outcome"] == "unchanged"
+    assert "resource" not in result and not fake.writes()
+    if stage != "auth":
+        assert result["error_code"] == "schema" and result["fields"] == ["value"]
+
+
+def test_invalid_info_identity_is_omitted_without_losing_the_error(
+    fake: FakeProduct, run_module: RunModule
+) -> None:
+    result = run_module(fixture_info.main, name="example\n")
+    assert result["failed"] and result["error_code"] == "validation_failed"
+    assert result["fields"] == ["name"] and "name" not in result
+    assert not result["changed"] and result["outcome"] == "unchanged"
+    assert "resource" not in result and not fake.requests
