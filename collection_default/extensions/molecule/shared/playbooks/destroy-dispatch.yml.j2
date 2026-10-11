@@ -1,6 +1,9 @@
 # Molecule destroy playbook: backend-agnostic cleanup. Both imported playbooks
 # tolerate the absence of their instances (and even of their tooling), so this
 # removes whatever exists regardless of which backend created it.
+#
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
 - name: "Molecule | Destroy (dispatch) | Podman"

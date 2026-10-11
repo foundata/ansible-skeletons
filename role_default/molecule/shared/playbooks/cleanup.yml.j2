@@ -2,6 +2,9 @@
 # prepare, converge, or verify that should not persist between test runs. It
 # runs after verify and before destroy. Optional, but can be useful for keeping
 # scenarios idempotent across repeated executions.
+#
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
 - name: "Molecule | Cleanup"

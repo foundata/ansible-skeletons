@@ -21,3 +21,16 @@ path = "**"
 precedence = "closest"
 SPDX-FileCopyrightText = "foundata GmbH <https://foundata.com>"
 SPDX-License-Identifier = "GPL-3.0-or-later"
+
+# The skeleton templates carry the license comment header of the files they
+# render, naming the generating organization. Their own licensing is this.
+[[annotations]]
+path = [
+  "collection_default/**",
+  "collection_modules/**",
+  "collection_modules_grid/**",
+  "role_default/**",
+]
+precedence = "override"
+SPDX-FileCopyrightText = "foundata GmbH <https://foundata.com>"
+SPDX-License-Identifier = "GPL-3.0-or-later"

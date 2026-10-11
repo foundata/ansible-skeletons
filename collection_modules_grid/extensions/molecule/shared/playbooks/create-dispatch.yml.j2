@@ -3,6 +3,9 @@
 # (entries without a "type" key default to podman) and no-ops silently
 # otherwise. This allows per-platform backend selection and even mixed
 # container/VM scenarios without any further configuration.
+#
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
 - name: "Molecule | Create (dispatch) | Podman typed platforms"

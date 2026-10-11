@@ -5,6 +5,9 @@
 # ansible-core versions are derived from "requires_ansible" in meta/runtime.yml.
 # Run nox inside the collection's Git repository: the license check honors
 # .gitignore only there.
+#
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 version = 1
 
@@ -16,8 +19,18 @@ min_python_version = "ansible-test-config"
 validate_collection_refs = "all"
 
 [sessions.license_check]
-# REUSE.toml states the licensing; files carry no license header of their own.
-run_license_check = false
+# The per-file check reads the license tags of every file but not REUSE.toml,
+# so it skips the files the licensing guide exempts from headers: the
+# generated changelog and the fragments. It also misreads the license sentence
+# in README.md; "reuse lint" still checks that file.
+run_license_check = true
+license_check_extra_ignore_paths = [
+  "CHANGELOG.rst",
+  "README.md",
+  "changelogs/changelog.yaml",
+  "changelogs/fragments/*",
+  "changelogs/fragments/archive/*",
+]
 
 [sessions.extra_checks]
 run_no_unwanted_files = true

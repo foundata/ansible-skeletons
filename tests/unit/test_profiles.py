@@ -25,17 +25,24 @@ def test_module_skeleton_layout(profile: str) -> None:
     assert not (skeleton / "roles").exists()
 
 
+# REUSE-IgnoreStart
 @pytest.mark.parametrize("name", ["collection_modules_grid", "collection_modules"])
-def test_python_templates_use_collection_license_metadata(name: str) -> None:
+def test_python_templates_carry_the_license_header(name: str) -> None:
     profile = ROOT / name
+    holder = (
+        "# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') }}"
+    )
     for path in profile.rglob("*.py.j2"):
-        source = path.read_text()
-        assert "SPDX-FileCopyrightText" not in source, path
-        assert "SPDX-License-Identifier" not in source, path
+        head = path.read_text().splitlines()[:20]
+        if not head:
+            continue  # An empty package marker stays empty.
+        assert holder in head, path
+        assert "# SPDX-License-Identifier: GPL-3.0-or-later" in head, path
         if path.parent == profile / "plugins/modules":
-            assert "GNU General Public License v3.0+" in "\n".join(
-                source.splitlines()[:20]
-            ), path
+            assert "GNU General Public License v3.0+" in "\n".join(head), path
+
+
+# REUSE-IgnoreEnd
 
 
 @pytest.mark.parametrize(
