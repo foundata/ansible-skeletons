@@ -3,8 +3,8 @@
 - Check licensing and metadata in `REUSE.toml`, `galaxy.yml` and the README's
   licensing and author sections.
 - Check collection dependencies in `galaxy.yml`, Python packages in
-  `requirements.txt` and the README's prerequisites. Remove `requirements.txt`
-  if no additional packages are needed.
+  `requirements.txt` and the README's prerequisites. Keep `requirements.txt`;
+  list Python packages there, or leave it with its comment when there are none.
 - Check `tests/config.yml` and run the checks in `DEVELOPMENT.md`.
 - Replace the fixture definition, modules and tests with a researched resource.
   Bind it in `tests/unit/plugins/modules/contract_subject.py` and keep

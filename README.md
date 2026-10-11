@@ -189,7 +189,7 @@ rules run.
 ### `collection_modules_grid`<a id="collection_modules_grid"></a>
 
 A module-first skeleton with a replaceable resource, info and activation module,
-a product-owned engine, fake API tests and an external-endpoint Molecule
+a shared resource engine, fake API tests and an external-endpoint Molecule
 scenario. It contains no deployment role.
 
 Its fixture speaks a grid API with UUID identifiers, paginated `search_item`

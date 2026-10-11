@@ -13,7 +13,7 @@ carries structure, decisions and scope only.
 Evidence labels: **D** documented, **S** read in matching release source,
 **I** inferred (name the premises), **O** observed on a lab target with its
 run and trace, **unknown** (name the next experiment). Use **spike-tested**
-or **integration-tested** only with linked evidence. The fixture is
+or **acceptance-tested** only with linked evidence. The fixture is
 source-defined test material, not product qualification.
 
 ## Decision sheet
@@ -34,10 +34,11 @@ source-defined test material, not product qualification.
 
 ## Structure and boundaries
 
-The product owns its engine and definitions. `foundata.utils` owns byte
-transport, deadlines, JSON decoding and safe error translation. Inventory is
-development-only. The core floor is 2.19 because shared playbooks use FQCN Jinja
-builtins; payload Python remains 3.9.
+The engine and the activation workflow come from the skeleton revision above and
+are not edited here; definitions, client and modules are product-owned.
+`foundata.utils` owns byte transport, deadlines, JSON decoding and safe error
+translation. Inventory is development-only. The core floor is 2.19 because
+shared playbooks use FQCN Jinja builtins; payload Python remains 3.9.
 
 ## Resources
 
@@ -68,7 +69,8 @@ Cuts: MVP <the two resources chosen for engine evidence, and why>; 1.0.0
 returned to the owner with their evidence>; later <the non-essential, in
 order>. Approved by the owner on <date>; re-approved on <date> where the picture
 changed (the approval is a commit of its own whose subject starts with
-`scope: approve`).
+`scope: approve`). Open issues for the next cut only; each links back to this
+section.
 
 Exclusions with guard decisions: <each excluded task: its risk, the guard
 options considered, the decision, and the evidence that would lift it>
