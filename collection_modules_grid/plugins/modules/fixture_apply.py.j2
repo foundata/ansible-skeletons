@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') }}
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
 # SPDX-License-Identifier: GPL-3.0-or-later
 # FIXME Replace family activation with the researched scope and effective-state probe.

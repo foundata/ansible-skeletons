@@ -1,7 +1,7 @@
 # How this collection is released, read by foundata's `release` command:
 # https://github.com/foundata/releasing/blob/main/docs/ansible-collections.md
 #
-# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') }}
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # The version lives in galaxy.yml, antsibull-changelog owns the changelog and

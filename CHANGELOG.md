@@ -16,6 +16,10 @@ and the project adheres to
 
 ### Added
 
+- collection_default, collection_modules, collection_modules_grid,
+  role_default: an optional `company_url` input. When set, the copyright holder
+  in license headers, `REUSE.toml` and the README notice reads
+  `<company> <<company_url>>`; Galaxy's `company` field keeps the plain name.
 - collection_default, collection_modules, collection_modules_grid: a
   `.releasing.toml` declaration for foundata's `release` command (ecosystem
   `ansible-collection`, `repository` to set before the first release), kept

@@ -7,7 +7,7 @@
 # Without this file, phases like 'cleanup', 'destroy', and 'syntax' that run
 # before 'create' would emit warnings about unmatched host patterns.
 #
-# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') }}
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 ---

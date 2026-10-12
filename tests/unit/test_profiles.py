@@ -30,7 +30,8 @@ def test_module_skeleton_layout(profile: str) -> None:
 def test_python_templates_carry_the_license_header(name: str) -> None:
     profile = ROOT / name
     holder = (
-        "# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') }}"
+        "# SPDX-FileCopyrightText: {{ company | default('FIXME your organization')"
+        " ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}"
     )
     for path in profile.rglob("*.py.j2"):
         head = path.read_text().splitlines()[:20]

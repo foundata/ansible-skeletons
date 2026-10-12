@@ -72,7 +72,8 @@ def check_tree(source: Path, destination: Path) -> None:
 
 
 # foundata's own renders get its author sentence and no skeleton credit.
-FOUNDATA_HOLDER = "foundata GmbH <https://foundata.com>"
+FOUNDATA_COMPANY = "foundata GmbH"
+FOUNDATA_URL = "https://foundata.com"
 FOUNDATA_AUTHOR = (
     "This [project](https://foundata.com/en/projects/) was created and is "
     "maintained\nby [foundata](https://foundata.com/).\n"
@@ -80,12 +81,39 @@ FOUNDATA_AUTHOR = (
 SKELETON_CREDIT = "Initially based on an\n[Ansible skeleton]"
 
 
-def check_attribution(project: Path, company: str) -> None:
+def holder(metadata: dict[str, object]) -> str:
+    """Return the copyright holder: the company, then its URL in angle brackets."""
+    company, url = str(metadata["company"]), metadata.get("company_url")
+    return f"{company} <{url}>" if url else company
+
+
+# REUSE-IgnoreStart
+def check_holders(project: Path, expected: str) -> None:
+    """Assert every license header of a fresh render names the holder."""
+    for path in sorted(project.rglob("*")):
+        if not path.is_file():
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+        for value in re.findall(
+            r"SPDX-FileCopyrightText:[ \t]*(.*?)[ \t]*$", text, re.MULTILINE
+        ):
+            if value != expected:
+                raise GateError(f"License header names {value!r}: {path}")
+
+
+# REUSE-IgnoreEnd
+
+
+def check_attribution(project: Path, metadata: dict[str, object]) -> None:
     """Assert the README's notice and author section match the holder."""
+    company = str(metadata["company"])
     readme = (project / "README.md").read_text(encoding="utf-8")
     notice = re.compile(
         r"^<!-- should match SPDX-PackageSupplier -->\n"
-        rf"Copyright \(c\) \d{{4}}, {re.escape(company)}$",
+        rf"Copyright \(c\) \d{{4}}, {re.escape(holder(metadata))}$",
         re.MULTILINE,
     )
     if not notice.search(readme):
@@ -124,9 +152,10 @@ def check_metadata(rendered: Rendered, metadata: dict[str, object]) -> None:
     for project in (rendered.role, rendered.collection):
         with (project / "REUSE.toml").open("rb") as stream:
             reuse = tomllib.load(stream)
-        if reuse["SPDX-PackageSupplier"] != metadata["company"]:
+        if reuse["SPDX-PackageSupplier"] != holder(metadata):
             raise GateError("REUSE metadata changed company")
-        check_attribution(project, str(metadata["company"]))
+        check_attribution(project, metadata)
+        check_holders(project, holder(metadata))
 
 
 def build_collection(rendered: Rendered) -> Path:
@@ -414,7 +443,8 @@ def module_smoke(
         metadata = example_metadata(punctuation=bool(index))
         if index == 0:
             # The first identity also lints foundata's own README variant.
-            metadata["company"] = FOUNDATA_HOLDER
+            metadata["company"] = FOUNDATA_COMPANY
+            metadata["company_url"] = FOUNDATA_URL
         # A double quote in the second name must survive every rendered file.
         metadata["product"] = (
             PRODUCTS[profile] if index == 0 else 'Other "Quoted" Product'
@@ -479,9 +509,10 @@ def module_smoke(
             raise GateError("Module render contains empty directories")
         with (rendered.collection / "REUSE.toml").open("rb") as stream:
             reuse = tomllib.load(stream)
-        if reuse["SPDX-PackageSupplier"] != metadata["company"]:
+        if reuse["SPDX-PackageSupplier"] != holder(metadata):
             raise GateError("REUSE metadata changed company")
-        check_attribution(rendered.collection, str(metadata["company"]))
+        check_attribution(rendered.collection, metadata)
+        check_holders(rendered.collection, holder(metadata))
         install_utils(rendered, utils_source)
         run(["git", "init", "--quiet"], cwd=rendered.collection)
         run(["git", "add", "."], cwd=rendered.collection)
@@ -763,7 +794,15 @@ def smoke(output: Path, *, lint: bool = False) -> None:
         ("explicit", example_metadata(), names),
         ("punctuation", example_metadata(punctuation=True), names),
         ("long-names", example_metadata(punctuation=True), long_names),
-        ("foundata", {**example_metadata(), "company": FOUNDATA_HOLDER}, names),
+        (
+            "foundata",
+            {
+                **example_metadata(),
+                "company": FOUNDATA_COMPANY,
+                "company_url": FOUNDATA_URL,
+            },
+            names,
+        ),
     ):
         rendered = render(
             output / case,

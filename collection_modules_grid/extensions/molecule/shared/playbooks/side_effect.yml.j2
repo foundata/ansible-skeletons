@@ -6,7 +6,7 @@
 # self-contained and either reverted within this playbook or cleaned up during
 # the subsequent cleanup phase. Optional.
 #
-# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') }}
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 ---

@@ -4,7 +4,7 @@
 # This stage provides primary functionality verification through Ansible's
 # declarative approach, which fails on execution errors.
 #
-# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') }}
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 ---

@@ -113,6 +113,7 @@ Some collections built using these skeletons:
       --collection-skeleton "./collection_default" \
       --extra-var '{"authors": ["FIXME User <user@example.com>"]}' \
       --extra-var "company='FIXME your organization'" \
+      --extra-var "company_url='FIXME https://organization.example.com'" \
       --extra-var "description='Manage FIXME.'" \
       --extra-var "repository='https://FIXME.example.com/repo/'" \
       --extra-var "issues='https://FIXME.example.com/repo/issues/'" \
@@ -127,6 +128,7 @@ Some collections built using these skeletons:
       --role-skeleton "./role_default" \
       --extra-var "author='FIXME User <user@example.com>'" \
       --extra-var "company='FIXME your organization'" \
+      --extra-var "company_url='FIXME https://organization.example.com'" \
       --extra-var "description='Manage FIXME.'" \
       --extra-var "repository_url='https://FIXME.example.com/repo/'" \
       --extra-var "issue_tracker_url='https://FIXME.example.com/repo/issues/'" \
@@ -140,6 +142,11 @@ Some collections built using these skeletons:
        [some](https://docs.ansible.com/ansible/latest/dev_guide/developing_collections_structure.html#roles-directory)
        [rules](https://docs.ansible.com/ansible/latest/dev_guide/developing_collections_creating.html#naming-your-collection)
        and should consist of `a-z`, `0-9` and `_` only.
+     - `company_url` is optional. When set, the copyright holder in license
+       headers, `REUSE.toml` and the README notice becomes
+       `<company> <<company_url>>`, for example
+       `foundata GmbH <https://foundata.com>`. Galaxy's `company` field keeps
+       the plain name.
      - Adapt the directory name of the `--[collection|role]-skeleton` parameter
        value to use a skeleton other than `[collection|role_]default`. The
        available skeletons are described below.
@@ -210,6 +217,7 @@ cat > metadata.json <<'EOF'
 {
   "authors": ["FIXME User <user@example.com>"],
   "company": "FIXME your organization",
+  "company_url": "FIXME https://organization.example.com",
   "description": "Manage FIXME.",
   "repository": "https://FIXME.example.com/repo/",
   "issues": "https://FIXME.example.com/repo/issues/",

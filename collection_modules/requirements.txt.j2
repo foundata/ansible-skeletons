@@ -3,7 +3,7 @@
 # See the official documentation for more information about the file format:
 # https://pip.pypa.io/en/stable/reference/requirements-file-format/
 #
-# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') }}
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 # FIXME Add packages or delete the file if no additional packages are needed

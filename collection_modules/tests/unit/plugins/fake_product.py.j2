@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') }}
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
 """REST transport adapter over the same stateful model as integration."""
 # FIXME Replace the fixture model with observed product behavior.

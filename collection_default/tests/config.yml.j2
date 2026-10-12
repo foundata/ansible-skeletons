@@ -1,7 +1,7 @@
 # Configuration for ansible-test, see
 # https://docs.ansible.com/projects/ansible/devel/dev_guide/testing/sanity/index.html
 #
-# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') }}
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 ---

@@ -7,7 +7,7 @@
 # Only test resources are managed; the endpoint itself is not provisioned.
 # See extensions/molecule/README.md for requirements and usage details.
 #
-# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') }}
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 ---

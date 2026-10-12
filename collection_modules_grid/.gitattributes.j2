@@ -1,6 +1,6 @@
 # Attributes for this repository, see https://git-scm.com/docs/gitattributes
 #
-# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') }}
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Store every text file with LF in the repository and write LF into the

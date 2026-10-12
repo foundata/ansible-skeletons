@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') }}
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Internal curated resource definitions; not a public interface."""
 # FIXME Replace this invented resource with the first researched product definition.

@@ -10,7 +10,7 @@
 # This works without root, without libvirt group membership and without any
 # IP discovery (instances are reachable via 127.0.0.1:<ssh_port>).
 #
-# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') }}
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 ---

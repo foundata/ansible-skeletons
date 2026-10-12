@@ -1,6 +1,6 @@
 # Execute the collection role "run" against all driver-created instances.
 #
-# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') }}
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 - name: "Molecule | Converge | Include the {{ namespace }}.{{ collection_name }}.run role"

@@ -3,7 +3,7 @@
 # Only values specific to the platform and its functionality should be included
 # here. Variables in this file override those defined in vars/main.yml.
 #
-# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') }}
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 ---

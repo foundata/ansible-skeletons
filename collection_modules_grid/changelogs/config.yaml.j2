@@ -3,7 +3,7 @@
 # Refer to the official documentation for more information on this file:
 # https://docs.ansible.com/projects/antsibull-changelog/changelog-configuration/
 #
-# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') }}
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 ---

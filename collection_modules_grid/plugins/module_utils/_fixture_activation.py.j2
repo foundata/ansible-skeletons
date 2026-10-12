@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') }}
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Fixture-only saved/active comparison; replace with product evidence."""
 # FIXME Replace the fixture probes and activation operation.

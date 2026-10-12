@@ -1,7 +1,7 @@
 # Ansible role: `{{ role_name }}`
 
 <!--
-SPDX-FileCopyrightText: {{ company | default('FIXME your organization') }}
+SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
@@ -209,7 +209,7 @@ There are no special requirements not covered by Ansible itself.
 
 <!--REUSE-IgnoreStart-->
 <!-- should match SPDX-PackageSupplier -->
-Copyright (c) {{ '%Y' | strftime }}, {{ company }}
+Copyright (c) {{ '%Y' | strftime }}, {{ company ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 
 This project is licensed under the GNU General Public License v3.0 or later
 (SPDX-License-Identifier: `GPL-3.0-or-later`), see

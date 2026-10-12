@@ -1,7 +1,7 @@
 # Ansible collection: `{{ namespace }}.{{ collection_name }}`
 
 <!--
-SPDX-FileCopyrightText: {{ company | default('FIXME your organization') }}
+SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
@@ -138,7 +138,7 @@ The fixture tests make no support claim for a real product. See
 
 <!--REUSE-IgnoreStart-->
 <!-- should match SPDX-PackageSupplier -->
-Copyright (c) {{ '%Y' | strftime }}, {{ company | default('FIXME your organization') }}
+Copyright (c) {{ '%Y' | strftime }}, {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 
 This project is licensed under the GNU General Public License v3.0 or later
 (SPDX-License-Identifier: `GPL-3.0-or-later`), see

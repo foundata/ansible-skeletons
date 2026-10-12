@@ -2,7 +2,7 @@
 # tolerate the absence of their instances (and even of their tooling), so this
 # removes whatever exists regardless of which backend created it.
 #
-# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') }}
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
