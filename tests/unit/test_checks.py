@@ -11,6 +11,7 @@ from typing import Any
 
 import pytest
 import yaml
+from packaging.specifiers import SpecifierSet
 
 from scripts.check import check, require_complete_tests
 from scripts.common import ROOT, GateError, Lane, isolated_environment, run, uv_command
@@ -22,6 +23,7 @@ from scripts.smoke import (
     default_sessions,
     lint_constraints,
     lint_project,
+    pinned_utils_version,
 )
 
 
@@ -526,6 +528,29 @@ def test_collection_default_lint_configuration() -> None:
         "max-start": 0,
         "max-end": 0,
     }
+
+
+@pytest.mark.parametrize("pins", [0, 1, 2])
+def test_module_checks_need_exactly_one_utils_pin(tmp_path: Path, pins: int) -> None:
+    collections = [{"name": "community.general", "version": "13.2.0"}]
+    collections += [{"name": "foundata.utils", "version": "1.0.0"}] * pins
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests/requirements.yml").write_text(
+        yaml.safe_dump({"collections": collections}), encoding="utf-8"
+    )
+    if pins == 1:
+        assert pinned_utils_version(tmp_path) == "1.0.0"
+    else:
+        with pytest.raises(GateError, match="exactly once"):
+            pinned_utils_version(tmp_path)
+
+
+@pytest.mark.parametrize("profile", ["collection_modules", "collection_modules_grid"])
+def test_pinned_utils_release_satisfies_the_skeleton_dependency(profile: str) -> None:
+    galaxy = (ROOT / profile / "galaxy.yml.j2").read_text(encoding="utf-8")
+    match = re.search(r'^  "foundata\.utils": "([^"]+)"$', galaxy, re.MULTILINE)
+    assert match is not None
+    assert pinned_utils_version() in SpecifierSet(match[1])
 
 
 @pytest.mark.parametrize("unstable", [False, True])

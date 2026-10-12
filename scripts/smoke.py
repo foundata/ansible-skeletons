@@ -326,8 +326,37 @@ def molecule_with_fake(rendered: Rendered) -> None:
             server.wait(timeout=30)
 
 
-def install_utils(rendered: Rendered, source: Path) -> None:
-    """Build the explicitly supplied unpublished dependency into the isolated tree."""
+def pinned_utils_version(root: Path = ROOT) -> str:
+    """Return the foundata.utils release pinned with the other gate dependencies."""
+    requirements = yaml.safe_load(
+        (root / "tests/requirements.yml").read_text(encoding="utf-8")
+    )
+    versions = [
+        str(entry["version"])
+        for entry in requirements.get("collections", [])
+        if isinstance(entry, dict) and entry.get("name") == "foundata.utils"
+    ]
+    if len(versions) != 1:
+        raise GateError("tests/requirements.yml must pin foundata.utils exactly once")
+    return versions[0]
+
+
+def install_utils(rendered: Rendered, source: Path | None = None) -> None:
+    """Install the pinned foundata.utils release, or build a local source instead."""
+    if source is None:
+        run(
+            [
+                "ansible-galaxy",
+                "collection",
+                "install",
+                "--no-deps",
+                "-p",
+                rendered.env["ANSIBLE_COLLECTIONS_PATH"],
+                f"foundata.utils:=={pinned_utils_version()}",
+            ],
+            env=rendered.env,
+        )
+        return
     if not (source / "galaxy.yml").is_file():
         raise GateError("--utils-source must be the foundata.utils source collection")
     metadata = yaml.safe_load((source / "galaxy.yml").read_text(encoding="utf-8"))
@@ -406,7 +435,7 @@ def exercise_modules(rendered: Rendered) -> None:
 def module_smoke(
     output: Path,
     *,
-    utils_source: Path,
+    utils_source: Path | None = None,
     profile: str = "collection_modules_grid",
     full: bool = False,
 ) -> None:
@@ -1033,18 +1062,18 @@ def main() -> int:
         choices=["collection_default", *MODULE_PROFILES],
         default="collection_default",
     )
-    parser.add_argument("--utils-source", type=Path)
+    parser.add_argument(
+        "--utils-source",
+        type=Path,
+        help="Local foundata.utils source to test instead of the pinned release",
+    )
     parser.add_argument("--ansible-tests", action="store_true")
     args = parser.parse_args()
     try:
         if args.profile in MODULE_PROFILES:
-            if args.utils_source is None:
-                raise GateError(
-                    "Module skeleton checks need --utils-source for unpublished foundata.utils"
-                )
             module_smoke(
                 args.output.resolve(),
-                utils_source=args.utils_source.resolve(),
+                utils_source=args.utils_source.resolve() if args.utils_source else None,
                 profile=args.profile,
                 full=args.ansible_tests,
             )

@@ -34,8 +34,10 @@ and the project adheres to
 - checks: quick checks render both module skeletons under two identities, one
   with a quoted product name, run their default sessions, and build and
   exercise the installed modules. The full matrix adds their sanity, unit and
-  integration lanes and the Molecule scenario against a fake product. A
-  long-name identity checks `collection_default` and `role_default`.
+  integration lanes and the Molecule scenario against a fake product. The
+  checks install the `foundata.utils` release pinned in `tests/requirements.yml`
+  or, with `--utils-source`, a local checkout. A long-name identity checks
+  `collection_default` and `role_default`.
 
 ### Changed
 

@@ -10,9 +10,10 @@ checks generate projects from all four skeletons, run their roles, and build
 and install the generated collections.
 
 Both module skeletons also render two identities and exercise installed fixture
-modules. While `foundata.utils` is unpublished, pass
-`--utils-source /path/to/utils` to checks and release checks, or set
-`SKELETONS_UTILS_SOURCE`.
+modules against the `foundata.utils` release pinned in `tests/requirements.yml`.
+To test a skeleton change against an unreleased `foundata.utils` commit, pass
+`--utils-source /path/to/utils` to `scripts/check.sh` or set
+`SKELETONS_UTILS_SOURCE`. Release checks always use the pinned release.
 
 
 ## Table of contents<a id="toc"></a>
@@ -87,7 +88,7 @@ variables. The helper refuses to overwrite an existing directory.
 | `scripts/release.py`        | Validate a release commit, then hand the tag to `releasing` |
 | `tests/unit/`               | Release and helper regression tests |
 | `tests/fixtures/`           | Disposable role execution fixtures |
-| `tests/requirements.yml`    | Pinned Galaxy dependencies for infrastructure tests |
+| `tests/requirements.yml`    | Pinned Galaxy dependencies for the checks |
 | `pyproject.toml`, `uv.lock` | Tool configuration, matrix and locked Python tools |
 
 Galaxy consumes one `.j2` suffix when creating a project. Files named
@@ -288,9 +289,8 @@ skeleton-specific gate (`scripts/release.py check`).
 
    ```sh
    evidence="../ansible-skeletons-release-${version}"
-   utils_source="../foundata.utils"  # while foundata.utils is unpublished
    uv run --locked python -m scripts.release check "${version}" \
-     --output "${evidence}" --utils-source "${utils_source}"
+     --output "${evidence}"
    ```
 
    Inspect `check.log` while the gate runs. A successful run creates
@@ -326,8 +326,7 @@ skeleton-specific gate (`scripts/release.py check`).
 8. Verify the published tag, the latest release and a fresh public clone:
 
    ```sh
-   uv run --locked python -m scripts.release verify "${evidence}/report.json" \
-     --utils-source "${utils_source}"
+   uv run --locked python -m scripts.release verify "${evidence}/report.json"
    ```
 
    `release verify` checks that the remote holds the tag and that the forge

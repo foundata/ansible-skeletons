@@ -126,10 +126,13 @@ def export_revision(
         bundle.extractall(destination, filter="data")
 
 
-def check_release(
-    version: str, output: Path, root: Path = ROOT, *, utils_source: Path | None = None
-) -> None:
+def check_release(version: str, output: Path, root: Path = ROOT) -> None:
     """Validate one clean commit; retain evidence without tagging or publishing."""
+    if os.environ.get("SKELETONS_UTILS_SOURCE"):
+        raise GateError(
+            "Release checks use the pinned foundata.utils release; "
+            "unset SKELETONS_UTILS_SOURCE"
+        )
     revision, base, backends = release_inputs(version, root)
     output = output.resolve()
     if output.is_relative_to(root.resolve()):
@@ -153,8 +156,6 @@ def check_release(
         ]
         for backend in backends:
             command.extend(["--integration", backend])
-        if utils_source is not None:
-            command.extend(["--utils-source", str(utils_source.resolve())])
         env = {
             key: value
             for key, value in os.environ.items()
@@ -338,9 +339,7 @@ def create_tag(path: Path, root: Path = ROOT) -> None:
     print(f"Created local tag v{version}; nothing was pushed or published")
 
 
-def verify_publication(
-    path: Path, root: Path = ROOT, *, utils_source: Path | None = None
-) -> None:
+def verify_publication(path: Path, root: Path = ROOT) -> None:
     """Check the remote tag, forge release and fresh clone's consumer workflow."""
     report = validate_report(path, root, tagged=True)
     version, revision = str(report["version"]), str(report["revision"])
@@ -378,10 +377,6 @@ def verify_publication(
             cwd=source,
             timeout=1800,
         )
-        if utils_source is None:
-            raise GateError(
-                "Publication checks need --utils-source for the module profile"
-            )
         for profile in MODULE_PROFILES:
             run(
                 uv_command(
@@ -391,8 +386,6 @@ def verify_publication(
                     "scripts.smoke",
                     "--profile",
                     profile,
-                    "--utils-source",
-                    str(utils_source.resolve()),
                     "--output",
                     str(Path(temporary) / profile),
                 ),
@@ -409,26 +402,17 @@ def main() -> int:
     check_parser = subparsers.add_parser("check", help="Validate a committed release")
     check_parser.add_argument("version")
     check_parser.add_argument("--output", required=True, type=Path)
-    check_parser.add_argument(
-        "--utils-source", type=Path, default=os.environ.get("SKELETONS_UTILS_SOURCE")
-    )
     for command in ("tag", "verify"):
         child = subparsers.add_parser(command)
         child.add_argument("report", type=Path)
-        if command == "verify":
-            child.add_argument(
-                "--utils-source",
-                type=Path,
-                default=os.environ.get("SKELETONS_UTILS_SOURCE"),
-            )
     args = parser.parse_args()
     try:
         if args.command == "check":
-            check_release(args.version, args.output, utils_source=args.utils_source)
+            check_release(args.version, args.output)
         elif args.command == "tag":
             create_tag(args.report)
         else:
-            verify_publication(args.report, utils_source=args.utils_source)
+            verify_publication(args.report)
     except (GateError, OSError, ValueError, subprocess.TimeoutExpired) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

@@ -139,10 +139,6 @@ def check(
     ):
         raise GateError("--foundata-wheel must name an existing wheel file")
     packages = [str(foundata_wheel.resolve())] if foundata_wheel else []
-    if utils_source is None:
-        raise GateError(
-            "Module profile checks need --utils-source for unpublished foundata.utils"
-        )
     runtime_outputs = [
         output,
         *[output / f"integration-{backend}" for backend in selected],
@@ -239,8 +235,11 @@ def check(
                 "scripts.smoke",
                 "--profile",
                 profile,
-                "--utils-source",
-                str(utils_source.resolve()),
+                *(
+                    ["--utils-source", str(utils_source.resolve())]
+                    if utils_source
+                    else []
+                ),
                 "--output",
                 str(output / profile),
                 *(["--ansible-tests"] if full else []),
@@ -317,7 +316,7 @@ def main() -> int:
         "--utils-source",
         type=Path,
         default=os.environ.get("SKELETONS_UTILS_SOURCE"),
-        help="Local source of unpublished foundata.utils",
+        help="Local foundata.utils source to test instead of the pinned release",
     )
     args = parser.parse_args()
     try:

@@ -10,3 +10,5 @@ collections:
     version: 3.3.0
   - name: community.general
     version: 13.2.0
+  - name: foundata.utils
+    version: 1.0.0
