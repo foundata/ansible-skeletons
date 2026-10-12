@@ -57,6 +57,8 @@ and the project adheres to
   collection per-file checker runs with explicit exemptions for changelogs,
   fragments and the README notice. README notices use the guide's form;
   foundata renders use its author sentence without the skeleton credit.
+- All skeletons: `.gitignore` retains the blank line below its repository
+  heading and uses a portable wildcard for macOS Finder icon metadata.
 
 ### Fixed
 

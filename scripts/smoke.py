@@ -48,6 +48,14 @@ def check_tree(source: Path, destination: Path) -> None:
         elif target.suffix == ".toml":
             with target.open("rb") as stream:
                 tomllib.load(stream)
+    # The guide's tail format keeps a blank line below the section heading.
+    ignore = (destination / ".gitignore").read_bytes()
+    if b"\n### Repository-specific files\n\n" not in ignore:
+        raise GateError("Rendered .gitignore lost the guide's tail format")
+    # ansible-test's line-endings sanity test rejects any carriage return, so
+    # the macOS icon entry is a wildcard instead of the upstream "Icon\r\r".
+    if b"\r" in ignore or b"\nIcon?\n" not in ignore:
+        raise GateError("Rendered .gitignore lost the portable macOS icon pattern")
     for runtime_template in (
         "shared/templates/cloud_init_user_data.yml.j2",
         "shared/templates/libvirt_domain.xml.j2",

@@ -134,9 +134,8 @@ fabric.properties
 .AppleDouble
 .LSOverride
 
-# Icon must end with two \r
-Icon
-
+# Finder icon metadata ends with a carriage return, matched by the wildcard.
+Icon?
 
 # Thumbnails
 ._*
@@ -401,6 +400,7 @@ $RECYCLE.BIN/
 # End of https://www.toptal.com/developers/gitignore/api/git,vim,linux,macos,windows,jetbrains+all,visualstudiocode,python,ansible
 
 ### Repository-specific files
+
 # Prevent accidental inclusion of ANSIBLE_HOME directory
 .ansible/*
 
