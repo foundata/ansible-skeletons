@@ -5,12 +5,45 @@
 import ast
 import json
 import re
+import tomllib
 from pathlib import Path
 
 import pytest
 
 from scripts.common import ROOT, GateError
 from scripts.render import example_metadata, render
+
+
+@pytest.mark.parametrize("profile", ["collection_modules_grid", "collection_modules"])
+def test_release_gate_runs_unrestricted_sanity_for_every_series(profile: str) -> None:
+    tree = ast.parse((ROOT / "scripts/smoke.py").read_text())
+    function = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "module_smoke"
+    )
+    selections = [
+        node.value
+        for node in ast.walk(function)
+        if isinstance(node, ast.AugAssign)
+        and isinstance(node.target, ast.Name)
+        and node.target.id == "session_sets"
+    ]
+    assert len(selections) == 1
+    sessions = ast.literal_eval(selections[0])
+    assert sessions == [
+        ["ansible-test-sanity"],
+        ["ansible-test-units"],
+        ["ansible-test-integration"],
+    ]
+    with (ROOT / profile / "antsibull-nox.toml.j2").open("rb") as stream:
+        config = tomllib.load(stream)
+    sanity = config["sessions"]["ansible_test_sanity"]
+    assert sanity == {
+        "skip_tests": ["changelog", "no-smart-quotes"],
+        "include_devel": True,
+    }
+    assert config["collection"] == {"min_python_version": "ansible-test-config"}
 
 
 @pytest.mark.parametrize("profile", ["collection_modules_grid", "collection_modules"])

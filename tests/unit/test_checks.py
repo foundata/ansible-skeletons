@@ -107,6 +107,24 @@ def test_missing_lint_wheel_is_rejected_before_any_checks(tmp_path: Path) -> Non
     assert not output.exists()
 
 
+def test_socket_layout_is_rejected_before_matrix(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def unexpected() -> None:
+        pytest.fail("Checks started before rejecting the output layout")
+
+    monkeypatch.setattr("scripts.check.check_static", unexpected)
+    output = tmp_path / ("x" * 104)
+    with pytest.raises(GateError, match="shorter"):
+        check(
+            output,
+            full=True,
+            backends=["podman", "libvirt", "ee"],
+            utils_source=tmp_path,
+        )
+    assert not output.exists()
+
+
 @pytest.mark.parametrize("wheel", [False, True])
 def test_nox_constraints_follow_effective_overlay_packages(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, wheel: bool

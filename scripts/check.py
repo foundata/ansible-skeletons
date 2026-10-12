@@ -24,6 +24,7 @@ from scripts.common import (
     uv_command,
     write_json,
 )
+from scripts.controller import check_socket_layout, controller_environment
 from scripts.render import MODULE_PROFILES
 
 
@@ -142,6 +143,12 @@ def check(
         raise GateError(
             "Module profile checks need --utils-source for unpublished foundata.utils"
         )
+    runtime_outputs = [
+        output,
+        *[output / f"integration-{backend}" for backend in selected],
+    ]
+    for runtime_output in runtime_outputs:
+        check_socket_layout(runtime_output)
     output.mkdir(parents=True, exist_ok=False)
     checks: list[str] = []
     check_static()
@@ -150,6 +157,32 @@ def check(
     pythons = config["python-versions"] if full else [str(config["default-python"])]
     if not isinstance(pythons, list):
         raise GateError("Invalid helper Python matrix")
+    os.environ["TMPDIR"] = controller_environment(output, dict(os.environ))["TMPDIR"]
+    for runtime_output in runtime_outputs:
+        for python in pythons:
+            run(
+                [
+                    "uv",
+                    "run",
+                    "--locked",
+                    "--isolated",
+                    "--python",
+                    str(python),
+                    "python",
+                    "-m",
+                    "scripts.controller",
+                    "--output",
+                    str(runtime_output),
+                ]
+            )
+        if runtime_output != output:
+            evidence = output / "controller-checks" / runtime_output.name
+            evidence.mkdir(parents=True)
+            for record in runtime_output.glob("controller-python*.json"):
+                record.rename(evidence / record.name)
+            # Keep the tier's exclusive output-directory creation check.
+            (runtime_output / "t").rmdir()
+            runtime_output.rmdir()
     for python in pythons:
         result = output / f"unit-python{python}.xml"
         run(

@@ -520,19 +520,8 @@ def module_smoke(
         # changelog) in check-only mode; the full matrix adds the ansible-test lanes.
         session_sets: list[list[str]] = [[]]
         if full:
-            newest = ".".join(importlib.metadata.version("ansible-core").split(".")[:2])
-            with (rendered.collection / "antsibull-nox.toml").open("rb") as stream:
-                config = tomllib.load(stream)
-            validation_lanes = [
-                f"ansible-test-sanity-{series}"
-                for series in config["sessions"]["ansible_test_units"][
-                    "core_python_versions"
-                ]
-                if series not in {"2.19", newest}
-            ]
             session_sets += [
-                ["ansible-test-sanity-2.19", f"ansible-test-sanity-{newest}"],
-                [*validation_lanes, "--", "--test", "validate-modules"],
+                ["ansible-test-sanity"],
                 ["ansible-test-units"],
                 ["ansible-test-integration"],
             ]

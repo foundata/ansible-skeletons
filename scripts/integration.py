@@ -5,15 +5,18 @@
 import argparse
 import json
 import os
+import re
 import shutil
 import socket
 import sys
+import tomllib
 import uuid
 from pathlib import Path
 
 import yaml
 
 from scripts.common import ROOT, GateError, require_tools, run, write_json
+from scripts.controller import check_socket_layout, controller_environment
 from scripts.render import Rendered, example_metadata, render
 
 
@@ -108,9 +111,16 @@ def configure_scenario(
 
 
 def podman_environment(output: Path, env: dict[str, str]) -> dict[str, str]:
-    """Confine image builds and template cleanup to a disposable Podman store."""
+    """Keep storage, locks and the rootless pause process inside this run."""
+    output = output.resolve()
+    env = controller_environment(output, env)
     storage = output / "podman"
     storage.mkdir()
+    runtime = output / "r"
+    runtime.mkdir(mode=0o700)
+    (runtime / "libpod/tmp").mkdir(parents=True, mode=0o700)
+    temporary = storage / "tmp"
+    temporary.mkdir()
     config = storage / "storage.conf"
     config.write_text(
         "[storage]\n"
@@ -120,7 +130,132 @@ def podman_environment(output: Path, env: dict[str, str]) -> dict[str, str]:
         f"rootless_storage_path = {json.dumps(str(storage / 'graph'))}\n",
         encoding="utf-8",
     )
-    return {**env, "CONTAINERS_STORAGE_CONF": str(config)}
+    engine = storage / "containers.conf"
+    engine.write_text(
+        '[engine]\nlock_type = "file"\n'
+        f"static_dir = {json.dumps(str(storage / 'graph/libpod'))}\n"
+        f"tmp_dir = {json.dumps(str(runtime / 't'))}\n",
+        encoding="utf-8",
+    )
+    isolated = {
+        key: value
+        for key, value in env.items()
+        if key
+        not in {
+            "CONTAINERS_CONF_OVERRIDE",
+            "CONTAINERS_CONF_MODULES",
+            "CONTAINER_HOST",
+            "CONTAINER_CONNECTION",
+        }
+    }
+    return {
+        **isolated,
+        "CONTAINERS_STORAGE_CONF": str(config),
+        "CONTAINERS_CONF": str(engine),
+        "XDG_CONFIG_HOME": str(storage / "config"),
+        "XDG_RUNTIME_DIR": str(runtime),
+    }
+
+
+def check_podman_paths(output: Path, env: dict[str, str]) -> None:
+    """Refuse cleanup unless effective storage and runtime paths are private."""
+    output = output.resolve()
+
+    def private(value: object) -> Path:
+        if not isinstance(value, str) or not Path(value).is_absolute():
+            raise GateError(f"Missing absolute Podman runtime path: {value!r}")
+        path = Path(value).resolve()
+        if path == output or not path.is_relative_to(output):
+            raise GateError(f"Podman runtime path is outside this run: {value}")
+        return path
+
+    storage_conf = private(env.get("CONTAINERS_STORAGE_CONF"))
+    engine_conf = private(env.get("CONTAINERS_CONF"))
+    runtime = private(env.get("XDG_RUNTIME_DIR"))
+    private(env.get("XDG_CONFIG_HOME"))
+    private(env.get("TMPDIR"))
+    if runtime.stat().st_mode & 0o077:
+        raise GateError("Podman runtime directory must be private to its owner")
+    with engine_conf.open("rb") as stream:
+        engine = tomllib.load(stream)["engine"]
+    if engine.get("lock_type") != "file":
+        raise GateError("Podman cleanup requires run-local file locks")
+    for key in ("static_dir", "tmp_dir"):
+        private(engine.get(key))
+    # JSON info omits static_dir and tmp_dir; debug info reports their effective
+    # values, including a database override of the supplied configuration.
+    output_text = run(
+        [
+            "podman",
+            "--remote=false",
+            "--log-level",
+            "debug",
+            "info",
+            "--format",
+            "json",
+        ],
+        env=env,
+        timeout=60,
+        capture=True,
+    )
+    start = output_text.find("{\n")
+    if start < 0:
+        raise GateError("Podman info did not report its effective paths")
+    info = mapping(json.JSONDecoder().raw_decode(output_text[start:])[0])
+    store = mapping(info.get("store"))
+    for key in ("graphRoot", "runRoot", "volumePath", "imageCopyTmpDir"):
+        private(store.get(key))
+    if private(store.get("configFile")) != storage_conf:
+        raise GateError("Podman selected another storage configuration")
+    host = mapping(info.get("host"))
+    if host.get("serviceIsRemote") is not False:
+        raise GateError("Podman cleanup requires a local engine")
+    private(mapping(host.get("remoteSocket")).get("path"))
+    runtime_version = mapping(host.get("ociRuntime")).get("version")
+    if not isinstance(runtime_version, str):
+        raise GateError("Podman info omitted the OCI runtime version")
+    rundirs = [
+        line.removeprefix("rundir:").strip()
+        for line in runtime_version.splitlines()
+        if line.startswith("rundir:")
+    ]
+    if len(rundirs) != 1:
+        raise GateError("Podman info omitted an unambiguous OCI state directory")
+    private(rundirs[0])
+    effective = {}
+    for line in output_text.splitlines():
+        match = re.search(r'msg=(".*")$', line)
+        if match:
+            message = json.loads(match[1])
+            for label in (
+                "graph root",
+                "run root",
+                "static dir",
+                "tmp dir",
+                "volume path",
+            ):
+                prefix = f"Using {label} "
+                if message.startswith(prefix):
+                    effective[label] = private(message[len(prefix) :])
+    if set(effective) != {
+        "graph root",
+        "run root",
+        "static dir",
+        "tmp dir",
+        "volume path",
+    }:
+        raise GateError("Podman debug info omitted an effective runtime path")
+    for label, key in (("static dir", "static_dir"), ("tmp dir", "tmp_dir")):
+        if effective[label] != private(engine[key]):
+            raise GateError(f"Podman selected another {label}")
+
+
+def reset_podman(output: Path, env: dict[str, str]) -> None:
+    """Recheck the effective paths immediately before destructive cleanup."""
+    check_podman_paths(output, env)
+    run(
+        ["podman", "--remote=false", "system", "reset", "--force"], env=env, timeout=180
+    )
 
 
 def lint_molecule(molecule: Path, rendered: Rendered) -> None:
@@ -148,6 +283,7 @@ def lint_molecule(molecule: Path, rendered: Rendered) -> None:
 
 def integration(backend: str, output: Path) -> None:
     """Run both generated projects; keep failures and always destroy the targets."""
+    check_socket_layout(output)
     require_tools("molecule", "ansible-galaxy", "ansible-lint")
     if backend in ("podman", "ee"):
         require_tools("podman")
@@ -160,22 +296,10 @@ def integration(backend: str, output: Path) -> None:
             raise GateError("libvirt integration requires access to /dev/kvm")
     output.mkdir(parents=True, exist_ok=False)
     rendered = render(output / "rendered", metadata=example_metadata())
-    env = rendered.env
+    env = controller_environment(output, rendered.env)
     if backend in ("podman", "ee"):
         env = podman_environment(output, env)
-        info = mapping(
-            json.loads(
-                run(
-                    ["podman", "info", "--format", "json"],
-                    env=env,
-                    timeout=60,
-                    capture=True,
-                )
-            )
-        )
-        store = mapping(info.get("store"))
-        if store.get("graphRoot") != str(output / "podman/graph"):
-            raise GateError("Podman did not select the disposable storage directory")
+        check_podman_paths(output, env)
     env["MOLECULE_GLOB"] = "{molecule,extensions/molecule}/*/molecule.yml"
     env["MOLECULE_VM_CACHE_DIR"] = str(output / "vm-images")
     run(
@@ -237,8 +361,7 @@ def integration(backend: str, output: Path) -> None:
             )
     finally:
         if backend in ("podman", "ee"):
-            # The separate store contains only resources created by this run.
-            run(["podman", "system", "reset", "--force"], env=env, timeout=180)
+            reset_podman(output, env)
     write_json(output / "integration.json", {"backend": backend, "results": evidence})
 
 
