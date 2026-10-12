@@ -1,0 +1,378 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Engine invariants over a synthetic definition and in-memory client only."""
+
+from __future__ import annotations
+
+from dataclasses import replace
+from typing import Any, Callable
+
+import pytest
+from ansible.module_utils.basic import AnsibleModule
+
+from ansible_collections.foundata.utils.plugins.module_utils import errors
+
+# isort: split
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils import (
+    _engine,
+)
+from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._engine import (
+    DeletionGuard,
+    Engine,
+    Field,
+    Key,
+    Reference,
+    Resource,
+    build_spec,
+    fail,
+    normalize,
+    run_resource,
+)
+
+from ..conftest import RunModule
+
+IDENTIFIER = Key("id", "Synthetic identifier", kind="int", minimum=1)
+SYNTHETIC = Resource(
+    name="synthetic",
+    route="/synthetic",
+    keys=(Key("label", "Identity"),),
+    fields=(Field("text", "str", "Text"), Field("members", "set", "Members")),
+    result_key="synthetic",
+    identifier=IDENTIFIER,
+    refuse_delete_when=(
+        DeletionGuard("dependents", "/dependent", "owner", IDENTIFIER),
+    ),
+)
+
+
+class ProductError(errors.ApiError):
+    def __init__(
+        self,
+        *,
+        category: str = "product",
+        code: str | None = None,
+        fields: list[str] | None = None,
+    ) -> None:
+        super().__init__(category=category, code=code)
+        self.fields = fields or []
+
+
+def name(value: object) -> str:
+    if (
+        not isinstance(value, str)
+        or not 0 < len(value) <= 253
+        or any(ord(char) < 32 or ord(char) == 127 for char in value)
+    ):
+        raise ValueError("invalid synthetic name")
+    return value
+
+
+def names(value: object) -> list[str]:
+    if not isinstance(value, list) or len(value) > 256:
+        raise ValueError("invalid synthetic names")
+    return [name(item) for item in value]
+
+
+class SyntheticClient:
+    def __init__(self) -> None:
+        self.rows: dict[int, dict[str, Any]] = {}
+        self.dependents: dict[int, dict[str, Any]] = {}
+        self.writes: list[str] = []
+        self.decoded: list[str] = []
+
+    def add(self, **values: Any) -> int:
+        identity = len(self.rows) + 1
+        self.rows[identity] = {
+            "id": identity,
+            "label": "example",
+            "text": "",
+            "members": [],
+            "dependents": [],
+            **values,
+        }
+        return identity
+
+    def list(self, definition: Any) -> list[dict[str, Any]]:
+        if isinstance(definition, Reference):
+            return [{"id": 7, "label": "owner"}]
+        return list(self.rows.values())
+
+    def get(self, definition: Any, identity: int) -> dict[str, Any] | None:
+        rows = self.dependents if isinstance(definition, DeletionGuard) else self.rows
+        return rows.get(identity)
+
+    def decode(self, field: Field, value: Any) -> Any:
+        self.decoded.append(field.name)
+        if field.kind == "map":
+            return {int(key): rights for key, rights in value.items()}
+        return value
+
+    @staticmethod
+    def encode(field: Field, value: Any) -> Any:
+        return value
+
+    def create(self, resource: Resource, values: dict[str, Any]) -> None:
+        self.writes.append("create")
+        self.add(**values)
+
+    def update(self, resource: Resource, identity: int, values: dict[str, Any]) -> None:
+        self.writes.append("update")
+        self.rows[identity].update(values)
+
+    def delete(self, resource: Resource, identity: int) -> None:
+        self.writes.append("delete")
+        del self.rows[identity]
+
+
+@pytest.fixture
+def connection() -> dict[str, Any]:
+    return {}
+
+
+@pytest.fixture(autouse=True)
+def synthetic(monkeypatch: pytest.MonkeyPatch) -> SyntheticClient:
+    client = SyntheticClient()
+    schema = errors.ErrorSchema(
+        codes_by_category={
+            "product": {None, "validation_failed", "rejected"},
+            "argument": {"invalid_identity"},
+            "response": {"schema"},
+            "eligibility": {"referenced"},
+            "verification": {"not_persisted"},
+        },
+        fallback=("product", None),
+        field_validators={"operation": name, "label": name, "fields": names},
+    )
+    monkeypatch.setattr(_engine, "Client", lambda params: client)
+    monkeypatch.setattr(_engine, "ProductError", ProductError)
+    monkeypatch.setattr(_engine, "SCHEMA", schema)
+    monkeypatch.setattr(_engine, "api_argument_spec", dict)
+    monkeypatch.setattr(_engine._compat, "check", lambda *args: None)
+    return client
+
+
+def entry(resource: Resource = SYNTHETIC) -> Callable[[], None]:
+    def main() -> None:
+        module = AnsibleModule(
+            argument_spec=build_spec(resource), supports_check_mode=True
+        )
+        run_resource(module, resource)
+
+    return main
+
+
+@pytest.mark.parametrize("kind", ["set", "names"])
+def test_set_bounds_follow_the_definition_on_input(kind: str) -> None:
+    field = Field("members", kind, "Members")
+    assert normalize(field, ["x" * 150], input_value=True) == ["x" * 150]
+    for values in (["x" * 151], [str(i) for i in range(257)]):
+        with pytest.raises(ProductError):
+            normalize(field, values, input_value=True)
+    larger = replace(field, maximum_items=300, item_limit=255)
+    values = [str(i) for i in range(257)] + ["x" * 151]
+    assert normalize(larger, values, input_value=True) == values
+    for values in (["x" * 256], [str(i) for i in range(301)]):
+        with pytest.raises(ProductError):
+            normalize(larger, values, input_value=True)
+    unbounded = replace(field, maximum_items=None, item_limit=None)
+    values = [str(i) for i in range(301)] + ["x" * 256]
+    assert normalize(unbounded, values, input_value=True) == values
+    for input_value in (False, True):
+        for invalid in ([""], [None], "not-a-list"):
+            with pytest.raises(ProductError):
+                normalize(unbounded, invalid, input_value=input_value)
+
+
+@pytest.mark.parametrize("kind", ["set", "names"])
+def test_stored_sets_are_read_beyond_the_bounds(kind: str) -> None:
+    field = Field("members", kind, "Members")
+    values = [str(i) for i in range(301)] + ["x" * 256]
+    assert normalize(field, values) == values
+
+
+def test_set_minimum_and_item_pattern_apply_to_input() -> None:
+    field = Field("members", "set", "Members", minimum_items=1, pattern=r"[a-z]+")
+    assert normalize(field, ["ab"], input_value=True) == ["ab"]
+    for invalid in ([], ["A1"]):
+        with pytest.raises(ProductError):
+            normalize(field, invalid, input_value=True)
+    assert normalize(field, []) == []
+    with pytest.raises(ProductError):
+        normalize(field, ["A1"])
+
+
+def test_map_bounds_follow_the_definition_on_input() -> None:
+    field = Field("rights", "map", "Rights", choices=("read",))
+    assert normalize(field, {"x" * 150: ["read"]}, input_value=True) == {
+        "x" * 150: ["read"]
+    }
+    for invalid in ({"x" * 151: ["read"]}, {str(i): ["read"] for i in range(257)}):
+        with pytest.raises(ProductError):
+            normalize(field, invalid, input_value=True)
+        assert normalize(field, invalid) == invalid
+    unbounded = replace(field, maximum_items=None, item_limit=None)
+    assert normalize(unbounded, {"x" * 151: ["read"]}, input_value=True) == {
+        "x" * 151: ["read"]
+    }
+    with pytest.raises(ProductError):
+        normalize(unbounded, {"": ["read"]})
+
+
+def test_stored_strings_are_read_beyond_the_limit() -> None:
+    field = Field("note", "str", "Note", limit=10)
+    assert normalize(field, "x" * 11) == "x" * 11
+    with pytest.raises(ProductError):
+        normalize(field, "x" * 11, input_value=True)
+
+
+def test_definition_can_allow_an_empty_identity_component(
+    synthetic: SyntheticClient, run_module: RunModule
+) -> None:
+    resource = replace(SYNTHETIC, keys=(Key("label", "Optional component", r".*"),))
+    result = run_module(entry(resource), label="", _ansible_check_mode=True)
+    assert not result.get("failed") and result["synthetic"]["label"] == ""
+    assert not synthetic.writes
+
+
+def test_identity_keys_are_strings() -> None:
+    resource = replace(SYNTHETIC, keys=(Key("tag", "Tag", kind="int"),))
+    with pytest.raises(ValueError, match="identity keys are strings"):
+        build_spec(resource)
+
+
+@pytest.mark.parametrize("reference", ["present", "malformed", "missing-key"])
+def test_synthetic_deletion_guard(
+    synthetic: SyntheticClient, run_module: RunModule, reference: str
+) -> None:
+    identity = synthetic.add(dependents=[7] if reference != "malformed" else 7)
+    synthetic.dependents[7] = {"id": 7}
+    if reference == "present":
+        synthetic.dependents[7]["owner"] = identity
+    result = run_module(entry(), label="example", state="absent")
+    assert result["failed"]
+    assert result["error_code"] == (
+        "referenced" if reference == "present" else "schema"
+    )
+    assert not result["changed"] and result["outcome"] == "unchanged"
+    assert not synthetic.writes and identity in synthetic.rows
+
+
+def test_engine_decodes_map_keys_before_resolving_references(
+    synthetic: SyntheticClient, run_module: RunModule
+) -> None:
+    field = Field(
+        "rights",
+        "map",
+        "Rights",
+        choices=("read",),
+        reference=Reference("/owners", "label", IDENTIFIER),
+    )
+    resource = replace(SYNTHETIC, fields=(field,))
+    synthetic.add(rights={"7": ["read"]})
+    result = run_module(entry(resource), label="example")
+    assert result["synthetic"]["rights"] == {"owner": ["read"]}
+    assert "rights" in synthetic.decoded and not synthetic.writes
+
+
+def test_identity_linked_field_is_refused(
+    synthetic: SyntheticClient, run_module: RunModule
+) -> None:
+    key = replace(SYNTHETIC.keys[0], follows_field="text")
+    synthetic.add(text="example")
+    result = run_module(
+        entry(replace(SYNTHETIC, keys=(key,))), label="example", text="other"
+    )
+    assert result["failed"] and result["error_code"] == "invalid_identity"
+    assert not result["changed"] and result["outcome"] == "unchanged"
+    assert result["fields"] == ["text"] and not synthetic.writes
+
+
+def test_identity_outside_the_key_pattern_is_refused_before_requests(
+    synthetic: SyntheticClient, run_module: RunModule
+) -> None:
+    result = run_module(entry(), label="example\n")
+    assert result["failed"] and result["error_code"] == "validation_failed"
+    assert result["fields"] == ["label"]
+    assert not result["changed"] and not synthetic.writes and not synthetic.decoded
+
+
+def test_undeclared_failure_key_degrades_to_a_generic_error() -> None:
+    captured: dict[str, Any] = {}
+
+    class Module:
+        def fail_json(self, msg: str, **kwargs: Any) -> None:
+            captured.update(kwargs)
+            raise SystemExit(1)
+
+    failure = ProductError(category="verification", code="not_persisted")
+    with pytest.raises(SystemExit):
+        fail(
+            Module(),
+            failure,
+            msg="failed",
+            changed=True,
+            outcome="unknown",
+            fields={"operation": "verify", "undeclared": "value"},
+        )
+    assert (captured["error_category"], captured["error_code"]) == ("product", None)
+    assert captured["operation"] == "verify" and "undeclared" not in captured
+    assert captured["changed"] and captured["outcome"] == "unknown"
+
+
+def test_unpublishable_identity_preserves_specific_error(
+    run_module: RunModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    resource = replace(SYNTHETIC, keys=(Key("label", "Optional component", r".*"),))
+
+    def reject(*args: Any) -> None:
+        raise ProductError(code="rejected")
+
+    monkeypatch.setattr(_engine._compat, "check", reject)
+    result = run_module(entry(resource), label="")
+    assert result["failed"] and "label" not in result
+    assert result["error_code"] == "rejected" and result["outcome"] == "unchanged"
+
+
+@pytest.mark.parametrize(
+    "fields,reported",
+    [
+        (["displayName", "a name with spaces"], True),
+        (["x" * 300], False),
+        (["line\nbreak"], False),
+        ([f"field{index}" for index in range(257)], False),
+    ],
+)
+def test_failure_after_a_write_keeps_changed_and_outcome(
+    synthetic: SyntheticClient,
+    run_module: RunModule,
+    monkeypatch: pytest.MonkeyPatch,
+    fields: list[str],
+    reported: bool,
+) -> None:
+    synthetic.add()
+
+    def mismatch(self: Engine, *args: Any) -> None:
+        raise ProductError(category="verification", code="not_persisted", fields=fields)
+
+    monkeypatch.setattr(Engine, "verify", mismatch)
+    result = run_module(entry(), label="example", text="new")
+    assert result["failed"] and result["changed"] and result["outcome"] == "unknown"
+    assert result["operation"] == "verify" and synthetic.writes == ["update"]
+    if reported:
+        assert result["error_code"] == "not_persisted" and result["fields"] == fields
+    else:
+        assert (result["error_category"], result["error_code"]) == ("product", None)
+        assert "fields" not in result and result["label"] == "example"
+
+
+def test_stored_object_beyond_the_bounds_is_read_compared_and_deleted(
+    synthetic: SyntheticClient, run_module: RunModule
+) -> None:
+    members = [f"member{index}" for index in range(257)] + ["x" * 151]
+    synthetic.add(members=members)
+    result = run_module(entry(), label="example", text="")
+    assert not result.get("failed") and not result["changed"]
+    assert sorted(result["synthetic"]["members"]) == sorted(members)
+    removed = run_module(entry(), label="example", state="absent")
+    assert not removed.get("failed") and removed["changed"]
+    assert not synthetic.rows

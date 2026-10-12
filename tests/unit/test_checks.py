@@ -292,6 +292,9 @@ def test_skeleton_lint_configurations_stay_in_sync(profile: str) -> None:
         "plugins/module_utils/_compat.py.j2",
         "tests/unit/plugins/conftest.py.j2",
         "tests/unit/plugins/modules/test_contract.py.j2",
+        "tests/unit/plugins/modules/test_engine.py.j2",
+        "tests/unit/plugins/modules/test_activation.py.j2",
+        "tests/unit/plugins/modules/test_info_failure.py.j2",
         "docs/architecture.md.j2",
         "tools/inventory/extract.py.j2",
     ):

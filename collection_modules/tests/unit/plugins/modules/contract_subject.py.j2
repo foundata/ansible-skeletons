@@ -1,6 +1,11 @@
 # SPDX-FileCopyrightText: {{ company | default('FIXME your organization') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Fixture bindings of the shared contract tests in ``test_contract.py``."""
+"""Product binding for test_contract.py; engine invariants are synthetic.
+
+Use real creation arguments, valid identities and two values of one mutable
+public field. Disable unsupported capabilities with a concrete skip reason.
+No set field, boolean field, info module or deletion guard is required.
+"""
 # FIXME Bind the first researched resource, its fake and its entry points here;
 # keep test_contract.py unchanged.
 
@@ -16,19 +21,33 @@ from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.modules i
     fixture_info,
 )
 
-from ..fake_product import FakeProduct, Response
+from ..fake_product import (
+    OLD_SECRET,
+    SECRET,
+    FakeProduct,
+    Response,
+    lost_response,
+)
+
+__all__ = ("OLD_SECRET", "lost_response")
 
 RESOURCE = FIXTURE
 RESULT = "fixture"
 KEY = "name"
+IDENTITIES = ("example", "other", "third", "fourth", "fifth")
+ARGS: dict[str, Any] = {}
 VALUE = "value"
-ENABLED = "enabled"
-LABELS = "labels"
+VALUES = ("first", "second")
+SECRETS = (SECRET, "SYNTHETIC-key")
+VERSION = "1.0.0"
+CAPABILITIES = {"delete": True, "listing": True, "drop": True, "reject": True}
+SKIP_REASONS: dict[str, str] = {}
 VERSION_PATH = "/system/version"
 OPERATION = f"{FIXTURE.name}:present"
 
 main: Callable[[], None] = fixture.main
 info_main: Callable[[], None] = fixture_info.main
+INFO_MAIN: Callable[[], None] | None = info_main
 
 
 def rows(fake: FakeProduct) -> dict[Any, dict[str, Any]]:
@@ -44,6 +63,18 @@ def add(fake: FakeProduct, **values: Any) -> Any:
 def lose_next(fake: FakeProduct, operation: str, callback: Callable[[], None]) -> None:
     """Run ``callback`` after the next create, update or delete took effect."""
     fake.lose_next(operation, callback)
+
+
+def drop_next(fake: FakeProduct, operation: str) -> None:
+    """Acknowledge the next update or delete without storing it."""
+    fake.drop_next(operation)
+
+
+def reject_next(fake: FakeProduct, operation: str) -> None:
+    """Store the next write, then answer with a definitive validation rejection."""
+    fake.after_write[operation] = lambda: Response(
+        422, None, raw=b"<html>rejected</html>"
+    )
 
 
 def make_incomplete(fake: FakeProduct) -> None:

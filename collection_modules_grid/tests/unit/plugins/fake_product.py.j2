@@ -34,6 +34,9 @@ class Response:
         self.body = raw if raw is not None else json.dumps(payload).encode()
 
 
+ACTIONS = {"create": "add_item", "update": "set_item", "delete": "del_item"}
+
+
 class FakeProduct:
     """One endpoint with grids, pagination, validation and controlled failures."""
 
@@ -47,7 +50,8 @@ class FakeProduct:
         self.auth_ok = True
         self.activate_ok = True
         self.faults: dict[str, Callable[[], Response | None]] = {}
-        self.after_write: dict[str, Callable[[], None]] = {}
+        self.after_write: dict[str, Callable[[], Response | None]] = {}
+        self.dropped: set[str] = set()
 
     def add(self, grid: str = "fixture", **values: str) -> str:
         key = str(uuid.uuid4())
@@ -77,11 +81,11 @@ class FakeProduct:
         self.total_offset = 1
 
     def lose_next(self, operation: str, callback: Callable[[], None]) -> None:
-        self.after_write[
-            {"create": "add_item", "update": "set_item", "delete": "del_item"}[
-                operation
-            ]
-        ] = callback
+        self.after_write[ACTIONS[operation]] = callback
+
+    def drop_next(self, operation: str) -> None:
+        """Acknowledge the next update or delete without storing it."""
+        self.dropped.add(ACTIONS[operation])
 
     def request(
         self, method: str, path: str, body: bytes | None, headers: dict[str, str]
@@ -119,6 +123,14 @@ class FakeProduct:
             return self.listing(items, data)
         if action == "get_item":
             return Response(200, {grid: items.get(key, {})})
+        if action in self.dropped and action in ("set_item", "del_item"):
+            self.dropped.discard(action)
+            return Response(
+                200,
+                {"result": "deleted"}
+                if action == "del_item"
+                else {"result": "saved", "uuid": key},
+            )
         if action == "del_item":
             removed = items.pop(key, None)
             response = Response(200, {"result": "deleted" if removed else "not found"})
@@ -148,9 +160,8 @@ class FakeProduct:
             items[key] = record
             response = Response(200, {"result": "saved", "uuid": key})
         hook = self.after_write.pop(action, None)
-        if hook:
-            hook()
-        return response
+        replacement = hook() if hook else None
+        return response if replacement is None else replacement
 
     def listing(
         self, items: dict[str, dict[str, str]], data: dict[str, Any]

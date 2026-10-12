@@ -45,7 +45,8 @@ class FakeProduct:
         self.auth_ok = True
         self.requests: list[tuple[str, str, Any]] = []
         self.faults: dict[str, Callable[[], Response | None]] = {}
-        self.after_write: dict[str, Callable[[], None]] = {}
+        self.after_write: dict[str, Callable[[], Response | None]] = {}
+        self.dropped: set[str] = set()
 
     def add(self, **values: Any) -> int:
         self.counter += 1
@@ -70,6 +71,10 @@ class FakeProduct:
 
     def lose_next(self, operation: str, callback: Callable[[], None]) -> None:
         self.after_write[operation] = callback
+
+    def drop_next(self, operation: str) -> None:
+        """Acknowledge the next update or delete without storing it."""
+        self.dropped.add(operation)
 
     def request(
         self, method: str, path: str, body: bytes | None, headers: dict[str, str]
@@ -138,6 +143,9 @@ class FakeProduct:
         if method == "DELETE":
             if identity is None:
                 return Response(404, None)
+            if "delete" in self.dropped:
+                self.dropped.discard("delete")
+                return Response(200, {})
             family.pop(identity, None)
             self.passwords.pop(identity, None)
             response = Response(200, {})
@@ -152,6 +160,9 @@ class FakeProduct:
                 return Response(404, None, raw=b"Not found")
             else:
                 operation = "update"
+                if operation in self.dropped:
+                    self.dropped.discard(operation)
+                    return Response(200, family[identity])
             row = copy.deepcopy(family[identity])
             password = data.pop("password", None)
             if password is not None:
@@ -163,9 +174,8 @@ class FakeProduct:
         else:
             return Response(405, None)
         hook = self.after_write.pop(operation, None)
-        if hook:
-            hook()
-        return response
+        replacement = hook() if hook else None
+        return response if replacement is None else replacement
 
 
 class Handler(BaseHTTPRequestHandler):

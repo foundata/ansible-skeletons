@@ -1,10 +1,6 @@
 # SPDX-FileCopyrightText: {{ company | default('FIXME your organization') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Behavioural client/engine contract, identical across the protocol variants.
-
-Product names, the fake and the entry points come from ``contract_subject``;
-a product binds its own resource there and keeps this file unchanged.
-"""
+"""Product-bound lifecycle contract; adapt only contract_subject.py."""
 
 from __future__ import annotations
 
@@ -24,86 +20,28 @@ from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_ut
     ProductError,
 )
 from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._engine import (
-    Engine,
-    Field,
-    Key,
-    Reference,
     Resource,
     build_spec,
-    normalize,
     run_resource,
-)
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._resources import (
-    RESOURCES,
 )
 
 from ..conftest import RunModule
-from ..fake_product import OLD_SECRET, SECRET, FakeProduct, lost_response
 from . import contract_subject as subject
 
 
-@pytest.mark.parametrize("kind", ["set", "names"])
-def test_set_bounds_follow_the_definition_on_input(kind: str) -> None:
-    field = Field("members", kind, "Members")
-    assert normalize(field, ["x" * 150], input_value=True) == ["x" * 150]
-    for values in (["x" * 151], [str(i) for i in range(257)]):
-        with pytest.raises(ProductError):
-            normalize(field, values, input_value=True)
-    larger = replace(field, maximum_items=300, item_limit=255)
-    values = [str(i) for i in range(257)] + ["x" * 151]
-    assert normalize(larger, values, input_value=True) == values
-    for values in (["x" * 256], [str(i) for i in range(301)]):
-        with pytest.raises(ProductError):
-            normalize(larger, values, input_value=True)
-    unbounded = replace(field, maximum_items=None, item_limit=None)
-    values = [str(i) for i in range(301)] + ["x" * 256]
-    assert normalize(unbounded, values, input_value=True) == values
-    for input_value in (False, True):
-        for invalid in ([""], [None], "not-a-list"):
-            with pytest.raises(ProductError):
-                normalize(unbounded, invalid, input_value=input_value)
+def arguments(index: int = 0, /, **values: Any) -> dict[str, Any]:
+    return {**subject.ARGS, subject.KEY: subject.IDENTITIES[index], **values}
 
 
-@pytest.mark.parametrize("kind", ["set", "names"])
-def test_stored_sets_are_read_beyond_the_bounds(kind: str) -> None:
-    field = Field("members", kind, "Members")
-    values = [str(i) for i in range(301)] + ["x" * 256]
-    assert normalize(field, values) == values
+def require(capability: str) -> None:
+    if not subject.CAPABILITIES[capability]:
+        pytest.skip(subject.SKIP_REASONS[capability])
 
 
-def test_set_minimum_and_item_pattern_apply_to_input() -> None:
-    field = Field("members", "set", "Members", minimum_items=1, pattern=r"[a-z]+")
-    assert normalize(field, ["ab"], input_value=True) == ["ab"]
-    for invalid in ([], ["A1"]):
-        with pytest.raises(ProductError):
-            normalize(field, invalid, input_value=True)
-    assert normalize(field, []) == []
-    with pytest.raises(ProductError):
-        normalize(field, ["A1"])
-
-
-def test_map_bounds_follow_the_definition_on_input() -> None:
-    field = Field("rights", "map", "Rights", choices=("read",))
-    assert normalize(field, {"x" * 150: ["read"]}, input_value=True) == {
-        "x" * 150: ["read"]
-    }
-    for invalid in ({"x" * 151: ["read"]}, {str(i): ["read"] for i in range(257)}):
-        with pytest.raises(ProductError):
-            normalize(field, invalid, input_value=True)
-        assert normalize(field, invalid) == invalid
-    unbounded = replace(field, maximum_items=None, item_limit=None)
-    assert normalize(unbounded, {"x" * 151: ["read"]}, input_value=True) == {
-        "x" * 151: ["read"]
-    }
-    with pytest.raises(ProductError):
-        normalize(unbounded, {"": ["read"]})
-
-
-def test_stored_strings_are_read_beyond_the_limit() -> None:
-    field = Field("note", "str", "Note", limit=10)
-    assert normalize(field, "x" * 11) == "x" * 11
-    with pytest.raises(ProductError):
-        normalize(field, "x" * 11, input_value=True)
+def info_main() -> Callable[[], None]:
+    if subject.INFO_MAIN is None:
+        pytest.skip(subject.SKIP_REASONS["info"])
+    return subject.INFO_MAIN
 
 
 def entry(resource: Resource) -> Callable[[], None]:
@@ -116,114 +54,78 @@ def entry(resource: Resource) -> Callable[[], None]:
     return main
 
 
-def test_lifecycle_preserves_unmanaged_fields(
-    fake: FakeProduct, run_module: RunModule
-) -> None:
-    created = run_module(
-        subject.main, name="example", **{subject.VALUE: "first", subject.ENABLED: False}
-    )
+def test_lifecycle_preserves_unmanaged_fields(fake: Any, run_module: RunModule) -> None:
+    first, second = subject.VALUES
+    created = run_module(subject.main, **arguments(**{subject.VALUE: first}))
     identity = created[subject.RESULT][subject.RESOURCE.identifier.name]
     assert created["changed_fields"] == [] and created["verified"] == "observed"
-    subject.rows(fake)[identity]["unmanaged"] = OLD_SECRET
-    assert not run_module(subject.main, name="example", **{subject.VALUE: "first"})[
+    subject.rows(fake)[identity]["unmanaged"] = subject.OLD_SECRET
+    assert not run_module(subject.main, **arguments(**{subject.VALUE: first}))[
         "changed"
     ]
     changed = run_module(
-        subject.main, name="example", **{subject.VALUE: "second"}, _ansible_diff=True
+        subject.main, **arguments(**{subject.VALUE: second}), _ansible_diff=True
     )
     assert changed["changed_fields"] == [subject.VALUE]
-    assert changed[subject.RESULT][subject.ENABLED] is False
     assert changed["diff"] == {
-        "before": {subject.VALUE: "first"},
-        "after": {subject.VALUE: "second"},
+        "before": {subject.VALUE: first},
+        "after": {subject.VALUE: second},
     }
-    assert subject.rows(fake)[identity]["unmanaged"] == OLD_SECRET
-    assert (
-        run_module(subject.main, name="example", state="absent")[subject.RESULT] is None
-    )
+    assert subject.rows(fake)[identity]["unmanaged"] == subject.OLD_SECRET
+
+
+def test_delete_is_idempotent(fake: Any, run_module: RunModule) -> None:
+    require("delete")
+    subject.add(fake, **arguments(**{subject.VALUE: subject.VALUES[0]}))
+    assert run_module(subject.main, **arguments(state="absent"))[subject.RESULT] is None
     count = len(fake.writes())
-    assert not run_module(subject.main, name="example", state="absent")["changed"]
+    assert not run_module(subject.main, **arguments(state="absent"))["changed"]
     assert len(fake.writes()) == count
-
-
-def test_definition_can_allow_an_empty_identity_component(
-    fake: FakeProduct, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    resource = replace(
-        subject.RESOURCE, keys=(Key("name", "Optional component", r".*"),)
-    )
-    monkeypatch.setattr(Engine, "find", lambda self, ident: None)
-    result = run_module(entry(resource), name="", _ansible_check_mode=True)
-    assert not result.get("failed") and result[subject.RESULT]["name"] == ""
-    assert not fake.writes()
-
-
-def test_identity_keys_are_strings() -> None:
-    resource = replace(subject.RESOURCE, keys=(Key("tag", "VLAN tag", kind="int"),))
-    with pytest.raises(ValueError, match="identity keys are strings"):
-        build_spec(resource)
-
-
-def test_deletion_guard_refuses_a_referenced_object(
-    fake: FakeProduct, run_module: RunModule
-) -> None:
-    identity = subject.add(fake)
-    subject.add_dependent(fake, identity)
-    refused = run_module(subject.main, name="example", state="absent")
-    assert refused["failed"] and refused["error_code"] == "referenced"
-    assert not refused["changed"] and refused["outcome"] == "unchanged"
-    assert not fake.writes() and identity in subject.rows(fake)
-
-
-def test_clients_decode_integer_map_keys() -> None:
-    reference = Reference("/owners", "name", Key("id", "Owner", kind="int", minimum=1))
-    field = Field("rights", "map", "Rights", choices=("read",), reference=reference)
-    assert Client.decode(field, {"7": ["read"]}) == {7: ["read"]}
 
 
 @pytest.mark.parametrize("incomplete", [False, True])
 def test_listing_is_complete_or_fails(
-    fake: FakeProduct, run_module: RunModule, incomplete: bool
+    fake: Any, run_module: RunModule, incomplete: bool
 ) -> None:
+    require("listing")
     for index in range(5):
-        subject.add(fake, name=f"item{index}")
+        subject.add(fake, **arguments(index))
     if incomplete:
         subject.make_incomplete(fake)
     result = run_module(
-        entry(replace(subject.RESOURCE, lookup="listing")), name="item4"
+        entry(replace(subject.RESOURCE, lookup="listing")), **arguments(4)
     )
     assert bool(result.get("failed")) == incomplete
     assert not fake.writes()
     if incomplete:
         assert result["error_code"] == "incomplete_listing"
     else:
-        assert result[subject.RESULT]["name"] == "item4"
+        assert result[subject.RESULT][subject.KEY] == subject.IDENTITIES[4]
 
 
-def test_ambiguous_listing_refuses_write(
-    fake: FakeProduct, run_module: RunModule
-) -> None:
-    subject.add(fake)
-    subject.add(fake)
+def test_ambiguous_listing_refuses_write(fake: Any, run_module: RunModule) -> None:
+    require("listing")
+    subject.add(fake, **arguments())
+    subject.add(fake, **arguments())
     result = run_module(
         entry(replace(subject.RESOURCE, lookup="listing")),
-        name="example",
-        **{subject.VALUE: "new"},
+        **arguments(**{subject.VALUE: subject.VALUES[1]}),
     )
     assert result["error_code"] == "ambiguous" and not fake.writes()
 
 
 @pytest.mark.parametrize("operation", ["create", "update", "delete"])
 def test_lost_response_never_repeats_write(
-    fake: FakeProduct, run_module: RunModule, operation: str
+    fake: Any, run_module: RunModule, operation: str
 ) -> None:
+    if operation == "delete":
+        require("delete")
     if operation != "create":
-        subject.add(fake)
-    subject.lose_next(fake, operation, lost_response)
+        subject.add(fake, **arguments(**{subject.VALUE: subject.VALUES[0]}))
+    subject.lose_next(fake, operation, subject.lost_response)
     result = run_module(
         subject.main,
-        name="example",
-        **{subject.VALUE: "new"},
+        **arguments(**{subject.VALUE: subject.VALUES[1]}),
         state="absent" if operation == "delete" else "present",
     )
     assert not result.get("failed") and result["verified"] == "observed"
@@ -231,97 +133,77 @@ def test_lost_response_never_repeats_write(
 
 
 def test_possible_write_then_failed_read_is_unknown(
-    fake: FakeProduct, run_module: RunModule
+    fake: Any, run_module: RunModule
 ) -> None:
     def fail_read() -> None:
         subject.deny(fake)
-        lost_response()
+        subject.lost_response()
 
     subject.lose_next(fake, "create", fail_read)
-    result = run_module(subject.main, name="example")
+    result = run_module(subject.main, **arguments())
     assert result["failed"] and result["changed"] and result["outcome"] == "unknown"
     assert len(subject.rows(fake)) == 1 and len(fake.writes()) == 1
 
 
-def test_delete_acknowledgement_does_not_prove_absence(
-    fake: FakeProduct, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
+def test_acknowledged_update_that_did_not_persist_is_unknown(
+    fake: Any, run_module: RunModule
 ) -> None:
-    subject.add(fake)
+    require("drop")
+    subject.add(fake, **arguments(**{subject.VALUE: subject.VALUES[0]}))
+    subject.drop_next(fake, "update")
+    result = run_module(subject.main, **arguments(**{subject.VALUE: subject.VALUES[1]}))
+    assert result["failed"] and result["error_code"] == "not_persisted"
+    assert result["fields"] == [subject.VALUE]
+    assert result["changed"] and result["outcome"] == "unknown"
+    assert len(fake.writes()) == 1
+
+
+def test_rejected_update_that_took_effect_is_changed(
+    fake: Any, run_module: RunModule
+) -> None:
+    require("reject")
+    subject.add(fake, **arguments(**{subject.VALUE: subject.VALUES[0]}))
+    subject.reject_next(fake, "update")
+    result = run_module(subject.main, **arguments(**{subject.VALUE: subject.VALUES[1]}))
+    assert result["failed"] and result["error_code"] == "validation_failed"
+    assert result["changed"] and result["outcome"] == "changed"
+    assert len(fake.writes()) == 1
+
+
+def test_creation_missing_at_read_back_is_unknown(
+    fake: Any, run_module: RunModule
+) -> None:
+    subject.lose_next(fake, "create", lambda: subject.rows(fake).clear())
+    result = run_module(subject.main, **arguments())
+    assert result["failed"] and result["error_code"] == "missing_after_write"
+    assert result["changed"] and result["outcome"] == "unknown"
+    assert len(fake.writes()) == 1
+
+
+def test_delete_acknowledgement_does_not_prove_absence(
+    fake: Any, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    require("delete")
+    subject.add(fake, **arguments())
     monkeypatch.setattr(Client, "delete", lambda self, resource, identity: None)
-    result = run_module(subject.main, name="example", state="absent")
+    result = run_module(subject.main, **arguments(state="absent"))
     assert result["failed"] and result["error_code"] == "still_present"
     assert result["changed"] and result["outcome"] == "unknown"
-    assert result["operation"] == "verify" and result["name"] == "example"
+    assert (
+        result["operation"] == "verify" and result[subject.KEY] == subject.IDENTITIES[0]
+    )
     assert len(subject.rows(fake)) == 1
 
 
 def test_failure_repeats_the_identity_the_schema_allows(
-    fake: FakeProduct, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
+    fake: Any, run_module: RunModule
 ) -> None:
-    for resource in RESOURCES:
-        assert {key.name for key in resource.keys} <= set(SCHEMA.field_validators)
+    assert {key.name for key in subject.RESOURCE.keys} <= set(SCHEMA.field_validators)
     subject.fault(fake, subject.VERSION_PATH, 500)
-    result = run_module(subject.main, name="example")
-    assert result["failed"] and result["name"] == "example"
+    result = run_module(subject.main, **arguments())
+    assert result["failed"] and result[subject.KEY] == subject.IDENTITIES[0]
     assert not result["changed"] and result["outcome"] == "unchanged"
-    assert "resource" not in result
-    # An identity the schema cannot publish is left out; the failure stays specific.
-    resource = replace(
-        subject.RESOURCE, keys=(Key("name", "Optional component", r".*"),)
-    )
-    monkeypatch.setattr(Engine, "find", lambda self, ident: None)
-    result = run_module(entry(resource), name="")
-    assert result["failed"] and "name" not in result
-    assert result["error_code"] == "rejected"
-    assert result["outcome"] == "unchanged" and not fake.writes()
-
-
-@pytest.mark.parametrize(
-    "names,reported",
-    [
-        (["displayName", "a name with spaces"], True),
-        (["x" * 300], False),
-        (["line\nbreak"], False),
-        ([f"field{index}" for index in range(257)], False),
-    ],
-)
-def test_failure_after_a_write_keeps_changed_and_outcome(
-    fake: FakeProduct,
-    run_module: RunModule,
-    monkeypatch: pytest.MonkeyPatch,
-    names: list[str],
-    reported: bool,
-) -> None:
-    subject.add(fake)
-
-    def mismatch(self: Engine, *args: Any) -> None:
-        raise ProductError(category="verification", code="not_persisted", fields=names)
-
-    monkeypatch.setattr(Engine, "verify", mismatch)
-    result = run_module(subject.main, name="example", **{subject.VALUE: "new"})
-    assert result["failed"] and result["changed"] and result["outcome"] == "unknown"
-    assert result["operation"] == "verify" and len(fake.writes()) == 1
-    if reported:
-        assert result["error_code"] == "not_persisted" and result["fields"] == names
-    else:
-        assert (result["error_category"], result["error_code"]) == ("product", None)
-        assert "fields" not in result and result["name"] == "example"
-
-
-def test_stored_object_beyond_the_bounds_is_read_compared_and_deleted(
-    fake: FakeProduct, run_module: RunModule
-) -> None:
-    labels = [f"label{index}" for index in range(257)] + ["x" * 151]
-    subject.add(fake, **{subject.LABELS: subject.stored_set(labels)})
-    read = run_module(subject.info_main, name="example")
-    assert not read.get("failed")
-    assert sorted(read[subject.RESULT][subject.LABELS]) == sorted(labels)
-    compared = run_module(subject.main, name="example", **{subject.VALUE: ""})
-    assert not compared.get("failed") and not compared["changed"]
-    assert sorted(compared[subject.RESULT][subject.LABELS]) == sorted(labels)
-    removed = run_module(subject.main, name="example", state="absent")
-    assert not removed.get("failed") and removed["changed"]
-    assert not subject.rows(fake)
+    assert "resource" not in result and not fake.writes()
 
 
 @pytest.mark.parametrize(
@@ -334,10 +216,10 @@ def test_stored_object_beyond_the_bounds_is_read_compared_and_deleted(
     ],
 )
 def test_status_classification_needs_no_json(
-    fake: FakeProduct, run_module: RunModule, status: int, category: str, code: str
+    fake: Any, run_module: RunModule, status: int, category: str, code: str
 ) -> None:
     subject.fault(fake, subject.VERSION_PATH, status)
-    result = run_module(subject.main, name="example")
+    result = run_module(subject.main, **arguments())
     assert (result["error_category"], result["error_code"]) == (category, code)
     assert not fake.writes()
 
@@ -346,48 +228,71 @@ def test_status_classification_needs_no_json(
 @pytest.mark.parametrize("exists", [False, True])
 @pytest.mark.parametrize("diff", [False, True])
 def test_check_mode_and_secrets(
-    fake: FakeProduct, run_module: RunModule, state: str, exists: bool, diff: bool
+    fake: Any, run_module: RunModule, state: str, exists: bool, diff: bool
 ) -> None:
+    if state == "absent":
+        require("delete")
     if exists:
-        subject.add(fake)
+        subject.add(fake, **arguments(**{subject.VALUE: subject.VALUES[0]}))
     result = run_module(
         subject.main,
-        name="example",
-        **{subject.VALUE: "new"},
+        **arguments(**{subject.VALUE: subject.VALUES[1]}),
         state=state,
         _ansible_check_mode=True,
         _ansible_diff=diff,
     )
-    assert not fake.writes()
+    assert not fake.writes() and not result.get("failed")
     assert result["verified"] == ("predicted" if result["changed"] else "observed")
     if not exists and state == "present":
         assert subject.RESOURCE.identifier.name not in result[subject.RESULT]
     secrets = result.pop("_ansible_new_secrets", [])
-    assert set(secrets) <= {SECRET, "SYNTHETIC-key"}
-    assert OLD_SECRET not in json.dumps(result) and SECRET not in json.dumps(result)
+    assert set(secrets) <= set(subject.SECRETS)
+    assert all(
+        secret not in json.dumps(result)
+        for secret in (*subject.SECRETS, subject.OLD_SECRET)
+    )
 
 
-def test_read_and_noop_do_not_discover_version(
-    fake: FakeProduct, run_module: RunModule
+def test_info_reads_without_writing_or_discovering_version(
+    fake: Any, run_module: RunModule
 ) -> None:
-    subject.add(fake)
-    assert not run_module(subject.info_main, name="example")["changed"]
-    assert not run_module(subject.main, name="example")["changed"]
+    main = info_main()
+    subject.add(fake, **arguments())
+    result = run_module(main, **{subject.KEY: subject.IDENTITIES[0]})
+    assert not result["changed"] and result["verified"] == "observed"
+    assert result[subject.RESULT][subject.KEY] == subject.IDENTITIES[0]
+    assert not fake.writes() and not subject.requested(fake, subject.VERSION_PATH)
+
+
+def test_info_failure_keeps_identity(fake: Any, run_module: RunModule) -> None:
+    main = info_main()
+    subject.deny(fake)
+    result = run_module(main, **{subject.KEY: subject.IDENTITIES[0]})
+    assert result["failed"] and result[subject.KEY] == subject.IDENTITIES[0]
+    assert not result["changed"] and result["outcome"] == "unchanged"
+    assert not fake.writes() and "resource" not in result
+
+
+def test_noop_does_not_discover_version(fake: Any, run_module: RunModule) -> None:
+    subject.add(fake, **arguments())
+    assert not run_module(subject.main, **arguments())["changed"]
     assert not subject.requested(fake, subject.VERSION_PATH)
 
 
 def test_check_prediction_validates_eligibility(
-    fake: FakeProduct, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
+    fake: Any, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(
-        _compat, "EXCLUSIONS", {subject.OPERATION: (("1.0.0", "synthetic exclusion"),)}
+        _compat,
+        "EXCLUSIONS",
+        {subject.OPERATION: ((subject.VERSION, "synthetic exclusion"),)},
     )
-    result = run_module(subject.main, name="example", _ansible_check_mode=True)
+    result = run_module(subject.main, **arguments(), _ansible_check_mode=True)
     assert result["error_code"] == "ineligible" and not fake.writes()
 
 
 def test_version_is_cached_but_each_operation_is_checked(
-    fake: FakeProduct, connection: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    fake: Any, connection: dict[str, Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     params = {
         **connection,
@@ -405,8 +310,8 @@ def test_version_is_cached_but_each_operation_is_checked(
 
     _compat.check(Module(), client, "first")
     monkeypatch.setattr(
-        _compat, "EXCLUSIONS", {"second": (("1.0.0", "synthetic exclusion"),)}
+        _compat, "EXCLUSIONS", {"second": ((subject.VERSION, "synthetic exclusion"),)}
     )
-    with pytest.raises(ProductError, match="operation failed"):
+    with pytest.raises(ProductError):
         _compat.check(Module(), client, "second")
     assert subject.requested(fake, subject.VERSION_PATH) == 1

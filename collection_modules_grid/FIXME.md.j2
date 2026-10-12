@@ -13,7 +13,10 @@ SPDX-License-Identifier: GPL-3.0-or-later
 - Check `tests/config.yml` and run the checks in `DEVELOPMENT.md`.
 - Replace the fixture definition, modules and tests with a researched resource.
   Bind it in `tests/unit/plugins/modules/contract_subject.py` and keep
-  `test_contract.py` unchanged.
+  `test_contract.py`, `test_engine.py` and `test_activation.py` unchanged.
+  The subject declares valid identities, creation arguments, a mutable field
+  and capability flags with skip reasons. Engine invariants use their own
+  synthetic definition and fake; do not add fields or guards to the product.
   The fixture speaks a conventional grid/CRUD style protocol (UUID identifiers,
   paginated search with a declared total, add, set and delete actions); a REST
   product should start from `collection_modules` instead.
