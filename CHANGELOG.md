@@ -21,101 +21,58 @@ and the project adheres to
   in license headers, `REUSE.toml` and the README notice reads
   `<company> <<company_url>>`; Galaxy's `company` field keeps the plain name.
 - collection_default, collection_modules, collection_modules_grid: a
-  `.releasing.toml` declaration for foundata's `release` command (ecosystem
-  `ansible-collection`, `repository` to set before the first release), kept
-  out of the archive by `build_ignore`.
-- collection_modules, collection_modules_grid: an `import-check` session that
-  runs the Galaxy importer with the prepared dependency tree reachable and
-  fails on an unresolved documentation fragment, which the stock
-  build-import-check session reports as non-fatal.
-- collection_modules: a module-only skeleton for REST products: integer
+  `.releasing.toml` for foundata's `release` command. Set its `repository`
+  before the first release.
+- collection_modules: a module-only skeleton for REST products with integer
   identifiers, by-name 404 absence, empty-page pagination, native JSON and
-  immediate writes, with a replaceable fixture that exercises a reference, a
-  write-only password and a deletion guard. No apply module.
-- collection_modules_grid: a module-only skeleton for grid-style APIs: UUID
+  immediate writes. Its fixture exercises a reference, a write-only password
+  and a deletion guard. It has no apply module.
+- collection_modules_grid: a module-only skeleton for grid-style APIs with UUID
   identifiers, paginated searches with a declared total, add, set and delete
-  actions, string-encoded values, a deletion guard and an apply module for
+  actions, string-encoded values and a deletion guard. Its apply module serves
   products that separate saved from active state.
-- collection_modules, collection_modules_grid: a protocol-free resource
-  lifecycle and activation workflow that every product renders unchanged,
-  contract tests that a product binds to its own resource through
-  `contract_subject.py`, fake-server integration targets, an external-endpoint
-  Molecule scenario, the module guide's architecture and Scope template and an
-  inventory extractor stub. Render with `product` (required) and
-  `skeleton_revision`; `version` defaults to 1.0.0. The collections depend on
-  `foundata.utils` `>=1.0.0,<2.0.0`, which is published together with this
-  release.
-- collection_modules, collection_modules_grid: test lanes for ansible-core
-  2.19 to 2.22 and devel; 2.22 and devel install GitHub branches and run on
-  Python 3.15 (devel's lower lane on 3.10), so both test moving targets. Set
-  `max_version` to leave out an unreleased series. Qualification is against
-  the bundled fake servers only: no product collection has been released on
-  these skeletons, and no REST product adaptation has been measured.
-- checks: both module skeletons under two identities, one with a quoted
-  product name: default sessions in quick checks, build and installed modules;
-  the full matrix adds their sanity, unit and integration lanes and the
-  Molecule scenario against the first identity's fake product. A long-name
-  identity checks `collection_default` and `role_default`.
+- checks: quick checks render both module skeletons under two identities, one
+  with a quoted product name, run their default sessions, and build and
+  exercise the installed modules. The full matrix adds their sanity, unit and
+  integration lanes and the Molecule scenario against a fake product. A
+  long-name identity checks `collection_default` and `role_default`.
 
 ### Changed
 
-- collection_modules, collection_modules_grid: the stock `build-import-check`
-  session only builds the collection. The Galaxy importer runs once, in the
-  strict `import-check` session, instead of also reporting every dependency's
-  documentation fragment as a non-fatal error.
-- All skeletons: rendered files carry the licensing guide's SPDX headers,
-  with the GNU line between the tags in Python modules and the documented
-  generated-file and format exceptions. REUSE checks the complete tree. The
-  collection per-file checker runs with explicit exemptions for changelogs,
-  fragments and the README notice. README notices use the guide's form;
-  foundata renders use its author sentence without the skeleton credit.
-- (collection|role)_default: the rendered projects use DocSmith's default
-  README template and need DocSmith 2.4 or newer for maximum-length names.
-  DocSmith 2.4 puts an anchor longer than 60 characters on its own line above
-  the heading. The collection's `docs` session installs at least 2.4.
-- All skeletons: `.gitignore` retains the blank line below its repository
-  heading and uses a portable wildcard for macOS Finder icon metadata.
+- All skeletons: rendered files carry the SPDX headers of the licensing guide,
+  and REUSE checks the complete tree. README notices follow the guide;
+  foundata's own renders leave out the skeleton credit.
+- (collection|role)_default: maximum-length names need DocSmith 2.4.0 or newer.
+  The collection's `docs` session installs it.
+- All skeletons: `.gitignore` keeps the blank line below its repository heading
+  and uses a portable wildcard for macOS Finder icon metadata.
 - All skeletons: one shared `.ansible-lint`. It excludes `docs/`, `tools/` and
-  `changelogs/.plugin-cache.yaml` everywhere, and its `kinds` cover Molecule
-  inventories. The module skeletons previously excluded only `docs/inventory/`
-  of `docs/`.
-- All skeletons: `requirements.txt` opens with one generic header.
-- (collection|role)_default: one Molecule README for both skeletons, with
-  paths relative to its directory. It lists the task directories of every
-  phase, and its requirements, nox and troubleshooting sections are revised.
+  `changelogs/.plugin-cache.yaml` and treats the Molecule inventory templates
+  as inventories.
+- All skeletons: `requirements.txt` starts with a generic header.
+- (collection|role)_default: one revised Molecule README for both skeletons. It
+  covers the task directories of every phase.
 
 ### Fixed
 
-- collection_modules, collection_modules_grid: the shared failure boundary
-  keeps the failure's own category and code when it leaves out a diagnostic
-  field the schema cannot publish, as `foundata.utils` does since its
-  `82d174b`; a generic product error no longer replaces a specific one.
-- collection_default: `changelogs/changelog.yaml` starts with no release
-  entry. The placeholder 1.0.0 summary made the first `release_summary`
-  fragment fail as a second summary; the example stays as a comment.
+- collection_default: `changelogs/changelog.yaml` starts without a placeholder
+  release, so the first `release_summary` fragment no longer fails.
 - (collection|role)_default: the ansible-core requirement is checked before
   the first templated task, so an older core reports the role's message
   instead of a Jinja load error.
 - (collection|role)_default: the README licensing section says "an SPDX
   software bill of materials" instead of "a SPDX".
 - (collection|role)_default: long namespace, collection and role names no
-  longer push the commented service examples, the neutralized file content or
-  the README lines past the YAML and Markdown line limits; the written file
-  content is unchanged. The `run` role's argument specification describes the
-  entry point as "Main entry point for the run role".
-- collection_default: `build_ignore` also excludes `.venv`, `.cache`,
-  `docs/inventory` and `tools`, like the module skeletons, so a local virtual
-  environment or tool cache no longer ends up in the collection archive.
-- role_default: `.gitignore` matches the collection skeletons and also ignores
-  the rumdl cache.
-- (collection|role)_default: the Molecule scenario configurations refer to
-  `../README.md`; the collection's reference to the role path FAQ named a
-  `molecule/README.md` that does not exist there, and the role's `ee` scenario
-  named `extensions/molecule/README.md`.
-- (collection|role)_default: the Molecule README no longer requires the
-  Molecule podman plugin, which the scenarios do not use. Its execution
-  environment link works again, and it describes when `nox -s molecule` runs
-  the platforms one at a time.
+  longer push comments, neutralized file content or README lines past the YAML
+  and Markdown line limits.
+- collection_default: `build_ignore` excludes `.venv` and `.cache`, so a local
+  virtual environment or tool cache no longer ends up in the archive.
+- role_default: `.gitignore` also ignores the rumdl cache, like the collection
+  skeletons.
+- (collection|role)_default: comments in the Molecule scenario configurations
+  point to the existing Molecule README.
+- (collection|role)_default: the Molecule README no longer requires the unused
+  Molecule podman plugin, and its execution environment link works again.
 
 
 ## [2.9.0] - 2026-10-05
