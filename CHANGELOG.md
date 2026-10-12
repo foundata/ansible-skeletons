@@ -49,6 +49,15 @@ and the project adheres to
   Molecule scenario against the first identity's fake product. A long-name
   identity checks `collection_default` and `role_default`.
 
+### Changed
+
+- All skeletons: rendered files carry the licensing guide's SPDX headers,
+  with the GNU line between the tags in Python modules and the documented
+  generated-file and format exceptions. REUSE checks the complete tree. The
+  collection per-file checker runs with explicit exemptions for changelogs,
+  fragments and the README notice. README notices use the guide's form;
+  foundata renders use its author sentence without the skeleton credit.
+
 ### Fixed
 
 - collection_default: `changelogs/changelog.yaml` starts with no release
