@@ -303,7 +303,7 @@ def test_identity_outside_the_key_pattern_is_refused_before_requests(
     assert not result["changed"] and not synthetic.writes and not synthetic.decoded
 
 
-def test_undeclared_failure_key_degrades_to_a_generic_error() -> None:
+def test_undeclared_failure_key_is_left_out_and_the_code_kept() -> None:
     captured: dict[str, Any] = {}
 
     class Module:
@@ -321,7 +321,10 @@ def test_undeclared_failure_key_degrades_to_a_generic_error() -> None:
             outcome="unknown",
             fields={"operation": "verify", "undeclared": "value"},
         )
-    assert (captured["error_category"], captured["error_code"]) == ("product", None)
+    assert (captured["error_category"], captured["error_code"]) == (
+        "verification",
+        "not_persisted",
+    )
     assert captured["operation"] == "verify" and "undeclared" not in captured
     assert captured["changed"] and captured["outcome"] == "unknown"
 
@@ -365,10 +368,13 @@ def test_failure_after_a_write_keeps_changed_and_outcome(
     result = run_module(entry(), label="example", text="new")
     assert result["failed"] and result["changed"] and result["outcome"] == "unknown"
     assert result["operation"] == "verify" and synthetic.writes == ["update"]
+    assert (result["error_category"], result["error_code"]) == (
+        "verification",
+        "not_persisted",
+    )
     if reported:
-        assert result["error_code"] == "not_persisted" and result["fields"] == fields
+        assert result["fields"] == fields
     else:
-        assert (result["error_category"], result["error_code"]) == ("product", None)
         assert "fields" not in result and result["label"] == "example"
 
 

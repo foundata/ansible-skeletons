@@ -644,18 +644,19 @@ def fail(
 ) -> NoReturn:
     """Fail through the error schema, never raising instead after a write.
 
-    A diagnostic payload the schema rejects degrades the failure to a generic
-    product error without that payload; ``changed`` and ``outcome`` stay.
+    A diagnostic field the schema cannot publish is left out; the failure
+    keeps its own category and code, and ``changed`` and ``outcome`` stay.
+    ``foundata.utils`` applies the same rule to whatever reaches it.
     """
     reportable: dict[str, Any] = {}
     for key, value in fields.items():
         validate = SCHEMA.field_validators.get(key)
+        if validate is None:
+            continue
         try:
-            if validate is None:
-                raise ValueError(key)
             reportable[key] = validate(value)
         except (TypeError, ValueError):
-            failure = ProductError()
+            continue
     errors.fail_from(
         module,
         failure,

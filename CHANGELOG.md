@@ -78,6 +78,10 @@ and the project adheres to
 
 ### Fixed
 
+- collection_modules, collection_modules_grid: the shared failure boundary
+  keeps the failure's own category and code when it leaves out a diagnostic
+  field the schema cannot publish, as `foundata.utils` does since its
+  `82d174b`; a generic product error no longer replaces a specific one.
 - collection_default: `changelogs/changelog.yaml` starts with no release
   entry. The placeholder 1.0.0 summary made the first `release_summary`
   fragment fail as a second summary; the example stays as a comment.
