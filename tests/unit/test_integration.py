@@ -4,6 +4,7 @@
 
 import json
 import os
+import shlex
 import sys
 import tempfile
 from collections.abc import Iterator
@@ -13,7 +14,23 @@ import pytest
 
 from scripts.common import ROOT, GateError, run
 from scripts.controller import SOCKET_LIMIT, check_socket_layout, controller_environment
-from scripts.integration import podman_environment, reset_podman
+from scripts.integration import molecule_command, podman_environment, reset_podman
+
+
+@pytest.mark.parametrize(
+    "readme",
+    [
+        "role_default/molecule/README.md.j2",
+        "collection_default/extensions/molecule/README.md.j2",
+    ],
+)
+def test_documented_ee_command_matches_execution(readme: str) -> None:
+    commands = [
+        shlex.split(line)
+        for line in (ROOT / readme).read_text().splitlines()
+        if line.startswith("molecule test ") and '"ee"' in line
+    ]
+    assert commands == [molecule_command("test", "ee")]
 
 
 @pytest.fixture

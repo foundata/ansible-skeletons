@@ -281,6 +281,11 @@ def lint_molecule(molecule: Path, rendered: Rendered) -> None:
     )
 
 
+def molecule_command(action: str, scenario: str) -> list[str]:
+    """Use the same scenario selection for execution and documented examples."""
+    return ["molecule", action, "--scenario-name", scenario]
+
+
 def integration(backend: str, output: Path) -> None:
     """Run both generated projects; keep failures and always destroy the targets."""
     check_socket_layout(output)
@@ -344,14 +349,14 @@ def integration(backend: str, output: Path) -> None:
             lint_molecule(molecule, rendered)
             try:
                 run(
-                    ["molecule", "test", "--scenario-name", scenario],
+                    molecule_command("test", scenario),
                     cwd=project,
                     env=env,
                     timeout=5400,
                 )
             finally:
                 run(
-                    ["molecule", "destroy", "--scenario-name", scenario],
+                    molecule_command("destroy", scenario),
                     cwd=project,
                     env=env,
                     timeout=600,
