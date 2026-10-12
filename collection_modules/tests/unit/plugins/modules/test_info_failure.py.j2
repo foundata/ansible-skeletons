@@ -8,13 +8,20 @@ from typing import Any
 
 import pytest
 
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._engine import (
-    Engine,
-    ProductError,
-)
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.modules import (
-    fixture_info,
-)
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._engine import (
+        Engine,
+        ProductError,
+    )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.modules import (
+        fixture_info,
+    )
+# isort: on
+# fmt: on
 
 from ..conftest import RunModule
 from ..fake_product import FakeProduct

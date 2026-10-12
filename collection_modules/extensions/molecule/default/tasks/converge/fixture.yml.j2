@@ -5,7 +5,8 @@
 ---
 - name: "Converge the fixture"
   module_defaults:
-    group/{{ namespace }}.{{ collection_name }}.api: "{% raw %}{{ product_connection }}{% endraw %}"
+    group/{{ namespace }}.{{ collection_name }}.api: >-
+      {{ '{{ product_connection }}' }}
   block:
     - name: "Save the scenario fixture"
       {{ namespace }}.{{ collection_name }}.fixture:

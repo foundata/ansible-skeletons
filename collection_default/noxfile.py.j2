@@ -119,7 +119,7 @@ def ansible_lint(session: nox.Session) -> None:
 
 
 @nox.session(name="docs", default=True)
-@antsibull_nox.sessions.install_packages(packages=["ansible-docsmith>=2.3.0", "rumdl"])
+@antsibull_nox.sessions.install_packages(packages=["ansible-docsmith>=2.4.0", "rumdl"])
 def docs(session: nox.Session) -> None:
     """Role documentation with DocSmith; regenerates it unless CI=true."""
     # ansible-docsmith validate .; ansible-docsmith generate . [--check]

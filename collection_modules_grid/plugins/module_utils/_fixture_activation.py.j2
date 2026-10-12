@@ -5,24 +5,38 @@
 
 from __future__ import annotations
 
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._activation import (
-    settle,
-)
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._client import (
-    Client,
-    ProductError,
-)
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._activation import (
+        settle,
+    )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._client import (
+        Client,
+        ProductError,
+    )
+# isort: on
+# fmt: on
 
 
 def compare_fixture(client: Client, names: list[str]) -> dict[str, str]:
     """Compare only public fixture fields; absence is a verified complete listing."""
-    from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._definitions import (
-        FIXTURE,
-    )
-    from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._engine import (
-        equal,
-        normalize,
-    )
+    # Preserve wrapping for maximum-length Galaxy identities.
+    # fmt: off
+    # isort: off
+    from ansible_collections.{{ namespace }}.\
+        {{ collection_name }}.plugins.module_utils._definitions import (
+            FIXTURE,
+        )
+    from ansible_collections.{{ namespace }}.\
+        {{ collection_name }}.plugins.module_utils._engine import (
+            equal,
+            normalize,
+        )
+    # isort: on
+    # fmt: on
 
     saved = client.search(FIXTURE.route)
     active = client.search("/fixture/active")

@@ -11,22 +11,31 @@ from dataclasses import replace
 import pytest
 from ansible.module_utils.basic import AnsibleModule
 
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils import (
-    _compat,
-)
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._definitions import (
-    FIXTURE,
-)
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._engine import (
-    Field,
-    Key,
-    Reference,
-    build_spec,
-    run_resource,
-)
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.modules import (
-    fixture,
-)
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils import (
+        _compat,
+    )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._definitions import (
+        FIXTURE,
+    )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._engine import (
+        Field,
+        Key,
+        Reference,
+        build_spec,
+        run_resource,
+    )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.modules import (
+        fixture,
+    )
+# isort: on
+# fmt: on
 
 from ..conftest import RunModule
 from ..fake_product import (

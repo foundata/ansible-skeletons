@@ -13,21 +13,28 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.foundata.utils.plugins.module_utils import errors
 
 # isort: split
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils import (
-    _engine,
-)
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._engine import (
-    DeletionGuard,
-    Engine,
-    Field,
-    Key,
-    Reference,
-    Resource,
-    build_spec,
-    fail,
-    normalize,
-    run_resource,
-)
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils import (
+        _engine,
+    )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._engine import (
+        DeletionGuard,
+        Engine,
+        Field,
+        Key,
+        Reference,
+        Resource,
+        build_spec,
+        fail,
+        normalize,
+        run_resource,
+    )
+# isort: on
+# fmt: on
 
 from ..conftest import RunModule
 

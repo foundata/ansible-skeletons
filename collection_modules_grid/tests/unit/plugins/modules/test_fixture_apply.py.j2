@@ -13,12 +13,19 @@ import pytest
 from ansible_collections.foundata.utils.plugins.module_utils import errors
 
 # isort: split
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils import (
-    _activation,
-)
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.modules import (
-    fixture_apply,
-)
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils import (
+        _activation,
+    )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.modules import (
+        fixture_apply,
+    )
+# isort: on
+# fmt: on
 
 from ..conftest import RunModule
 from ..fake_product import SECRET, FakeProduct, lost_response

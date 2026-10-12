@@ -98,14 +98,22 @@ def test_module_render_does_not_require_default_collection(
 
 
 @pytest.mark.parametrize(
-    "namespace,name", [("test_one", "first"), ("test_two", "second")]
+    "namespace,name,role",
+    [
+        ("test_one", "first", "example_role"),
+        ("test_two", "second", "other_role"),
+        ("n" * 64, "c" * 64, "r" * 64),
+    ],
 )
-@pytest.mark.parametrize("profile", ["collection_modules_grid", "collection_modules"])
+@pytest.mark.parametrize(
+    "profile", ["collection_default", "collection_modules_grid", "collection_modules"]
+)
 def test_render_selects_profile_and_preserves_metadata(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     namespace: str,
     name: str,
+    role: str,
     profile: str,
 ) -> None:
     calls: list[list[str]] = []
@@ -123,12 +131,14 @@ def test_render_selects_profile_and_preserves_metadata(
         tmp_path / "render",
         namespace=namespace,
         collection_name=name,
+        role_name=role,
         profile=profile,
         metadata=metadata,
     )
     assert rendered.profile == profile
     assert calls[1][calls[1].index("--collection-skeleton") + 1] == str(ROOT / profile)
     assert calls[1][-1] == f"{namespace}.{name}"
+    assert calls[0][-1] == role
     assert json.loads((rendered.work / "extra-vars.json").read_text()) == metadata
 
 

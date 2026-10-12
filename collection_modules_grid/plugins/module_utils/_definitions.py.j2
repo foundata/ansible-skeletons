@@ -5,13 +5,19 @@
 
 from __future__ import annotations
 
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._engine import (
-    Actions,
-    DeletionGuard,
-    Field,
-    Key,
-    Resource,
-)
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._engine import (
+        Actions,
+        DeletionGuard,
+        Field,
+        Key,
+        Resource,
+    )
+# isort: on
+# fmt: on
 
 UUID = r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}"
 

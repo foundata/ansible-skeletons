@@ -15,13 +15,20 @@
       This role requires Ansible {{ '{{' }} __{{ role_name }}_meta['galaxy_info']['min_ansible_version'] {{ '}}' }}
       or higher. You are currently running Ansible {{ '{{' }} ansible_version['full'] {{ '}}' }} .
   when:
-    - ansible_version['full'] is ansible.builtin.version(__{{ role_name }}_meta['galaxy_info']['min_ansible_version'], "<")
+    - >-
+      ansible_version['full'] is ansible.builtin.version(
+        __{{ role_name }}_meta['galaxy_info']['min_ansible_version'], "<")
 
 - name: "Init | Gather role-specific facts"
   ansible.builtin.setup:
-    gather_subset: "{{ '{{' }} ['!all', '!min'] + (__{{ role_name }}_used_facts.keys() | ansible.builtin.list) {{ '}}' }}"
+    gather_subset: >-
+      {{ '{{' }}
+        ['!all', '!min'] + (__{{ role_name }}_used_facts.keys() | ansible.builtin.list)
+      {{ '}}' }}
   when:
-    - not ((__{{ role_name }}_used_facts.values() | ansible.builtin.flatten) is ansible.builtin.subset(ansible_facts.keys()))
+    - >-
+      not ((__{{ role_name }}_used_facts.values() | ansible.builtin.flatten)
+           is ansible.builtin.subset(ansible_facts.keys()))
 
 - name: "Init | Notify when platform support check is not possible"
   ansible.builtin.debug:
@@ -42,7 +49,8 @@
     msg: >
       Neither {{ '{{' }} ansible_facts['distribution'] {{ '}}' }} (distribution) nor {{ '{{' }} ansible_facts['os_family'] {{ '}}' }} (os_family)
       with versions '{{ '{{' }} ansible_facts['distribution_major_version'] {{ '}}' }}', '{{ '{{' }} ansible_facts['distribution_version'] {{ '}}' }}',
-      or 'all' is in the list of supported platforms from vars/main.yml: {{ '{{' }} __{{ role_name }}_supported_platforms {{ '}}' }}
+      or 'all' is in the list of supported platforms from vars/main.yml:
+      {{ '{{' }} __{{ role_name }}_supported_platforms {{ '}}' }}
   vars:
     __{{ role_name }}_platform_names_regex: >-
       ^({{ '{{' }} ansible_facts['distribution'] {{ '}}' }}|{{ '{{' }} ansible_facts['os_family'] {{ '}}' }})$
@@ -51,10 +59,14 @@
     __{{ role_name }}_matched_versions: >-
       {{ '{{' }}
         __{{ role_name }}_supported_platforms
-        | ansible.builtin.selectattr('name', 'ansible.builtin.match', __{{ role_name }}_platform_names_regex, ignorecase=true)
+        | ansible.builtin.selectattr(
+            'name', 'ansible.builtin.match',
+            __{{ role_name }}_platform_names_regex, ignorecase=true)
         | ansible.builtin.map(attribute='versions')
         | ansible.builtin.flatten
-        | ansible.builtin.select('ansible.builtin.match', __{{ role_name }}_platform_versions_regex, ignorecase=true)
+        | ansible.builtin.select(
+            'ansible.builtin.match',
+            __{{ role_name }}_platform_versions_regex, ignorecase=true)
         | ansible.builtin.list
       {{ '}}' }}
   when:
@@ -65,8 +77,16 @@
 - name: "Init | Set platform-specific filename list (most to least specific; raw with possible duplicates)"
   ansible.builtin.set_fact:
     __{{ role_name }}_platform_filenames_raw:
-      - "{{ '{{' }} __{{ role_name }}_dist {{ '}}' }}_{{ '{{' }} __{{ role_name }}_dist_ver {{ '}}' }}.yml"
-      - "{{ '{{' }} __{{ role_name }}_dist {{ '}}' }}_{{ '{{' }} __{{ role_name }}_dist_major {{ '}}' }}.yml"
+      - >-
+        {{ '{{' }}
+          __{{ role_name }}_dist ~ '_'
+          ~ __{{ role_name }}_dist_ver ~ '.yml'
+        {{ '}}' }}
+      - >-
+        {{ '{{' }}
+          __{{ role_name }}_dist ~ '_'
+          ~ __{{ role_name }}_dist_major ~ '.yml'
+        {{ '}}' }}
       - "{{ '{{' }} __{{ role_name }}_dist {{ '}}' }}.yml"
       - "{{ '{{' }} __{{ role_name }}_os_family {{ '}}' }}.yml"
   vars:
@@ -116,7 +136,10 @@
   ansible.builtin.include_vars:
     file: "{{ '{{' }} __{{ role_name }}_vars_file {{ '}}' }}"
   vars:
-    __{{ role_name }}_vars_file: "{{ '{{' }} role_path {{ '}}' }}/vars/{{ '{{' }} __{{ role_name }}_varsfile_item {{ '}}' }}"
+    __{{ role_name }}_vars_file: >-
+      {{ '{{' }}
+        role_path ~ '/vars/' ~ __{{ role_name }}_varsfile_item
+      {{ '}}' }}
   when:
     - __{{ role_name }}_vars_file is ansible.builtin.file
   loop: "{{ '{{' }} __{{ role_name }}_platform_filenames_most_specific_last {{ '}}' }}"

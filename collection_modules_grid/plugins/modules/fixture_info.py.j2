@@ -82,19 +82,27 @@ from ansible_collections.foundata.utils.plugins.module_utils import errors
 
 # Keep dependency and local imports stable across rendered namespace ordering.
 # isort: split
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._client import (
-    Client,
-    ProductError,
-    api_argument_spec,
-)
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._definitions import (
-    FIXTURE,
-)
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._engine import (
-    Engine,
-    fail,
-    identity_fields,
-)
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._client import (
+        Client,
+        ProductError,
+        api_argument_spec,
+    )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._definitions import (
+        FIXTURE,
+    )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._engine import (
+        Engine,
+        fail,
+        identity_fields,
+    )
+# isort: on
+# fmt: on
 
 
 def main() -> None:

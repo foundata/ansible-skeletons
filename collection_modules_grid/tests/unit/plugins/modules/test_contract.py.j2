@@ -11,19 +11,27 @@ from typing import Any, Callable
 import pytest
 from ansible.module_utils.basic import AnsibleModule
 
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils import (
-    _compat,
-)
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._client import (
-    SCHEMA,
-    Client,
-    ProductError,
-)
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._engine import (
-    Resource,
-    build_spec,
-    run_resource,
-)
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils import (
+        _compat,
+    )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._client import (
+        SCHEMA,
+        Client,
+        ProductError,
+    )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._engine import (
+        Resource,
+        build_spec,
+        run_resource,
+    )
+# isort: on
+# fmt: on
 
 from ..conftest import RunModule
 from . import contract_subject as subject

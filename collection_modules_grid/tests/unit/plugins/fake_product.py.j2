@@ -18,9 +18,15 @@ from ansible_collections.foundata.utils.plugins.module_utils import errors
 
 # Keep dependency and local imports stable across rendered namespace ordering.
 # isort: split
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils import (
-    _client,
-)
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils import (
+        _client,
+    )
+# isort: on
+# fmt: on
 
 SECRET = "SYNTHETIC-secret-input"
 OLD_SECRET = "SYNTHETIC-secret-from-unmanaged-listing"

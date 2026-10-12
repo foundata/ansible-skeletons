@@ -57,6 +57,10 @@ and the project adheres to
   collection per-file checker runs with explicit exemptions for changelogs,
   fragments and the README notice. README notices use the guide's form;
   foundata renders use its author sentence without the skeleton credit.
+- (collection|role)_default: the rendered projects use DocSmith's default
+  README template and need DocSmith 2.4 or newer for maximum-length names.
+  DocSmith 2.4 puts an anchor longer than 60 characters on its own line above
+  the heading. The collection's `docs` session installs at least 2.4.
 - All skeletons: `.gitignore` retains the blank line below its repository
   heading and uses a portable wildcard for macOS Finder icon metadata.
 

@@ -230,6 +230,7 @@ def test_generated_projects_have_no_repository_tooling(
 @pytest.mark.parametrize("profile", ["collection_modules_grid", "collection_modules"])
 def test_skeleton_lint_configurations_stay_in_sync(profile: str) -> None:
     for name in (
+        ".ansible-docsmith.toml.j2",
         ".ansible-lint.j2",
         ".yamllint.j2",
     ):

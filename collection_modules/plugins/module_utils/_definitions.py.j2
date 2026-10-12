@@ -5,14 +5,20 @@
 
 from __future__ import annotations
 
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._engine import (
-    Actions,
-    DeletionGuard,
-    Field,
-    Key,
-    Reference,
-    Resource,
-)
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._engine import (
+        Actions,
+        DeletionGuard,
+        Field,
+        Key,
+        Reference,
+        Resource,
+    )
+# isort: on
+# fmt: on
 
 IDENTIFIER = Key("id", "Server-assigned positive integer", kind="int", minimum=1)
 

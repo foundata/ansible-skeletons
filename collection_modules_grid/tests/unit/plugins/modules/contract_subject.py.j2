@@ -13,13 +13,20 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._definitions import (
-    FIXTURE,
-)
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.modules import (
-    fixture,
-    fixture_info,
-)
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._definitions import (
+        FIXTURE,
+    )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.modules import (
+        fixture,
+        fixture_info,
+    )
+# isort: on
+# fmt: on
 
 from ..fake_product import (
     ACTIONS,

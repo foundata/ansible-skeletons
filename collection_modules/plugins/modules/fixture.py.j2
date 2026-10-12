@@ -115,13 +115,20 @@ verified:
 
 from ansible.module_utils.basic import AnsibleModule
 
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._definitions import (
-    FIXTURE,
-)
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._engine import (
-    build_spec,
-    run_resource,
-)
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._definitions import (
+        FIXTURE,
+    )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._engine import (
+        build_spec,
+        run_resource,
+    )
+# isort: on
+# fmt: on
 
 
 def main() -> None:

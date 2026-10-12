@@ -409,7 +409,7 @@ def module_smoke(
             "Name-only initialization did not identify the missing product variable"
         )
     for index, (namespace, name) in enumerate(
-        (("skeleton_test", "module_fixture"), ("alternate_ns", "other_product"))
+        (("skeleton_test", "module_fixture"), ("n" * 64, "c" * 64))
     ):
         metadata = example_metadata(punctuation=bool(index))
         if index == 0:
@@ -754,9 +754,9 @@ def smoke(output: Path, *, lint: bool = False) -> None:
     names = ("skeleton_test", "example_app", "example_role")
     # Long names push generated lines past the YAML and Markdown limits.
     long_names = (
-        "zz_alternate_namespace",
-        "another_long_product_name",
-        "zz_long_role_name_for_tests",
+        "n" * 64,
+        "c" * 64,
+        "r" * 64,
     )
     for case, metadata, (namespace, collection_name, role_name) in (
         ("defaults", None, names),

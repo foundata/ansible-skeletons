@@ -5,15 +5,15 @@ SPDX-FileCopyrightText: {{ company | default('FIXME your organization') }}
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
-FIXME Replace these questions with decisions and evidence for
-{{ product | default('Example Product') }} in `{{ namespace }}.{{ collection_name }}`.
+{% filter wordwrap(width=78, break_long_words=False, break_on_hyphens=False) %}
+FIXME Replace these questions with decisions and evidence for {{ product | default('Example Product') }} in `{{ namespace }}.{{ collection_name }}`.
+{% endfilter %}{{ '' }}
 
 Skeleton revision:
 `{{ skeleton_revision | default('unknown; record the skeleton commit or tag') }}`.
-Research record: `{{ collection_name }}/research.md` in foundata's internal
-designs repository (sources with revisions and hashes, the research rows, the
-representative trace, timing evidence, skeleton adaptations). This document
-carries structure, decisions and scope only.
+{% filter wordwrap(width=78, break_long_words=False, break_on_hyphens=False) %}
+Research record: `{{ collection_name }}/research.md` in foundata's internal designs repository (sources with revisions and hashes, the research rows, the representative trace, timing evidence, skeleton adaptations). This document carries structure, decisions and scope only.
+{% endfilter %}{{ '' }}
 
 Evidence labels: **D** documented, **S** read in matching release source,
 **I** inferred (name the premises), **O** observed on a lab target with its

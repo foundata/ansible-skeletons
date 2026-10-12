@@ -28,7 +28,10 @@
       tags:
         - "{{ role_name }}_setup"
   vars:
-    __{{ role_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/setup/install/{{ '{{' }} __{{ role_name }}_loop_item {{ '}}' }}"
+    __{{ role_name }}_task_file: >-
+      {{ '{{' }}
+        role_path ~ '/tasks/setup/install/' ~ __{{ role_name }}_loop_item
+      {{ '}}' }}
   when:
     - {{ role_name }}_state == 'present'
     - __{{ role_name }}_task_file is ansible.builtin.file
@@ -59,7 +62,10 @@
       tags:
         - "{{ role_name }}_config"
   vars:
-    __{{ role_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/config/{{ '{{' }} __{{ role_name }}_loop_item {{ '}}' }}"
+    __{{ role_name }}_task_file: >-
+      {{ '{{' }}
+        role_path ~ '/tasks/config/' ~ __{{ role_name }}_loop_item
+      {{ '}}' }}
   when:
     - {{ role_name }}_state == 'present'
     - __{{ role_name }}_task_file is ansible.builtin.file
@@ -90,7 +96,10 @@
       tags:
         - "{{ role_name }}_service"
   vars:
-    __{{ role_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/service/{{ '{{' }} __{{ role_name }}_loop_item {{ '}}' }}"
+    __{{ role_name }}_task_file: >-
+      {{ '{{' }}
+        role_path ~ '/tasks/service/' ~ __{{ role_name }}_loop_item
+      {{ '}}' }}
   when:
     - {{ role_name }}_state == 'present'
     - __{{ role_name }}_task_file is ansible.builtin.file
@@ -121,7 +130,10 @@
       tags:
         - "{{ role_name }}_setup"
   vars:
-    __{{ role_name }}_task_file: "{{ '{{' }} role_path {{ '}}' }}/tasks/setup/uninstall/{{ '{{' }} __{{ role_name }}_loop_item {{ '}}' }}"
+    __{{ role_name }}_task_file: >-
+      {{ '{{' }}
+        role_path ~ '/tasks/setup/uninstall/' ~ __{{ role_name }}_loop_item
+      {{ '}}' }}
   when:
     - {{ role_name }}_state == 'absent'
     - __{{ role_name }}_task_file is ansible.builtin.file

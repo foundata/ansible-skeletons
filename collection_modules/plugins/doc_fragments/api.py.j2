@@ -22,5 +22,7 @@ notes:
   - "Runs on the execution host; delegate to an authorized host or use C(connection: local)."
   - "The endpoint must already exist, with credentials authorized for the requested operations."
   - "Checks the product version before writes; an unsupported series warns and proceeds. Known exclusions fail first."
-  - "Use C(group/{{ namespace }}.{{ collection_name }}.api) in C(module_defaults) for connection options."
+  - >-
+    Use C(group/{{ namespace }}.{{ collection_name }}.api)
+    in C(module_defaults) for connection options.
 """

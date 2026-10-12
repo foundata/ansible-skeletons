@@ -5,7 +5,8 @@
 ---
 - name: "Verify fixture state"
   module_defaults:
-    group/{{ namespace }}.{{ collection_name }}.api: "{% raw %}{{ product_connection }}{% endraw %}"
+    group/{{ namespace }}.{{ collection_name }}.api: >-
+      {{ '{{ product_connection }}' }}
   block:
     - name: "Read the saved fixture"
       {{ namespace }}.{{ collection_name }}.fixture_info:

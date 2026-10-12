@@ -5,8 +5,14 @@
 
 from __future__ import annotations
 
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._definitions import (
-    FIXTURE,
-)
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._definitions import (
+        FIXTURE,
+    )
+# isort: on
+# fmt: on
 
 RESOURCES = (FIXTURE,)

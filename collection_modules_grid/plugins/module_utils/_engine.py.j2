@@ -30,15 +30,22 @@ from ansible_collections.foundata.utils.plugins.module_utils import errors
 
 # Keep dependency and local imports stable across rendered namespace ordering.
 # isort: split
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils import (
-    _compat,
-)
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._client import (
-    SCHEMA,
-    Client,
-    ProductError,
-    api_argument_spec,
-)
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils import (
+        _compat,
+    )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._client import (
+        SCHEMA,
+        Client,
+        ProductError,
+        api_argument_spec,
+    )
+# isort: on
+# fmt: on
 
 MISSING = object()
 

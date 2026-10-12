@@ -5,7 +5,8 @@
 ---
 - name: "Exercise the fixture lifecycle"
   module_defaults:
-    group/{{ namespace }}.{{ collection_name }}.api: "{% raw %}{{ fixture_fake_connection }}{% endraw %}"
+    group/{{ namespace }}.{{ collection_name }}.api: >-
+      {{ '{{ fixture_fake_connection }}' }}
   block:
     - name: "Predict creation"
       {{ namespace }}.{{ collection_name }}.fixture:

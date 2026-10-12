@@ -5,7 +5,9 @@ SPDX-FileCopyrightText: {{ company | default('FIXME your organization') }}
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
+{% filter wordwrap(width=78, break_long_words=False, break_on_hyphens=False) %}
 This repository contains the `{{ role_name }}` Ansible role.
+{% endfilter %}{{ '' }}
 
 
 
@@ -68,25 +70,31 @@ Uninstall:
 
 It might be useful and faster to only call parts of the role by using tags:
 
-- `{{ role_name }}_setup`: Manage basic resources, such as packages or service
-  users.
-- `{{ role_name }}_config`: Manage settings, such as adapting or creating
-  configuration files.
-- `{{ role_name }}_service`: Manage services and daemons, such as running states
-  and service boot configurations.
+- {% filter wordwrap(width=76, break_long_words=False, break_on_hyphens=False) | indent(2) %}
+`{{ role_name }}_setup`: Manage basic resources, such as packages or service users.
+{% endfilter %}{{ '' }}
+- {% filter wordwrap(width=76, break_long_words=False, break_on_hyphens=False) | indent(2) %}
+`{{ role_name }}_config`: Manage settings, such as adapting or creating configuration files.
+{% endfilter %}{{ '' }}
+- {% filter wordwrap(width=76, break_long_words=False, break_on_hyphens=False) | indent(2) %}
+`{{ role_name }}_service`: Manage services and daemons, such as running states and service boot configurations.
+{% endfilter %}{{ '' }}
 
 There are also tags that are generally not intended to be called directly but
 are included for completeness and to cover edge cases:
 
-- `{{ role_name }}_always`, `always`: Tasks needed by the role itself for
-  internal role setup and the Ansible environment.
+- {% filter wordwrap(width=76, break_long_words=False, break_on_hyphens=False) | indent(2) %}
+`{{ role_name }}_always`, `always`: Tasks needed by the role itself for internal role setup and the Ansible environment.
+{% endfilter %}{{ '' }}
 
 
 <!-- ANSIBLE DOCSMITH MAIN START -->
 
 ## Role variables<a id="variables"></a>
 
+{% filter wordwrap(width=72, break_long_words=False, break_on_hyphens=False) %}
 Main entry point for the {{ role_name }} role
+{% endfilter %}{{ '' }}
 
 FIXME Describe what this entry point manages.
 
@@ -99,7 +107,13 @@ The following variables can be configured for this role:
 | {{ ('`' ~ role_name ~ '_autoupgrade`').ljust(__docsmith_width) }} | `bool` | No       | `false`     | If set to `true`, all managed packages will be upgraded during each Ansible run (e.g., when the package provider detects a newer version than the currently installed one). |
 | {{ ('`' ~ role_name ~ '_service_state`').ljust(__docsmith_width) }} | `str`  | No       | `"enabled"` | Defines the status of the service(s). Possible values:<br><br>- `enabled`: Service is running and will start automatically at boot. - `disabled`: Service is stopped and will not start automatically at boot. - `running`: Service is running but will […](#variable-{{ role_name }}_service_state) |
 
+{% if ('variable-' ~ role_name ~ '_state') | length > 60 %}
+<a id="variable-{{ role_name }}_state"></a>
+
+### `{{ role_name }}_state`
+{% else %}
 ### `{{ role_name }}_state`<a id="variable-{{ role_name }}_state"></a>
+{% endif %}
 
 [*⇑ Back to ToC ⇑*](#toc)
 
@@ -118,7 +132,13 @@ deleting created users, stopping services, restoring modified settings, ...
 
 
 
+{% if ('variable-' ~ role_name ~ '_autoupgrade') | length > 60 %}
+<a id="variable-{{ role_name }}_autoupgrade"></a>
+
+### `{{ role_name }}_autoupgrade`
+{% else %}
 ### `{{ role_name }}_autoupgrade`<a id="variable-{{ role_name }}_autoupgrade"></a>
+{% endif %}
 
 [*⇑ Back to ToC ⇑*](#toc)
 
@@ -132,7 +152,13 @@ currently installed one).
 
 
 
+{% if ('variable-' ~ role_name ~ '_service_state') | length > 60 %}
+<a id="variable-{{ role_name }}_service_state"></a>
+
+### `{{ role_name }}_service_state`
+{% else %}
 ### `{{ role_name }}_service_state`<a id="variable-{{ role_name }}_service_state"></a>
+{% endif %}
 
 [*⇑ Back to ToC ⇑*](#toc)
 
@@ -168,7 +194,8 @@ See `dependencies` in [`meta/main.yml`](./meta/main.yml).
 ## Compatibility<a id="compatibility"></a>
 
 See `min_ansible_version` in [`meta/main.yml`](./meta/main.yml) and
-`__{{ role_name }}_supported_platforms` in [`vars/main.yml`](./vars/main.yml).
+`__{{ role_name }}_supported_platforms`
+in [`vars/main.yml`](./vars/main.yml).
 
 
 

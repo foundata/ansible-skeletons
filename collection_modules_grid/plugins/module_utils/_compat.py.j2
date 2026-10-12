@@ -11,10 +11,16 @@ from __future__ import annotations
 
 from typing import Any
 
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._client import (
-    Client,
-    ProductError,
-)
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._client import (
+        Client,
+        ProductError,
+    )
+# isort: on
+# fmt: on
 
 SUPPORTED_SERIES = ("1.0",)
 """Series the integration tests passed on; see docs/architecture.md."""

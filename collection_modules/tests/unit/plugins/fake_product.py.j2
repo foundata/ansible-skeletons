@@ -12,16 +12,25 @@ import pytest
 from ansible_collections.foundata.utils.plugins.module_utils import errors
 
 # isort: split
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils import (
-    _client,
-)
-from ansible_collections.{{ namespace }}.{{ collection_name }}.tests.integration.targets.setup_fixture_fake.files.fake_product import (
-    KEY,
-    OLD_SECRET,
-    SECRET,
-    FakeProduct,
-    Response,
-)
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils import (
+        _client,
+    )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.tests.integration.targets.setup_fixture_fake.files import (
+        fake_product,
+    )
+# isort: on
+# fmt: on
+
+KEY = fake_product.KEY
+OLD_SECRET = fake_product.OLD_SECRET
+SECRET = fake_product.SECRET
+FakeProduct = fake_product.FakeProduct
+Response = fake_product.Response
 
 __all__ = (
     "KEY",

@@ -13,7 +13,10 @@ short_description: Manage one fixture record
 description:
   - "Adopts the unique record with O(name); a rename creates a different record. Ambiguous and internal identities are refused."
   - "Only declared fields are managed. Omitted and null options are unmanaged; empty values clear a field."
-  - "Saves without activation. Run M({{ namespace }}.{{ collection_name }}.fixture_apply) after all writes, on every play execution."
+  - >-
+    Saves without activation. Run
+    M({{ namespace }}.{{ collection_name }}.fixture_apply)
+    after all writes, on every play execution.
   - "O(state=absent) deletes only the named record and refuses while a dependent record refers to it. Writers must coordinate access to this family."
 version_added: "{{ version | default('1.0.0') }}"
 author:
@@ -101,13 +104,20 @@ verified:
 
 from ansible.module_utils.basic import AnsibleModule
 
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._definitions import (
-    FIXTURE,
-)
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._engine import (
-    build_spec,
-    run_resource,
-)
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._definitions import (
+        FIXTURE,
+    )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._engine import (
+        build_spec,
+        run_resource,
+    )
+# isort: on
+# fmt: on
 
 
 def main() -> None:

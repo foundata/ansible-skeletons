@@ -76,13 +76,20 @@ verification:
 
 from ansible.module_utils.basic import AnsibleModule
 
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils import (
-    _activation,
-    _fixture_activation,
-)
-from ansible_collections.{{ namespace }}.{{ collection_name }}.plugins.module_utils._definitions import (
-    FIXTURE,
-)
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils import (
+        _activation,
+        _fixture_activation,
+    )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._definitions import (
+        FIXTURE,
+    )
+# isort: on
+# fmt: on
 
 
 def main() -> None:
