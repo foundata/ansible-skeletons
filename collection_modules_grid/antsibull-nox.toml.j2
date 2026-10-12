@@ -43,7 +43,11 @@ doc_fragment = "{{ namespace }}.{{ collection_name }}.api"
 exclusions = []
 
 [sessions.build_import_check]
-run_galaxy_importer = true
+# Only builds the collection. The Galaxy importer runs in the import-check
+# session of noxfile.py, which makes the dependencies resolvable and fails on
+# documentation errors; here every dependency's doc fragment would be reported
+# as a non-fatal error.
+run_galaxy_importer = false
 
 # The ansible-lint session is defined in noxfile.py.
 

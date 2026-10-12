@@ -18,8 +18,10 @@ Sessions defined here are foundata's own. The others come from antsibull-nox
 and are configured in antsibull-nox.toml.
 """
 
+import json
 import os
 import sys
+import tarfile
 from pathlib import Path
 
 import nox
@@ -138,6 +140,131 @@ def changelog(session: nox.Session) -> None:
     session.run(
         "antsibull-changelog", "lint-changelog-yaml", "changelogs/changelog.yaml"
     )
+
+
+@nox.session(name="import-check", default=True)
+@antsibull_nox.sessions.install_packages(packages=["ansible-core", "galaxy-importer"])
+def import_check(session: nox.Session) -> None:
+    """Galaxy importer on the built archive with every dependency resolvable.
+
+    The stock build-import-check session treats an unresolved documentation
+    fragment as a non-fatal error, which hides a missing or unpublished
+    dependency. This session prepares the dependency tree, lets ansible-doc
+    find it through sys.path scanning (the importer sets its own collections
+    path) and fails on any documentation error the importer reports.
+    """
+    env = _prepare(session)
+    collections = env["ANSIBLE_COLLECTIONS_PATH"]
+    env = {
+        **env,
+        "PYTHONPATH": collections,
+        "ANSIBLE_COLLECTIONS_SCAN_SYS_PATH": "true",
+    }
+    output = (Path(session.create_tmp()) / "import-check").resolve()
+    session.run(
+        "ansible-galaxy",
+        "collection",
+        "build",
+        "--force",
+        "--output-path",
+        str(output),
+        silent=True,
+        env=env,
+    )
+    archives = sorted(output.glob("*.tar.gz"))
+    if len(archives) != 1:
+        session.error(f"Expected one built archive, found {len(archives)}")
+    _artifact_docs(session, archives[0], output / "installed", collections)
+    # The importer writes importer_result.json in its current directory.
+    with session.chdir(output):
+        log = session.run(
+            "python",
+            "-m",
+            "galaxy_importer.main",
+            str(archives[0]),
+            env=env,
+            silent=True,
+        )
+    problems = [
+        line
+        for line in str(log or "").splitlines()
+        if "Error running ansible-doc" in line or line.lstrip().startswith("ERROR")
+    ]
+    if problems:
+        session.error(
+            "galaxy-importer reported documentation errors:\n" + "\n".join(problems)
+        )
+    session.log("galaxy-importer resolved every plugin's documentation")
+
+
+def _artifact_docs(
+    session: nox.Session, archive: Path, installed: Path, dependencies: str
+) -> None:
+    """Require complete documentation resolved from the installed archive."""
+    with tarfile.open(archive) as stream:
+        manifest = stream.extractfile("MANIFEST.json")
+        if manifest is None:
+            session.error("Built archive has no manifest")
+        metadata = json.load(manifest)["collection_info"]
+    fqcn = f"{metadata['namespace']}.{metadata['name']}"
+    env = {
+        "ANSIBLE_COLLECTIONS_PATH": os.pathsep.join((str(installed), dependencies)),
+        "ANSIBLE_COLLECTIONS_SCAN_SYS_PATH": "false",
+        "PYTHONPATH": "",
+    }
+    session.run(
+        "ansible-galaxy",
+        "collection",
+        "install",
+        "--no-deps",
+        "--force",
+        "--collections-path",
+        str(installed),
+        str(archive),
+        env=env,
+        silent=True,
+    )
+    modules = (
+        installed
+        / "ansible_collections"
+        / metadata["namespace"]
+        / metadata["name"]
+        / "plugins/modules"
+    ).resolve()
+    if not modules.is_relative_to(installed.resolve()):
+        session.error("Installed module directory escapes the artifact")
+    expected = {
+        fqcn
+        + "."
+        + ".".join(path.relative_to(modules).with_suffix("").parts): path.resolve()
+        for path in modules.rglob("*.py")
+        if path.name != "__init__.py"
+    }
+    if not expected:
+        session.error("Built archive contains no modules")
+    with session.chdir(installed):
+        output = session.run(
+            "ansible-doc",
+            "--json",
+            *sorted(expected),
+            env=env,
+            silent=True,
+        )
+    try:
+        docs = json.loads(output or "")
+    except (ValueError, TypeError):
+        session.error("ansible-doc did not return documentation JSON")
+    if not isinstance(docs, dict) or set(docs) != set(expected):
+        session.error("ansible-doc omitted or added module entries")
+    for name, path in expected.items():
+        entry = docs[name]
+        doc = entry.get("doc") if isinstance(entry, dict) else None
+        filename = doc.get("filename") if isinstance(doc, dict) else None
+        if not isinstance(filename, str) or Path(filename).resolve() != path:
+            session.error(f"ansible-doc resolved {name} outside the installed artifact")
+        if not path.is_relative_to(modules):
+            session.error(f"Installed module {name} escapes the artifact")
+    session.log(f"ansible-doc verified {len(expected)} installed artifact modules")
 
 
 def _platforms() -> list[tuple[str, str]]:

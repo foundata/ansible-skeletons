@@ -24,6 +24,10 @@ and the project adheres to
   `.releasing.toml` declaration for foundata's `release` command (ecosystem
   `ansible-collection`, `repository` to set before the first release), kept
   out of the archive by `build_ignore`.
+- collection_modules, collection_modules_grid: an `import-check` session that
+  runs the Galaxy importer with the prepared dependency tree reachable and
+  fails on an unresolved documentation fragment, which the stock
+  build-import-check session reports as non-fatal.
 - collection_modules: a module-only skeleton for REST products: integer
   identifiers, by-name 404 absence, empty-page pagination, native JSON and
   immediate writes, with a replaceable fixture that exercises a reference, a
@@ -55,6 +59,10 @@ and the project adheres to
 
 ### Changed
 
+- collection_modules, collection_modules_grid: the stock `build-import-check`
+  session only builds the collection. The Galaxy importer runs once, in the
+  strict `import-check` session, instead of also reporting every dependency's
+  documentation fragment as a non-fatal error.
 - All skeletons: rendered files carry the licensing guide's SPDX headers,
   with the GNU line between the tags in Python modules and the documented
   generated-file and format exceptions. REUSE checks the complete tree. The

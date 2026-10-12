@@ -2,9 +2,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Check generated Nox behavior without requiring Nox in the unit environment."""
 
+import io
+import json
 import runpy
 import sys
-from collections.abc import Callable
+import tarfile
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from typing import cast
@@ -16,7 +20,9 @@ from scripts.common import ROOT, GateError
 
 
 @pytest.fixture
-def noxfile(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, object]:
+def noxfile(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest
+) -> dict[str, object]:
     """Load the generated noxfile with nox and antsibull-nox replaced by stubs."""
     installed_packages: list[object] = []
 
@@ -42,7 +48,8 @@ def noxfile(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, object
     for module in (nox, antsibull, sessions):
         monkeypatch.setitem(sys.modules, module.__name__, module)
     monkeypatch.chdir(tmp_path)
-    loaded = runpy.run_path(str(ROOT / "collection_default/noxfile.py.j2"))
+    profile = getattr(request, "param", "collection_default")
+    loaded = runpy.run_path(str(ROOT / profile / "noxfile.py.j2"))
     assert ["ansible-lint-foundata"] in installed_packages
     return loaded
 
@@ -50,6 +57,104 @@ def noxfile(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, object
 @pytest.fixture
 def lint_session(noxfile: dict[str, object]) -> Callable[[Mock], None]:
     return cast(Callable[[Mock], None], noxfile["ansible_lint"])
+
+
+@pytest.mark.parametrize(
+    "noxfile", ["collection_modules", "collection_modules_grid"], indirect=True
+)
+@pytest.mark.parametrize(
+    "problem", [None, "exit", "json", "missing", "outside", "symlink-root"]
+)
+def test_import_check_requires_installed_artifact_docs(
+    noxfile: dict[str, object], tmp_path: Path, problem: str | None
+) -> None:
+    archive = tmp_path / "example.tar.gz"
+    content = json.dumps(
+        {"collection_info": {"namespace": "test", "name": "example"}}
+    ).encode()
+    with tarfile.open(archive, "w:gz") as stream:
+        info = tarfile.TarInfo("MANIFEST.json")
+        info.size = len(content)
+        stream.addfile(info, io.BytesIO(content))
+    installed = tmp_path / "installed"
+    module = installed / "ansible_collections/test/example/plugins/modules/fixture.py"
+    module.parent.mkdir(parents=True)
+    module.write_text("# Installed artifact\n")
+    session = MagicMock()
+    session.error.side_effect = GateError
+    docs = {"test.example.fixture": {"doc": {"filename": str(module)}}}
+    if problem == "outside":
+        docs["test.example.fixture"]["doc"]["filename"] = str(tmp_path / "fixture.py")
+    elif problem == "symlink-root":
+        foreign = tmp_path / "foreign-modules"
+        module.parent.rename(foreign)
+        module.parent.symlink_to(foreign, target_is_directory=True)
+        docs["test.example.fixture"]["doc"]["filename"] = str(foreign / "fixture.py")
+    elif problem == "missing":
+        docs = {}
+
+    def run(*args: str, **kwargs: object) -> str:
+        if args[0] != "ansible-doc":
+            return ""
+        if problem == "exit":
+            raise GateError("ansible-doc exited nonzero")
+        assert args == ("ansible-doc", "--json", "test.example.fixture")
+        assert kwargs["env"] == {
+            "ANSIBLE_COLLECTIONS_PATH": f"{installed}:{tmp_path / 'dependencies'}",
+            "ANSIBLE_COLLECTIONS_SCAN_SYS_PATH": "false",
+            "PYTHONPATH": "",
+        }
+        return "invalid" if problem == "json" else json.dumps(docs)
+
+    session.run.side_effect = run
+    check = cast(Callable[..., None], noxfile["_artifact_docs"])
+    if problem:
+        with pytest.raises(GateError):
+            check(session, archive, installed, str(tmp_path / "dependencies"))
+    else:
+        check(session, archive, installed, str(tmp_path / "dependencies"))
+        session.chdir.assert_called_once_with(installed)
+        session.error.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "noxfile", ["collection_modules", "collection_modules_grid"], indirect=True
+)
+def test_importer_output_stays_in_its_temporary_directory(
+    noxfile: dict[str, object], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    check = cast(Callable[[Mock], None], noxfile["import_check"])
+    docs = Mock()
+    monkeypatch.setitem(check.__globals__, "_artifact_docs", docs)
+    session = MagicMock()
+    session.create_tmp.return_value = ".nox/import-check/tmp"
+    output = tmp_path / ".nox/import-check/tmp/import-check"
+
+    @contextmanager
+    def chdir(path: Path) -> Iterator[None]:
+        with monkeypatch.context() as context:
+            context.chdir(path)
+            yield
+
+    def run(*args: str, **kwargs: object) -> str:
+        if args[0] == "ansible-galaxy":
+            output.mkdir(parents=True, exist_ok=True)
+            (output / "test-example-1.0.0.tar.gz").touch()
+        else:
+            assert args[:3] == ("python", "-m", "galaxy_importer.main")
+            assert Path(args[3]).is_absolute() and Path(args[3]).is_file()
+            assert Path.cwd() == output
+            Path("importer_result.json").write_text("{}\n")
+        return ""
+
+    session.chdir.side_effect = chdir
+    session.run.side_effect = run
+    for _ in range(2):
+        check(session)
+        assert not (tmp_path / "importer_result.json").exists()
+        assert (output / "importer_result.json").is_file()
+        assert Path.cwd() == tmp_path
+    assert docs.call_count == 2
 
 
 @pytest.mark.parametrize("installed", [False, True])
