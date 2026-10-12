@@ -7,8 +7,7 @@
 # https://docs.ansible.com/projects/molecule/configuration/
 #
 # This scenario uses Podman to create and manage a container based testing
-# environment. See extensions/molecule/README.md for requirements and usage
-# details.
+# environment. See ../README.md for requirements and usage details.
 #
 # SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
@@ -63,7 +62,7 @@ provisioner:
     defaults:
       # If roles are not found by Molecule, try to run molecule with an adjusted
       # MOLECULE_GLOB environment variable instead of setting roles_path and/or
-      # collections_path. See molecule/README.md#faq-role-path-detection for details.
+      # collections_path. See ../README.md#faq-role-path-detection for details.
       verbosity: ${ANSIBLE_VERBOSITY:-0} # noqa
       display_args_to_stdout: ${ANSIBLE_DISPLAY_ARGS_TO_STDOUT:-false} # noqa
       # set forks >= number of test platforms for better performance
@@ -84,8 +83,10 @@ provisioner:
 verifier:
   name: "ansible"
   enabled: true
+{# skeleton-variant: role-name-check #}
 
 # Skip role name validation against Ansible Galaxy standards. This prevents
 # development friction when working without a Galaxy account.
 # https://docs.ansible.com/projects/molecule/configuration/#role-name-check
 role_name_check: 1
+{# end skeleton-variant #}

@@ -1,12 +1,21 @@
-# Ansible Molecule: Testing this collection
+# Molecule tests
 
 <!--
 SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
-This directory provides resources for testing the collection and its resources
-with [Molecule](https://docs.ansible.com/projects/molecule/).
+This directory contains the
+[Molecule](https://docs.ansible.com/projects/molecule/) scenarios of this
+project:
+
+- `default` tests the project on several Linux distributions, in Podman
+  containers or QEMU/KVM virtual machines.
+- `ee` builds an Ansible execution environment (EE) with
+  [`ansible-builder`](https://docs.ansible.com/projects/builder/en/latest/)
+  and checks that the project is included.
+
+Paths are relative to this directory unless stated otherwise.
 
 
 
@@ -17,54 +26,44 @@ with [Molecule](https://docs.ansible.com/projects/molecule/).
   - [Scenario `ee`](#requirements-scenario-ee)
 - [Usage](#usage)
   - [Run tests](#usage-testing)
+{# skeleton-variant: nox-toc #}
     - [Through nox](#usage-nox)
+{# end skeleton-variant #}
     - [Scenario `default`](#usage-testing-default)
     - [VM platforms (`type: "libvirt"`)](#usage-testing-vm)
     - [Scenario `ee`](#usage-testing-ee)
   - [Access instance terminal](#usage-instance-access)
   - [Write tests](#usage-add-tests)
 - [FAQ, troubleshooting](#faq)
-  - [Molecule role path detection issues](#faq-role-path-detection)
+  - [Molecule does not find the scenarios](#faq-role-path-detection)
   - [Air-gapped environments](#faq-air-gapped)
   - [Container: `inotify_init1(): Too many open files`](#faq-inotify)
-  - [VMs: Instance-to-instance networking (multi-node scenarios)](#faq-vm-multi-node)
+  - [VMs: Instance-to-instance networking](#faq-vm-multi-node)
 
 
 
 ## Requirements<a id="requirements"></a>
 
-See the official documentation on how to
-[install Molecule](https://docs.ansible.com/projects/molecule/installation/#pip).
+Install [Molecule](https://docs.ansible.com/projects/molecule/installation/).
+The scenarios use Molecule's `default` driver with their own create and destroy
+playbooks, so they need no Molecule driver plugin. Before each run, Molecule
+installs the collections a scenario needs from `<scenario>/requirements.yml`.
 
 
 
 ### Scenario `default`<a id="requirements-scenario-default"></a>
 
-Each platform in `default/molecule.yml` selects its backend via the `type` key:
-`"podman"` (container, the default when omitted) or `"libvirt"` (QEMU/KVM
-virtual machine). The requirements depend on which backend types the platform
-list uses.
+Each platform in `default/molecule.yml` selects its backend with the `type` key:
+`"podman"` for a container, which is also the default without a `type` key, or
+`"libvirt"` for a QEMU/KVM virtual machine. Install what the listed platforms
+need.
 
-For container platforms (`type: "podman"` or no `type` key):
+Container platforms need [Podman](https://podman.io/docs/installation). Set
+`MOLECULE_PODMAN_EXECUTABLE` to use another Podman binary than `podman`.
 
-1. [Podman](https://podman.io/docs/installation).
-2. The Molecule [plugin](https://github.com/ansible-community/molecule-plugins)
-   `podman`:
+Virtual machine platforms need:
 
-   ```bash
-   pip install "molecule" "molecule[podman]"
-   ```
-
-   or when using
-   [`uv`](https://docs.astral.sh/uv/getting-started/installation/):
-
-   ```bash
-   uv pip install "molecule" "molecule-plugins[podman]"
-   ```
-
-For VM platforms (`type: "libvirt"`):
-
-1. libvirt (QEMU/KVM driver and client), QEMU tooling and
+1. libvirt with the QEMU driver and client, the QEMU tools and
    [passt](https://passt.top/):
 
    ```bash
@@ -75,24 +74,20 @@ For VM platforms (`type: "libvirt"`):
    sudo apt install libvirt-daemon libvirt-clients qemu-system-x86 qemu-utils passt
    ```
 
-   Please note that a user session (`qemu:///session`) needs *no* root
-   privileges and *no* `libvirt` group membership.
-2. Access to `/dev/kvm`. This works out of the box for locally logged-in
-   (seated) users on Fedora, Debian and Ubuntu. Headless sessions (SSH, CI
-   runners) on Debian and Ubuntu additionally need membership in the `kvm` group
-   (`sudo usermod -aG kvm <user>`, then re-login).
-3. The [`pycdlib`](https://pypi.org/project/pycdlib/) Python package in the
-   Molecule virtual environment (used to build cloud-init NoCloud seed ISO
-   images):
+   The scenario uses the libvirt user session (`qemu:///session`), which needs
+   no root privileges and no membership in the `libvirt` group.
+2. Access to `/dev/kvm`. Users logged in locally on Fedora, Debian and Ubuntu
+   have it by default. Headless sessions on Debian and Ubuntu, such as SSH
+   sessions or CI runners, also need membership in the `kvm` group
+   (`sudo usermod -aG kvm <user>`, then log in again).
+3. The [`pycdlib`](https://pypi.org/project/pycdlib/) Python package in
+   Molecule's Python environment. It builds the cloud-init NoCloud seed ISO
+   images:
 
    ```bash
    pip install "pycdlib"
-   ```
 
-   or when using
-   [`uv`](https://docs.astral.sh/uv/getting-started/installation/):
-
-   ```bash
+   # or with uv
    uv pip install "pycdlib"
    ```
 
@@ -100,128 +95,114 @@ For VM platforms (`type: "libvirt"`):
 
 ### Scenario `ee`<a id="requirements-scenario-ee"></a>
 
-Additional requirements:
+The `ee` scenario needs [Podman](https://podman.io/docs/installation) and
+`ansible-builder`:
 
-1. [Podman](https://podman.io/docs/installation).
-2. The Molecule [plugin](https://github.com/ansible-community/molecule-plugins)
-   `podman`:
+```bash
+pip install "ansible-builder"
 
-   ```bash
-   pip install "molecule" "molecule[podman]"
-   ```
+# or with uv
+uv pip install "ansible-builder"
+```
 
-   or when using `uv`:
-
-   ```bash
-   uv pip install "molecule" "molecule-plugins[podman]"
-   ```
-
-3. [`ansible-builder`](https://docs.ansible.com/projects/builder/en/latest/):
-
-   ```bash
-   pip install "ansible-builder"
-   ```
-
-   or when using
-   [`uv`](https://docs.astral.sh/uv/getting-started/installation/):
-
-   ```bash
-   uv pip install "ansible-builder"
-   ```
 
 
 ## Usage<a id="usage"></a>
 
-### Run tests<a id="usage-testing"></a>
-
-#### Through nox<a id="usage-nox"></a>
-
-`nox -s molecule` runs the `default` scenario with the collection and the
-scenario requirements prepared in a temporary tree; nothing is installed into
-`~/.ansible`. Platforms of type `libvirt` run one at a time, container platforms
-together; `MOLECULE_SERIAL=true` runs every platform on its own.
-
-Anything after `--` is passed to Molecule, so the commands in the following
-sections also work as `nox -s molecule -- <command>`. Molecule takes one
-platform name per run, on `test` only. See
-[`DEVELOPMENT.md`](../../DEVELOPMENT.md) for the other checks.
-
-#### Scenario `default`<a id="usage-testing-default"></a>
-
-Tests the collection's resources against multiple OS platforms. Each platform
-runs as a Podman container or as a QEMU/KVM virtual machine, depending on its
-`type` key in `default/molecule.yml` (see the comments there; swap the active
-entry per platform to switch the backend). Containers and VMs can be mixed
-within one run.
+Run Molecule from the project's root directory, with `MOLECULE_GLOB` matching
+both the role layout (`molecule/`) and the collection layout
+(`extensions/molecule/`). The examples below assume these two commands. The
+[FAQ](#faq-role-path-detection) explains why the variable is set.
 
 ```bash
-cd "/collection-root-dir"
+cd "/path/to/project"
 export MOLECULE_GLOB="./{extensions/molecule,molecule}/*/molecule.yml"
+```
 
-# Test all defined platforms
-# See the platforms key in molecule/<scenario>/molecule.yml for a list.
+
+
+### Run tests<a id="usage-testing"></a>
+
+{# skeleton-variant: nox #}
+#### Through nox<a id="usage-nox"></a>
+
+`nox -s molecule` runs the `default` scenario. It prepares the collection and
+the scenario requirements in a temporary tree, so it installs nothing into
+`~/.ansible`. All platforms run in one Molecule run, unless the platform list
+contains a virtual machine: then each platform runs on its own, one after the
+other. `MOLECULE_SERIAL=true` or `MOLECULE_SERIAL=false` overrides that choice.
+
+Arguments after `--` go to Molecule, so the commands in the following sections
+also work as `nox -s molecule -- <command>`. Molecule takes one platform name
+per run, on `test` only. See [`DEVELOPMENT.md`](../../DEVELOPMENT.md) for the
+other checks.
+
+{# end skeleton-variant #}
+#### Scenario `default`<a id="usage-testing-default"></a>
+
+```bash
+# Test all platforms listed in default/molecule.yml
 molecule test
 
-# Test a single platform, use higher Ansible verbosity
+# Test one platform with more Ansible output
 molecule -vvvv test --platform-name="molecule-debian12"
 
-# Keep instances after testing, clean up manually when done.
+# Keep the instances after testing, then destroy them when done
 molecule test --destroy="never"
 molecule test --platform-name="molecule-debian12" --destroy="never"
 molecule list
 molecule destroy
 ```
 
+To switch a platform between container and virtual machine, swap its active
+entry in `default/molecule.yml`. The comments there list the keys of each
+backend. One run can mix containers and virtual machines.
+
 
 
 #### VM platforms (`type: "libvirt"`)<a id="usage-testing-vm"></a>
 
-VM platforms exist for tests containers cannot cover (kernel settings, nested
-virtualization, Podman inside the test target, ...). They boot vendor cloud
-images via a session libvirt daemon (`qemu:///session`) with
-[passt](https://passt.top/) user networking, which deliberately needs no root
-privileges, no `libvirt` group membership and no polkit rules.
+Use virtual machines for tests that containers cannot cover, such as kernel
+settings, nested virtualization or Podman inside the test target. They boot
+vendor cloud images in the libvirt user session with passt user networking,
+which needs no root privileges, no `libvirt` group membership and no polkit
+rules.
 
-VMs are resource hungry compared to containers, prefer `--platform-name` runs on
-smaller machines. A resource guard fails the `create` step early when the sum of
-the requested instance memory (plus a host reserve) exceeds the available memory
-or when the image cache disk space runs low. Environment variables:
+Virtual machines need far more resources than containers. On smaller machines,
+test one platform at a time with `--platform-name`. A resource guard stops the
+`create` step early when the requested memory plus a host reserve exceeds the
+available memory, or when the image cache runs low on disk space.
+
+The first run downloads each cloud image (qcow2, several hundred MiB) into the
+image cache. Deleting the cache is safe; the scenario downloads missing images
+again.
 
 |            Variable            |                  Default                   | Purpose |
 | ------------------------------ | ------------------------------------------ | ------- |
 | `MOLECULE_VM_LIBVIRT_URI`      | `qemu:///session`                          | libvirt connection URI |
-| `MOLECULE_VM_CACHE_DIR`        | `~/.cache/ansible-molecule-libvirt/images` | cloud image cache directory |
-| `MOLECULE_VM_REFRESH_IMAGES`   | (unset)                                    | set to `1` to force re-downloading the cached cloud images |
-| `MOLECULE_VM_IGNORE_RESOURCES` | (unset)                                    | set to `1` to skip the memory / disk space resource guard |
+| `MOLECULE_VM_CACHE_DIR`        | `~/.cache/ansible-molecule-libvirt/images` | Cloud image cache directory |
+| `MOLECULE_VM_REFRESH_IMAGES`   | (unset)                                    | Set to `1` to download the cached cloud images again |
+| `MOLECULE_VM_IGNORE_RESOURCES` | (unset)                                    | Set to `1` to skip the memory and disk space guard |
 
-The scenario downloads vendor cloud images (qcow2, several hundred MiB each) on
-first use and caches them at `~/.cache/ansible-molecule-libvirt/images`
-(override with the `MOLECULE_VM_CACHE_DIR` environment variable). The cache is
-safe to delete at any time, images are re-downloaded on demand.
+If an instance does not come up:
 
-Debugging hints if an instance does not come up:
-
-- Boot console log: `vm/<name>/console.log` inside Molecule's ephemeral
-  directory (usually `~/.ansible/tmp/molecule.*.default/`)
-- Domain states: `virsh --connect 'qemu:///session' list --all`
-- Guest IP via the guest agent:
+- Read its boot console log, `vm/<name>/console.log` in Molecule's ephemeral
+  directory (usually `~/.ansible/tmp/molecule.*.default/`).
+- List the domain states: `virsh --connect 'qemu:///session' list --all`
+- Ask the guest agent for the IP address:
   `virsh --connect 'qemu:///session' domifaddr '<name>' --source agent`
-- Graphical console: [`virt-manager`](https://virt-manager.org/) connected to
-  `qemu:///session` shows the text console with boot output of each instance.
+- Watch the boot output of each instance in
+  [`virt-manager`](https://virt-manager.org/), connected to `qemu:///session`.
+
 
 
 #### Scenario `ee`<a id="usage-testing-ee"></a>
 
-Tests that the collection can be included in an
-[Ansible Execution Environment (EE)](https://docs.ansible.com/projects/ansible/latest/getting_started_ee/i)
-built with
-[`ansible-builder`](https://docs.ansible.com/projects/builder/en/latest/).
+The scenario builds the project artifact and an
+[execution environment](https://docs.ansible.com/projects/ansible/latest/getting_started_ee/index.html)
+image, then checks that the project is included in the EE:
 
 ```bash
-cd "/collection-root-dir"
-export MOLECULE_GLOB="./{extensions/molecule,molecule}/*/molecule.yml"
-
-# Test: create collection artifact and EE image, verify inclusion in the EE
 molecule test --scenario-name "ee"
 ```
 
@@ -229,62 +210,61 @@ molecule test --scenario-name "ee"
 
 ### Access instance terminal<a id="usage-instance-access"></a>
 
-```bash
-cd "/collection-root-dir"
-export MOLECULE_GLOB="./{extensions/molecule,molecule}/*/molecule.yml"
+`molecule login` opens a shell in a running instance, for example one kept with
+`--destroy="never"`. It works for containers and virtual machines:
 
+```bash
 molecule list
-molecule login --host <name>
+molecule login --host "<name>"
 ```
 
 
 
 ### Write tests<a id="usage-add-tests"></a>
 
-Good starting point to add tests specific to your collection:
+The playbooks in `shared/playbooks/` run each Molecule phase. Every phase also
+includes the task files of a directory under `<scenario>/tasks/`, in
+alphabetical order:
 
-1. **Converge** - Place `*.yml` task files in
-   `extensions/molecule/<scenario>/tasks/converge`.
-   - Your primarily role includes should happen here to demonstrate all over
-     functionality.
-   - This step also provides verification through Ansible's declarative approach
-     and their failures on execution.
-2. **Verification** - Place `*.yml` task files in
-   `extensions/molecule/<scenario>/tasks/verify`.
-   - Usually contains `ansible.builtin.assert` tasks for validating outcomes.
-   - Focuses on verifying the expected post-converge system state and runtime
-     behavior.
+|      Directory       |            Task files            | Use |
+| -------------------- | -------------------------------- | --- |
+| `tasks/converge/`    | `*.yml`                          | Apply the project. Failing tasks already fail the test. |
+| `tasks/verify/`      | `*.yml`                          | Check the resulting state and behavior, usually with `ansible.builtin.assert`. |
+| `tasks/prepare/`     | `all.yml`, `<instance name>.yml` | Configure all instances, or one, before converge. |
+| `tasks/side_effect/` | `*.yml`                          | Change the instances between two test steps. |
+| `tasks/cleanup/`     | `*.yml`                          | Remove what the tests left behind. |
 
-This file structure allows you to update your collection's `extensions/molecule`
-directory with the latest content from a
-[rendered `collection_default` skeleton](https://github.com/foundata/ansible-skeletons)
-without losing your collection-specific tests.
+The `*.yml.example` files in `default/tasks/` show how to apply the project.
+Rename one to `*.yml` to use it.
 
+Project-specific tests stay in these directories. You can therefore update the
+rest of this directory from a newer rendered skeleton of
+[foundata/ansible-skeletons](https://github.com/foundata/ansible-skeletons)
+without losing them.
 
 
-## FAQ<a id="faq"></a>
 
-### Molecule role path detection issues, `MOLECULE_GLOB`<a id="faq-role-path-detection"></a>
+## FAQ, troubleshooting<a id="faq"></a>
 
-If Molecule fails to
+### Molecule does not find the scenarios<a id="faq-role-path-detection"></a>
 
-- detect collection roles and/or
-- install the updated collection version on each run
-
-try to adapt the `MOLECULE_GLOB` environment variable (which defaults to
-`molecule/*/molecule.yml`) and execute `molecule` from the collection's root
-directory instead of the `extensions` subdirectory:
+If Molecule does not find the roles or does not install the current version of
+the project on each run, set `MOLECULE_GLOB` and run `molecule` from the
+project's root directory instead of the `extensions` subdirectory:
 
 ```bash
-cd "/collection-root-dir"
+cd "/path/to/project"
 export MOLECULE_GLOB="./{extensions/molecule,molecule}/*/molecule.yml"
 molecule list
 
-# or inline for the following command only
+# or for one command only
 MOLECULE_GLOB="./{extensions/molecule,molecule}/*/molecule.yml" molecule list
 ```
 
-Further reading:
+Without the variable, Molecule looks for `molecule/*/molecule.yml` in the
+working directory. Recent releases use `extensions/molecule/*/molecule.yml`
+instead when the working directory contains a valid `galaxy.yml`. Further
+reading:
 
 - Source:
   [`molecule/command/base.py`](https://github.com/ansible/molecule/blob/main/src/molecule/command/base.py)
@@ -298,21 +278,17 @@ Further reading:
 
 ### Air-gapped environments<a id="faq-air-gapped"></a>
 
-Molecule scenarios typically require network access to Container registries
-([quay.io](https://quay.io/), [docker.io / Docker Hub](https://hub.docker.com/))
-and standard operating system package repositories. If your environment is
-air-gapped but your local network provides needed resources for a scenario, you
-can
+The scenarios download container images and the EE base image from
+[quay.io](https://quay.io/), collections from Ansible Galaxy, cloud images for
+virtual machines from the distributions, and packages from the distributions'
+repositories. If your network provides mirrors:
 
-1. Adapt `molecule/<scenario>/molecule.yml`, modify `platforms['image']` to use
-   local image registries.
-2. Create `molecule/<scenario>/tasks/prepare/all.yml` to extend Molecule's
-   instance preparation phase for additional configuration using Ansible.
-   Example:
+1. Point `platforms[].image` in `<scenario>/molecule.yml` to your registry.
+2. Configure the instances in `<scenario>/tasks/prepare/all.yml`, for example to
+   use internal package mirrors:
 
    ```yaml
    ---
-
    - name: "Molecule | Prepare | Configure internal package repository mirrors for Debian/Ubuntu"
      when:
        - (ansible_facts['os_family'] | ansible.builtin.lower) == 'debian'
@@ -326,62 +302,62 @@ can
              deb http://internal-mirror.example.com/debian {{ '{{' }} ansible_facts['distribution_release'] {{ '}}' }}-updates main contrib non-free
              deb http://internal-mirror.example.com/debian-security {{ '{{' }} ansible_facts['distribution_release'] {{ '}}' }}-security main contrib non-free
 
-
        - name: "Molecule | Prepare | Update apt cache"
          ansible.builtin.apt:
-           update_cache: yes
+           update_cache: true
    ```
 
-   You can also use dedicated `<inventory_hostname / platforms['name']>.yml`
-   files to target specific instances instead of `when:` conditions in
-   `all.yml`.
+   To configure a single instance, put its tasks into `<instance name>.yml`
+   instead of using `when:` conditions in `all.yml`.
 
 
 
 ### Container: `inotify_init1(): Too many open files`<a id="faq-inotify"></a>
 
-If you are not able to start all platform instances in parallel, you might need
-to increase `fs.inotify.max_user_instances` or do not run all containers at the
-same time (using `--platform-name` parameter):
+If not all platform instances start in parallel, start fewer containers at once
+with `--platform-name`, or raise the inotify limits:
 
 ```bash
 # Inspect
 sysctl fs.inotify
 
-# Adapt (runtime only) / test with a higher value (example: 512, 524288)
+# Test higher values until the next reboot (example: 512, 524288)
 echo 512 | sudo tee /proc/sys/fs/inotify/max_user_instances
 echo 524288 | sudo tee /proc/sys/fs/inotify/max_user_watches
 
-# Adapt (persistent)
+# Keep them across reboots
 echo "fs.inotify.max_user_instances=512" | sudo tee -a /etc/sysctl.conf
 echo "fs.inotify.max_user_watches=524288" | sudo tee -a /etc/sysctl.conf
 sudo sysctl -p
 ```
 
-It may help during debugging to manually start a container with the same image
-while you hit limits and inspect its logs:
+To debug, keep the instances, find the stopped container and start it with
+debug logging. Keep the complete output of the failing command:
 
 ```bash
-# trigger resource limit
+# Reproduce the resource limit
 molecule test --destroy="never"
 
-# inspect
-podman image
-podman start <imageid> --log-level debug 2>&1 | grep -i -E "not|warn|err|deny|denie"
+# Inspect
+podman images
+podman ps --all --no-trunc
+podman --log-level debug start <container-id>
 ```
 
 
 
-### VMs: Instance-to-instance networking (multi-node scenarios)<a id="faq-vm-multi-node"></a>
+### VMs: Instance-to-instance networking<a id="faq-vm-multi-node"></a>
 
-VM platforms (`type: "libvirt"`) use [passt](https://passt.top/) user
-networking: every instance gets its own isolated userspace network stack.
-Host-to-instance traffic works via the SSH port forwards, but instances cannot
-reach each other. If your scenario really needs instance-to-instance traffic,
-the escalation path is bridged networking via the setuid `qemu-bridge-helper`
-(`<interface type='bridge'><source bridge='virbr0'/>`), which keeps the
-privilege inside one narrow, audited helper binary instead of making the whole
-user session root-equivalent:
+Virtual machine instances cannot reach each other. [passt](https://passt.top/)
+gives every instance its own isolated user-space network stack, and the host
+reaches the instances through SSH port forwards. The shared playbooks do not
+implement or support traffic between instances.
+
+A scenario that needs it would have to use bridged networking through the
+setuid `qemu-bridge-helper`
+(`<interface type='bridge'><source bridge='virbr0'/>`). That confines the
+privilege to one narrow, audited helper binary instead of making the whole user
+session equivalent to root:
 
 - **Fedora** ships everything needed (`/etc/qemu/bridge.conf` containing
   `allow virbr0`, setuid helper). One-time setup:
@@ -390,7 +366,4 @@ user session root-equivalent:
   a `bridge.conf`. You would need
   `sudo dpkg-statoverride --update --add root root 4755 /usr/lib/qemu/qemu-bridge-helper`
   and to create `/etc/qemu/bridge.conf` with the content `allow virbr0`
-  yourself. Consider this carefully, it is a security posture change.
-
-This is documented for completeness, it is not implemented or supported by the
-shared playbooks yet.
+  yourself. This changes the system's security posture; consider it carefully.

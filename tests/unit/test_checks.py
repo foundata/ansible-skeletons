@@ -4,8 +4,10 @@
 
 import json
 import os
+import re
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -245,29 +247,31 @@ def test_generated_projects_have_no_repository_tooling(
         check_tree(ROOT / "collection_default", tmp_path)
 
 
-@pytest.mark.parametrize("profile", ["collection_modules_grid", "collection_modules"])
-def test_skeleton_lint_configurations_stay_in_sync(profile: str) -> None:
-    for name in (
-        ".ansible-docsmith.toml.j2",
+SKELETONS = (
+    "role_default",
+    "collection_default",
+    "collection_modules",
+    "collection_modules_grid",
+)
+SKELETON_GROUPS = {
+    "all": SKELETONS,
+    "role_and_collection_default": ("role_default", "collection_default"),
+    "collections": SKELETONS[1:],
+    "module_skeletons": ("collection_modules", "collection_modules_grid"),
+}
+# Files that must stay identical within a group outside their variant regions,
+# named by their path in collection_default. Explicit paths keep a missing copy
+# in the comparison; a file belongs to the largest group that shares it.
+SHARED_FILES = {
+    "all": (
         ".ansible-lint.j2",
-        ".yamllint.j2",
-    ):
-        assert (ROOT / "role_default" / name).read_bytes() == (
-            ROOT / "collection_default" / name
-        ).read_bytes()
-    # Explicit paths keep missing or changed shared files in the comparison.
-    for name in (
         ".gitattributes.j2",
         ".gitignore.j2",
-        ".releasing.toml.j2",
         ".rumdl.toml.j2",
         ".yamllint.j2",
-        "CHANGELOG.rst.j2",
         "CODE_OF_CONDUCT.md.j2",
+        "LICENSES/GPL-3.0-or-later.txt",
         "REUSE.toml.j2",
-        "changelogs/changelog.yaml.j2",
-        "changelogs/config.yaml.j2",
-        "changelogs/fragments/00-fragment-template.txt.j2",
         "extensions/molecule/default/requirements.yml.j2",
         "extensions/molecule/shared/playbooks/cleanup.yml.j2",
         "extensions/molecule/shared/playbooks/converge.yml.j2",
@@ -286,49 +290,224 @@ def test_skeleton_lint_configurations_stay_in_sync(profile: str) -> None:
         "extensions/molecule/shared/templates/cloud_init_user_data.yml.j2.j2",
         "extensions/molecule/shared/templates/libvirt_domain.xml.j2.j2",
         "requirements.txt.j2",
-        "tests/config.yml.j2",
-    ):
-        assert (ROOT / "collection_default" / name).read_bytes() == (
-            ROOT / profile / name
-        ).read_bytes(), name
-    # These static files only acquire a template suffix in the module skeleton.
-    for name in (
-        "LICENSES/GPL-3.0-or-later.txt",
+    ),
+    "role_and_collection_default": (
+        ".ansible-docsmith.toml.j2",
+        "extensions/molecule/README.md.j2",
+        "extensions/molecule/default/inventory/hosts.yml.j2",
+        "extensions/molecule/default/molecule.yml.j2",
+        "extensions/molecule/default/tasks/prepare/.gitkeep",
+        "extensions/molecule/default/tasks/side_effect/.gitkeep",
+        "extensions/molecule/default/tasks/verify/.gitkeep",
+        "extensions/molecule/ee/inventory/hosts.yml.j2",
+        "extensions/molecule/ee/molecule.yml.j2",
+        "extensions/molecule/ee/requirements.yml.j2",
+        "extensions/molecule/ee/tasks/converge/artifact-ee.yml.j2",
+        "extensions/molecule/ee/tasks/destroy/ee.yml.j2",
+        "extensions/molecule/ee/tasks/prepare/all.yml.j2",
+        "extensions/molecule/ee/tasks/prepare/localhost.yml.j2",
+        "extensions/molecule/ee/tasks/verify/ee.yml.j2",
+    ),
+    "collections": (
+        ".releasing.toml.j2",
+        "CHANGELOG.rst.j2",
+        "changelogs/changelog.yaml.j2",
+        "changelogs/config.yaml.j2",
+        "changelogs/fragments/00-fragment-template.txt.j2",
         "changelogs/fragments/archive/.gitkeep",
-    ):
-        assert (ROOT / "collection_default" / name).read_bytes() == (
-            ROOT / profile / f"{name}.j2"
-        ).read_bytes(), name
-    for name in (
-        ".ansible-lint.j2",
-        ".mypy.ini.j2",
-        "ruff.toml.j2",
-        "antsibull-nox.toml.j2",
-        "noxfile.py.j2",
         "galaxy.yml.j2",
-        "plugins/module_utils/_engine.py.j2",
+        "meta/runtime.yml.j2",
+        "tests/config.yml.j2",
+    ),
+    "module_skeletons": (
+        ".mypy.ini.j2",
+        "DEVELOPMENT.md.j2",
+        "antsibull-nox.toml.j2",
+        "docs/architecture.md.j2",
+        "docs/inventory/.gitkeep.j2",
+        "extensions/molecule/README.md.j2",
+        "extensions/molecule/default/inventory/hosts.yml.j2",
+        "extensions/molecule/default/molecule.yml.j2",
+        "noxfile.py.j2",
         "plugins/module_utils/_activation.py.j2",
         "plugins/module_utils/_compat.py.j2",
+        "plugins/module_utils/_engine.py.j2",
+        "ruff.toml.j2",
         "tests/unit/plugins/conftest.py.j2",
+        "tests/unit/plugins/modules/test_activation.py.j2",
         "tests/unit/plugins/modules/test_contract.py.j2",
         "tests/unit/plugins/modules/test_engine.py.j2",
-        "tests/unit/plugins/modules/test_activation.py.j2",
         "tests/unit/plugins/modules/test_info_failure.py.j2",
-        "docs/architecture.md.j2",
         "tools/inventory/extract.py.j2",
+    ),
+}
+# Static files that only acquire a template suffix in the module skeletons.
+MODULE_SKELETON_TEMPLATES = frozenset(
+    ("LICENSES/GPL-3.0-or-later.txt", "changelogs/fragments/archive/.gitkeep")
+)
+# Lines a skeleton needs differently in an otherwise shared file. Galaxy renders
+# the Jinja comment lines to nothing; see DEVELOPMENT.md.
+VARIANT_REGION = re.compile(
+    r"^\{# skeleton-variant: (?P<name>[a-z][a-z0-9-]*) #\}\n"
+    r".*?"
+    r"^\{# end skeleton-variant #\}\n",
+    re.DOTALL | re.MULTILINE,
+)
+VARIANT_MARKER = re.compile(r"^\{# (end )?skeleton-variant\b.*#\}\n", re.MULTILINE)
+
+
+def shared_path(skeleton: str, name: str) -> Path:
+    """Path of the shared file ``name`` (as in collection_default) in a skeleton."""
+    if skeleton == "role_default" and name.startswith("extensions/molecule/"):
+        name = name.removeprefix("extensions/")
+    if skeleton in SKELETON_GROUPS["module_skeletons"] and (
+        name in MODULE_SKELETON_TEMPLATES
     ):
-        assert (ROOT / "collection_modules_grid" / name).read_bytes() == (
-            ROOT / "collection_modules" / name
-        ).read_bytes(), name
-    for skeleton in ("role_default", "collection_default"):
-        assert not (ROOT / skeleton / "pyproject.toml").exists()
-        assert not (ROOT / skeleton / "scripts").exists()
-    config = yaml.safe_load((ROOT / "collection_default/.ansible-lint.j2").read_text())
-    assert (
-        len([rule for rule in config["enable_list"] if rule.startswith("foundata-")])
-        == 17
+        name = f"{name}.j2"
+    return ROOT / skeleton / name
+
+
+def shared_text(path: Path) -> str:
+    """The shared part of a file: each variant region is reduced to its name."""
+    text = VARIANT_REGION.sub(
+        lambda region: f"[variant {region['name']}]\n",
+        path.read_text(encoding="utf-8"),
     )
+    assert "skeleton-variant" not in text, f"Unbalanced variant marker in {path}"
+    return text
+
+
+def source_yaml(path: Path) -> Any:
+    """Parse a YAML template source as Galaxy renders its variant markers."""
+    return yaml.safe_load(VARIANT_MARKER.sub("", path.read_text(encoding="utf-8")))
+
+
+@pytest.mark.parametrize(
+    ("other", "same"),
+    [
+        ("a\n{# skeleton-variant: x #}\n2\n3\n{# end skeleton-variant #}\nb\n", True),
+        ("a\n{# skeleton-variant: x #}\n{# end skeleton-variant #}\nb\n", True),
+        ("a\n{# skeleton-variant: y #}\n1\n{# end skeleton-variant #}\nb\n", False),
+        ("a\n{# skeleton-variant: x #}\n1\n{# end skeleton-variant #}\nc\n", False),
+        ("a\n1\nb\n", False),
+    ],
+)
+def test_variant_regions_alone_may_differ(
+    tmp_path: Path, other: str, same: bool
+) -> None:
+    reference = tmp_path / "reference"
+    reference.write_text(
+        "a\n{# skeleton-variant: x #}\n1\n{# end skeleton-variant #}\nb\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "other").write_text(other, encoding="utf-8")
+    assert (shared_text(reference) == shared_text(tmp_path / "other")) is same
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "{# skeleton-variant: x #}\n1\n",
+        "1\n{# end skeleton-variant #}\n",
+        "{# skeleton-variant: x #}\n{# skeleton-variant: y #}\n"
+        "{# end skeleton-variant #}\n{# end skeleton-variant #}\n",
+        "{# skeleton-variant: Bad Name #}\n{# end skeleton-variant #}\n",
+    ],
+)
+def test_unbalanced_variant_markers_are_rejected(tmp_path: Path, text: str) -> None:
+    path = tmp_path / "shared"
+    path.write_text(text, encoding="utf-8")
+    with pytest.raises(AssertionError, match="Unbalanced variant marker"):
+        shared_text(path)
+
+
+@pytest.mark.parametrize(
+    ("group", "name"),
+    [
+        pytest.param(group, name, id=f"{group}:{name}")
+        for group, names in SHARED_FILES.items()
+        for name in names
+    ],
+)
+def test_shared_skeleton_files_are_identical(group: str, name: str) -> None:
+    paths = {
+        skeleton: shared_path(skeleton, name) for skeleton in SKELETON_GROUPS[group]
+    }
+    missing = [skeleton for skeleton, path in paths.items() if not path.is_file()]
+    assert not missing, f"{name} is missing in: {', '.join(missing)}"
+    reference, *others = paths
+    content = shared_text(paths[reference])
+    differing = [
+        skeleton for skeleton in others if shared_text(paths[skeleton]) != content
+    ]
+    assert not differing, f"{name} differs from {reference} in: {', '.join(differing)}"
+
+
+def test_shared_files_are_declared_once_per_skeleton() -> None:
+    assert set(SHARED_FILES) <= set(SKELETON_GROUPS)
+    seen: set[tuple[str, str]] = set()
+    for group, names in SHARED_FILES.items():
+        assert len(names) == len(set(names)), group
+        for name in names:
+            # A path may be shared twice only by disjoint groups.
+            pairs = {(skeleton, name) for skeleton in SKELETON_GROUPS[group]}
+            assert not seen & pairs, f"{name} is declared twice"
+            seen |= pairs
+
+
+def readme_closing_sections(skeleton: str) -> str:
+    """The README from the licensing section to the end."""
+    text = (ROOT / skeleton / "README.md.j2").read_text(encoding="utf-8")
+    start = text.find("\n## Licensing, copyright")
+    assert start != -1, f"{skeleton} README has no licensing section"
+    return text[start:]
+
+
+def test_collection_readme_closing_sections_are_identical() -> None:
+    reference, *others = SKELETON_GROUPS["collections"]
+    expected = readme_closing_sections(reference)
+    differing = [
+        skeleton for skeleton in others if readme_closing_sections(skeleton) != expected
+    ]
+    assert not differing, f"README closing sections differ in: {', '.join(differing)}"
+
+
+def test_template_inputs_are_not_linted_as_ansible_templates() -> None:
+    config = source_yaml(ROOT / "collection_default/.ansible-lint.j2")
+    assert config["kinds"] == [
+        {"inventory": "extensions/molecule/**/inventory/*.yml.j2"},
+    ]
+
+
+@pytest.mark.parametrize("skeleton", SKELETONS)
+def test_skeletons_ship_no_repository_tooling(skeleton: str) -> None:
+    assert not (ROOT / skeleton / "pyproject.toml").exists()
+    assert not (ROOT / skeleton / "scripts").exists()
+
+
+def test_skeletons_enable_the_same_foundata_rules() -> None:
+    enabled = {
+        skeleton: [
+            rule
+            for rule in source_yaml(ROOT / skeleton / ".ansible-lint.j2")["enable_list"]
+            if rule.startswith("foundata-")
+        ]
+        for skeleton in SKELETONS
+    }
+    reference = enabled["collection_default"]
+    assert len(reference) == len(set(reference))
+    # The verify command only rejects unknown rules; this count keeps every rule
+    # that ansible-lint-foundata ships enabled.
+    assert len(reference) == 17
+    assert {"foundata-string-quotes", "foundata-parameter-order"} <= set(reference)
+    assert all(rules == reference for rules in enabled.values()), enabled
+
+
+def test_collection_default_lint_configuration() -> None:
+    config = source_yaml(ROOT / "collection_default/.ansible-lint.j2")
     assert config["exclude_paths"] == [
+        "docs/",
+        "tools/",
         ".cache/",
         ".git/",
         ".hg/",
@@ -337,10 +516,11 @@ def test_skeleton_lint_configurations_stay_in_sync(profile: str) -> None:
         ".nox/",
         ".venv/",
         "changelogs/changelog.yaml",
+        "changelogs/.plugin-cache.yaml",
     ]
-    yaml_config = yaml.safe_load((ROOT / "collection_default/.yamllint.j2").read_text())
-    assert "foundata-string-quotes" in config["enable_list"]
-    assert "foundata-parameter-order" in config["enable_list"]
+    yaml_config = yaml.safe_load(
+        (ROOT / "collection_default/.yamllint.j2").read_text(encoding="utf-8")
+    )
     assert yaml_config["rules"]["empty-lines"] == {
         "max": 2,
         "max-start": 0,

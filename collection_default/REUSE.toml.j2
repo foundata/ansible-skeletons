@@ -2,8 +2,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 version = 1
+{# skeleton-variant: package #}
 SPDX-PackageName = "Ansible collection: {{ namespace }}.{{ collection_name }}"
 SPDX-PackageDownloadLocation = {{ repository | to_json(ensure_ascii=False) }}
+{# end skeleton-variant #}
 SPDX-PackageSupplier = {{ (company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '')) | to_json(ensure_ascii=False) }}
 SPDX-PackageComment = """
 This project may include calls to Application Programming Interfaces

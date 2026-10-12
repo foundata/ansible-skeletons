@@ -75,6 +75,14 @@ and the project adheres to
   the heading. The collection's `docs` session installs at least 2.4.
 - All skeletons: `.gitignore` retains the blank line below its repository
   heading and uses a portable wildcard for macOS Finder icon metadata.
+- All skeletons: one shared `.ansible-lint`. It excludes `docs/`, `tools/` and
+  `changelogs/.plugin-cache.yaml` everywhere, and its `kinds` cover Molecule
+  inventories. The module skeletons previously excluded only `docs/inventory/`
+  of `docs/`.
+- All skeletons: `requirements.txt` opens with one generic header.
+- (collection|role)_default: one Molecule README for both skeletons, with
+  paths relative to its directory. It lists the task directories of every
+  phase, and its requirements, nox and troubleshooting sections are revised.
 
 ### Fixed
 
@@ -95,6 +103,19 @@ and the project adheres to
   the README lines past the YAML and Markdown line limits; the written file
   content is unchanged. The `run` role's argument specification describes the
   entry point as "Main entry point for the run role".
+- collection_default: `build_ignore` also excludes `.venv`, `.cache`,
+  `docs/inventory` and `tools`, like the module skeletons, so a local virtual
+  environment or tool cache no longer ends up in the collection archive.
+- role_default: `.gitignore` matches the collection skeletons and also ignores
+  the rumdl cache.
+- (collection|role)_default: the Molecule scenario configurations refer to
+  `../README.md`; the collection's reference to the role path FAQ named a
+  `molecule/README.md` that does not exist there, and the role's `ee` scenario
+  named `extensions/molecule/README.md`.
+- (collection|role)_default: the Molecule README no longer requires the
+  Molecule podman plugin, which the scenarios do not use. Its execution
+  environment link works again, and it describes when `nox -s molecule` runs
+  the platforms one at a time.
 
 
 ## [2.9.0] - 2026-10-05

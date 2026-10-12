@@ -166,17 +166,14 @@ def build_collection(rendered: Rendered) -> Path:
         ".vscode/settings.json",
         "AGENTS.md",
         "stale.tar.gz",
+        "docs/inventory/sentinel.yml",
+        "tools/sentinel.py",
+        "tests/output/sentinel",
+        ".cache/sentinel",
+        ".venv/sentinel",
+        ".mypy_cache/sentinel",
+        ".ruff_cache/sentinel",
     )
-    if rendered.profile in MODULE_PROFILES:
-        excluded += (
-            "docs/inventory/sentinel.yml",
-            "tools/sentinel.py",
-            "tests/output/sentinel",
-            ".cache/sentinel",
-            ".venv/sentinel",
-            ".mypy_cache/sentinel",
-            ".ruff_cache/sentinel",
-        )
     for relative in excluded:
         path = rendered.collection / relative
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -234,31 +231,27 @@ def build_collection(rendered: Rendered) -> Path:
                     "antsibull-nox.toml",
                     "CODE_OF_CONDUCT.md",
                 )
-                or name.startswith(("extensions/molecule/", "scripts/"))
-                or (
-                    rendered.profile in MODULE_PROFILES
-                    and (
-                        name.startswith(
-                            (
-                                "docs/inventory",
-                                "tools/",
-                                "tests/output",
-                                ".cache/",
-                                ".venv/",
-                            )
-                        )
-                        or any(
-                            part
-                            in {
-                                "__pycache__",
-                                ".mypy_cache",
-                                ".ruff_cache",
-                                ".pytest_cache",
-                                ".nox",
-                            }
-                            for part in Path(name).parts
-                        )
+                or name.startswith(
+                    (
+                        "extensions/molecule/",
+                        "scripts/",
+                        "docs/inventory",
+                        "tools/",
+                        "tests/output",
+                        ".cache/",
+                        ".venv/",
                     )
+                )
+                or any(
+                    part
+                    in {
+                        "__pycache__",
+                        ".mypy_cache",
+                        ".ruff_cache",
+                        ".pytest_cache",
+                        ".nox",
+                    }
+                    for part in Path(name).parts
                 )
             ):
                 raise GateError(

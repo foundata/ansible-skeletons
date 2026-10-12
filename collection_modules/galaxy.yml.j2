@@ -6,7 +6,7 @@
 ---
 namespace: "{{ namespace }}"
 name: "{{ collection_name }}"
-version: "{{ version | default('1.0.0') }}"
+version: "{{ version }}"
 license:
   # See https://spdx.org/licenses/ for valid IDs and syntax. The project's
   # REUSE.toml file provides detailed licensing and copyright information
@@ -28,17 +28,17 @@ tags:
   # ["application", "cloud", "database", "eda", "infrastructure", "linux", "monitoring", "networking", "security", "storage", "tools", "windows"]
   - "application"
 
+# Collections that this collection requires to be installed.
+# Note: "*" selects the latest version available (not: "any")
+{# skeleton-variant: dependencies #}
 dependencies:
   "foundata.utils": ">=1.0.0,<2.0.0"
+{# end skeleton-variant #}
 
 # List of file glob-like patterns to filter files or directories that should
 # not be included in the build artifact. Some are always filtered by
 # _build_files_manifest_walk(), e.g. galaxy.yml, *.pyc, *.retry, and .git
 build_ignore:
-  - ".cache"
-  - ".venv"
-  - "docs/inventory"
-  - "tools"
   # Build artifacts, Ansible
   - "*.tar.gz"
   - ".ansible"
@@ -53,6 +53,7 @@ build_ignore:
   # Development tooling
   - ".ansible-docsmith.toml"
   - ".ansible-lint"
+  - ".cache"
   - ".gitattributes"
   - ".gitignore"
   - ".mypy.ini"
@@ -63,6 +64,7 @@ build_ignore:
   - ".releasing.toml"
   - ".rumdl.toml"
   - ".rumdl_cache"
+  - ".venv"
   - ".yamllint"
   - "antsibull-nox.toml"
   - "scripts"
@@ -73,6 +75,8 @@ build_ignore:
   - "ruff.toml"
   - "rumdl.toml"
   - "tests/output"
+  - "docs/inventory"
+  - "tools"
   # Repository hosting
   - ".github"
   - ".gitlab"

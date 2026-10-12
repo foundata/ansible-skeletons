@@ -104,6 +104,21 @@ in check-only mode; full matrix checks add the sanity, unit and integration
 sessions, one chain at a time, and the Molecule scenario against the first
 identity's own fake product.
 
+`tests/unit/test_checks.py` lists the files that skeletons share. Copies of a
+shared file are identical except inside variant regions, which wrap the few
+lines a skeleton needs differently:
+
+```jinja
+{# skeleton-variant: dependencies #}
+dependencies:
+  "foundata.utils": ">=1.0.0,<2.0.0"
+{# end skeleton-variant #}
+```
+
+Every copy declares the same regions in the same order; a region may be empty.
+Galaxy renders the marker lines to nothing. Change the shared text in every
+copy at once.
+
 
 ## Development standards<a id="development-standards"></a>
 

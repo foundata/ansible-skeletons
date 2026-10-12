@@ -30,10 +30,12 @@ tags:
 
 # Collections that this collection requires to be installed.
 # Note: "*" selects the latest version available (not: "any")
+{# skeleton-variant: dependencies #}
 # dependencies:
 # FIXME uncomment the following for usually needed collections (remove if not needed);
 #   "ansible.utils": ">=5.1.0"
 #   "ansible.posix": ">=2.0.0"
+{# end skeleton-variant #}
 
 # List of file glob-like patterns to filter files or directories that should
 # not be included in the build artifact. Some are always filtered by
@@ -53,6 +55,7 @@ build_ignore:
   # Development tooling
   - ".ansible-docsmith.toml"
   - ".ansible-lint"
+  - ".cache"
   - ".gitattributes"
   - ".gitignore"
   - ".mypy.ini"
@@ -63,6 +66,7 @@ build_ignore:
   - ".releasing.toml"
   - ".rumdl.toml"
   - ".rumdl_cache"
+  - ".venv"
   - ".yamllint"
   - "antsibull-nox.toml"
   - "scripts"
@@ -73,6 +77,8 @@ build_ignore:
   - "ruff.toml"
   - "rumdl.toml"
   - "tests/output"
+  - "docs/inventory"
+  - "tools"
   # Repository hosting
   - ".github"
   - ".gitlab"

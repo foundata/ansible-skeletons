@@ -2,9 +2,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 version = 1
+{# skeleton-variant: package #}
 SPDX-PackageName = "Ansible role: {{ role_name }}"
 SPDX-PackageDownloadLocation = {{ repository_url | to_json(ensure_ascii=False) }}
-SPDX-PackageSupplier = {{ (company ~ (' <' ~ company_url ~ '>' if company_url | default('') else '')) | to_json(ensure_ascii=False) }}
+{# end skeleton-variant #}
+SPDX-PackageSupplier = {{ (company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '')) | to_json(ensure_ascii=False) }}
 SPDX-PackageComment = """
 This project may include calls to Application Programming Interfaces
 ("API calls"), as well as their respective specifications and code that
@@ -19,5 +21,5 @@ supersede any terms of these additional agreements.
 [[annotations]]
 path = "**"
 precedence = "closest"
-SPDX-FileCopyrightText = {{ (company ~ (' <' ~ company_url ~ '>' if company_url | default('') else '')) | to_json(ensure_ascii=False) }}
+SPDX-FileCopyrightText = {{ (company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '')) | to_json(ensure_ascii=False) }}
 SPDX-License-Identifier = "GPL-3.0-or-later"

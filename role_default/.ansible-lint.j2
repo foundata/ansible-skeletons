@@ -8,6 +8,10 @@
 profile: "production"
 strict: true
 
+# Molecule links this as inventory; it is not an ansible.builtin.template input.
+kinds:
+  - inventory: "extensions/molecule/**/inventory/*.yml.j2"
+
 enable_list:
   - "jinja-template-extension"
   - "loop-var-prefix"
@@ -35,6 +39,8 @@ skip_list:
   - "use-loop"
 
 exclude_paths:
+  - "docs/"
+  - "tools/"
   # Explicit exclusions replace ansible-lint's defaults.
   - ".cache/"
   - ".git/"
@@ -45,5 +51,6 @@ exclude_paths:
   - ".venv/"
   # Generator-owned output; validate separately with antsibull-changelog.
   - "changelogs/changelog.yaml"
+  - "changelogs/.plugin-cache.yaml"
 
 # YAML formatting is configured in the adjacent .yamllint file.
