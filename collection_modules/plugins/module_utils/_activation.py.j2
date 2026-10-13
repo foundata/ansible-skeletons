@@ -4,6 +4,14 @@
 
 An activation module compares saved with loaded state for named objects,
 applies when they differ or when asked to, and verifies afterwards.
+
+A reply lost after the apply request was sent (a timeout, a dropped
+connection or an undecodable body) proves nothing by itself. The module goes
+on to verify only when an object named in ``verify`` drifted before: its
+convergence shows that the apply ran, and a drifting object that stays out
+of sync fails as not effective. Without such a difference, for example
+``activate: always`` on objects already in sync, the module fails with the
+outcome unknown and never sends the apply again.
 """
 
 from __future__ import annotations

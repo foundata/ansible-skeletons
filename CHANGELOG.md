@@ -41,6 +41,10 @@ and the project adheres to
 
 ### Changed
 
+- collection_modules, collection_modules_grid: the shared `_activation.py`
+  docstring states the lost-reply rule: verification continues only when a
+  named object drifted before, and `always` on objects already in sync ends
+  with the outcome unknown.
 - collection_modules, collection_modules_grid: no `docs/architecture.md`
   template any more. Rationale lives beside the code: `DEVELOPMENT.md` gains
   a Boundaries section that names the skeleton-owned files, `_compat.py` and
