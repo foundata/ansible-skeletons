@@ -41,6 +41,12 @@ and the project adheres to
 
 ### Changed
 
+- collection_modules, collection_modules_grid: no `docs/architecture.md`
+  template any more. Rationale lives beside the code: `DEVELOPMENT.md` gains
+  a Boundaries section that names the skeleton-owned files, `_compat.py` and
+  `meta/runtime.yml` state their reasons inline, and `FIXME.md` sends the
+  rule a module utility enforces into that file's docstring. The smoke test
+  no longer requires the record or the skeleton revision inside it.
 - All skeletons: rendered files carry the SPDX headers of the licensing guide,
   and REUSE checks the complete tree. README notices follow the guide;
   foundata's own renders leave out the skeleton credit.

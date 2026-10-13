@@ -202,7 +202,6 @@ def build_collection(rendered: Rendered) -> Path:
                     if rendered.profile == "collection_modules_grid"
                     else ()
                 ),
-                "docs/architecture.md",
                 "CHANGELOG.rst",
                 "tests/unit/plugins/conftest.py",
             )
@@ -499,9 +498,6 @@ def module_smoke(
             raise GateError(
                 "Module user agent must identify the collection and its version"
             )
-        architecture = (rendered.collection / "docs/architecture.md").read_text()
-        if f"`{metadata['skeleton_revision']}`" not in architecture:
-            raise GateError("Architecture omitted the supplied skeleton revision")
         scenario = rendered.collection / "extensions/molecule/default"
         molecule = yaml.safe_load((scenario / "molecule.yml").read_text())
         inventory = scenario / molecule["provisioner"]["inventory"]["links"]["hosts"]

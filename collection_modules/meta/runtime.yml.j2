@@ -14,7 +14,8 @@
 # Raising this floor is a breaking release.
 requires_ansible: {{ ('>=' ~ (min_ansible_version | default('2.19.0'))) | to_json }}
 {# skeleton-variant: action-groups #}
-# The floor rationale is in docs/architecture.md.
+# The anchors above are the reason for the default floor; replace this line
+# when the collection needs a higher one.
 # FIXME Replace the fixture members when introducing product modules.
 action_groups:
   api:

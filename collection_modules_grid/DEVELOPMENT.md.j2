@@ -52,8 +52,23 @@ together. Bind the shared contract tests to the new resource in
 `test_contract.py`, `test_engine.py` and `test_activation.py` as shipped.
 The subject supplies valid identities, creation arguments, one mutable field
 and capability flags with skip reasons. The engine tests contain their own
-synthetic definition and fake. Its engine ships in
-this product; a change it needs goes through the skeleton, never a local patch.
+synthetic definition and fake.
+
+## Boundaries<a id="boundaries"></a>
+
+`plugins/module_utils/_engine.py`, `plugins/module_utils/_activation.py` and
+`tests/unit/plugins/conftest.py` come from the skeleton and stay identical to
+its render; a change they need goes through the skeleton, never a local patch.
+`foundata.utils` owns byte transport, deadlines, JSON decoding and safe error
+translation. Everything else is product-owned: the client, the definitions,
+the modules and documentation fragments, the fake product and the inventory
+extractor. The inventory under `docs/inventory/` is development evidence;
+nothing reads it at runtime.
+
+FIXME Add what this product decides and a reader of the code cannot see:
+which families use a handwritten lifecycle instead of a definition and why,
+and which writers and prerequisites the caller must supply. The rule a
+module utility enforces belongs in that file's docstring, not here.
 
 ## Releases<a id="releases"></a>
 

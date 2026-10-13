@@ -23,7 +23,7 @@ from ansible_collections.{{ namespace }}.\
 # fmt: on
 
 SUPPORTED_SERIES = ("1.0",)
-"""Series the integration tests passed on; see docs/architecture.md."""
+"""Series the file-only integration tests and the lab acceptance passed on."""
 
 EXCLUSIONS: dict[str, tuple[tuple[str, str], ...]] = {}
 """Operation name to (release, evidence) pairs on which it is ineligible.

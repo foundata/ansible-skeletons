@@ -325,7 +325,6 @@ SHARED_FILES = {
         ".mypy.ini.j2",
         "DEVELOPMENT.md.j2",
         "antsibull-nox.toml.j2",
-        "docs/architecture.md.j2",
         "docs/inventory/.gitkeep.j2",
         "extensions/molecule/README.md.j2",
         "extensions/molecule/default/inventory/hosts.yml.j2",
