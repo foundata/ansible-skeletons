@@ -218,11 +218,23 @@ def test_subprocess_failure_leaves_no_passing_report(
     # This miniature repository has no scripts.check module. A real failing
     # child process proves that export success cannot become gate success.
     monkeypatch.delenv("SKELETONS_UTILS_SOURCE", raising=False)
+    # pytest's temporary paths exceed the socket budget, which is not under test.
+    monkeypatch.setattr("scripts.release.check_output_layout", lambda *_: None)
     output = tmp_path / "failed-check"
     with pytest.raises(GateError, match="Release checks failed"):
         check_release("1.1.0", output, repository)
     assert (output / "check.log").is_file()
     assert not (output / "report.json").exists()
+
+
+def test_release_check_refuses_a_long_evidence_path_before_creating_it(
+    repository: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("SKELETONS_UTILS_SOURCE", raising=False)
+    output = tmp_path / ("x" * 104)
+    with pytest.raises(GateError, match="shorter"):
+        check_release("1.1.0", output, repository)
+    assert not output.exists()
 
 
 def test_release_check_refuses_a_local_utils_source(

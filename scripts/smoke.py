@@ -10,6 +10,7 @@ import re
 import subprocess
 import sys
 import tarfile
+import tempfile
 import time
 import tomllib
 import xml.etree.ElementTree as ET
@@ -18,6 +19,7 @@ from pathlib import Path
 import yaml
 
 from scripts.common import ROOT, GateError, run, write_json
+from scripts.controller import NOX_ENVDIR_PREFIX
 from scripts.render import (
     MODULE_PROFILES,
     PRODUCTS,
@@ -927,7 +929,10 @@ def check_nox_gate(rendered: Rendered) -> None:
     run(["git", "init", "--quiet"], cwd=rendered.collection)
     run(["git", "add", "."], cwd=rendered.collection)
     run(["antsibull-nox", "lint-config"], cwd=rendered.collection, env=rendered.env)
-    environment = rendered.work / "nox"
+    # Python 3.14 binds the docs-check forkserver socket below the session's tmp
+    # directory. The check runs this with TMPDIR inside its output, so a short
+    # envdir there keeps the socket within the budget of scripts.controller.
+    environment = Path(tempfile.mkdtemp(prefix=NOX_ENVDIR_PREFIX))
     listing = run(
         ["nox", "--list"], cwd=rendered.collection, env=rendered.env, capture=True
     )

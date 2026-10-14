@@ -31,13 +31,6 @@ and the project adheres to
   identifiers, paginated searches with a declared total, add, set and delete
   actions, string-encoded values and a deletion guard. Its apply module serves
   products that separate saved from active state.
-- checks: quick checks render both module skeletons under two identities, one
-  with a quoted product name, run their default sessions, and build and
-  exercise the installed modules. The full matrix adds their sanity, unit and
-  integration lanes and the Molecule scenario against a fake product. The
-  checks install the `foundata.utils` release pinned in `tests/requirements.yml`
-  or, with `--utils-source`, a local checkout. A long-name identity checks
-  `collection_default` and `role_default`.
 
 ### Changed
 
@@ -68,6 +61,10 @@ and the project adheres to
 
 ### Fixed
 
+- checks: the release gate gives Molecule's SSH control sockets and the
+  generated collection's nox environments short run-private directories, and
+  refuses an evidence path that is too long for its sockets before it starts.
+  The release checklist's example path fits.
 - collection_default: `changelogs/changelog.yaml` starts without a placeholder
   release, so the first `release_summary` fragment no longer fails.
 - (collection|role)_default: the ansible-core requirement is checked before

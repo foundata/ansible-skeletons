@@ -16,7 +16,12 @@ from pathlib import Path
 import yaml
 
 from scripts.common import ROOT, GateError, require_tools, run, write_json
-from scripts.controller import check_socket_layout, controller_environment
+from scripts.controller import (
+    SSH_CONTROL_DIRECTORY,
+    SSH_CONTROL_LAYOUT,
+    check_socket_layout,
+    controller_environment,
+)
 from scripts.render import Rendered, example_metadata, render
 
 
@@ -288,7 +293,7 @@ def molecule_command(action: str, scenario: str) -> list[str]:
 
 def integration(backend: str, output: Path) -> None:
     """Run both generated projects; keep failures and always destroy the targets."""
-    check_socket_layout(output)
+    check_socket_layout(output, SSH_CONTROL_LAYOUT)
     require_tools("molecule", "ansible-galaxy", "ansible-lint")
     if backend in ("podman", "ee"):
         require_tools("podman")
@@ -302,6 +307,11 @@ def integration(backend: str, output: Path) -> None:
     output.mkdir(parents=True, exist_ok=False)
     rendered = render(output / "rendered", metadata=example_metadata())
     env = controller_environment(output, rendered.env)
+    # SSH control sockets would otherwise live in ~/.ansible/cp of the rendered
+    # home, too deep for the socket path limit.
+    control = output / SSH_CONTROL_DIRECTORY
+    control.mkdir(mode=0o700)
+    env["ANSIBLE_SSH_CONTROL_PATH_DIR"] = str(control)
     if backend in ("podman", "ee"):
         env = podman_environment(output, env)
         check_podman_paths(output, env)

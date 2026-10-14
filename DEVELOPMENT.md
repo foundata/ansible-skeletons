@@ -285,13 +285,19 @@ skeleton-specific gate (`scripts/release.py check`).
 
    Implementation changes must already be committed. The final status must be
    empty, including untracked files. Do not amend this commit after validation.
-4. Run the release gate, choosing a new output directory outside the checkout:
+4. Run the release gate into a new output directory outside the checkout:
 
    ```sh
-   evidence="../ansible-skeletons-release-${version}"
+   evidence="${HOME}/sk-${version}"
    uv run --locked python -m scripts.release check "${version}" \
      --output "${evidence}"
    ```
+
+   Keep the resolved path at 29 bytes or shorter. The controller, Podman, the
+   generated collection's `docs-check` workers and Molecule's SSH connections
+   bind Unix sockets below it, and the gate refuses a longer path before it
+   starts. Do not use a tmpfs such as `/tmp`: the integration tests keep their
+   container storage below the output. The gate can run for several hours.
 
    Inspect `check.log` while the gate runs. A successful run creates
    `report.json`; a failure retains diagnostics but creates no passing report.

@@ -15,12 +15,20 @@ from scripts.common import GateError, write_json
 SOCKET_LIMIT = 104
 # Python 3.12/3.13 use listener-XXXXXXXX; 3.14 uses sock-XXXXXXXXXXXX.
 CONTROLLER_SUFFIX = "pymp-xxxxxxxx/listener-xxxxxxxx"
+# Generated collections' nox environments live below TMPDIR, and Python 3.14
+# binds the docs-check forkserver socket in the session's own tmp directory.
+NOX_ENVDIR_PREFIX = "nox-"
+NOX_LAYOUT = f"t/{NOX_ENVDIR_PREFIX}xxxxxxxx/docs-check-3-14/tmp/{CONTROLLER_SUFFIX}"
+# Molecule names SSH control sockets %h-%p-%r; OpenSSH binds the master socket
+# under a 16-character temporary suffix first.
+SSH_CONTROL_DIRECTORY = "s"
+SSH_CONTROL_LAYOUT = f"{SSH_CONTROL_DIRECTORY}/127.0.0.1-65535-molecule.{'x' * 16}"
 
 
-def check_socket_layout(output: Path) -> None:
+def check_socket_layout(output: Path, *layouts: str) -> None:
     """Reject layouts before any matrix work or runtime state is created."""
     output = output.resolve()
-    for relative in (f"t/{CONTROLLER_SUFFIX}", "r/podman/podman.sock"):
+    for relative in (f"t/{CONTROLLER_SUFFIX}", "r/podman/podman.sock", *layouts):
         path = output / relative
         if not path.resolve().is_relative_to(output):
             raise GateError("Socket directory is outside this run")

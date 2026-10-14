@@ -13,7 +13,7 @@ import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
-from scripts.check import default_lane, required_checks
+from scripts.check import check_output_layout, default_lane, required_checks
 from scripts.common import ROOT, GateError, digest, run, uv_command, write_json
 from scripts.render import MODULE_PROFILES
 
@@ -137,6 +137,7 @@ def check_release(version: str, output: Path, root: Path = ROOT) -> None:
     output = output.resolve()
     if output.is_relative_to(root.resolve()):
         raise GateError("Release evidence must be outside the working tree")
+    check_output_layout(output / "checks", backends)
     output.mkdir(parents=True, exist_ok=False)
     archive = output / "source.tar"
     with tempfile.TemporaryDirectory(prefix="ansible-skeletons-release-") as temporary:

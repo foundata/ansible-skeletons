@@ -24,7 +24,12 @@ from scripts.common import (
     uv_command,
     write_json,
 )
-from scripts.controller import check_socket_layout, controller_environment
+from scripts.controller import (
+    NOX_LAYOUT,
+    SSH_CONTROL_LAYOUT,
+    check_socket_layout,
+    controller_environment,
+)
 from scripts.render import MODULE_PROFILES
 
 
@@ -124,6 +129,13 @@ def required_checks(*, full: bool, backends: list[str]) -> list[str]:
     ]
 
 
+def check_output_layout(output: Path, backends: list[str]) -> None:
+    """Budget every socket a check binds below its output, before any work."""
+    check_socket_layout(output, NOX_LAYOUT)
+    for backend in backends:
+        check_socket_layout(output / f"integration-{backend}", SSH_CONTROL_LAYOUT)
+
+
 def check(
     output: Path,
     *,
@@ -143,8 +155,7 @@ def check(
         output,
         *[output / f"integration-{backend}" for backend in selected],
     ]
-    for runtime_output in runtime_outputs:
-        check_socket_layout(runtime_output)
+    check_output_layout(output, selected)
     output.mkdir(parents=True, exist_ok=False)
     checks: list[str] = []
     check_static()

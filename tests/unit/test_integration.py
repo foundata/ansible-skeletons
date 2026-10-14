@@ -13,7 +13,13 @@ from pathlib import Path
 import pytest
 
 from scripts.common import ROOT, GateError, run
-from scripts.controller import SOCKET_LIMIT, check_socket_layout, controller_environment
+from scripts.controller import (
+    NOX_LAYOUT,
+    SOCKET_LIMIT,
+    SSH_CONTROL_LAYOUT,
+    check_socket_layout,
+    controller_environment,
+)
 from scripts.integration import molecule_command, podman_environment, reset_podman
 
 
@@ -198,6 +204,21 @@ def test_controller_budget_is_stricter_than_podman(
     assert len(os.fsencode(path / "r/podman/podman.sock")) < SOCKET_LIMIT
     with pytest.raises(GateError, match="shorter"):
         check_socket_layout(path)
+
+
+@pytest.mark.parametrize("layout", [SSH_CONTROL_LAYOUT, NOX_LAYOUT])
+def test_tool_socket_budgets_are_stricter_than_controller(layout: str) -> None:
+    # Molecule's SSH control sockets and the generated docs-check workers bind
+    # below the output too; the preflight must budget them before any work.
+    # The layout check is pure path arithmetic, so a fixed root keeps the
+    # lengths independent of the test's own temporary directory.
+    root = Path("/gate-budget")
+    # Two separators join root, name and layout; the limit itself is excluded.
+    limit = SOCKET_LIMIT - len(os.fsencode(root)) - len(layout) - 3
+    check_socket_layout(root / ("x" * limit), layout)
+    check_socket_layout(root / ("x" * (limit + 1)))
+    with pytest.raises(GateError, match="shorter"):
+        check_socket_layout(root / ("x" * (limit + 1)), layout)
 
 
 def test_controller_refuses_temporary_symlink_escape(
