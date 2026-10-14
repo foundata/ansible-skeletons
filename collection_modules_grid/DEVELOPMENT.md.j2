@@ -56,9 +56,12 @@ synthetic definition and fake.
 
 ## Boundaries<a id="boundaries"></a>
 
-`plugins/module_utils/_engine.py`, `plugins/module_utils/_activation.py` and
-`tests/unit/plugins/conftest.py` come from the skeleton and stay identical to
-its render; a change they need goes through the skeleton, never a local patch.
+`plugins/module_utils/_engine.py`, `plugins/module_utils/_activation.py`,
+`tests/unit/plugins/conftest.py` and the shared `test_contract.py`,
+`test_engine.py` and `test_activation.py` under `tests/unit/plugins/modules/`
+come from the skeleton and stay identical to its render; a change they need
+goes through the skeleton, never a local patch. `contract_subject.py` binds
+the contract tests to the product.
 `foundata.utils` owns byte transport, deadlines, JSON decoding and safe error
 translation. Everything else is product-owned: the client, the definitions,
 the modules and documentation fragments, the fake product and the inventory
