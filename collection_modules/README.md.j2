@@ -15,7 +15,7 @@ invented fixture contract below after qualifying the first product resource.
 - [Included content](#content)
 - [Dependencies](#dependencies)
 - [Collection contract](#collection-contract)
-- [Example](#example)
+- [Usage](#usage)
 - [Compatibility](#compatibility)
 - [Licensing, copyright](#licensing-copyright)
 - [Author information](#author-information)
@@ -93,11 +93,19 @@ evidence-backed operation exclusions fail before writing.
 
 
 
-## Example
+## Usage<a id="usage"></a>
+
+Each section below covers one administration task: what its modules manage and
+refuse, what you prepare and when to activate. It ends with the tasks of that
+task's play and the names of its modules;
+`ansible-doc {{ namespace }}.{{ collection_name }}.<module>` shows a module's
+options, return values and own rules. Every example is the task list of this
+play, run on the control node against an inventory host that carries the
+endpoint's variables:
 
 ```yaml
 ---
-- name: "Configure a fixture endpoint"
+- name: "Configure {{ product | default('Example Product') }}"
   hosts: "product_api"
   connection: "local"
   gather_facts: false
@@ -107,15 +115,24 @@ evidence-backed operation exclusions fail before writing.
       url: "{% raw %}{{ product_url }}{% endraw %}"
       api_key: "{% raw %}{{ product_api_key }}{% endraw %}"
       api_secret: "{% raw %}{{ product_api_secret }}{% endraw %}"
-  tasks:
-    - name: "Save the record"
-      {{ namespace }}.{{ collection_name }}.fixture:
-        name: "example"
-        value: "ready"
-
+  tasks: # the tasks of the section
 ```
 
+### FIXME Name the administration task<a id="usage-fixture"></a>
 
+FIXME Two to four sentences: what the family manages, what it refuses and why,
+what the caller prepares, and when to run the apply module. A rule a single
+module enforces belongs in that module's documentation, not here. One section
+per administration task of the plan, in its order.
+
+```yaml
+- name: "Save the record"
+  {{ namespace }}.{{ collection_name }}.fixture:
+    name: "example"
+    value: "ready"
+```
+
+Modules: `fixture`, `fixture_info`.
 
 ## Compatibility<a id="compatibility"></a>
 
