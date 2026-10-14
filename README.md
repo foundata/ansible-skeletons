@@ -48,8 +48,8 @@ The skeletons follow these style guides:
 - [Usage](#usage)
 - [Description of provided skeletons](#content)
   - [`collection_default`](#collection_default)
-  - [`collection_modules_grid`](#collection_modules_grid)
   - [`collection_modules`](#collection_modules)
+  - [`collection_modules_grid`](#collection_modules_grid)
   - [`role_default`](#role_default)
 - [Compatibility](#compatibility)
 - [Contributing](#contributing)
@@ -197,11 +197,42 @@ With `nox --no-venv`, a missing extension produces a warning and only stock
 rules run.
 
 
+### `collection_modules`<a id="collection_modules"></a>
+
+The REST fixture uses server-assigned integer identifiers, case-insensitive
+names, by-key 404 absence, empty-page pagination, native JSON and
+POST/PUT-or-PATCH/DELETE writes that take effect immediately.
+
+It includes a replaceable resource and info module, references, a write-only
+password and a deletion guard; no apply module. Its lifecycle, test runner and
+research scaffolds are byte-identical to the grid variant, enforced by tests.
+
+```sh
+ansible-galaxy collection init \
+  --collection-skeleton ./collection_modules \
+  --extra-vars @metadata.json \
+  --extra-vars "skeleton_revision=$(git describe --tags --always)" \
+  --extra-vars '{"product": "Example REST Product"}' namespace.product
+```
+
+The `metadata.json`, the defaults and the `foundata.utils` prerequisite are the
+same as above.
+Follow the rendered `FIXME.md` to replace the fixture with product evidence.
+
+
 
 ### `collection_modules_grid`<a id="collection_modules_grid"></a>
 
-A module-first skeleton with a replaceable resource, info and activation module,
-a shared resource engine, fake API tests and an external-endpoint Molecule
+A module-first skeleton for products exposing a grid-style API.
+
+A grid-style API is an HTTP API pattern designed around managing tabular
+collections of resources. Unlike conventional resource-oriented REST APIs, it
+typically exposes action-based endpoints such as search_item, add_item, set_item
+and del_item, with standardized request and response structures for listing,
+pagination and resource management.
+
+The skeleton provides a replaceable resource, info and activation module, a
+shared resource engine, fake API tests and an external-endpoint Molecule
 scenario. It contains no deployment role.
 
 Its fixture speaks a grid API with UUID identifiers, paginated `search_item`
@@ -236,29 +267,6 @@ The fixture imports `foundata.utils >=1.0.0`.
 Follow the rendered `FIXME.md` to adapt the fixture. The shared contract tests
 reach the fixture only through `tests/unit/plugins/modules/contract_subject.py`;
 a product binds its own resource there and keeps `test_contract.py` unchanged.
-
-
-### `collection_modules`<a id="collection_modules"></a>
-
-The REST fixture uses server-assigned integer identifiers, case-insensitive
-names, by-key 404 absence, empty-page pagination, native JSON and
-POST/PUT-or-PATCH/DELETE writes that take effect immediately.
-
-It includes a replaceable resource and info module, references, a write-only
-password and a deletion guard; no apply module. Its lifecycle, test runner and
-research scaffolds are byte-identical to the grid variant, enforced by tests.
-
-```sh
-ansible-galaxy collection init \
-  --collection-skeleton ./collection_modules \
-  --extra-vars @metadata.json \
-  --extra-vars "skeleton_revision=$(git describe --tags --always)" \
-  --extra-vars '{"product": "Example REST Product"}' namespace.product
-```
-
-The `metadata.json`, the defaults and the `foundata.utils` prerequisite are the
-same as above.
-Follow the rendered `FIXME.md` to replace the fixture with product evidence.
 
 
 ### `role_default`<a id="role_default"></a>
