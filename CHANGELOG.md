@@ -59,7 +59,7 @@ and the project adheres to
   The collection's `docs` session installs it.
 - All skeletons: `.gitignore` keeps the blank line below its repository heading
   and uses a portable wildcard for macOS Finder icon metadata.
-- All skeletons: one shared `.ansible-lint`. It excludes `docs/`, `tools/` and
+- All skeletons: one shared `.ansible-lint`. It excludes `tools/` and
   `changelogs/.plugin-cache.yaml` and treats the Molecule inventory templates
   as inventories.
 - All skeletons: `requirements.txt` starts with a generic header.

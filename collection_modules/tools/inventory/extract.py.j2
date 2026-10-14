@@ -7,7 +7,7 @@
 """Inventory stub: supply fixed source bytes and retrieval time for reproducibility.
 
 Example: uv run tools/inventory/extract.py --source SOURCE --series 1.0
---release 1.0.0 --retrieved 2026-01-01T00:00:00Z --output docs/inventory/1.0.yml
+--release 1.0.0 --retrieved 2026-01-01T00:00:00Z --output tools/inventory/1.0.yml
 
 Rerun twice and compare bytes; never hand-edit generated inventory. This stub
 records provenance only and makes no coverage claim. FIXME Parse the product's
@@ -104,8 +104,13 @@ def main() -> int:
     }
     body = yaml.dump(document, Dumper=InventoryDumper, sort_keys=False, width=120)
     args.output.parent.mkdir(parents=True, exist_ok=True)
+    license_header = "".join(
+        Path(__file__).read_text(encoding="utf-8").splitlines(keepends=True)[:2]
+    )
     args.output.write_text(
-        "# Generated provenance stub; rerun, do not edit.\n---\n" + body,
+        license_header
+        + "# Generated provenance stub; rerun, do not edit.\n---\n"
+        + body,
         encoding="utf-8",
     )
     return 0

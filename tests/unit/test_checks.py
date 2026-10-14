@@ -325,7 +325,6 @@ SHARED_FILES = {
         ".mypy.ini.j2",
         "DEVELOPMENT.md.j2",
         "antsibull-nox.toml.j2",
-        "docs/inventory/.gitkeep.j2",
         "extensions/molecule/README.md.j2",
         "extensions/molecule/default/inventory/hosts.yml.j2",
         "extensions/molecule/default/molecule.yml.j2",
@@ -507,7 +506,6 @@ def test_skeletons_enable_the_same_foundata_rules() -> None:
 def test_collection_default_lint_configuration() -> None:
     config = source_yaml(ROOT / "collection_default/.ansible-lint.j2")
     assert config["exclude_paths"] == [
-        "docs/",
         "tools/",
         ".cache/",
         ".git/",

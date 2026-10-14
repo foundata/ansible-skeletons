@@ -166,7 +166,7 @@ def build_collection(rendered: Rendered) -> Path:
         ".vscode/settings.json",
         "AGENTS.md",
         "stale.tar.gz",
-        "docs/inventory/sentinel.yml",
+        "tools/inventory/1.0.yml",
         "tools/sentinel.py",
         "tests/output/sentinel",
         ".cache/sentinel",
@@ -234,7 +234,6 @@ def build_collection(rendered: Rendered) -> Path:
                     (
                         "extensions/molecule/",
                         "scripts/",
-                        "docs/inventory",
                         "tools/",
                         "tests/output",
                         ".cache/",

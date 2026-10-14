@@ -65,8 +65,9 @@ the contract tests to the product.
 `foundata.utils` owns byte transport, deadlines, JSON decoding and safe error
 translation. Everything else is product-owned: the client, the definitions,
 the modules and documentation fragments, the fake product and the inventory
-extractor. The inventory under `docs/inventory/` is development evidence;
-nothing reads it at runtime.
+extractor. The extractor writes `tools/inventory/<series>.yml` beside itself.
+That inventory is development evidence: it never ships and nothing reads it
+at runtime.
 
 FIXME Add what this product decides and a reader of the code cannot see:
 which families use a handwritten lifecycle instead of a definition and why,
