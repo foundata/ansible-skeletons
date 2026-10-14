@@ -15,4 +15,5 @@
 
     - name: "Activate deletion"
       {{ namespace }}.{{ collection_name }}.fixture_apply:
-        verify: ["molecule_fixture_example"]
+        verify:
+          - "molecule_fixture_example"

@@ -19,6 +19,8 @@ archive_path_template: "./changelogs/fragments/archive"
 ignore_other_fragment_extensions: true
 prelude_section_name: "release_summary"
 prelude_section_title: "Release Summary"
+# antsibull-changelog writes these pairs as flow sequences; keep its form here.
+# yamllint disable rule:brackets
 sections:
   - ["major_changes", "Major Changes"]
   - ["minor_changes", "Minor Changes"]
@@ -28,6 +30,7 @@ sections:
   - ["security_fixes", "Security Fixes"]
   - ["bugfixes", "Bugfixes"]
   - ["known_issues", "Known Issues"]
+# yamllint enable rule:brackets
 title: "{{ namespace }}.{{ collection_name }} Ansible collection"
 trivial_section_name: "trivial"
 mention_ancestor: true

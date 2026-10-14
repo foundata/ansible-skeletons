@@ -17,7 +17,8 @@
 
     - name: "Activate the update"
       {{ namespace }}.{{ collection_name }}.fixture_apply:
-        verify: ["molecule_fixture_example"]
+        verify:
+          - "molecule_fixture_example"
       register: __testing_fixture_activated
 
     - name: "Assert the update became effective"

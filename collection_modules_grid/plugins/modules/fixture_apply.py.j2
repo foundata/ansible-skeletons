@@ -54,7 +54,8 @@ EXAMPLES = r"""
     api_key: "{% raw %}{{ fixture_api_key }}{% endraw %}"
     api_secret: "{% raw %}{{ fixture_api_secret }}{% endraw %}"
     activate: "auto"
-    verify: ["example"]
+    verify:
+      - "example"
 """
 
 RETURN = r"""

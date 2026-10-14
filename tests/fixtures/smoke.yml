@@ -78,8 +78,12 @@
 
     - name: "Populate only part of the required platform facts"
       ansible.builtin.setup:
-        gather_subset: ["!all", "!min", "distribution"]
-        filter: ["ansible_distribution"]
+        gather_subset:
+          - "!all"
+          - "!min"
+          - "distribution"
+        filter:
+          - "ansible_distribution"
 
     - name: "Verify partial fact fixture"
       ansible.builtin.assert:

@@ -16,4 +16,5 @@
     - name: "Converge active state"
       {{ namespace }}.{{ collection_name }}.fixture_apply:
         activate: "auto"
-        verify: ["molecule_fixture_example"]
+        verify:
+          - "molecule_fixture_example"

@@ -24,7 +24,9 @@ rules:
   line-length:
     max: 160
   truthy:
-    allowed-values: ["true", "false"]
+    allowed-values:
+      - "true"
+      - "false"
     level: "error"
   quoted-strings:
     quote-type: "double"
@@ -37,6 +39,8 @@ rules:
   braces:
     min-spaces-inside: 0
     max-spaces-inside: 1
+  brackets:
+    forbid: "non-empty"
   octal-values:
     forbid-implicit-octal: true
     forbid-explicit-octal: true
