@@ -1,22 +1,377 @@
-# API scenario
+# Molecule tests
 
 <!--
 SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
-FIXME Adapt the environment names and resource tasks to the product.
-Prepare an authorized endpoint and a JSON credentials file containing `key`
-and `secret`. The scenario owns only records prefixed `molecule_fixture_`.
+This directory contains the
+[Molecule](https://docs.ansible.com/projects/molecule/) scenario of this
+collection. `default` runs the modules on the control node against an API
+endpoint you provide. It creates and changes only records whose names start with
+`molecule_fixture_`, and removes them again. It provisions nothing: the
+endpoint, its automation account and its recovery are yours.
 
-```sh
-export MOLECULE_PRODUCT_URL=https://lab.example.invalid/api
-export MOLECULE_PRODUCT_CREDENTIALS=/path/to/credentials.json
+Paths are relative to this directory unless stated otherwise.
+
+
+
+## Table of contents
+
+- [Requirements](#requirements)
+- [Usage](#usage)
+  - [Run tests](#usage-testing)
+    - [Through nox](#usage-nox)
+    - [With Molecule directly](#usage-molecule)
+  - [Test sequence](#usage-sequence)
+  - [Write tests](#usage-add-tests)
+  - [Provision your own target](#usage-owned-target)
+    - [Container platforms (`type: "podman"`)](#usage-owned-podman)
+    - [VM platforms (`type: "libvirt"`)](#usage-owned-vm)
+    - [Access instance terminal](#usage-instance-access)
+- [FAQ, troubleshooting](#faq)
+  - [Molecule does not find the scenario](#faq-role-path-detection)
+  - [An aborted run left records behind](#faq-leftovers)
+  - [Certificate validation fails](#faq-tls)
+  - [Container: `inotify_init1(): Too many open files`](#faq-inotify)
+  - [VMs: Instance-to-instance networking](#faq-vm-multi-node)
+
+
+
+## Requirements<a id="requirements"></a>
+
+- [Molecule](https://docs.ansible.com/projects/molecule/installation/). The nox
+  session installs it; a direct run needs it in your Python environment.
+- An endpoint you may change, reachable over HTTPS from the control node. Use a
+  lab or a disposable instance, never a production system: the tests write
+  through the API.
+{# skeleton-variant: activation-requirement #}
+- No other writer on the endpoint during a run. Activation is global: the
+  tests' apply step also activates changes someone else saved and left pending.
+{# end skeleton-variant #}
+- An automation account with the privileges the collection README documents,
+  and a JSON file with its credentials, readable only by you and kept outside
+  the repository:
+
+  ```json
+  {"key": "<API key>", "secret": "<API secret>"}
+  ```
+
+FIXME Rename the `MOLECULE_PRODUCT_*` variables and the credential keys to the
+product, in `default/inventory/hosts.yml` and here.
+
+|             Variable              | Default | Purpose |
+| --------------------------------- | ------- | ------- |
+| `MOLECULE_PRODUCT_URL`            | (none)  | API base URL, for example `https://lab.example.com/api` |
+| `MOLECULE_PRODUCT_CREDENTIALS`    | (none)  | Path to the credentials file |
+| `MOLECULE_PRODUCT_VALIDATE_CERTS` | `true`  | `false` disables TLS certificate validation; see the [FAQ](#faq-tls) |
+
+
+
+## Usage<a id="usage"></a>
+
+### Run tests<a id="usage-testing"></a>
+
+#### Through nox<a id="usage-nox"></a>
+
+```bash
+export MOLECULE_PRODUCT_URL="https://lab.example.com/api"
+export MOLECULE_PRODUCT_CREDENTIALS="/path/to/credentials.json"
 uv run noxfile.py -s molecule
 ```
 
-Use a run-owned `ANSIBLE_HOME`, `XDG_CACHE_HOME` and collection path. The
-scenario runs locally against the supplied endpoint; it performs no host
-preparation. It verifies saved and active state, checks a changed value and
-removes its records. The shared provisioning playbooks remain available for
-a lab that owns its target; see the alternative in `default/molecule.yml`.
+The session installs the collection and the scenario requirements into a
+temporary tree, so it installs nothing into `~/.ansible`.
+Then it runs the complete [test sequence](#usage-sequence). Arguments after
+`--` go to Molecule, for example `uv run noxfile.py -s molecule -- converge`.
+With nox installed, `nox` replaces `uv run noxfile.py`. See
+[`DEVELOPMENT.md`](../../DEVELOPMENT.md) for the other checks.
+
+
+
+#### With Molecule directly<a id="usage-molecule"></a>
+
+Run Molecule from the collection's root directory with `MOLECULE_GLOB` set; the
+[FAQ](#faq-role-path-detection) explains why:
+
+```bash
+cd "/path/to/collection"
+export MOLECULE_GLOB="./{extensions/molecule,molecule}/*/molecule.yml"
+
+# The complete test sequence
+molecule test
+
+# Single steps while developing a test, with more Ansible output
+molecule -vvvv converge
+molecule verify
+molecule cleanup
+```
+
+Give parallel runs their own `ANSIBLE_HOME`, `XDG_CACHE_HOME` and collections
+path, so that they do not share installed collections or caches.
+
+
+
+### Test sequence<a id="usage-sequence"></a>
+
+`molecule test` runs these steps against the endpoint, without create, prepare
+or destroy:
+
+|     Step      | What it does |
+| ------------- | ------------ |
+| `syntax`      | Checks the playbooks. |
+| `cleanup`     | Removes records an aborted earlier run left behind. |
+| `converge`    | Creates the fixture records. |
+| `idempotence` | Runs converge again; any reported change fails the test. |
+| `verify`      | Reads the saved state back and asserts it. |
+| `side_effect` | Changes a value and asserts the update and its diff. |
+| `cleanup`     | Removes the fixture records. |
+
+{# skeleton-variant: activation-sequence #}
+`converge`, `side_effect` and `cleanup` run
+`{{ namespace }}.{{ collection_name }}.fixture_apply` after saving, so each change
+also becomes active. `verify` compares the effective state with the
+saved state in check mode, without writing. With `activate: "auto"`, the apply
+module changes nothing when both already match, so `idempotence` stays clean.
+
+{# end skeleton-variant #}
+
+
+### Write tests<a id="usage-add-tests"></a>
+
+The playbooks in `shared/playbooks/` run each step. Each step also includes the
+task files of a directory under `default/tasks/`, in alphabetical order:
+
+|      Directory       | Use |
+| -------------------- | --- |
+| `tasks/converge/`    | Bring the fixture records to their declared state. Failing tasks already fail the test. |
+| `tasks/verify/`      | Read the state independently, with an info module or check mode, and assert it. |
+| `tasks/side_effect/` | Change the fixtures and assert the reported change. |
+| `tasks/cleanup/`     | Remove the fixture records. It also runs first, so absence is not an error. |
+
+The `fixture.yml` files exercise the skeleton's example module; replace them
+with the product's resources. Set the connection once per block with
+`module_defaults` for the `{{ namespace }}.{{ collection_name }}.api` action
+group and the `product_connection` inventory variable. When adding tests:
+
+- Name every record with the `molecule_fixture_` prefix and touch nothing else
+  on the endpoint.
+- Assert what the product reports, not only what the module returned.
+- Tag a task `molecule-idempotence-notest` only when it acts on every call by
+  design; Molecule then skips it in the `idempotence` step.
+
+Project-specific tests stay in `default/tasks/`. You can therefore update the
+rest of this directory from a newer rendered skeleton of
+[foundata/ansible-skeletons](https://github.com/foundata/ansible-skeletons)
+without losing them.
+
+
+
+### Provision your own target<a id="usage-owned-target"></a>
+
+When the scenario should own its target, for example a containerized product or
+a virtual appliance, the shared playbooks also provide create, prepare and
+destroy for Podman containers and QEMU/KVM virtual machines. In
+`default/molecule.yml`:
+
+1. Set `managed: true`.
+2. Enable the commented `create`, `prepare` and `destroy` playbooks and add
+   those steps to `test_sequence`.
+3. Declare the platforms. Each platform selects its backend with the `type`
+   key: `"podman"` for a container, which is also the default without a `type`
+   key, or `"libvirt"` for a QEMU/KVM virtual machine. One run can mix
+   containers and virtual machines.
+
+Put setup tasks into `default/tasks/prepare/all.yml` for all instances, or into
+`default/tasks/prepare/<instance name>.yml` for one. `default/requirements.yml`
+already lists the collections both backends use.
+
+```bash
+# Test one platform, keep its instance, then destroy it when done
+molecule test --platform-name="<name>" --destroy="never"
+molecule list
+molecule destroy
+```
+
+
+
+#### Container platforms (`type: "podman"`)<a id="usage-owned-podman"></a>
+
+Container platforms need [Podman](https://podman.io/docs/installation). Set
+`MOLECULE_PODMAN_EXECUTABLE` to use another Podman binary than `podman`.
+
+
+
+#### VM platforms (`type: "libvirt"`)<a id="usage-owned-vm"></a>
+
+Virtual machine platforms need:
+
+1. libvirt with the QEMU driver and client, the QEMU tools and
+   [passt](https://passt.top/):
+
+   ```bash
+   # Fedora
+   sudo dnf install libvirt-daemon-driver-qemu libvirt-client qemu-kvm qemu-img passt
+
+   # Debian, Ubuntu
+   sudo apt install libvirt-daemon libvirt-clients qemu-system-x86 qemu-utils passt
+   ```
+
+   The scenario uses the libvirt user session (`qemu:///session`), which needs
+   no root privileges and no membership in the `libvirt` group.
+2. Access to `/dev/kvm`. Users logged in locally on Fedora, Debian and Ubuntu
+   have it by default. Headless sessions on Debian and Ubuntu, such as SSH
+   sessions or CI runners, also need membership in the `kvm` group
+   (`sudo usermod -aG kvm <user>`, then log in again).
+3. The [`pycdlib`](https://pypi.org/project/pycdlib/) Python package in
+   Molecule's Python environment. It builds the cloud-init NoCloud seed ISO
+   images:
+
+   ```bash
+   pip install "pycdlib"
+
+   # or with uv
+   uv pip install "pycdlib"
+   ```
+
+Virtual machines boot vendor cloud images in the libvirt user session with
+passt user networking, which needs no root privileges, no `libvirt` group
+membership and no polkit rules.
+
+Virtual machines need far more resources than containers. On smaller machines,
+test one platform at a time with `--platform-name`. A resource guard stops the
+`create` step early when the requested memory plus a host reserve exceeds the
+available memory, or when the image cache runs low on disk space.
+
+The first run downloads each cloud image (qcow2, several hundred MiB) into the
+image cache. Deleting the cache is safe; the scenario downloads missing images
+again.
+
+|            Variable            |                  Default                   | Purpose |
+| ------------------------------ | ------------------------------------------ | ------- |
+| `MOLECULE_VM_LIBVIRT_URI`      | `qemu:///session`                          | libvirt connection URI |
+| `MOLECULE_VM_CACHE_DIR`        | `~/.cache/ansible-molecule-libvirt/images` | Cloud image cache directory |
+| `MOLECULE_VM_REFRESH_IMAGES`   | (unset)                                    | Set to `1` to download the cached cloud images again |
+| `MOLECULE_VM_IGNORE_RESOURCES` | (unset)                                    | Set to `1` to skip the memory and disk space guard |
+
+If an instance does not come up:
+
+- Read its boot console log, `vm/<name>/console.log` in Molecule's ephemeral
+  directory (usually `~/.ansible/tmp/molecule.*.default/`).
+- List the domain states: `virsh --connect 'qemu:///session' list --all`
+- Ask the guest agent for the IP address:
+  `virsh --connect 'qemu:///session' domifaddr '<name>' --source agent`
+- Watch the boot output of each instance in
+  [`virt-manager`](https://virt-manager.org/), connected to `qemu:///session`.
+
+
+
+#### Access instance terminal<a id="usage-instance-access"></a>
+
+`molecule login` opens a shell in a running instance, for example one kept with
+`--destroy="never"`. It works for containers and virtual machines:
+
+```bash
+molecule list
+molecule login --host "<name>"
+```
+
+
+
+## FAQ, troubleshooting<a id="faq"></a>
+
+### Molecule does not find the scenario<a id="faq-role-path-detection"></a>
+
+Without `MOLECULE_GLOB`, Molecule looks for `molecule/*/molecule.yml` in the
+working directory. Recent releases use `extensions/molecule/*/molecule.yml`
+instead when the working directory contains a valid `galaxy.yml`. Setting the
+variable and running from the collection's root works with both, and lets
+Molecule install the current version of the collection on each run:
+
+```bash
+MOLECULE_GLOB="./{extensions/molecule,molecule}/*/molecule.yml" molecule list
+```
+
+Further reading:
+[`molecule/command/base.py`](https://github.com/ansible/molecule/blob/main/src/molecule/command/base.py),
+issues [4015](https://github.com/ansible/molecule/issues/4015),
+[4017](https://github.com/ansible/molecule/issues/4017),
+[4040](https://github.com/ansible/molecule/issues/4040),
+[4061](https://github.com/ansible/molecule/issues/4061) and pull request
+[4177](https://github.com/ansible/molecule/pull/4177).
+
+
+
+### An aborted run left records behind<a id="faq-leftovers"></a>
+
+The next `molecule test` removes them in its first `cleanup` step. To remove
+them without testing, run `molecule cleanup`. Records without the
+`molecule_fixture_` prefix are never touched; anything else a failed test
+changed on the endpoint is for you to inspect.
+
+
+
+### Certificate validation fails<a id="faq-tls"></a>
+
+The control node must trust the endpoint's certificate. Add your private
+certificate authority to the system trust store of the control node. Set
+`MOLECULE_PRODUCT_VALIDATE_CERTS=false` only for a disposable lab endpoint on a
+network you control: the credentials then travel to an unverified peer.
+
+
+
+### Container: `inotify_init1(): Too many open files`<a id="faq-inotify"></a>
+
+If not all platform instances start in parallel, start fewer containers at once
+with `--platform-name`, or raise the inotify limits:
+
+```bash
+# Inspect
+sysctl fs.inotify
+
+# Test higher values until the next reboot (example: 512, 524288)
+echo 512 | sudo tee /proc/sys/fs/inotify/max_user_instances
+echo 524288 | sudo tee /proc/sys/fs/inotify/max_user_watches
+
+# Keep them across reboots
+echo "fs.inotify.max_user_instances=512" | sudo tee -a /etc/sysctl.conf
+echo "fs.inotify.max_user_watches=524288" | sudo tee -a /etc/sysctl.conf
+sudo sysctl -p
+```
+
+To debug, keep the instances, find the stopped container and start it with
+debug logging. Keep the complete output of the failing command:
+
+```bash
+# Reproduce the resource limit
+molecule test --destroy="never"
+
+# Inspect
+podman images
+podman ps --all --no-trunc
+podman --log-level debug start <container-id>
+```
+
+
+
+### VMs: Instance-to-instance networking<a id="faq-vm-multi-node"></a>
+
+Virtual machine instances cannot reach each other. [passt](https://passt.top/)
+gives every instance its own isolated user-space network stack, and the host
+reaches the instances through SSH port forwards. The shared playbooks do not
+implement or support traffic between instances.
+
+A scenario that needs it would have to use bridged networking through the
+setuid `qemu-bridge-helper`
+(`<interface type='bridge'><source bridge='virbr0'/>`). That confines the
+privilege to one narrow, audited helper binary instead of making the whole user
+session equivalent to root:
+
+- **Fedora** ships everything needed (`/etc/qemu/bridge.conf` containing
+  `allow virbr0`, setuid helper). One-time setup:
+  `sudo virsh --connect 'qemu:///system' net-start default && sudo virsh --connect 'qemu:///system' net-autostart default`.
+- **Debian and Ubuntu** deliberately ship the helper without setuid and without
+  a `bridge.conf`. You would need
+  `sudo dpkg-statoverride --update --add root root 4755 /usr/lib/qemu/qemu-bridge-helper`
+  and to create `/etc/qemu/bridge.conf` with the content `allow virbr0`
+  yourself. This changes the system's security posture; consider it carefully.
