@@ -309,10 +309,10 @@ infrastructure coverage. It is reviewed against the
 Module skeleton checks run on the default lane; their rendered collections carry
 their own lanes.
 
-ansible-core before 2.19 cannot run the rendered content: the templates write
-Jinja's own filters and tests as `ansible.builtin.<name>`, which ansible-core
-resolves from 2.19. The development helpers require Python 3.12 or newer;
-consumers only need Ansible and its supported Python runtime.
+**ansible-core before 2.19 cannot run the rendered content:** the templates
+write Jinja's own filters and tests as `ansible.builtin.<name>`, which
+ansible-core resolves from 2.19. The development helpers require Python 3.12 or
+newer; consumers only need Ansible and its supported Python runtime.
 
 The following versions are known to be problematic:
 
