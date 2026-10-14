@@ -41,6 +41,7 @@ and the project adheres to
 
 ### Changed
 
+- All skeletons: `.gitattributes` uses the guide's wording.
 - collection_modules, collection_modules_grid: the shared `_activation.py`
   docstring states the lost-reply rule: verification continues only when a
   named object drifted before, and `always` on objects already in sync ends
