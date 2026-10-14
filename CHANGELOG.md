@@ -34,6 +34,11 @@ and the project adheres to
 
 ### Changed
 
+- collection_modules, collection_modules_grid: the README's Example section is
+  a Usage section, one subsection per administration task with the tasks of
+  one runnable example, the play shown once.
+- All skeletons: `.yamllint` forbids non-empty flow sequences; lists are
+  written one item per line, as the playbook guide says.
 - All skeletons: `.gitattributes` uses the guide's wording.
 - collection_modules, collection_modules_grid: the shared `_activation.py`
   docstring states the lost-reply rule: verification continues only when a
