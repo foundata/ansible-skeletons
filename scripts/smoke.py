@@ -7,6 +7,8 @@ import importlib.metadata
 import json
 import os
 import re
+import runpy
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -278,6 +280,19 @@ def build_collection(rendered: Rendered) -> Path:
         cwd=rendered.work,
         env=rendered.env,
     )
+    installed = (
+        Path(rendered.env["ANSIBLE_COLLECTIONS_PATH"])
+        / "ansible_collections"
+        / rendered.collection.parent.name
+        / rendered.collection.name
+    )
+    # Test fixtures stay outside the stripped collection; runtime code does not.
+    if (installed / "tests").is_dir():
+        shutil.copytree(installed / "tests", rendered.work / "artifact-tests")
+    checker = runpy.run_path(str(rendered.collection / "tests/runtime_check.py"))
+    checker["strip_runtime"](installed)
+    rendered.env["ANSIBLE_COLLECTIONS_SCAN_SYS_PATH"] = "false"
+    rendered.env["PYTHONPATH"] = ""
     return archive
 
 
@@ -428,7 +443,9 @@ def exercise_modules(rendered: Rendered) -> None:
         cwd=rendered.work,
         env={
             **rendered.env,
-            "ANSIBLE_ROLES_PATH": str(installed / "tests/integration/targets"),
+            "ANSIBLE_ROLES_PATH": str(
+                rendered.work / "artifact-tests/integration/targets"
+            ),
         },
     )
 

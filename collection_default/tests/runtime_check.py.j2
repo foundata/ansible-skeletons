@@ -1,0 +1,358 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Check a built collection with only its four runtime directories installed."""
+
+from __future__ import annotations
+
+import argparse
+import ast
+import importlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tarfile
+import tempfile
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
+RUNTIME_DIRECTORIES = frozenset(("meta", "plugins", "roles", "playbooks"))
+
+
+def strip_runtime(collection: Path) -> None:
+    """Prune an installed copy, refusing links outside its retained content."""
+    if collection.is_symlink() or not collection.is_dir():
+        raise ValueError(f"Not an installed collection directory: {collection}")
+    for path in collection.iterdir():
+        if path.name in RUNTIME_DIRECTORIES:
+            if path.is_symlink() or not path.is_dir():
+                raise ValueError(f"Runtime directory is not a real directory: {path}")
+        elif path.is_dir() and not path.is_symlink():
+            shutil.rmtree(path)
+        else:
+            path.unlink()
+    for path in collection.rglob("*"):
+        if path.is_symlink() and not path.resolve(strict=True).is_relative_to(
+            collection.resolve()
+        ):
+            raise ValueError(f"Runtime link escapes the installed collection: {path}")
+
+
+def isolated_environment(work: Path, collections: Path) -> dict[str, str]:
+    """Do not inherit collection, plugin, Python or pytest lookup paths."""
+    env = {
+        name: value
+        for name, value in os.environ.items()
+        if not name.startswith(("ANSIBLE_", "PYTHON", "PYTEST_"))
+    }
+    home = work / "home"
+    home.mkdir()
+    config = work / "ansible.cfg"
+    config.write_text("[defaults]\n", encoding="utf-8")
+    return {
+        **env,
+        "HOME": str(home),
+        "ANSIBLE_CONFIG": str(config),
+        "ANSIBLE_COLLECTIONS_PATH": str(collections),
+        "ANSIBLE_COLLECTIONS_SCAN_SYS_PATH": "false",
+        "ANSIBLE_ROLES_PATH": str(work / "empty-roles"),
+        "ANSIBLE_LOCAL_TEMP": str(work / "ansible-tmp"),
+        "PYTHONPATH": str(collections),
+        "PYTHONNOUSERSITE": "1",
+        "PYTHONSAFEPATH": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    }
+
+
+def run(command: list[str], work: Path, env: dict[str, str]) -> str:
+    """Keep diagnostics on failure and bound each check's execution time."""
+    print("+ " + " ".join(command), flush=True)
+    result = subprocess.run(
+        command, cwd=work, env=env, text=True, capture_output=True, timeout=1800
+    )
+    if result.returncode:
+        raise RuntimeError(result.stdout + result.stderr)
+    return result.stdout
+
+
+def collection_identity(archive: Path) -> tuple[str, str]:
+    """Use the built artifact's identity, not the checkout's version metadata."""
+    with tarfile.open(archive) as bundle:
+        stream = bundle.extractfile("MANIFEST.json")
+        if stream is None:
+            raise ValueError("The collection archive has no MANIFEST.json")
+        with stream:
+            metadata = json.load(stream)["collection_info"]
+    namespace, name = metadata["namespace"], metadata["name"]
+    if any(
+        not isinstance(value, str) or not re.fullmatch(r"[a-z][a-z0-9_]*", value)
+        for value in (namespace, name)
+    ):
+        raise ValueError("Invalid collection identity in artifact")
+    return namespace, name
+
+
+def copy_dependencies(
+    source: Path, destination: Path, identity: tuple[str, str]
+) -> None:
+    """Materialize prepared dependencies without a second copy of the subject."""
+    tree = source / "ansible_collections"
+    if not tree.is_dir():
+        raise ValueError(f"Missing prepared dependency tree: {tree}")
+    for namespace in sorted(tree.iterdir()):
+        if not namespace.is_dir():
+            continue
+        for collection in sorted(namespace.iterdir()):
+            if not collection.is_dir() or (namespace.name, collection.name) == identity:
+                continue
+            target = (
+                destination / "ansible_collections" / namespace.name / collection.name
+            )
+            shutil.copytree(
+                collection,
+                target,
+                ignore=shutil.ignore_patterns(".git", ".nox", ".venv", "__pycache__"),
+            )
+
+
+def check_origins(collection: Path, fqcn: str) -> int:
+    """Reject Python imports resolved from an unstripped or ambient collection."""
+    prefix = f"ansible_collections.{fqcn}"
+    count = 0
+    for name, module in tuple(sys.modules.items()):
+        if name != prefix and not name.startswith(prefix + "."):
+            continue
+        filename = getattr(module, "__file__", None)
+        paths = [filename] if filename else list(getattr(module, "__path__", ()))
+        for path in paths:
+            if not Path(path).resolve().is_relative_to(collection.resolve()):
+                raise ValueError(
+                    f"{name} resolved outside the stripped artifact: {path}"
+                )
+        if filename:
+            count += 1
+    return count
+
+
+def probe(collection: Path, fqcn: str) -> None:
+    """Import delivered Python code without executing module entry points."""
+    paths = sorted((collection / "plugins").rglob("*.py"))
+    for path in paths:
+        parts = path.relative_to(collection).with_suffix("").parts
+        if parts[-1] == "__init__":
+            parts = parts[:-1]
+        importlib.import_module(".".join(("ansible_collections", fqcn, *parts)))
+    check_origins(collection, fqcn)
+    print(f"Imported {len(paths)} Python files from the stripped artifact")
+
+
+def unit_tests(collection: Path, fqcn: str, harness: Path) -> None:
+    """Reuse runtime tests outside the collection; never restore tests inside it."""
+    import pytest
+
+    sys.path.insert(0, str(harness))
+    report = harness / "unit-results.xml"
+    result = pytest.main(
+        [
+            str(harness / "_runtime_tests/unit"),
+            "--import-mode=importlib",
+            "-q",
+            "-p",
+            "no:cacheprovider",
+            f"--rootdir={harness}",
+            f"--junitxml={report}",
+        ]
+    )
+    if result:
+        raise RuntimeError(f"Installed-artifact unit tests failed: {result}")
+    if not check_origins(collection, fqcn):
+        raise ValueError("Unit tests imported no code from the stripped artifact")
+    suites = list(ET.parse(report).getroot().iter("testsuite"))
+    if sum(int(s.get("tests", "0")) - int(s.get("skipped", "0")) for s in suites) <= 0:
+        raise ValueError("Installed-artifact unit tests executed no cases")
+
+
+def copy_test_fixtures(collection: Path, harness: Path, fqcn: str) -> None:
+    """Relocate only test imports; do not expose a collection.tests fallback."""
+    source = collection / "tests"
+    if not source.is_dir():
+        return
+    destination = harness / "_runtime_tests"
+    shutil.copytree(source, destination)
+    (destination / "__init__.py").touch()
+    prefix = f"ansible_collections.{fqcn}.tests"
+    for path in destination.rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        changed = False
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.ImportFrom)
+                and node.module
+                and (node.module == prefix or node.module.startswith(prefix + "."))
+            ):
+                node.module = "_runtime_tests" + node.module[len(prefix) :]
+                changed = True
+        if changed:
+            path.write_text(ast.unparse(tree) + "\n", encoding="utf-8")
+
+
+def check_docs(collection: Path, fqcn: str, work: Path, env: dict[str, str]) -> None:
+    """Require module documentation and role loading from the retained files."""
+    modules = collection / "plugins/modules"
+    expected = {
+        fqcn + "." + ".".join(path.relative_to(modules).with_suffix("").parts): path
+        for path in modules.rglob("*.py")
+        if path.name != "__init__.py"
+    }
+    if expected:
+        documents = json.loads(
+            run(["ansible-doc", "--json", *sorted(expected)], work, env)
+        )
+        if set(documents) != set(expected):
+            raise ValueError("ansible-doc omitted or added module entries")
+        for name, path in expected.items():
+            filename = documents[name].get("doc", {}).get("filename", "")
+            if Path(filename).resolve() != path.resolve():
+                raise ValueError(
+                    f"ansible-doc resolved {name} outside the stripped artifact"
+                )
+    roles = sorted(path for path in (collection / "roles").glob("*") if path.is_dir())
+    for role in roles:
+        name = f"{fqcn}.{role.name}"
+        documents = json.loads(
+            run(["ansible-doc", "-t", "role", "--json", name], work, env)
+        )
+        if name not in documents:
+            raise ValueError(f"ansible-doc omitted role {name}")
+        play = work / "role-syntax.json"
+        play.write_text(
+            json.dumps(
+                [{"hosts": "localhost", "gather_facts": False, "roles": [name]}]
+            ),
+            encoding="utf-8",
+        )
+        run(
+            ["ansible-playbook", "-i", "localhost,", "--syntax-check", str(play)],
+            work,
+            env,
+        )
+    print(f"Checked documentation/loading: {len(expected)} modules, {len(roles)} roles")
+
+
+def check(artifact: Path | None, dependencies: Path) -> None:
+    """Build or reuse an archive, install it, strip it and run isolated checks."""
+    project = Path(__file__).resolve().parents[1]
+    with tempfile.TemporaryDirectory(prefix="collection-runtime-") as directory:
+        work = Path(directory)
+        collections = work / "collections"
+        env = isolated_environment(work, collections)
+        if artifact is None:
+            output = work / "dist"
+            output.mkdir()
+            run(
+                [
+                    "ansible-galaxy",
+                    "collection",
+                    "build",
+                    str(project),
+                    "--output-path",
+                    str(output),
+                ],
+                work,
+                env,
+            )
+            archives = list(output.glob("*.tar.gz"))
+            if len(archives) != 1:
+                raise ValueError("Expected exactly one built collection archive")
+            artifact = archives[0]
+        identity = collection_identity(artifact)
+        copy_dependencies(dependencies, collections, identity)
+        run(
+            [
+                "ansible-galaxy",
+                "collection",
+                "install",
+                "--no-deps",
+                "-p",
+                str(collections),
+                str(artifact),
+            ],
+            work,
+            env,
+        )
+        collection = collections / "ansible_collections" / identity[0] / identity[1]
+        harness = work / "harness"
+        harness.mkdir()
+        fqcn = ".".join(identity)
+        # Tests and their documentation fixtures are exempt from the boundary.
+        # Their code imports must still resolve to the stripped installation.
+        copy_test_fixtures(collection, harness, fqcn)
+        if (collection / "README.md").is_file():
+            shutil.copyfile(collection / "README.md", harness / "README.md")
+        strip_runtime(collection)
+        for name in RUNTIME_DIRECTORIES:
+            if (collection / name).is_dir():
+                (harness / name).symlink_to(collection / name, target_is_directory=True)
+        runner = work / "runtime_check.py"
+        shutil.copyfile(__file__, runner)
+        print(
+            run(
+                [sys.executable, str(runner), "--probe", str(collection), fqcn],
+                work,
+                env,
+            )
+        )
+        check_docs(collection, fqcn, work, env)
+        if any((harness / "_runtime_tests/unit").rglob("test_*.py")):
+            print(
+                run(
+                    [
+                        sys.executable,
+                        str(runner),
+                        "--units",
+                        str(collection),
+                        fqcn,
+                        str(harness),
+                    ],
+                    work,
+                    env,
+                )
+            )
+        if {path.name for path in collection.iterdir()} - RUNTIME_DIRECTORIES:
+            raise ValueError("A check restored files outside the runtime boundary")
+        print(f"Runtime boundary passed: {fqcn}")
+
+
+def main() -> None:
+    """Run through Nox, or supply an existing release artifact explicitly."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--artifact", type=Path)
+    parser.add_argument("--dependencies", type=Path)
+    parser.add_argument(
+        "--probe", nargs=2, metavar=("COLLECTION", "FQCN"), help=argparse.SUPPRESS
+    )
+    parser.add_argument(
+        "--units",
+        nargs=3,
+        metavar=("COLLECTION", "FQCN", "HARNESS"),
+        help=argparse.SUPPRESS,
+    )
+    args = parser.parse_args()
+    if args.probe:
+        probe(Path(args.probe[0]), args.probe[1])
+    elif args.units:
+        unit_tests(Path(args.units[0]), args.units[1], Path(args.units[2]))
+    elif args.dependencies is None:
+        parser.error("--dependencies is required (Nox supplies its prepared tree)")
+    else:
+        check(
+            args.artifact.resolve() if args.artifact else None,
+            args.dependencies.resolve(),
+        )
+
+
+if __name__ == "__main__":
+    main()

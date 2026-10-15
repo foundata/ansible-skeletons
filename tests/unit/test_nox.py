@@ -31,6 +31,8 @@ def noxfile(
     ) -> Callable[[Callable[[Mock], None]], Callable[[Mock], None]]:
         if "packages" in kwargs:
             installed_packages.append(kwargs["packages"])
+        if kwargs.get("name") == "runtime-check":
+            assert kwargs["default"] is True
         return lambda function: function
 
     nox = ModuleType("nox")
@@ -57,6 +59,35 @@ def noxfile(
 @pytest.fixture
 def lint_session(noxfile: dict[str, object]) -> Callable[[Mock], None]:
     return cast(Callable[[Mock], None], noxfile["ansible_lint"])
+
+
+@pytest.mark.parametrize(
+    "noxfile",
+    ["collection_default", "collection_modules", "collection_modules_grid"],
+    indirect=True,
+)
+def test_runtime_check_passes_prepared_dependencies_and_artifact(
+    noxfile: dict[str, object], tmp_path: Path
+) -> None:
+    (tmp_path / "requirements.txt").touch()
+    (tmp_path / "tests/unit").mkdir(parents=True)
+    (tmp_path / "tests/unit/requirements.txt").touch()
+    session = MagicMock()
+    session.posargs = ["--artifact", "/release/collection.tar.gz"]
+    check = cast(Callable[[Mock], None], noxfile["runtime_check"])
+    check(session)
+    assert [call.args for call in session.install.call_args_list] == [
+        ("-r", "requirements.txt"),
+        ("-r", "tests/unit/requirements.txt"),
+    ]
+    session.run.assert_called_once_with(
+        "python",
+        "tests/runtime_check.py",
+        "--dependencies",
+        str(tmp_path / "collections"),
+        "--artifact",
+        "/release/collection.tar.gz",
+    )
 
 
 @pytest.mark.parametrize(

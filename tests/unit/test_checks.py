@@ -334,6 +334,7 @@ SHARED_FILES = {
         "requirements-dev.txt.j2",
         "ruff.toml.j2",
         "tests/config.yml.j2",
+        "tests/runtime_check.py.j2",
     ),
     "module_skeletons": (
         ".mypy.ini.j2",
@@ -709,6 +710,7 @@ def test_helper_session_covers_all_roots_without_executing_files(
         "roles/second/files/nested/guard.py",
         "tools/inventory/extract.py",
         "scripts/maintenance.py",
+        "tests/runtime_check.py",
     ]
     for name in paths:
         path = tmp_path / name
@@ -719,10 +721,11 @@ def test_helper_session_covers_all_roots_without_executing_files(
     session = HelperSession()
     load_helper_session(helper_project, check_only=True)(session)
     assert len(session.commands) == 3
-    assert set(session.commands[0][-5:]) == {
+    assert set(session.commands[0][-6:]) == {
         "extensions/molecule",
         "tools",
         "scripts",
+        "tests/runtime_check.py",
         "roles/first/files",
         "roles/second/files",
     }

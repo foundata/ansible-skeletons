@@ -47,6 +47,10 @@ def check_static() -> None:
         "tests",
         "collection_default/noxfile.py.j2",
         *[f"{profile}/noxfile.py.j2" for profile in MODULE_PROFILES],
+        *[
+            f"{profile}/tests/runtime_check.py.j2"
+            for profile in ("collection_default", *MODULE_PROFILES)
+        ],
     ]
     run(["ruff", "format", "--check", "--extension", "j2:python", *sources])
     run(["ruff", "check", "--extension", "j2:python", *sources])

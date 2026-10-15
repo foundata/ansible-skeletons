@@ -16,6 +16,12 @@ and the project adheres to
 
 ### Added
 
+- collection_default, collection_modules, collection_modules_grid: a default
+  `runtime-check` Nox session checks a built artifact with only `meta/`,
+  `plugins/`, `roles/` and `playbooks/` retained. It checks imports,
+  documentation and role syntax, and runs existing unit tests outside the
+  stripped collection. Skeleton runtime smoke tests also use the stripped
+  installation.
 - collection_default, collection_modules, collection_modules_grid:
   `requirements-dev.txt` requires `releasing>=7.0.0`, whose `release build`
   runs sanity tests on the committed revision before building the archive.

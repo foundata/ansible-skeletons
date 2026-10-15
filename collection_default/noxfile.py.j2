@@ -72,6 +72,23 @@ def _prepare(session: nox.Session) -> dict[str, str]:
     return {"ANSIBLE_COLLECTIONS_PATH": str(prepared.current_place)}
 
 
+@nox.session(name="runtime-check", default=True)
+@antsibull_nox.sessions.install_packages(packages=["ansible-core", "pytest"])
+def runtime_check(session: nox.Session) -> None:
+    """Check the built artifact with only its runtime directories retained."""
+    env = _prepare(session)
+    for requirements in ("requirements.txt", "tests/unit/requirements.txt"):
+        if Path(requirements).is_file():
+            session.install("-r", requirements)
+    session.run(
+        "python",
+        "tests/runtime_check.py",
+        "--dependencies",
+        env["ANSIBLE_COLLECTIONS_PATH"],
+        *session.posargs,
+    )
+
+
 @nox.session(name="ansible-lint", default=True)
 @antsibull_nox.sessions.install_packages(packages=["ansible-lint-foundata"])
 def ansible_lint(session: nox.Session) -> None:
@@ -140,11 +157,12 @@ def helper_lint(session: nox.Session) -> None:
         Path("extensions/molecule"),
         Path("tools"),
         Path("scripts"),
+        Path("tests/runtime_check.py"),
         *sorted(Path("roles").glob("*/files")),
     ]
-    roots = [str(candidate) for candidate in candidates if candidate.is_dir()]
+    roots = [str(candidate) for candidate in candidates if candidate.exists()]
     if not roots:
-        session.skip("No Python helper directories found")
+        session.skip("No Python helpers found")
     options = [
         "--config",
         "ruff.toml",
