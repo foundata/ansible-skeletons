@@ -14,6 +14,11 @@ and the project adheres to
 
 ## [Unreleased]
 
+- Nothing worth mentioning right now.
+
+
+## [2.10.0] - 2026-10-15
+
 ### Added
 
 - collection_default, collection_modules, collection_modules_grid,
@@ -484,7 +489,8 @@ and the project adheres to
 - All functionality and files, `role_default`
 
 
-[unreleased]: https://github.com/foundata/ansible-skeletons/compare/v2.9.0...HEAD
+[unreleased]: https://github.com/foundata/ansible-skeletons/compare/v2.10.0...HEAD
+[2.10.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.10.0
 [2.9.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.9.0
 [2.8.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.8.0
 [2.7.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.7.0
