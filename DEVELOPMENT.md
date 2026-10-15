@@ -337,7 +337,9 @@ skeleton-specific gate (`scripts/release.py check`).
 
    `release verify` checks that the remote holds the tag and that the forge
    reports it as latest. The helper then clones the tag anonymously and runs
-   rendering, build, installation and role smoke tests on that clone. At any
+   rendering, build, installation and role smoke tests on that clone,
+   including the module skeletons' Molecule scenario against the fake product.
+   No container or VM starts, but the run takes several minutes. At any
    point, `uv run --locked release status "${version}"` reports where the
    release stands.
 
