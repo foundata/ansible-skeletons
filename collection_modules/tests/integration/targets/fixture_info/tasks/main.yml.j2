@@ -63,14 +63,18 @@
     - name: "Read the updated fixture twice"
       {{ namespace }}.{{ collection_name }}.fixture_info:
         name: "integration_info"
-      loop: [1, 2]
+      loop:
+        - 1
+        - 2
       register: __fixture_info_repeated
 
     - name: "Delete the fixture twice"
       {{ namespace }}.{{ collection_name }}.fixture:
         name: "integration_info"
         state: "absent"
-      loop: [1, 2]
+      loop:
+        - 1
+        - 2
       register: __fixture_info_deleted
 
     - name: "Read the deleted fixture"

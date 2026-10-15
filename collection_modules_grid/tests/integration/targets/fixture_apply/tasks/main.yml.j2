@@ -15,19 +15,22 @@
 
     - name: "Predict activation"
       {{ namespace }}.{{ collection_name }}.fixture_apply:
-        verify: ["integration_apply"]
+        verify:
+          - "integration_apply"
       check_mode: true
       register: __fixture_apply_prediction
 
     - name: "Activate the family"
       {{ namespace }}.{{ collection_name }}.fixture_apply:
         activate: "auto"
-        verify: ["integration_apply"]
+        verify:
+          - "integration_apply"
       register: __fixture_apply_first
 
     - name: "Repeat activation"
       {{ namespace }}.{{ collection_name }}.fixture_apply:
-        verify: ["integration_apply"]
+        verify:
+          - "integration_apply"
       register: __fixture_apply_second
 
     - name: "Verify activation converges"
@@ -48,7 +51,8 @@
 
     - name: "Reject a wrong activation credential"
       {{ namespace }}.{{ collection_name }}.fixture_apply:
-        verify: ["integration_apply"]
+        verify:
+          - "integration_apply"
         api_secret: "WRONG-SYNTHETIC-SECRET"
       ignore_errors: true
       register: __fixture_apply_denied
@@ -62,7 +66,8 @@
 
     - name: "Activate the update"
       {{ namespace }}.{{ collection_name }}.fixture_apply:
-        verify: ["integration_apply"]
+        verify:
+          - "integration_apply"
       register: __fixture_apply_updated
 
     - name: "Verify failures and update"
@@ -83,7 +88,8 @@
 
     - name: "Activate deletion"
       {{ namespace }}.{{ collection_name }}.fixture_apply:
-        verify: ["integration_apply"]
+        verify:
+          - "integration_apply"
       register: __fixture_apply_deleted
 
     - name: "Verify deletion became effective"
@@ -100,7 +106,8 @@
 
     - name: "Repeat deletion activation"
       {{ namespace }}.{{ collection_name }}.fixture_apply:
-        verify: ["integration_apply"]
+        verify:
+          - "integration_apply"
       register: __fixture_apply_settled
 
     - name: "Verify repeated deletion is unchanged"
