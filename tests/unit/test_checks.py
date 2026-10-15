@@ -15,6 +15,7 @@ from typing import Any, cast
 
 import pytest
 import yaml
+from packaging.requirements import Requirement
 from packaging.specifiers import SpecifierSet
 
 from scripts.check import check, require_complete_tests
@@ -330,6 +331,7 @@ SHARED_FILES = {
         "changelogs/fragments/archive/.gitkeep",
         "galaxy.yml.j2",
         "meta/runtime.yml.j2",
+        "requirements-dev.txt.j2",
         "ruff.toml.j2",
         "tests/config.yml.j2",
     ),
@@ -472,6 +474,19 @@ def readme_closing_sections(skeleton: str) -> str:
     start = text.find("\n## Licensing, copyright")
     assert start != -1, f"{skeleton} README has no licensing section"
     return text[start:]
+
+
+@pytest.mark.parametrize("skeleton", SKELETON_GROUPS["collections"])
+def test_collection_release_tool_requires_sanity_gate(skeleton: str) -> None:
+    path = ROOT / skeleton / "requirements-dev.txt.j2"
+    requirements = [
+        Requirement(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line and not line.startswith("#")
+    ]
+    release_tool = next(item for item in requirements if item.name == "releasing")
+    assert "7.0.0" in release_tool.specifier
+    assert "6.0.0" not in release_tool.specifier
 
 
 def test_collection_readme_closing_sections_are_identical() -> None:

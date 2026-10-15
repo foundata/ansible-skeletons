@@ -227,6 +227,7 @@ def build_collection(rendered: Rendered) -> Path:
                     ".ansible-lint",
                     ".yamllint",
                     "pyproject.toml",
+                    "requirements-dev.txt",
                     "uv.lock",
                     "noxfile.py",
                     "antsibull-nox.toml",

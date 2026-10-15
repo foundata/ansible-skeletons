@@ -16,6 +16,10 @@ and the project adheres to
 
 ### Added
 
+- collection_default, collection_modules, collection_modules_grid:
+  `requirements-dev.txt` requires `releasing>=7.0.0`, whose `release build`
+  runs sanity tests on the committed revision before building the archive.
+  The file is excluded from Galaxy archives.
 - collection_default, collection_modules, collection_modules_grid: a default
   `helper-lint` Nox session checks Python under `extensions/molecule/`,
   `roles/*/files/`, `tools/` and `scripts/` with Ruff, without executing helpers

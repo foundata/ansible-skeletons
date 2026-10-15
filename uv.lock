@@ -386,7 +386,7 @@ dev = [
     { name = "mypy" },
     { name = "pytest", specifier = ">=9" },
     { name = "pyyaml" },
-    { name = "releasing", specifier = ">=6,<7" },
+    { name = "releasing", specifier = ">=7.0.0,<8" },
     { name = "reuse" },
     { name = "ruff" },
     { name = "rumdl" },
@@ -2126,7 +2126,7 @@ wheels = [
 
 [[package]]
 name = "releasing"
-version = "6.0.0"
+version = "7.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "markdown-it-py" },
@@ -2134,9 +2134,9 @@ dependencies = [
     { name = "pyyaml" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/57/d7/2750b753df20751d7b7659356b07313591eebabdfa936e93c83942e2ade5/releasing-6.0.0.tar.gz", hash = "sha256:f7a5f8edfd58be97208f9a9f241207b384f3d62141753d504ab24c66c24f034a", size = 93755, upload-time = "2026-10-12T09:08:42.544Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/07/60/f1736cd4f5fb7273f8da003c1bba44f4114b2cc04c8e984c5f6f27b8dc4b/releasing-7.0.0.tar.gz", hash = "sha256:ef6379d560cc4f5ab3540ef5ea204ba252db4a40d13e2854b851e764f589e575", size = 97029, upload-time = "2026-10-15T20:42:26.496Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3f/63/950beba5195c859029137831e859e29b1bd84ab461e97120b2ffa80b3f4a/releasing-6.0.0-py3-none-any.whl", hash = "sha256:f56acf851c44bad365cc3dca4f10d524980befd2811b3b713109870a02d8590c", size = 105459, upload-time = "2026-10-12T09:08:41.143Z" },
+    { url = "https://files.pythonhosted.org/packages/a7/49/2f40ceb36b9b686addbf14dfed71f14326012e7ff76680473c74194ae642/releasing-7.0.0-py3-none-any.whl", hash = "sha256:7e9cc0d2cde7c1ae4e3354c8cb25e336f4cc69fbeadb38f1024cfe033091ae66", size = 109291, upload-time = "2026-10-15T20:42:25.136Z" },
 ]
 
 [[package]]

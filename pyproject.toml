@@ -13,7 +13,7 @@ dev = [
   "mypy",
   "pytest>=9",
   "PyYAML",
-  "releasing>=6,<7",
+  "releasing>=7.0.0,<8",
   "reuse",
   "ruff",
   "rumdl",

@@ -69,6 +69,16 @@ module utility enforces belongs in that file's docstring, not here.
 
 ## Releases<a id="releases"></a>
 
+Releases require `releasing>=7.0.0` for the `release` command. Install the
+development requirement in the maintainer's Python environment:
+
+```sh
+python -m pip install -r requirements-dev.txt
+```
+
+`release build` runs the committed revision's Ansible sanity tests before
+building the archive.
+
 FIXME Describe what a release of this collection consists of, its product
 qualification and the steps to make one. The release runs through foundata's
 `release` command, declared in `.releasing.toml` (kept out of the archive by
