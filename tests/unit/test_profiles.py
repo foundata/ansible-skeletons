@@ -5,6 +5,7 @@
 import ast
 import json
 import re
+import subprocess
 import tomllib
 from pathlib import Path
 
@@ -12,6 +13,47 @@ import pytest
 
 from scripts.common import ROOT, GateError
 from scripts.render import example_metadata, render
+
+
+@pytest.mark.parametrize("profile", ["collection_modules_grid", "collection_modules"])
+@pytest.mark.parametrize(
+    "product",
+    [
+        "Example Product",
+        'Other "Quoted" Product',
+        "Triple \"\"\" and '''",
+        "Path\\name\nnext line",
+        "Unicode ä😀",
+    ],
+)
+def test_inventory_product_literal_preserves_content_and_formatting(
+    profile: str, product: str
+) -> None:
+    source = (ROOT / profile / "tools/inventory/extract.py.j2").read_text()
+    expression = (
+        "{{ product | default('Example Product') | to_json(ensure_ascii=False) }}"
+    )
+    assert expression in source
+    source = source.replace(expression, json.dumps(product, ensure_ascii=False))
+    product_line = next(line for line in source.splitlines() if '"product":' in line)
+    assert ast.literal_eval("{" + product_line + "}")["product"] == product
+    subprocess.run(
+        [
+            "ruff",
+            "format",
+            "--check",
+            "--config",
+            str(ROOT / profile / "ruff.toml.j2"),
+            "--stdin-filename",
+            "tools/inventory/extract.py",
+            "-",
+        ],
+        input=source,
+        text=True,
+        capture_output=True,
+        check=True,
+        timeout=30,
+    )
 
 
 @pytest.mark.parametrize("profile", ["collection_modules_grid", "collection_modules"])

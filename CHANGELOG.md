@@ -14,7 +14,15 @@ and the project adheres to
 
 ## [Unreleased]
 
-- Nothing worth mentioning right now.
+### Added
+
+- collection_default, collection_modules, collection_modules_grid: a default
+  `helper-lint` Nox session checks Python under `extensions/molecule/`,
+  `roles/*/files/`, `tools/` and `scripts/` with Ruff, without executing helpers
+  or adding them to mypy's scope. Local runs fix imports and format; `CI=true`
+  only checks. Explicit CI session lists must include `helper-lint`.
+- collection_default: an explicit `ruff.toml` using the module skeletons'
+  lint and formatting policy.
 
 
 ## [2.10.0] - 2026-10-15

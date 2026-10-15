@@ -130,6 +130,56 @@ def docs(session: nox.Session) -> None:
     )
 
 
+@nox.session(name="helper-lint", default=True)
+@antsibull_nox.sessions.install_packages(packages=["ruff"])
+def helper_lint(session: nox.Session) -> None:
+    """Ruff for Python helpers; fix imports and format unless CI=true."""
+    if session.posargs:
+        session.error("helper-lint has a fixed scope and accepts no arguments")
+    candidates = [
+        Path("extensions/molecule"),
+        Path("tools"),
+        Path("scripts"),
+        *sorted(Path("roles").glob("*/files")),
+    ]
+    roots = [str(candidate) for candidate in candidates if candidate.is_dir()]
+    if not roots:
+        session.skip("No Python helper directories found")
+    options = [
+        "--config",
+        "ruff.toml",
+        "--force-exclude",
+        "--config",
+        'include = ["*.py"]',
+    ]
+    files = session.run(
+        "ruff",
+        "check",
+        "--quiet",
+        "--show-files",
+        "--no-fix",
+        *options,
+        *roots,
+        silent=True,
+    )
+    if not files or not files.strip():
+        session.skip("No Python helpers found after Ruff exclusions")
+    if not CHECK_ONLY:
+        session.run(
+            "ruff",
+            "check",
+            "--select",
+            "I",
+            "--fix",
+            "--no-unsafe-fixes",
+            *options,
+            *roots,
+        )
+        session.run("ruff", "format", *options, *roots)
+    session.run("ruff", "check", "--no-fix", *options, *roots)
+    session.run("ruff", "format", "--check", *options, *roots)
+
+
 @nox.session(name="markdown", default=True)
 @antsibull_nox.sessions.install_packages(packages=["rumdl"])
 def markdown(session: nox.Session) -> None:

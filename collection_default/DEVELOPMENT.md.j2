@@ -17,28 +17,26 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 ## Checks<a id="checks"></a>
 
-Run every check from the collection root, inside its Git repository:
+Run from the collection's Git root. If Nox is installed, use `nox`
+instead of `uv run noxfile.py`.
 
 ```bash
-uv run noxfile.py                 # rewrite, then check: lint, docs, Markdown, changelog, build
-CI=true uv run noxfile.py         # check only; fails on anything a rewrite would change
-uv run noxfile.py -l              # list all sessions
-uv run noxfile.py -s ansible-test-sanity  # ansible-test sanity, one session per ansible-core version
-uv run noxfile.py -s molecule     # Molecule, "default" scenario
+uv run noxfile.py                 # fix, then run default checks
+CI=true uv run noxfile.py         # check only
+uv run noxfile.py -l              # list sessions
+uv run noxfile.py -s helper-lint   # Python helpers
+uv run noxfile.py -s ansible-test-sanity
+uv run noxfile.py -s molecule
 uv run noxfile.py -s molecule -- test --platform-name molecule-debian13
 ```
 
-With nox installed, `nox` replaces `uv run noxfile.py`. A plain run applies
-the project's own rewrites before checking: `ansible-lint --fix`, role
-documentation generated from `meta/argument_specs.yml` and formatted as
-`.ansible-docsmith.toml` configures, Markdown formatting.
-With `CI=true` every session only checks. Arguments after `--` go to the
-session's tool unchanged. `noxfile.py` documents each session; the built-in
-sessions are configured in `antsibull-nox.toml`.
+`helper-lint` covers Python in `extensions/molecule/`, `roles/*/files/`,
+`tools/` and `scripts/`, using [ruff.toml](ruff.toml).
+It runs by default; add it to CI configurations that list sessions explicitly.
 
-If `docs-check` fails with `AF_UNIX path too long` under Python 3.14, run nox
-with Python 3.13 or from a shorter checkout path: `antsibull-docs` starts
-worker processes whose socket path includes the checkout.
+Session definitions: [noxfile.py](noxfile.py).
+Built-in session settings: [antsibull-nox.toml](antsibull-nox.toml).
+Run container-backed sessions sequentially.
 
 ## Releases<a id="releases"></a>
 

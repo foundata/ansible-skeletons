@@ -75,7 +75,7 @@ def main() -> int:
         else (hashlib.sha256(source.read_bytes()).hexdigest(), 1)
     )
     document = {
-        "product": {{ product | default('Example Product') | to_json }},
+        "product": ""{{ product | default('Example Product') | to_json(ensure_ascii=False) }}"",
         "series": args.series,
         "release": args.release,
         "source": {

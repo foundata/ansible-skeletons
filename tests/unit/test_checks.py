@@ -2,12 +2,16 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Test failure propagation, isolation and check completeness."""
 
+import ast
 import json
 import os
 import re
+import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
 import yaml
@@ -172,6 +176,7 @@ def test_nox_gate_isolates_stock_passthrough(
                 "* docs-check -> Run 'antsibull-docs lint-collection-docs'\n"
                 "* build-import-check -> Run build and import checkers\n"
                 "* ansible-lint -> ansible-lint with the foundata rules\n"
+                "* helper-lint -> Ruff for Python helpers\n"
                 "* docs -> Role documentation with DocSmith\n"
                 "- molecule -> Molecule\n\n"
                 "sessions marked with * are selected, sessions marked with - are skipped.\n"
@@ -185,7 +190,13 @@ def test_nox_gate_isolates_stock_passthrough(
             if command[1:3] == ["--sessions", "build-import-check"]:
                 assert "PIP_CONSTRAINT" not in env
                 return ""
-            assert command[1:5] == ["--sessions", "docs-check", "ansible-lint", "docs"]
+            assert command[1:6] == [
+                "--sessions",
+                "docs-check",
+                "ansible-lint",
+                "helper-lint",
+                "docs",
+            ]
             assert env["PIP_CONSTRAINT"] == str(tmp_path / "lint-constraints.txt")
             return "Verified discovery and execution of 17 foundata rules.\n"
         if command[:3] == [str(tmp_path / "stock-lint/bin/python"), "-m", "nox"]:
@@ -319,6 +330,7 @@ SHARED_FILES = {
         "changelogs/fragments/archive/.gitkeep",
         "galaxy.yml.j2",
         "meta/runtime.yml.j2",
+        "ruff.toml.j2",
         "tests/config.yml.j2",
     ),
     "module_skeletons": (
@@ -332,7 +344,6 @@ SHARED_FILES = {
         "plugins/module_utils/_activation.py.j2",
         "plugins/module_utils/_compat.py.j2",
         "plugins/module_utils/_engine.py.j2",
-        "ruff.toml.j2",
         "tests/unit/plugins/conftest.py.j2",
         "tests/unit/plugins/modules/test_activation.py.j2",
         "tests/unit/plugins/modules/test_contract.py.j2",
@@ -581,3 +592,234 @@ def test_default_sessions_come_from_the_starred_listing() -> None:
         "sessions marked with * are selected, sessions marked with - are skipped.\n"
     )
     assert default_sessions(listing) == ["license-check", "changelog"]
+
+
+class HelperSkip(Exception):
+    """Represent a skipped generated helper session without loading Nox."""
+
+
+class HelperSession:
+    """Execute the generated session's Ruff commands without installing tools."""
+
+    def __init__(self) -> None:
+        self.posargs: list[str] = []
+        self.commands: list[tuple[str, ...]] = []
+
+    def run(self, *command: str, silent: bool = False) -> str:
+        self.commands.append(command)
+        assert command[0] == "ruff"
+        result = subprocess.run(
+            command,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            timeout=30,
+        )
+        return result.stdout
+
+    def skip(self, message: str) -> None:
+        raise HelperSkip(message)
+
+    def error(self, message: str) -> None:
+        raise ValueError(message)
+
+
+def load_helper_session(
+    profile: str, *, check_only: bool
+) -> Callable[[HelperSession], None]:
+    tree = ast.parse((ROOT / profile / "noxfile.py.j2").read_text(encoding="utf-8"))
+    functions = [
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "helper_lint"
+    ]
+    assert len(functions) == 1
+    function = functions[0]
+    decorators = [ast.unparse(decorator) for decorator in function.decorator_list]
+    assert decorators == [
+        "nox.session(name='helper-lint', default=True)",
+        "antsibull_nox.sessions.install_packages(packages=['ruff'])",
+    ]
+    function.decorator_list = []
+    namespace: dict[str, Any] = {
+        "Path": Path,
+        "CHECK_ONLY": check_only,
+        "nox": SimpleNamespace(Session=HelperSession),
+    }
+    exec(
+        compile(ast.Module(body=[function], type_ignores=[]), "<helper-lint>", "exec"),
+        namespace,
+    )
+    return cast(Callable[[HelperSession], None], namespace["helper_lint"])
+
+
+@pytest.fixture(params=SKELETON_GROUPS["collections"])
+def helper_project(
+    request: pytest.FixtureRequest, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> str:
+    profile = request.param
+    assert isinstance(profile, str)
+    monkeypatch.chdir(tmp_path)
+    run(["git", "init", "--quiet"], cwd=tmp_path)
+    (tmp_path / "ruff.toml").write_text(
+        (ROOT / profile / "ruff.toml.j2").read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    return profile
+
+
+def test_helper_sessions_are_identical() -> None:
+    functions = []
+    for profile in SKELETON_GROUPS["collections"]:
+        tree = ast.parse((ROOT / profile / "noxfile.py.j2").read_text(encoding="utf-8"))
+        functions.append(
+            ast.dump(
+                next(
+                    node
+                    for node in tree.body
+                    if isinstance(node, ast.FunctionDef) and node.name == "helper_lint"
+                )
+            )
+        )
+    assert len(set(functions)) == 1
+
+
+def test_helper_session_covers_all_roots_without_executing_files(
+    helper_project: str, tmp_path: Path
+) -> None:
+    paths = [
+        "extensions/molecule/default/files/acceptance.py",
+        "extensions/molecule/focused/files/test_browser.py",
+        "roles/first/files/guard.py",
+        "roles/second/files/nested/guard.py",
+        "tools/inventory/extract.py",
+        "scripts/maintenance.py",
+    ]
+    for name in paths:
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            'raise RuntimeError("Must not execute helpers")\n', encoding="utf-8"
+        )
+    session = HelperSession()
+    load_helper_session(helper_project, check_only=True)(session)
+    assert len(session.commands) == 3
+    assert set(session.commands[0][-5:]) == {
+        "extensions/molecule",
+        "tools",
+        "scripts",
+        "roles/first/files",
+        "roles/second/files",
+    }
+    assert all("--fix" not in command for command in session.commands)
+    assert session.commands[-1][:3] == ("ruff", "format", "--check")
+
+
+@pytest.mark.parametrize("empty_directory", [False, True])
+def test_empty_helper_session_never_falls_back_to_repository_root(
+    helper_project: str, tmp_path: Path, empty_directory: bool
+) -> None:
+    (tmp_path / "unrelated.py").write_text("invalid python !\n", encoding="utf-8")
+    if empty_directory:
+        (tmp_path / "tools").mkdir()
+    session = HelperSession()
+    with pytest.raises(HelperSkip, match="No Python"):
+        load_helper_session(helper_project, check_only=True)(session)
+    assert len(session.commands) == int(empty_directory)
+
+
+def test_helper_session_respects_exclusions_and_python_only_scope(
+    helper_project: str, tmp_path: Path
+) -> None:
+    config = tmp_path / "ruff.toml"
+    config.write_text(
+        'extend-exclude = ["tools/vendor"]\n' + config.read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    (tmp_path / ".gitignore").write_text("tools/ignored.py\n", encoding="utf-8")
+    for name in (
+        "tools/ignored.py",
+        "tools/vendor/invalid.py",
+        "tools/.venv/invalid.py",
+        "tools/template.py.j2",
+        "tools/notebook.ipynb",
+        "tools/script.rb",
+    ):
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("invalid python !\n", encoding="utf-8")
+    session = HelperSession()
+    with pytest.raises(HelperSkip, match="after Ruff exclusions"):
+        load_helper_session(helper_project, check_only=True)(session)
+    assert len(session.commands) == 1
+
+
+@pytest.mark.parametrize(
+    "content", ["print(missing_name)\n", "VALUE=1\n", "import sys\n"]
+)
+def test_helper_ci_reports_failure_without_rewriting(
+    helper_project: str, tmp_path: Path, content: str
+) -> None:
+    config = tmp_path / "ruff.toml"
+    config.write_text(
+        "fix = true\nunsafe-fixes = true\n" + config.read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    path = tmp_path / "tools/helper.py"
+    path.parent.mkdir()
+    path.write_text(content, encoding="utf-8")
+    session = HelperSession()
+    with pytest.raises(subprocess.CalledProcessError):
+        load_helper_session(helper_project, check_only=True)(session)
+    assert path.read_text(encoding="utf-8") == content
+    assert all("--fix" not in command for command in session.commands)
+
+
+def test_helper_local_mode_fixes_imports_and_formatting_only(
+    helper_project: str, tmp_path: Path
+) -> None:
+    path = tmp_path / "tools/helper.py"
+    path.parent.mkdir()
+    path.write_text(
+        'import sys\nimport os\n\nVALUE={name: True for name in ("one", "two")}\n'
+        "print(sys.version, os.name, VALUE)\n",
+        encoding="utf-8",
+    )
+    session = HelperSession()
+    with pytest.raises(subprocess.CalledProcessError):
+        load_helper_session(helper_project, check_only=False)(session)
+    updated = path.read_text(encoding="utf-8")
+    assert updated.startswith("import os\nimport sys\n")
+    assert 'VALUE = {name: True for name in ("one", "two")}' in updated
+    fixes = [command for command in session.commands if "--fix" in command]
+    assert len(fixes) == 1
+    assert fixes[0][:5] == ("ruff", "check", "--select", "I", "--fix")
+    assert all("--unsafe-fixes" not in command for command in session.commands)
+
+
+def test_helper_ci_rejects_arguments_that_could_override_check_mode(
+    helper_project: str,
+) -> None:
+    session = HelperSession()
+    session.posargs = ["--fix"]
+    with pytest.raises(ValueError, match="accepts no arguments"):
+        load_helper_session(helper_project, check_only=True)(session)
+    assert not session.commands
+
+
+def test_helper_local_formatting_is_stable(helper_project: str, tmp_path: Path) -> None:
+    path = tmp_path / "tools/helper.py"
+    path.parent.mkdir()
+    path.write_text(
+        "import sys\nimport os\n\nVALUE=1\nprint(sys.version, os.name, VALUE)\n",
+        encoding="utf-8",
+    )
+    helper = load_helper_session(helper_project, check_only=False)
+    first = HelperSession()
+    helper(first)
+    formatted = path.read_bytes()
+    assert b"VALUE = 1\n" in formatted
+    assert len(first.commands) == 5
+    helper(HelperSession())
+    assert path.read_bytes() == formatted
+    load_helper_session(helper_project, check_only=True)(HelperSession())

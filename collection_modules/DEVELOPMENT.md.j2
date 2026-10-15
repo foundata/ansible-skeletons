@@ -16,35 +16,30 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 ## Checks<a id="checks"></a>
 
-Run every check from the collection root, inside its Git repository:
+Run from the collection's Git root. If Nox is installed, use `nox`
+instead of `uv run noxfile.py`.
 
 ```bash
-uv run noxfile.py                 # rewrite, then check
-CI=true uv run noxfile.py         # check only; fails on anything a rewrite would change
-uv run noxfile.py -l              # list all sessions
-uv run noxfile.py -s lint         # Python, plugin YAML and typed unit tests
+uv run noxfile.py                 # fix, then run default checks
+CI=true uv run noxfile.py         # check only
+uv run noxfile.py -l              # list sessions
+uv run noxfile.py -s lint         # Python, plugin YAML and typing
+uv run noxfile.py -s helper-lint   # Python helpers
 uv run noxfile.py -s ansible-test-sanity
 uv run noxfile.py -s ansible-test-units
 uv run noxfile.py -s ansible-test-integration
 uv run noxfile.py -s molecule
 ```
 
-With nox installed, `nox` replaces `uv run noxfile.py`, for example
-`nox -s lint`. A plain run applies the project's own rewrites before checking:
-`ansible-lint --fix`, Python and Markdown formatting.
-With `CI=true` every session only checks. Arguments after `--` go to the
-session's tool unchanged. `noxfile.py` documents each session; the built-in
-sessions are configured in `antsibull-nox.toml`.
+`helper-lint` covers Python in `extensions/molecule/`, `roles/*/files/`,
+`tools/` and `scripts/`, using [ruff.toml](ruff.toml).
+It runs by default; add it to CI configurations that list sessions explicitly.
 
-Select the `ansible-test-*` meta sessions by name. Tags select nothing:
-antsibull-nox registers them for its CI matrix generator only.
-Set `max_version` in the ansible-test session configuration to omit an
-unreleased series; otherwise its lane installs the GitHub stable branch
-before a PyPI release. Run one nox chain at a time per container store.
+Session definitions: [noxfile.py](noxfile.py).
+Built-in session settings: [antsibull-nox.toml](antsibull-nox.toml).
+Run container-backed sessions sequentially.
 
-If `docs-check` fails with `AF_UNIX path too long` under Python 3.14, run nox
-with Python 3.13 or from a shorter checkout path: `antsibull-docs` starts
-worker processes whose socket path includes the checkout.
+## Boundaries<a id="boundaries"></a>
 
 Replace the [fixture](plugins/modules/fixture.py), its definition and tests
 together. Bind the shared contract tests to the new resource in
@@ -53,8 +48,6 @@ together. Bind the shared contract tests to the new resource in
 The subject supplies valid identities, creation arguments, one mutable field
 and capability flags with skip reasons. The engine tests contain their own
 synthetic definition and fake.
-
-## Boundaries<a id="boundaries"></a>
 
 `plugins/module_utils/_engine.py`, `plugins/module_utils/_activation.py`,
 `tests/unit/plugins/conftest.py` and the shared `test_contract.py`,
