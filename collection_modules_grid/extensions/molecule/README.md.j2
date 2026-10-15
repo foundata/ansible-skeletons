@@ -129,10 +129,11 @@ or destroy:
 
 {# skeleton-variant: activation-sequence #}
 `converge`, `side_effect` and `cleanup` run
-`{{ namespace }}.{{ collection_name }}.fixture_apply` after saving, so each change
-also becomes active. `verify` compares the effective state with the
-saved state in check mode, without writing. With `activate: "auto"`, the apply
-module changes nothing when both already match, so `idempotence` stays clean.
+`{{ namespace }}.{{ collection_name }}.fixture_apply`
+after saving, so each change also becomes active. `verify` compares the
+effective state with the saved state in check mode, without writing. With
+`activate: "auto"`, the apply module changes nothing when both already match, so
+`idempotence` stays clean.
 
 {# end skeleton-variant #}
 
@@ -151,8 +152,9 @@ task files of a directory under `default/tasks/`, in alphabetical order:
 
 The `fixture.yml` files exercise the skeleton's example module; replace them
 with the product's resources. Set the connection once per block with
-`module_defaults` for the `{{ namespace }}.{{ collection_name }}.api` action
-group and the `product_connection` inventory variable. When adding tests:
+`module_defaults` for the
+`{{ namespace }}.{{ collection_name }}.api`
+action group and the `product_connection` inventory variable. When adding tests:
 
 - Name every record with the `molecule_fixture_` prefix and touch nothing else
   on the endpoint.

@@ -35,7 +35,9 @@ options:
     description: Activate on a difference, or unconditionally.
     type: str
     default: auto
-    choices: [auto, always]
+    choices:
+      - auto
+      - always
   verify:
     description:
       - Exact fixture names to compare, including deleted records.

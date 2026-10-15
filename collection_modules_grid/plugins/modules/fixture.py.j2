@@ -52,7 +52,9 @@ options:
     description: Whether the named record exists.
     type: str
     default: present
-    choices: [present, absent]
+    choices:
+      - present
+      - absent
 """
 
 EXAMPLES = r"""
@@ -65,7 +67,8 @@ EXAMPLES = r"""
     name: "example"
     value: "ready"
     enabled: true
-    labels: ["managed"]
+    labels:
+      - "managed"
 """
 
 RETURN = r"""

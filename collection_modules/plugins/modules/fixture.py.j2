@@ -55,12 +55,16 @@ options:
     description: Set the password only on creation, or write it on every invocation. An always write is not idempotent.
     type: str
     default: on_create
-    choices: [on_create, always]
+    choices:
+      - on_create
+      - always
   state:
     description: Whether the named record exists.
     type: str
     default: present
-    choices: [present, absent]
+    choices:
+      - present
+      - absent
 """
 
 EXAMPLES = r"""
@@ -73,7 +77,8 @@ EXAMPLES = r"""
     name: "example"
     value: "ready"
     enabled: true
-    labels: ["managed"]
+    labels:
+      - "managed"
 """
 
 RETURN = r"""
