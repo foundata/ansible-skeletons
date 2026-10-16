@@ -13,13 +13,14 @@ SPDX-License-Identifier: GPL-3.0-or-later
 - Check `tests/config.yml` and run the checks in `DEVELOPMENT.md`.
 - Replace the fixture definition, modules and tests with a researched resource.
   Bind it in `tests/unit/plugins/modules/contract_subject.py` and keep
-  `test_contract.py`, `test_engine.py` and `test_activation.py` unchanged.
+  `test_contract.py`, `test_engine.py`, `test_activation.py` and
+  `test_lifecycle.py` unchanged.
   The subject declares valid identities, creation arguments, a mutable field
   and capability flags with skip reasons. Engine invariants use their own
   synthetic definition and fake; do not add fields or guards to the product.
   The fixture uses REST with integer identifiers, by-name 404 absence,
   native JSON and immediate writes. Replace the client, fake transport and
-  fake server from product evidence; keep the shared lifecycle.
+  fake server from product evidence; keep the skeleton-owned lifecycle base.
 - The shared `_activation.py` is unused here. Add a scope-named apply module
   only where saved and active state differ, with compare, apply and settle
   probes.

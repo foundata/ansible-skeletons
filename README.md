@@ -199,13 +199,20 @@ rules run.
 
 ### `collection_modules`<a id="collection_modules"></a>
 
-The REST fixture uses server-assigned integer identifiers, case-insensitive
-names, by-key 404 absence, empty-page pagination, native JSON and
-POST/PUT-or-PATCH/DELETE writes that take effect immediately.
+A module-first skeleton with one skeleton-owned lifecycle base for both
+definition-driven resources and handwritten families. The engine supplies
+hooks to that base; a second, nested fixture family shows how to copy a family
+utility and edit its hooks without changing the sequence. Both fixtures use
+one lost-response harness for create, update and delete.
 
-It includes a replaceable resource and info module, references, a write-only
-password and a deletion guard; no apply module. Its lifecycle, test runner and
-research scaffolds are byte-identical to the grid variant, enforced by tests.
+Its REST fixture uses server-assigned integer identifiers, case-insensitive
+names, by-key 404 absence, empty-page pagination, native JSON and
+POST/PUT-or-PATCH/DELETE writes that take effect immediately. It includes a
+replaceable resource and info module, references, a write-only password and
+a deletion guard; no apply module. The verifying activation helper remains
+available, but act-once activation and appliance recovery machinery do not
+ship in this variant. Shared base and harness files are byte-identical to
+the appliance variant outside declared variant regions, enforced by tests.
 
 ```sh
 ansible-galaxy collection init \
@@ -223,23 +230,26 @@ Follow the rendered `FIXME.md` to replace the fixture with product evidence.
 
 ### `collection_modules_appliance`<a id="collection_modules_appliance"></a>
 
-A module-first skeleton for products exposing a grid-style API.
+A module-first skeleton for appliances whose managed configuration carries
+the management path, whose activation is global, and whose console recovery
+is rehearsed per family. Choose it by those traits, not by the API's endpoint
+shape.
 
-A grid-style API is an HTTP API pattern designed around managing tabular
-collections of resources. Unlike conventional resource-oriented REST APIs, it
-typically exposes action-based endpoints such as search_item, add_item, set_item
-and del_item, with standardized request and response structures for listing,
-pagination and resource management.
+It ships the same skeleton-owned lifecycle base, definition engine, copyable
+family scaffold and loss harness as `collection_modules`. It adds act-once
+activation for scopes without an authoritative loaded-state receipt, a
+management-path guard scaffold, and a recovery drill with a lab contract.
+Independent recovery and a single writer are prerequisites. Act-once reports
+`verified: unverifiable`, not proof that the requested state became active.
 
-The skeleton provides a replaceable resource, info and activation module, a
-shared resource engine, fake API tests and an external-endpoint Molecule
-scenario. It contains no deployment role.
-
-Its fixture speaks a grid API with UUID identifiers, paginated `search_item`
-listings with a declared total, `add_item`, `set_item` and `del_item` actions,
-string-encoded values and fixed response envelopes; deletion is refused while a
-dependent record refers to the fixture. For REST products, use
-`collection_modules` below.
+Its replaceable resource, info and verifying activation modules exercise a
+grid-style fake API: UUID identifiers, paginated `search_item` listings with a
+declared total, `add_item`, `set_item` and `del_item` actions, string-encoded
+values and fixed response envelopes. A dependent record blocks deletion.
+The second fixture has nested values that a flat definition cannot express.
+The external-endpoint Molecule scenario runs both families and skips the
+recovery stage with a reason when no console contract is supplied. It
+contains no deployment role.
 
 Render with the metadata from the usage example and the product's display name:
 

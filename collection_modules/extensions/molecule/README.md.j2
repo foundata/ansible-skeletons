@@ -123,16 +123,23 @@ or destroy:
 | ------------- | ------------ |
 | `syntax`      | Checks the playbooks. |
 | `cleanup`     | Removes records an aborted earlier run left behind. |
-| `converge`    | Creates the fixture records. |
+| `converge`    | Creates definition-driven and nested-family fixture records. |
 | `idempotence` | Runs converge again; any reported change fails the test. |
 | `verify`      | Reads the saved state back and asserts it. |
-| `side_effect` | Changes a value and asserts the update and its diff. |
+| `side_effect` | Checks updates and diffs, then lost create, update and delete replies for both families. |
 | `cleanup`     | Removes the fixture records. |
 
 {# skeleton-variant: activation-sequence #}
 {# end skeleton-variant #}
 
 
+The shared loss helper forwards the real client write, drops exactly one
+completed response, and requires an observed result. A fresh module invocation
+then reads the same declaration without another write. It does not replay the
+lost request.
+
+{# skeleton-variant: recovery-sequence #}
+{# end skeleton-variant #}
 {# skeleton-variant: recovery-contract #}
 {# end skeleton-variant #}
 {# skeleton-variant: recovery-tool #}
@@ -149,8 +156,12 @@ task files of a directory under `default/tasks/`, in alphabetical order:
 | `tasks/side_effect/` | Change the fixtures and assert the reported change. |
 | `tasks/cleanup/`     | Remove the fixture records. It also runs first, so absence is not an error. |
 
-The `fixture.yml` files exercise the skeleton's example module; replace them
-with the product's resources. Set the connection once per block with
+The `fixture.yml` files exercise a definition-driven resource;
+`fixture_family.yml` exercises the copyable nested family. Copy that utility,
+module and its task files per family, edit hooks rather than the lifecycle
+sequence, and replace the verifier slot with independent product evidence.
+Parameterize `zz_loss.yml` for the copied module and its identity; keep
+`shared/files/loss.py` unchanged. Set the connection once per block with
 `module_defaults` for the
 `{{ namespace }}.{{ collection_name }}.api`
 action group and the `product_connection` inventory variable. When adding tests:

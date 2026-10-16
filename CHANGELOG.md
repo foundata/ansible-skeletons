@@ -16,7 +16,14 @@ and the project adheres to
 
 ### Changed
 
-- Rename `collection_modules_grid` to `collection_modules_appliance`.
+- Rename `collection_modules_grid` to `collection_modules_appliance`. Select
+  the variant by management-path configuration, global activation and
+  per-family console recovery, not by a grid-style API.
+- Both module variants: replace the definition engine's independent
+  `Engine.run` and result boundary with hooks on one lifecycle base. Keep
+  `Engine(module, resource, client)` for definition-driven reads.
+- Separate activation ownership: the verifying helper stays shared; act-once
+  activation and its hooks ship only in the appliance variant.
 
 ### Fixed
 
@@ -27,6 +34,24 @@ and the project adheres to
 
 ### Added
 
+- Both module variants: skeleton-owned `_lifecycle.py`, a product-bound
+  `_family.py`, and synthetic `test_lifecycle.py` coverage for family hooks,
+  custom operations, staged writes and lost-response settlement.
+- Both module variants: a nested family scaffold with hook contracts, module
+  documentation, unit and file-only integration tests, default scenario
+  tasks, a verifier slot, Usage and changelog placeholders, and a copy
+  checklist.
+- Both module variants: one parameterized response-loss harness, exercised
+  for create, update and delete by both fixture families.
+- Appliance variant: `_act_once.py` with preflight and bounded readiness
+  hooks, its shared tests, a management-path guard scaffold, recovery and
+  single-writer prerequisites, and `verified: unverifiable` semantics.
+- Appliance variant: a conditional last-stage recovery drill, generic fresh
+  API and DNS probes, fail-closed family hooks, the console lab contract and
+  a standalone single-family drill playbook. No recovery scenario is added.
+- Rendered Boundaries documentation names the base, engine, activation,
+  harnesses and shared tests as skeleton-owned invariants, plus the
+  appliance-only activation and drill files.
 - collection_default, collection_modules, collection_modules_grid: a default
   `runtime-check` Nox session checks a built artifact with only `meta/`,
   `plugins/`, `roles/` and `playbooks/` retained. It checks imports,
@@ -44,6 +69,14 @@ and the project adheres to
   only checks. Explicit CI session lists must include `helper-lint`.
 - collection_default: an explicit `ruff.toml` using the module skeletons'
   lint and formatting policy.
+
+### Removed
+
+- The `collection_modules_grid` initialization path; use
+  `collection_modules_appliance`.
+- The engine's separate lifecycle sequence and local client/schema binding.
+  Invariant tests and product bindings migrate to `_family.py`; family
+  implementations use the base's hooks rather than patching `_engine`.
 
 
 ## [2.10.0] - 2026-10-15

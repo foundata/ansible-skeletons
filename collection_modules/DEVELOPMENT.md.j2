@@ -54,30 +54,38 @@ Run container-backed sessions sequentially.
 ## Boundaries<a id="boundaries"></a>
 
 Replace the [fixture](plugins/modules/fixture.py), its definition and tests
-together. Bind the shared contract tests to the new resource in
-`tests/unit/plugins/modules/contract_subject.py` and keep
-`test_contract.py`, `test_engine.py` and `test_activation.py` as shipped.
-The subject supplies valid identities, creation arguments, one mutable field
-and capability flags with skip reasons. The engine tests contain their own
-synthetic definition and fake.
+together. Bind the shared contract tests in
+`tests/unit/plugins/modules/contract_subject.py`. For a family a definition
+cannot express, copy `_fixture_family.py`, its module and its tests. Edit hooks,
+never the lifecycle sequence. The synthetic base and engine tests remain
+independent of the product's fixtures.
 
-`plugins/module_utils/_engine.py`, `plugins/module_utils/_activation.py`,
-`tests/unit/plugins/conftest.py` and the shared `test_contract.py`,
-`test_engine.py` and `test_activation.py` under `tests/unit/plugins/modules/`
-come from the skeleton and stay identical to its render; a change they need
-goes through the skeleton, never a local patch. `contract_subject.py` binds
-the contract tests to the product.
+The following files are skeleton-owned invariants. Keep them byte-identical
+to the selected render; a required change goes through the skeleton:
+
+- `plugins/module_utils/_lifecycle.py`, `_engine.py` and `_activation.py`.
+- `extensions/molecule/shared/files/loss.py`, the one-response loss harness.
+- `tests/unit/plugins/conftest.py`, the generic module runner.
+- `test_contract.py`, `test_engine.py`, `test_activation.py` and
+  `test_lifecycle.py` under `tests/unit/plugins/modules/`.
+
+{# skeleton-variant: appliance-invariants #}
+{# end skeleton-variant #}
+The shared Molecule playbooks dispatch scenario hooks and retain their
+skeleton-owned structure. `contract_subject.py` binds the contract tests to
+the product; `_family.py` binds the lifecycle to its client, error schema and
+compatibility policy. Bring those bindings forward with product values kept.
+
 `foundata.utils` owns byte transport, deadlines, JSON decoding and safe error
-translation. Everything else is product-owned: the client, the definitions,
-the modules and documentation fragments, the fake product and the inventory
-extractor. The extractor writes `tools/inventory/<series>.yml` beside itself.
-That inventory is development evidence: it never ships and nothing reads it
-at runtime.
+translation. The client, definitions, copied family utilities, guard rules,
+modules, documentation fragments, fake product, scenario hooks and inventory
+extractor are product-owned. The extractor writes
+`tools/inventory/<series>.yml` beside itself. That inventory is development
+evidence: it never ships and nothing reads it at runtime.
 
-FIXME Add what this product decides and a reader of the code cannot see:
-which families use a handwritten lifecycle instead of a definition and why,
-and which writers and prerequisites the caller must supply. The rule a
-module utility enforces belongs in that file's docstring, not here.
+FIXME State which families use hooks rather than definitions and why, and
+which writers and prerequisites the caller supplies. Each enforced rule and
+its reason belong in its utility's docstring.
 
 ## Releases<a id="releases"></a>
 

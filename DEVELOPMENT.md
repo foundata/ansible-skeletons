@@ -79,8 +79,8 @@ variables. The helper refuses to overwrite an existing directory.
 | ------------------------------- | ------- |
 | `role_default/`                 | Standalone role skeleton |
 | `collection_default/`           | Collection skeleton, including its `run` role |
-| `collection_modules_appliance/` | Module-only collection skeleton |
-| `collection_modules/`           | REST module-only collection skeleton |
+| `collection_modules_appliance/` | Management-path appliance module skeleton |
+| `collection_modules/`           | Module skeleton with an immediate-write REST fixture |
 | `scripts/render.py`             | Render a role and the selected collection skeleton with Galaxy |
 | `scripts/smoke.py`              | Validate rendering, artifacts and role behavior |
 | `scripts/check.sh`              | Local quality-check entry point |
@@ -104,6 +104,17 @@ list without a composition layer. Quick checks run their default nox sessions
 in check-only mode; full matrix checks add the sanity, unit and integration
 sessions, one chain at a time, and the Molecule scenario against the first
 identity's own fake product.
+
+Both module variants own one `_lifecycle.py` sequence and result boundary.
+The product binding `_family.py` supplies its client, error schema and
+compatibility policy. `_engine.py` implements definition-driven hooks;
+`_fixture_family.py` demonstrates nested values through the same base. Copy
+that family utility per family and edit hooks, not the sequence. The shared
+loss harness proves lost create, update and delete settlement for both
+fixtures. Only the appliance variant carries act-once activation, the
+management-path guard scaffold and recovery machinery. Its default scenario
+skips the last recovery stage with a reason when credentials have no console
+contract, so the fake-product gate needs no lab.
 
 `tests/unit/test_checks.py` lists the files that skeletons share. Copies of a
 shared file are identical except inside variant regions, which wrap the few
@@ -165,7 +176,14 @@ limited to):
   Repository checks require successful foundata rule verification.
 - Both module skeletons under two identities: their default Nox sessions in
   check-only mode (Ruff and mypy including the integration targets' Python),
-  a build, and the installed fixture modules.
+  a build, and the installed definition-driven and nested-family modules.
+
+The full matrix also executes both module scenarios against their own fake
+products, including the six lost-response cases and the appliance's explicit
+no-console recovery skip. Unit tests cover management-listener refusal in
+normal and check mode. They do not qualify a product's console recovery;
+that drill belongs to the collection's authorized lab before a family's first
+management-path write.
 
 To test a future release candidate, build its wheel and override the released
 package. Example:
@@ -177,8 +195,13 @@ package. Example:
 To retain results, including generated projects and collection archives:
 
 ```sh
-./scripts/check.sh --output /tmp/skeleton-check-results
+./scripts/check.sh --output "${HOME}/sk-check-1"
 ```
+
+Keep the absolute output path at most 29 bytes and outside tmpfs. Nox's
+nested virtual environments and Podman's storage need a short filesystem
+path. Choose a fresh directory; remove obsolete outputs after retaining the
+result you need.
 
 Run only the helper regression suite with:
 
