@@ -195,10 +195,12 @@ limited to):
 
 The full matrix also executes both module scenarios against their own fake
 products, including the six lost-response cases and the appliance's explicit
-no-console recovery skip. Unit tests cover management-listener refusal in
-normal and check mode. They do not qualify a product's console recovery;
-that drill belongs to the collection's authorized lab before a family's first
-management-path write.
+no-console recovery skip. The appliance variant's default scenario ends with
+its recovery drill, which skips without a console contract. The fake product
+has no console, so the checks exercise only the skip; they do not qualify a
+live drill. Unit tests cover management-listener refusal in normal and check
+mode. They do not qualify a product's console recovery; that drill belongs to
+the collection's authorized lab before a family's first management-path write.
 
 The check runs independent steps at the same time: the repository test runs,
 the lanes, `generated-lint`, and each identity of both module skeletons.
