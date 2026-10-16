@@ -32,18 +32,18 @@
       name: "molecule_fixture_loss"
       declaration:
         state: "absent"
-    - module: "{{ namespace }}.{{ collection_name }}.fixture_family"
-      name: "molecule_fixture_family_loss"
+    - module: "{{ namespace }}.{{ collection_name }}.fixture_nested"
+      name: "molecule_fixture_nested_loss"
       declaration:
         settings:
           port: 8080
-    - module: "{{ namespace }}.{{ collection_name }}.fixture_family"
-      name: "molecule_fixture_family_loss"
+    - module: "{{ namespace }}.{{ collection_name }}.fixture_nested"
+      name: "molecule_fixture_nested_loss"
       declaration:
         settings:
           port: 9090
-    - module: "{{ namespace }}.{{ collection_name }}.fixture_family"
-      name: "molecule_fixture_family_loss"
+    - module: "{{ namespace }}.{{ collection_name }}.fixture_nested"
+      name: "molecule_fixture_nested_loss"
       declaration:
         state: "absent"
   loop_control:

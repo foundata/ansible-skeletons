@@ -123,7 +123,7 @@ names, so it runs once, on the newest released core of the matrix.
 Both module variants own one `_lifecycle.py` sequence and result boundary.
 The product binding `_binding.py` supplies its client, error schema and
 compatibility policy. `_engine.py` implements definition-driven hooks;
-`_fixture_family.py` demonstrates nested values through the same base. Copy
+`_fixture_nested.py` demonstrates nested values through the same base. Copy
 that family utility per family and edit hooks, not the sequence. The shared
 loss harness proves lost create, update and delete settlement for both
 fixtures. Only the appliance variant carries act-once activation, the

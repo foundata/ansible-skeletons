@@ -11,7 +11,7 @@ import pytest
 # isort: off
 from ansible_collections.{{ namespace }}.\
     {{ collection_name }}.plugins.modules import (
-        fixture_family,
+        fixture_nested,
     )
 # isort: on
 # fmt: on
@@ -26,10 +26,10 @@ def test_refuse_listener_coverage(
     fake: FakeProduct, run_module: RunModule, check: bool, exists: bool
 ) -> None:
     if exists:
-        run_module(fixture_family.main, name="guarded", settings={"port": 8080})
+        run_module(fixture_nested.main, name="guarded", settings={"port": 8080})
     before = len(fake.writes())
     result = run_module(
-        fixture_family.main,
+        fixture_nested.main,
         name="guarded",
         settings={"network": "192.0.2.0/24", "port": 443},
         _ansible_check_mode=check,
@@ -45,11 +45,11 @@ def test_guard_matches_address_and_port(
     fake: FakeProduct, run_module: RunModule
 ) -> None:
     result = run_module(
-        fixture_family.main,
+        fixture_nested.main,
         name="guarded",
         settings={"network": "192.0.2.0/24", "port": 8443},
     )
     assert result["changed"] and not result.get("failed")
-    fake.families["guarded"]["settings"]["port"] = 443
-    removed = run_module(fixture_family.main, name="guarded", state="absent")
-    assert removed["changed"] and "guarded" not in fake.families
+    fake.nested_rows["guarded"]["settings"]["port"] = 443
+    removed = run_module(fixture_nested.main, name="guarded", state="absent")
+    assert removed["changed"] and "guarded" not in fake.nested_rows

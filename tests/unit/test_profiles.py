@@ -118,8 +118,8 @@ def test_management_guard_is_appliance_only() -> None:
         assert (
             skeleton / "tests/unit/plugins/modules/test_management_guard.py.j2"
         ).is_file() is appliance
-        family = (skeleton / "plugins/module_utils/_fixture_family.py.j2").read_text()
-        assert ("protect_listener" in family) is appliance
+        nested = (skeleton / "plugins/module_utils/_fixture_nested.py.j2").read_text()
+        assert ("protect_listener" in nested) is appliance
 
 
 def test_recovery_stage_is_appliance_only() -> None:

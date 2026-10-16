@@ -8,15 +8,15 @@
       {{ '{{ product_connection }}' }}
   block:
     - name: "Change one nested member"
-      {{ namespace }}.{{ collection_name }}.fixture_family:
-        name: "molecule_fixture_family"
+      {{ namespace }}.{{ collection_name }}.fixture_nested:
+        name: "molecule_fixture_nested"
         settings:
           port: 9090
       diff: true
-      register: __testing_family_updated
+      register: __testing_nested_updated
 
     - name: "Assert the nested update"
       ansible.builtin.assert:
         that:
-          - __testing_family_updated['changed_fields'] == ['settings.port']
-          - __testing_family_updated['fixture_family']['settings']['network'] == '198.51.100.0/24'
+          - __testing_nested_updated['changed_fields'] == ['settings.port']
+          - __testing_nested_updated['fixture_nested']['settings']['network'] == '198.51.100.0/24'

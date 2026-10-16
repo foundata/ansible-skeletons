@@ -20,7 +20,7 @@ from typing import Any, ClassVar
 class Handler(BaseHTTPRequestHandler):
     server: HTTPServer
     credentials = ""
-    families: ClassVar[dict[str, dict[str, Any]]] = {}
+    nested_rows: ClassVar[dict[str, dict[str, Any]]] = {}
     # Shared by all requests: the server creates one handler per request.
     records: ClassVar[dict[str, dict[str, str]]] = {}
     active: ClassVar[dict[str, dict[str, str]]] = {}
@@ -36,15 +36,15 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def family_request(self, action: str, name: str, data: dict[str, Any]) -> None:
+    def nested_request(self, action: str, name: str, data: dict[str, Any]) -> None:
         if action == "get_item":
-            self.send_json(200, {"family": self.families.get(name)})
+            self.send_json(200, {"nested": self.nested_rows.get(name)})
             return
         if action == "del_item":
-            self.families.pop(name, None)
+            self.nested_rows.pop(name, None)
         else:
             record = copy.deepcopy(
-                self.families.get(
+                self.nested_rows.get(
                     name,
                     {
                         "name": name,
@@ -58,7 +58,7 @@ class Handler(BaseHTTPRequestHandler):
                 )
             )
             record["settings"].update(data.get("settings", {}))
-            self.families[name] = record
+            self.nested_rows[name] = record
         self.send_json(200, {"status": "ok"})
 
     def dispatch(self) -> None:
@@ -92,7 +92,7 @@ class Handler(BaseHTTPRequestHandler):
                 },
             )
             return
-        if self.path == "/api/family/context":
+        if self.path == "/api/nested/context":
             self.send_json(
                 200,
                 {
@@ -104,9 +104,9 @@ class Handler(BaseHTTPRequestHandler):
                 },
             )
             return
-        if self.path.startswith("/api/family/"):
-            _prefix, _api, _family, action, name = self.path.split("/")
-            self.family_request(action, name, data.get("family", {}))
+        if self.path.startswith("/api/nested/"):
+            _prefix, _api, _route, action, name = self.path.split("/")
+            self.nested_request(action, name, data.get("nested", {}))
             return
         match = re.fullmatch(
             r"/api/fixture/(get_item|add_item|set_item|del_item)(?:/([^/]+))?",

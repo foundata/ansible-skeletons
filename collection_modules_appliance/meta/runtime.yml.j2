@@ -20,7 +20,7 @@ requires_ansible: {{ ('>=' ~ (min_ansible_version | default('2.19.0'))) | to_jso
 action_groups:
   api:
     - "fixture"
-    - "fixture_family"
+    - "fixture_nested"
     - "fixture_apply"
     - "fixture_info"
 {# end skeleton-variant #}

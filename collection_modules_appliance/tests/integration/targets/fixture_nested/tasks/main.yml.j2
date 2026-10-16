@@ -1,0 +1,76 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+---
+- name: "Exercise the nested family lifecycle"
+  module_defaults:
+    group/{{ namespace }}.{{ collection_name }}.api: >-
+      {{ '{{ fixture_fake_connection }}' }}
+  block:
+    - name: "Predict the nested creation"
+      {{ namespace }}.{{ collection_name }}.fixture_nested:
+        name: "integration_nested"
+        settings:
+          port: 8080
+      check_mode: true
+      register: __nested_prediction
+
+    - name: "Create the nested fixture"
+      {{ namespace }}.{{ collection_name }}.fixture_nested:
+        name: "integration_nested"
+        settings:
+          network: "198.51.100.9/24"
+          port: 8080
+      register: __nested_created
+
+    - name: "Repeat the nested declaration"
+      {{ namespace }}.{{ collection_name }}.fixture_nested:
+        name: "integration_nested"
+        settings:
+          port: 8080
+      register: __nested_repeated
+
+    - name: "Update only one nested member"
+      {{ namespace }}.{{ collection_name }}.fixture_nested:
+        name: "integration_nested"
+        settings:
+          port: 9090
+      diff: true
+      register: __nested_updated
+
+    - name: "Confirm nested preservation and observation"
+      ansible.builtin.assert:
+        that:
+          - __nested_prediction is ansible.builtin.changed
+          - __nested_prediction['verified'] == 'predicted'
+          - __nested_created is ansible.builtin.changed
+          - __nested_created['verified'] == 'observed'
+          - __nested_repeated is not ansible.builtin.changed
+          - __nested_updated['changed_fields'] == ['settings.port']
+          - __nested_updated['fixture_nested']['settings']['network'] == '198.51.100.0/24'
+          - __nested_updated['diff']['before']['settings']['port'] == 8080
+          - __nested_updated['diff']['after']['settings']['port'] == 9090
+
+    - name: "Delete the nested fixture"
+      {{ namespace }}.{{ collection_name }}.fixture_nested:
+        name: "integration_nested"
+        state: "absent"
+      register: __nested_deleted
+
+    - name: "Repeat the nested deletion"
+      {{ namespace }}.{{ collection_name }}.fixture_nested:
+        name: "integration_nested"
+        state: "absent"
+      register: __nested_absent
+
+    - name: "Confirm nested absence"
+      ansible.builtin.assert:
+        that:
+          - __nested_deleted is ansible.builtin.changed
+          - __nested_deleted['fixture_nested'] is ansible.builtin.none
+          - __nested_absent is not ansible.builtin.changed
+  always:
+    - name: "Stop the nested fixture endpoint"
+      ansible.builtin.include_role:
+        name: "setup_fixture_fake"
+        tasks_from: "stop"

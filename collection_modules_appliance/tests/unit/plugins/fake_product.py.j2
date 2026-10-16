@@ -48,7 +48,7 @@ class FakeProduct:
 
     def __init__(self) -> None:
         self.version = "1.0.0"
-        self.families: dict[str, dict[str, Any]] = {}
+        self.nested_rows: dict[str, dict[str, Any]] = {}
         self.listener = {"address": "192.0.2.1", "port": 443}
         self.grids: dict[str, dict[str, dict[str, str]]] = {"fixture": {}}
         self.active: dict[str, dict[str, str]] = {}
@@ -61,15 +61,15 @@ class FakeProduct:
         self.after_write: dict[str, Callable[[], Response | None]] = {}
         self.dropped: set[str] = set()
 
-    def family_request(self, method: str, name: str, data: dict[str, Any]) -> Response:
+    def nested_request(self, method: str, name: str, data: dict[str, Any]) -> Response:
         if method == "GET":
-            return Response(200, {"family": self.families.get(name)})
+            return Response(200, {"nested": self.nested_rows.get(name)})
         operation = {"POST": "create", "PUT": "update", "DELETE": "delete"}[method]
         if operation == "delete":
-            self.families.pop(name, None)
+            self.nested_rows.pop(name, None)
         else:
             record = copy.deepcopy(
-                self.families.get(
+                self.nested_rows.get(
                     name,
                     {
                         "name": name,
@@ -83,7 +83,7 @@ class FakeProduct:
                 )
             )
             record["settings"].update(data.get("settings", {}))
-            self.families[name] = record
+            self.nested_rows[name] = record
         hook = self.after_write.pop(ACTIONS[operation], None)
         replacement = hook() if hook else None
         return Response(200, {"status": "ok"}) if replacement is None else replacement
@@ -146,7 +146,7 @@ class FakeProduct:
             return response
         if path == "/fixture/active/search_item":
             return self.listing(self.active, data)
-        if path == "/family/context":
+        if path == "/nested/context":
             return Response(
                 200,
                 {
@@ -154,15 +154,15 @@ class FakeProduct:
                     "defaults": {"network": "198.51.100.0/24", "port": 8080},
                 },
             )
-        if path.startswith("/family/"):
-            _prefix, _family, action, name = path.split("/")
+        if path.startswith("/nested/"):
+            _prefix, _route, action, name = path.split("/")
             method = {
                 "get_item": "GET",
                 "add_item": "POST",
                 "set_item": "PUT",
                 "del_item": "DELETE",
             }[action]
-            return self.family_request(method, name, data.get("family", {}))
+            return self.nested_request(method, name, data.get("nested", {}))
         match = re.fullmatch(
             r"/([a-z_]+)/(search_item|get_item|add_item|set_item|del_item)(?:/([^/]+))?",
             path,

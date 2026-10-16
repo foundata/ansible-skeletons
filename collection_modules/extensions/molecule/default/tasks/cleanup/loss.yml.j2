@@ -13,8 +13,8 @@
         state: "absent"
 
     - name: "Remove the nested family fixture"
-      {{ namespace }}.{{ collection_name }}.fixture_family:
-        name: "molecule_fixture_family_loss"
+      {{ namespace }}.{{ collection_name }}.fixture_nested:
+        name: "molecule_fixture_nested_loss"
         state: "absent"
 {# skeleton-variant: loss-cleanup-activation #}
 {# end skeleton-variant #}

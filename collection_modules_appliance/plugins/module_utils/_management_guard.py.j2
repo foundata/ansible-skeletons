@@ -33,7 +33,7 @@ def protect_listener(client: Any, predicted: dict[str, Any], absent: bool) -> No
     """Read the current listener and refuse overlapping address and port values."""
     if absent:
         return
-    context = client.read("GET", "/family/context")
+    context = client.read("GET", "/nested/context")
     try:
         listener = context["listener"]
         address = ipaddress.ip_address(listener["address"])

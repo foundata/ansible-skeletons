@@ -2,12 +2,14 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
-- name: "Clean up the scenario family"
+- name: "Converge the nested fixture family"
   module_defaults:
     group/{{ namespace }}.{{ collection_name }}.api: >-
       {{ '{{ product_connection }}' }}
   block:
-    - name: "Delete the scenario family"
-      {{ namespace }}.{{ collection_name }}.fixture_family:
-        name: "molecule_fixture_family"
-        state: "absent"
+    - name: "Save the scenario family"
+      {{ namespace }}.{{ collection_name }}.fixture_nested:
+        name: "molecule_fixture_nested"
+        settings:
+          network: "198.51.100.0/24"
+          port: 8080

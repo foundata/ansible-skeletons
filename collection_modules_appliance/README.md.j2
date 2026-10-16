@@ -29,7 +29,7 @@ invented fixture contract below after qualifying the first product resource.
 |      Module      | Purpose |
 | ---------------- | ------- |
 | `fixture`        | Converge one saved record |
-| `fixture_family` | Manage a nested family through lifecycle hooks |
+| `fixture_nested` | Manage a nested family through lifecycle hooks |
 | `fixture_info`   | Read its public saved state |
 | `fixture_apply`  | Activate the fixture family and verify named records |
 <!-- END MODULE TABLE -->
@@ -173,7 +173,7 @@ per administration task of the plan, in its order.
 
 Modules: `fixture`, `fixture_apply`, `fixture_info`.
 
-### FIXME Name the nested family task<a id="usage-fixture-family"></a>
+### FIXME Name the nested family task<a id="usage-fixture-nested"></a>
 
 FIXME Replace this scaffold example and the module's notes with the researched
 family's identity, ownership, eligibility and concurrency contract. Copy the
@@ -181,14 +181,14 @@ family utility and edit hooks, never the shared lifecycle sequence.
 
 ```yaml
 - name: "Manage one nested family"
-  {{ namespace }}.{{ collection_name }}.fixture_family:
+  {{ namespace }}.{{ collection_name }}.fixture_nested:
     name: "example"
     settings:
       network: "198.51.100.0/24"
       port: 8080
 ```
 
-Modules: `fixture_family`.
+Modules: `fixture_nested`.
 
 ## Compatibility<a id="compatibility"></a>
 

@@ -28,7 +28,7 @@ from ansible_collections.{{ namespace }}.\
     {{ collection_name }}.plugins.module_utils._binding import (
         Binding,
     )
-{# skeleton-variant: family-guard-import #}
+{# skeleton-variant: nested-guard-import #}
 {# end skeleton-variant #}
 # isort: on
 # fmt: on
@@ -53,11 +53,11 @@ def argument_spec() -> dict[str, Any]:
     }
 
 
-class FixtureFamily(Binding):
+class FixtureNested(Binding):
     """A nested resource; replace product hooks when copying this scaffold."""
 
-    result_key = "fixture_family"
-    compatibility_id = "fixture_family"
+    result_key = "fixture_nested"
+    compatibility_id = "fixture_nested"
     identity_options = ("name",)
     whole_diff = True
     recheck_code = "stale"
@@ -107,12 +107,12 @@ class FixtureFamily(Binding):
 
     def lookup(self) -> Any:
         """Read the complete named object or None, including on lost replies."""
-{# skeleton-variant: family-read #}
-        reply = self.client.read(f"/families/{self.key}")
+{# skeleton-variant: nested-read #}
+        reply = self.client.read(f"/nested/{self.key}")
 {# end skeleton-variant #}
-        if not isinstance(reply, dict) or "family" not in reply:
+        if not isinstance(reply, dict) or "nested" not in reply:
             raise ProductError(category="response", code="schema")
-        record = reply["family"]
+        record = reply["nested"]
         if record is None:
             return None
         if (
@@ -157,7 +157,7 @@ class FixtureFamily(Binding):
     def protect(self) -> None:
         """Refuse unsafe transitions before prediction, including check mode."""
         super().protect()
-{# skeleton-variant: family-protect #}
+{# skeleton-variant: nested-protect #}
 {# end skeleton-variant #}
 
     def secret(self, name: str) -> bool:
@@ -183,16 +183,16 @@ class FixtureFamily(Binding):
     def recheck(self) -> None:
         """Refuse a stale snapshot just before a write; never retry the write."""
         super().recheck()
-{# skeleton-variant: family-recheck #}
+{# skeleton-variant: nested-recheck #}
 {# end skeleton-variant #}
 
     def write(self) -> None:
         """Send exactly one mutation, preserving unmanaged nested members."""
         record = copy.deepcopy(self.record or {"name": self.key, "settings": {}})
         record["settings"].update(self.delta.get("settings", {}))
-{# skeleton-variant: family-write #}
+{# skeleton-variant: nested-write #}
         method = "DELETE" if self.absent else ("POST" if self.record is None else "PUT")
-        reply = self.client.write(method, f"/families/{self.key}", record)
+        reply = self.client.write(method, f"/nested/{self.key}", record)
 {# end skeleton-variant #}
         if not isinstance(reply, dict) or reply.get("status") != "ok":
             raise ProductError(category="product", code="rejected")

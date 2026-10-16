@@ -7,7 +7,7 @@ from __future__ import annotations
 
 DOCUMENTATION = r"""
 ---
-module: fixture_family
+module: fixture_nested
 short_description: Manage a nested fixture family on the lifecycle base
 description:
   - "Manages one immutable name and only declared nested settings."
@@ -58,7 +58,7 @@ options:
 EXAMPLES = r"""
 ---
 - name: "Save a nested fixture"
-  {{ namespace }}.{{ collection_name }}.fixture_family:
+  {{ namespace }}.{{ collection_name }}.fixture_nested:
     url: "https://example.invalid/api"
     api_key: "{% raw %}{{ fixture_api_key }}{% endraw %}"
     api_secret: "{% raw %}{{ fixture_api_secret }}{% endraw %}"
@@ -70,7 +70,7 @@ EXAMPLES = r"""
 
 RETURN = r"""
 ---
-fixture_family:
+fixture_nested:
   description: Public observed state, or predicted state in check mode; null after deletion.
   returned: success
   type: dict
@@ -105,8 +105,8 @@ from ansible.module_utils.basic import AnsibleModule
 # fmt: off
 # isort: off
 from ansible_collections.{{ namespace }}.\
-    {{ collection_name }}.plugins.module_utils._fixture_family import (
-        FixtureFamily,
+    {{ collection_name }}.plugins.module_utils._fixture_nested import (
+        FixtureNested,
         argument_spec,
     )
 # isort: on
@@ -115,7 +115,7 @@ from ansible_collections.{{ namespace }}.\
 
 def main() -> None:
     module = AnsibleModule(argument_spec=argument_spec(), supports_check_mode=True)
-    FixtureFamily(module).execute()
+    FixtureNested(module).execute()
 
 
 if __name__ == "__main__":

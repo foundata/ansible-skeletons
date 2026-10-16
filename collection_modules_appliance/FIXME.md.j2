@@ -38,11 +38,11 @@ SPDX-License-Identifier: GPL-3.0-or-later
   "Recovery drill" in `extensions/molecule/README.md`. Document independent
   recovery and one writer, including pending changes from other clients, as
   caller prerequisites.
-- Copy `plugins/module_utils/_fixture_family.py` for each family that a flat
+- Copy `plugins/module_utils/_fixture_nested.py` for each family that a flat
   definition cannot express. Edit its hooks and their contracts, never the
   lifecycle sequence. Keep `_lifecycle.py` and the shared tests unchanged.
   Bind the client, schema and compatibility policy once in `_binding.py`.
-  Copy the `fixture_family` module, unit test, file-only integration target
+  Copy the `fixture_nested` module, unit test, file-only integration target
   and default scenario tasks together. Replace the module's notes FIXME,
   verifier slot and Usage subsection with researched product evidence.
   Preserve unmanaged nested values and prove lost create, update and delete
