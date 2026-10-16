@@ -348,7 +348,6 @@ SHARED_FILES = {
         ".mypy.ini.j2",
         "DEVELOPMENT.md.j2",
         "antsibull-nox.toml.j2",
-        "changelogs/fragments/10-fixture-family.txt.j2",
         "extensions/molecule/README.md.j2",
         "extensions/molecule/default/inventory/hosts.yml.j2",
         "extensions/molecule/default/molecule.yml.j2",

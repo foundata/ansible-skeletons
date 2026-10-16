@@ -63,8 +63,7 @@ and the project adheres to
   custom operations, staged writes and lost-response settlement.
 - Both module variants: a nested family scaffold with hook contracts, module
   documentation, unit and file-only integration tests, default scenario
-  tasks, a verifier slot, Usage and changelog placeholders, and a copy
-  checklist.
+  tasks, a verifier slot, a Usage placeholder and a copy checklist.
 - Both module variants: one parameterized response-loss harness, exercised
   for create, update and delete by both fixture families.
 - Appliance variant: `_act_once.py` with preflight and bounded readiness
