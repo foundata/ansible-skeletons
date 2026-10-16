@@ -14,6 +14,10 @@ and the project adheres to
 
 ## [Unreleased]
 
+### Changed
+
+- Rename `collection_modules_grid` to `collection_modules_appliance`.
+
 ### Fixed
 
 - collection_default, collection_modules, collection_modules_grid: the

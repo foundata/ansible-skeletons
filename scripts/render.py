@@ -11,9 +11,9 @@ from pathlib import Path
 
 from scripts.common import ROOT, GateError, isolated_environment, run, write_json
 
-MODULE_PROFILES = ("collection_modules_grid", "collection_modules")
+MODULE_PROFILES = ("collection_modules_appliance", "collection_modules")
 PRODUCTS = {
-    "collection_modules_grid": "Example Grid",
+    "collection_modules_appliance": "Example Grid",
     "collection_modules": "Example REST Product",
 }
 """Product display names of the example renders of each module profile."""

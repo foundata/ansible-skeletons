@@ -15,7 +15,9 @@ from scripts.common import ROOT, GateError
 from scripts.render import example_metadata, render
 
 
-@pytest.mark.parametrize("profile", ["collection_modules_grid", "collection_modules"])
+@pytest.mark.parametrize(
+    "profile", ["collection_modules_appliance", "collection_modules"]
+)
 @pytest.mark.parametrize(
     "product",
     [
@@ -56,7 +58,9 @@ def test_inventory_product_literal_preserves_content_and_formatting(
     )
 
 
-@pytest.mark.parametrize("profile", ["collection_modules_grid", "collection_modules"])
+@pytest.mark.parametrize(
+    "profile", ["collection_modules_appliance", "collection_modules"]
+)
 def test_release_gate_runs_unrestricted_sanity_for_every_series(profile: str) -> None:
     tree = ast.parse((ROOT / "scripts/smoke.py").read_text())
     function = next(
@@ -88,7 +92,9 @@ def test_release_gate_runs_unrestricted_sanity_for_every_series(profile: str) ->
     assert config["collection"] == {"min_python_version": "ansible-test-config"}
 
 
-@pytest.mark.parametrize("profile", ["collection_modules_grid", "collection_modules"])
+@pytest.mark.parametrize(
+    "profile", ["collection_modules_appliance", "collection_modules"]
+)
 def test_module_skeleton_layout(profile: str) -> None:
     skeleton = ROOT / profile
     assert all(
@@ -101,7 +107,7 @@ def test_module_skeleton_layout(profile: str) -> None:
 
 
 # REUSE-IgnoreStart
-@pytest.mark.parametrize("name", ["collection_modules_grid", "collection_modules"])
+@pytest.mark.parametrize("name", ["collection_modules_appliance", "collection_modules"])
 def test_python_templates_carry_the_license_header(name: str) -> None:
     profile = ROOT / name
     holder = (
@@ -126,7 +132,7 @@ def test_python_templates_carry_the_license_header(name: str) -> None:
     [
         "role_default/molecule/default",
         "collection_default/extensions/molecule/default",
-        "collection_modules_grid/extensions/molecule/default",
+        "collection_modules_appliance/extensions/molecule/default",
         "collection_modules/extensions/molecule/default",
     ],
 )
@@ -152,7 +158,9 @@ def test_molecule_inventory_render_name(scenario: str) -> None:
         ("DEVELOPMENT.md.j2", ["Prerequisites", "Checks", "Releases"]),
     ],
 )
-@pytest.mark.parametrize("profile", ["collection_modules_grid", "collection_modules"])
+@pytest.mark.parametrize(
+    "profile", ["collection_modules_appliance", "collection_modules"]
+)
 def test_module_skeleton_has_standard_documentation(
     filename: str, sections: list[str], profile: str
 ) -> None:
@@ -161,7 +169,9 @@ def test_module_skeleton_has_standard_documentation(
         assert f"## {section}<a id=" in source
 
 
-@pytest.mark.parametrize("profile", ["collection_modules_grid", "collection_modules"])
+@pytest.mark.parametrize(
+    "profile", ["collection_modules_appliance", "collection_modules"]
+)
 def test_module_render_does_not_require_default_collection(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, profile: str
 ) -> None:
@@ -182,7 +192,8 @@ def test_module_render_does_not_require_default_collection(
     ],
 )
 @pytest.mark.parametrize(
-    "profile", ["collection_default", "collection_modules_grid", "collection_modules"]
+    "profile",
+    ["collection_default", "collection_modules_appliance", "collection_modules"],
 )
 def test_render_selects_profile_and_preserves_metadata(
     tmp_path: Path,
@@ -225,7 +236,9 @@ def test_invalid_profile_never_creates_output(tmp_path: Path) -> None:
     assert not output.exists()
 
 
-@pytest.mark.parametrize("profile", ["collection_modules_grid", "collection_modules"])
+@pytest.mark.parametrize(
+    "profile", ["collection_modules_appliance", "collection_modules"]
+)
 def test_engine_contains_no_protocol_literals(profile: str) -> None:
     source = (ROOT / profile / "plugins/module_utils/_engine.py.j2").read_text()
     source = source.replace("{{ namespace }}", "example").replace(

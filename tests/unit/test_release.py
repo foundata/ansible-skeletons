@@ -267,7 +267,7 @@ def test_release_check_refuses_a_local_utils_source(
         ),
         (
             [
-                "collection_modules_grid/extensions/molecule/shared/playbooks/verify.yml.j2"
+                "collection_modules_appliance/extensions/molecule/shared/playbooks/verify.yml.j2"
             ],
             ["podman"],
         ),

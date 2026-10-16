@@ -28,7 +28,7 @@ SPDX-License-Identifier = "GPL-3.0-or-later"
 path = [
   "collection_default/**",
   "collection_modules/**",
-  "collection_modules_grid/**",
+  "collection_modules_appliance/**",
   "role_default/**",
 ]
 precedence = "override"

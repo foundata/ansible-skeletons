@@ -265,13 +265,13 @@ SKELETONS = (
     "role_default",
     "collection_default",
     "collection_modules",
-    "collection_modules_grid",
+    "collection_modules_appliance",
 )
 SKELETON_GROUPS = {
     "all": SKELETONS,
     "role_and_collection_default": ("role_default", "collection_default"),
     "collections": SKELETONS[1:],
-    "module_skeletons": ("collection_modules", "collection_modules_grid"),
+    "module_skeletons": ("collection_modules", "collection_modules_appliance"),
 }
 # Files that must stay identical within a group outside their variant regions,
 # named by their path in collection_default. Explicit paths keep a missing copy
@@ -569,7 +569,9 @@ def test_module_checks_need_exactly_one_utils_pin(tmp_path: Path, pins: int) -> 
             pinned_utils_version(tmp_path)
 
 
-@pytest.mark.parametrize("profile", ["collection_modules", "collection_modules_grid"])
+@pytest.mark.parametrize(
+    "profile", ["collection_modules", "collection_modules_appliance"]
+)
 def test_pinned_utils_release_satisfies_the_skeleton_dependency(profile: str) -> None:
     galaxy = (ROOT / profile / "galaxy.yml.j2").read_text(encoding="utf-8")
     match = re.search(r'^  "foundata\.utils": "([^"]+)"$', galaxy, re.MULTILINE)

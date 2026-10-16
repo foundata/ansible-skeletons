@@ -75,21 +75,21 @@ variables. The helper refuses to overwrite an existing directory.
 
 ## Project structure<a id="project-structure"></a>
 
-|            Path             | Purpose |
-| --------------------------- | ------- |
-| `role_default/`             | Standalone role skeleton |
-| `collection_default/`       | Collection skeleton, including its `run` role |
-| `collection_modules_grid/`  | Module-only collection skeleton |
-| `collection_modules/`       | REST module-only collection skeleton |
-| `scripts/render.py`         | Render a role and the selected collection skeleton with Galaxy |
-| `scripts/smoke.py`          | Validate rendering, artifacts and role behavior |
-| `scripts/check.sh`          | Local quality-check entry point |
-| `scripts/integration.py`    | Generated Molecule scenarios with active fixtures |
-| `scripts/release.py`        | Validate a release commit, then hand the tag to `releasing` |
-| `tests/unit/`               | Release and helper regression tests |
-| `tests/fixtures/`           | Disposable role execution fixtures |
-| `tests/requirements.yml`    | Pinned Galaxy dependencies for the checks |
-| `pyproject.toml`, `uv.lock` | Tool configuration, matrix and locked Python tools |
+|              Path               | Purpose |
+| ------------------------------- | ------- |
+| `role_default/`                 | Standalone role skeleton |
+| `collection_default/`           | Collection skeleton, including its `run` role |
+| `collection_modules_appliance/` | Module-only collection skeleton |
+| `collection_modules/`           | REST module-only collection skeleton |
+| `scripts/render.py`             | Render a role and the selected collection skeleton with Galaxy |
+| `scripts/smoke.py`              | Validate rendering, artifacts and role behavior |
+| `scripts/check.sh`              | Local quality-check entry point |
+| `scripts/integration.py`        | Generated Molecule scenarios with active fixtures |
+| `scripts/release.py`            | Validate a release commit, then hand the tag to `releasing` |
+| `tests/unit/`                   | Release and helper regression tests |
+| `tests/fixtures/`               | Disposable role execution fixtures |
+| `tests/requirements.yml`        | Pinned Galaxy dependencies for the checks |
+| `pyproject.toml`, `uv.lock`     | Tool configuration, matrix and locked Python tools |
 
 Galaxy consumes one `.j2` suffix when creating a project. Files named
 `*.j2.j2` intentionally become runtime `*.j2` templates. Likewise, `FIXME`
@@ -97,7 +97,7 @@ instructions and `.yml.example` files are intentional parts of the product.
 Do not reject all remaining Jinja expressions or placeholders as render errors.
 
 Edit each skeleton directly in its own directory.
-`scripts.render --profile collection_modules_grid` or
+`scripts.render --profile collection_modules_appliance` or
 `--profile collection_modules` selects a module skeleton. Both variants run
 through the render and release gates; the unit tests enforce their shared-file
 list without a composition layer. Quick checks run their default nox sessions

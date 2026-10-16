@@ -49,7 +49,7 @@ The skeletons follow these style guides:
 - [Description of provided skeletons](#content)
   - [`collection_default`](#collection_default)
   - [`collection_modules`](#collection_modules)
-  - [`collection_modules_grid`](#collection_modules_grid)
+  - [`collection_modules_appliance`](#collection_modules_appliance)
   - [`role_default`](#role_default)
 - [Compatibility](#compatibility)
 - [Contributing](#contributing)
@@ -221,7 +221,7 @@ Follow the rendered `FIXME.md` to replace the fixture with product evidence.
 
 
 
-### `collection_modules_grid`<a id="collection_modules_grid"></a>
+### `collection_modules_appliance`<a id="collection_modules_appliance"></a>
 
 A module-first skeleton for products exposing a grid-style API.
 
@@ -256,7 +256,7 @@ cat > metadata.json <<'EOF'
 }
 EOF
 ansible-galaxy collection init \
-  --collection-skeleton ./collection_modules_grid \
+  --collection-skeleton ./collection_modules_appliance \
   --extra-vars @metadata.json \
   --extra-vars "skeleton_revision=$(git describe --tags --always)" \
   --extra-vars '{"product": "Example Grid"}' namespace.product

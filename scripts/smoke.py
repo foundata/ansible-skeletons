@@ -203,7 +203,7 @@ def build_collection(rendered: Rendered) -> Path:
                 "plugins/modules/fixture_info.py",
                 *(
                     ("plugins/modules/fixture_apply.py",)
-                    if rendered.profile == "collection_modules_grid"
+                    if rendered.profile == "collection_modules_appliance"
                     else ()
                 ),
                 "CHANGELOG.rst",
@@ -410,7 +410,7 @@ def exercise_modules(rendered: Rendered) -> None:
         / name
     )
     modules = ("fixture", "fixture_info") + (
-        ("fixture_apply",) if rendered.profile == "collection_modules_grid" else ()
+        ("fixture_apply",) if rendered.profile == "collection_modules_appliance" else ()
     )
     for module in modules:
         docs = run(
@@ -454,7 +454,7 @@ def module_smoke(
     output: Path,
     *,
     utils_source: Path | None = None,
-    profile: str = "collection_modules_grid",
+    profile: str = "collection_modules_appliance",
     full: bool = False,
 ) -> None:
     """Render distinct identities and exercise the installed module skeleton."""
