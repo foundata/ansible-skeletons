@@ -669,6 +669,12 @@ class Runner:
             return False
         return not (step.serial and any(other.serial for other in running))
 
+    def order(self) -> list[Step]:
+        """One job keeps the plan's order. More jobs start long steps first."""
+        if self.jobs == 1:
+            return list(self.steps)
+        return sorted(self.steps, key=lambda step: not step.long)
+
     def execute(self) -> dict[str, str]:
         """Run every step that can run; return each step's status."""
         (self.output / "logs").mkdir(exist_ok=True)
@@ -682,13 +688,7 @@ class Runner:
                 self.say(
                     f"reused {step.name}, passed in {took} at {record.get('finished')}"
                 )
-        # One job keeps the plan's order. More jobs start long steps first.
-        order = (
-            self.steps
-            if self.jobs == 1
-            else sorted(self.steps, key=lambda step: not step.long)
-        )
-        waiting = [step for step in order if step.name not in self.status]
+        waiting = [step for step in self.order() if step.name not in self.status]
         running: dict[Future[bool], Step] = {}
         with ThreadPoolExecutor(max_workers=self.jobs) as pool:
             while True:

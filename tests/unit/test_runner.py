@@ -79,13 +79,24 @@ def test_independent_steps_run_at_the_same_time(output: Path) -> None:
 
 
 def test_long_steps_start_first_with_several_jobs(output: Path) -> None:
-    started: list[str] = []
     steps = [
-        Step("short", recorder(started, "short")),
-        Step("long", recorder(started, "long"), long=True),
+        Step("a", recorder([], "a")),
+        Step("b", recorder([], "b"), long=True),
+        Step("c", recorder([], "c")),
+        Step("d", recorder([], "d"), long=True),
     ]
-    Runner(output, steps, jobs=2).execute()
-    assert started[0] == "long"
+    assert [step.name for step in Runner(output, steps, jobs=2).order()] == [
+        "b",
+        "d",
+        "a",
+        "c",
+    ]
+    assert [step.name for step in Runner(output, steps, jobs=1).order()] == [
+        "a",
+        "b",
+        "c",
+        "d",
+    ]
 
 
 @pytest.mark.parametrize("jobs", [1, 2])
