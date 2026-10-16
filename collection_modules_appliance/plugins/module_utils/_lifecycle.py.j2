@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Skeleton-owned lifecycle of one declared object or activation; internal.
+"""Skeleton-owned lifecycle of one declared object or operation; internal.
 
 A family subclasses :class:`Lifecycle` once per collection binding (the
 rendered ``_family.py``) and supplies the product steps as hooks. The base
@@ -26,13 +26,6 @@ changed anyway. A write that the client reports as never started
 is always written, to an existing object only with ``update_password:
 always``; it makes a successful write ``unverifiable`` and a lost one
 unknown.
-
-``act_once`` is the activation of a family whose loaded state cannot be
-tied to saved identities: it checks the saved state (``preflight``),
-activates on every run (``activate``) and reports ``changed``,
-``activated`` and ``verified: unverifiable``, or ``predicted`` in check
-mode. A lost reply leaves the outcome unknown and is never sent again;
-``effective`` may add a bounded readiness check without claiming more.
 
 Failures go through the binding's error schema with ``operation``,
 ``outcome`` (``unchanged``, ``unknown`` or ``changed``), the identity
@@ -226,18 +219,6 @@ class Lifecycle:
                 category="verification", code="not_persisted", fields=mismatch
             )
 
-    # Product steps of an activation that cannot observe its effect.
-
-    def preflight(self) -> None:
-        """Check the saved state the activation would load."""
-
-    def activate(self) -> None:
-        raise NotImplementedError
-
-    def effective(self) -> dict[str, Any]:
-        """Optional bounded readiness check; returns extra result keys."""
-        return {}
-
     # The sequence.
 
     def step(self, name: str) -> None:
@@ -247,9 +228,6 @@ class Lifecycle:
         if self.state_option:
             return f"{self.compatibility_id}:{self.params[self.state_option]}"
         return self.compatibility_id
-
-    def activation_id(self) -> str:
-        return self.compatibility_id + "_apply"
 
     def ensure_compatible(self, operation: str) -> None:
         if operation not in self.compatible:
@@ -346,28 +324,6 @@ class Lifecycle:
             result["verified"] = "unverifiable"
         return result
 
-    def act_once(self) -> dict[str, Any]:
-        self.step("connect")
-        self.client = self.connect()
-        self.step("protect")
-        self.preflight()
-        self.step("compatibility")
-        self.ensure_compatible(self.activation_id())
-        result: dict[str, Any] = {
-            "changed": True,
-            "activated": True,
-            "verified": "predicted" if self.module.check_mode else "unverifiable",
-        }
-        if self.module.check_mode:
-            return result
-        self.step("apply")
-        self.attempted = True
-        self.activate()
-        self.step("verify")
-        result.update(self.effective())
-        self.confirmed = True
-        return result
-
     # The catch boundary.
 
     def identity_fields(self) -> dict[str, Any]:
@@ -399,19 +355,10 @@ class Lifecycle:
             fields=fields,
         )
 
-    def execute(
-        self,
-        action: Callable[[], dict[str, Any]] | None = None,
-        *,
-        activation: bool = False,
-    ) -> None:
-        """Run the selected sequence under the shared failure boundary."""
+    def execute(self, action: Callable[[], dict[str, Any]] | None = None) -> None:
+        """Run a resource or supplied operation under the failure boundary."""
         try:
-            sequence = (
-                action
-                if action is not None
-                else (self.act_once if activation else self.reconcile)
-            )
+            sequence = action if action is not None else self.reconcile
             result = self.finish(sequence())
         except errors.ApiError as failure:
             self.fail(failure)

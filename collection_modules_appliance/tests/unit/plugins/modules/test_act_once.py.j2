@@ -1,0 +1,92 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Act-once appliance activation over the synthetic lifecycle family."""
+
+from __future__ import annotations
+
+from typing import Any
+
+import pytest
+from ansible.module_utils.basic import AnsibleModule
+
+from ansible_collections.foundata.utils.plugins.module_utils import errors
+
+# isort: split
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._act_once import (
+        ActOnce,
+    )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._lifecycle import (
+        Failure,
+    )
+# isort: on
+# fmt: on
+
+from ..conftest import RunModule
+from .test_lifecycle import Store, Synthetic, lose, spec
+
+
+class ActivationStore(Store):
+    def __init__(self) -> None:
+        super().__init__()
+        self.applied = 0
+        self.refuse_activation = False
+
+
+class SyntheticActivation(ActOnce, Synthetic):
+    def preflight(self) -> None:
+        if any(row.get("referenced") for row in self.client.rows.values()):
+            raise Failure(category="eligibility", code="referenced")
+
+    def activate(self) -> None:
+        def apply() -> None:
+            self.client.applied += 1
+
+        self.client.write("apply", apply)
+        if self.client.refuse_activation:
+            raise errors.ApiError(category="product", code="rejected")
+
+    def effective(self) -> dict[str, Any]:
+        return {"loaded": self.client.applied}
+
+
+def main() -> None:
+    arguments = spec()
+    arguments["apply"] = {"type": "bool", "default": False}
+    module = AnsibleModule(argument_spec=arguments, supports_check_mode=True)
+    SyntheticActivation(module).execute(activation=module.params["apply"])
+
+
+@pytest.fixture
+def connection() -> dict[str, Any]:
+    return {}
+
+
+@pytest.fixture(autouse=True)
+def store(monkeypatch: pytest.MonkeyPatch) -> ActivationStore:
+    instance = ActivationStore()
+    monkeypatch.setattr(SyntheticActivation, "connect", lambda self: instance)
+    return instance
+
+
+def test_act_once(store: ActivationStore, run_module: RunModule) -> None:
+    predicted = run_module(main, apply=True, _ansible_check_mode=True)
+    assert predicted["changed"] and predicted["activated"]
+    assert predicted["verified"] == "predicted" and not store.writes
+    for count in (1, 2):
+        result = run_module(main, apply=True)
+        assert result["verified"] == "unverifiable" and result["loaded"] == count
+    store.after = lose
+    lost = run_module(main, apply=True)
+    assert lost["outcome"] == "unknown" and lost["operation"] == "apply"
+    store.refuse_activation = True
+    refused = run_module(main, apply=True)
+    assert refused["outcome"] == "unknown" and refused["error_code"] == "rejected"
+    store.rows["a"] = {"name": "a", "referenced": True}
+    blocked = run_module(main, apply=True)
+    assert blocked["outcome"] == "unchanged" and blocked["operation"] == "protect"
+    assert store.writes == ["apply"] * 4

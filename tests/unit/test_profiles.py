@@ -106,6 +106,21 @@ def test_module_skeleton_layout(profile: str) -> None:
     assert not (skeleton / "roles").exists()
 
 
+def test_act_once_is_appliance_only() -> None:
+    for profile in ("collection_modules", "collection_modules_appliance"):
+        skeleton = ROOT / profile
+        appliance = profile.endswith("_appliance")
+        assert (
+            skeleton / "plugins/module_utils/_act_once.py.j2"
+        ).is_file() is appliance
+        assert (
+            skeleton / "tests/unit/plugins/modules/test_act_once.py.j2"
+        ).is_file() is appliance
+        base = (skeleton / "plugins/module_utils/_lifecycle.py.j2").read_text()
+        for hook in ("act_once", "preflight", "activate", "effective", "activation_id"):
+            assert f"def {hook}(" not in base
+
+
 # REUSE-IgnoreStart
 @pytest.mark.parametrize("name", ["collection_modules_appliance", "collection_modules"])
 def test_python_templates_carry_the_license_header(name: str) -> None:

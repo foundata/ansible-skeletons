@@ -1,0 +1,73 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Act once when saved identities cannot prove the loaded state; internal.
+
+Preflight checks the saved state before compatibility and check-mode prediction.
+Normal mode activates once and reports verified: unverifiable. A lost reply
+leaves the outcome unknown. Effective may check bounded readiness without
+claiming a loaded-state receipt. Families supply the product hooks and binding.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Callable
+
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._lifecycle import (
+        Lifecycle,
+    )
+# isort: on
+# fmt: on
+
+
+class ActOnce(Lifecycle):
+    """Mixin for an appliance family with an unobservable activation receipt."""
+
+    def preflight(self) -> None:
+        """Check the saved state the activation would load."""
+
+    def activate(self) -> None:
+        raise NotImplementedError
+
+    def effective(self) -> dict[str, Any]:
+        """Optional bounded readiness check; returns extra result keys."""
+        return {}
+
+    def activation_id(self) -> str:
+        return self.compatibility_id + "_apply"
+
+    def act_once(self) -> dict[str, Any]:
+        self.step("connect")
+        self.client = self.connect()
+        self.step("protect")
+        self.preflight()
+        self.step("compatibility")
+        self.ensure_compatible(self.activation_id())
+        result: dict[str, Any] = {
+            "changed": True,
+            "activated": True,
+            "verified": "predicted" if self.module.check_mode else "unverifiable",
+        }
+        if self.module.check_mode:
+            return result
+        self.step("apply")
+        self.attempted = True
+        self.activate()
+        self.step("verify")
+        result.update(self.effective())
+        self.confirmed = True
+        return result
+
+    def execute(
+        self,
+        action: Callable[[], dict[str, Any]] | None = None,
+        *,
+        activation: bool = False,
+    ) -> None:
+        """Select act-once when requested, then use the base's result boundary."""
+        if action is None and activation:
+            action = self.act_once
+        super().execute(action)

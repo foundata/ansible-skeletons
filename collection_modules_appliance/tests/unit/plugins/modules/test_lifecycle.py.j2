@@ -56,10 +56,8 @@ class Store:
         self.rows: dict[str, dict[str, Any]] = {}
         self.writes: list[str] = []
         self.versions = 0
-        self.applied = 0
         self.after: Callable[[], None] | None = None
         self.drop = False
-        self.refuse_activation = False
 
     def write(self, kind: str, apply: Callable[[], None]) -> None:
         self.writes.append(kind)
@@ -128,21 +126,6 @@ class Synthetic(Lifecycle):
         else:
             self.client.write("update", lambda: rows[key].update(delta))
 
-    def preflight(self) -> None:
-        if any(row.get("referenced") for row in self.client.rows.values()):
-            raise Failure(category="eligibility", code="referenced")
-
-    def activate(self) -> None:
-        def apply() -> None:
-            self.client.applied += 1
-
-        self.client.write("apply", apply)
-        if self.client.refuse_activation:
-            raise errors.ApiError(category="product", code="rejected")
-
-    def effective(self) -> dict[str, Any]:
-        return {"loaded": self.client.applied}
-
 
 def spec() -> dict[str, Any]:
     return {
@@ -160,13 +143,12 @@ def spec() -> dict[str, Any]:
             "choices": ["present", "absent"],
             "default": "present",
         },
-        "apply": {"type": "bool", "default": False},
     }
 
 
 def main() -> None:
     module = AnsibleModule(argument_spec=spec(), supports_check_mode=True)
-    Synthetic(module).execute(activation=module.params["apply"])
+    Synthetic(module).execute()
 
 
 @pytest.fixture
@@ -274,25 +256,6 @@ def test_secret_is_unverifiable_and_rotates_only_when_asked(
     store.after = lose
     lost = run_module(main, name="a", secret="s5", update_password="always")
     assert lost["error_code"] == "create_unknown" and lost["outcome"] == "unknown"
-
-
-def test_act_once(store: Store, run_module: RunModule) -> None:
-    predicted = run_module(main, apply=True, _ansible_check_mode=True)
-    assert predicted["changed"] and predicted["activated"]
-    assert predicted["verified"] == "predicted" and not store.writes
-    for count in (1, 2):
-        result = run_module(main, apply=True)
-        assert result["verified"] == "unverifiable" and result["loaded"] == count
-    store.after = lose
-    lost = run_module(main, apply=True)
-    assert lost["outcome"] == "unknown" and lost["operation"] == "apply"
-    store.refuse_activation = True
-    refused = run_module(main, apply=True)
-    assert refused["outcome"] == "unknown" and refused["error_code"] == "rejected"
-    store.rows["a"] = {"name": "a", "referenced": True}
-    blocked = run_module(main, apply=True)
-    assert blocked["outcome"] == "unchanged" and blocked["operation"] == "protect"
-    assert store.writes == ["apply"] * 4
 
 
 @pytest.mark.parametrize("lost_reply", [False, True])
