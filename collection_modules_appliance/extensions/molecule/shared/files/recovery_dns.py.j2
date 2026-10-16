@@ -50,9 +50,9 @@ def main() -> int:
         print("no valid answer", file=sys.stderr)
         return 1
     offset = 12
-    for _ in range(questions):
+    for _question_index in range(questions):
         offset = skip_name(reply, offset) + 4
-    for _ in range(answers):
+    for _answer_index in range(answers):
         offset = skip_name(reply, offset)
         kind, klass, _ttl, length = struct.unpack("!2HIH", reply[offset : offset + 10])
         offset += 10

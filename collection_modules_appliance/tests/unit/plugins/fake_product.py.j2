@@ -155,7 +155,7 @@ class FakeProduct:
                 },
             )
         if path.startswith("/family/"):
-            _, _, action, name = path.split("/")
+            _prefix, _family, action, name = path.split("/")
             method = {
                 "get_item": "GET",
                 "add_item": "POST",

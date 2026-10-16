@@ -105,7 +105,7 @@ class Handler(BaseHTTPRequestHandler):
             )
             return
         if self.path.startswith("/api/family/"):
-            _, _, _, action, name = self.path.split("/")
+            _prefix, _api, _family, action, name = self.path.split("/")
             self.family_request(action, name, data.get("family", {}))
             return
         match = re.fullmatch(
