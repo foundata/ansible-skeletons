@@ -31,8 +31,8 @@ from ansible_collections.{{ namespace }}.\
         run_resource,
     )
 from ansible_collections.{{ namespace }}.\
-    {{ collection_name }}.plugins.module_utils._family import (
-        Family,
+    {{ collection_name }}.plugins.module_utils._binding import (
+        Binding,
     )
 # isort: on
 # fmt: on
@@ -274,7 +274,7 @@ def test_info_follows_binding_probe_policy_without_writing(
 ) -> None:
     if flip_policy:
         monkeypatch.setattr(
-            Family, "compatibility_always", not Family.compatibility_always
+            Binding, "compatibility_always", not Binding.compatibility_always
         )
     main = info_main()
     subject.add(fake, **arguments())
@@ -283,7 +283,7 @@ def test_info_follows_binding_probe_policy_without_writing(
     assert result[subject.RESULT][subject.KEY] == subject.IDENTITIES[0]
     assert not fake.writes()
     assert subject.requested(fake, subject.VERSION_PATH) == int(
-        Family.compatibility_always
+        Binding.compatibility_always
     )
 
 
@@ -305,12 +305,12 @@ def test_noop_follows_binding_probe_policy(
 ) -> None:
     if flip_policy:
         monkeypatch.setattr(
-            Family, "compatibility_always", not Family.compatibility_always
+            Binding, "compatibility_always", not Binding.compatibility_always
         )
     subject.add(fake, **arguments())
     assert not run_module(subject.main, **arguments())["changed"]
     assert subject.requested(fake, subject.VERSION_PATH) == int(
-        Family.compatibility_always
+        Binding.compatibility_always
     )
 
 

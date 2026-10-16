@@ -25,8 +25,8 @@ from ansible_collections.{{ namespace }}.\
         api_argument_spec,
     )
 from ansible_collections.{{ namespace }}.\
-    {{ collection_name }}.plugins.module_utils._family import (
-        Family,
+    {{ collection_name }}.plugins.module_utils._binding import (
+        Binding,
     )
 {# skeleton-variant: family-guard-import #}
 {# end skeleton-variant #}
@@ -53,7 +53,7 @@ def argument_spec() -> dict[str, Any]:
     }
 
 
-class FixtureFamily(Family):
+class FixtureFamily(Binding):
     """A nested resource; replace product hooks when copying this scaffold."""
 
     result_key = "fixture_family"

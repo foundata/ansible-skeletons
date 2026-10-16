@@ -42,7 +42,7 @@ and the project adheres to
 
 ### Fixed
 
-- Both module variants: honour `Family.compatibility_always` on lifecycle
+- Both module variants: honour `Binding.compatibility_always` on lifecycle
   entry points and information reads, and make the shared noop and info
   contract tests follow that policy.
 - collection_default, collection_modules, collection_modules_grid: the
@@ -59,7 +59,7 @@ and the project adheres to
   the lanes and module skeletons whose sources differ from `HEAD`; it never
   writes a passing report.
 - Both module variants: skeleton-owned `_lifecycle.py`, a product-bound
-  `_family.py`, and synthetic `test_lifecycle.py` coverage for family hooks,
+  `_binding.py`, and synthetic `test_lifecycle.py` coverage for family hooks,
   custom operations, staged writes and lost-response settlement.
 - Both module variants: a nested family scaffold with hook contracts, module
   documentation, unit and file-only integration tests, default scenario
@@ -99,7 +99,7 @@ and the project adheres to
 - The `collection_modules_grid` initialization path; use
   `collection_modules_appliance`.
 - The engine's separate lifecycle sequence and local client/schema binding.
-  Invariant tests and product bindings migrate to `_family.py`; family
+  Invariant tests and product bindings migrate to `_binding.py`; family
   implementations use the base's hooks rather than patching `_engine`.
 
 

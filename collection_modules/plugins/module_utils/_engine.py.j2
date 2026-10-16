@@ -4,7 +4,7 @@
 
 ``_lifecycle`` owns the sequence, the settlement of a lost reply and the
 result and failure contracts; this module supplies the steps from a curated
-definition. The rendered ``_family`` binding supplies the product client,
+definition. The rendered ``_binding`` supplies the product client,
 error schema and compatibility check.
 
 Client contract (exercised by tests/unit/plugins/modules/test_contract.py):
@@ -44,8 +44,8 @@ from ansible_collections.{{ namespace }}.\
         api_argument_spec,
     )
 from ansible_collections.{{ namespace }}.\
-    {{ collection_name }}.plugins.module_utils._family import (
-        Family,
+    {{ collection_name }}.plugins.module_utils._binding import (
+        Binding,
     )
 from ansible_collections.{{ namespace }}.\
     {{ collection_name }}.plugins.module_utils._lifecycle import (
@@ -306,7 +306,7 @@ def equal(field: Field, current: Any, desired: Any) -> bool:
     return bool(current == desired)
 
 
-class Engine(Family):
+class Engine(Binding):
     """Plan one minimal write and recover by the declared lookup, never by retry."""
 
     message = "Resource reconciliation failed; see error_category and error_code"
@@ -595,7 +595,7 @@ def fail(
     errors.fail_from(
         module,
         failure,
-        schema=Family.schema,
+        schema=Binding.schema,
         msg=msg,
         changed=changed,
         outcome=outcome,

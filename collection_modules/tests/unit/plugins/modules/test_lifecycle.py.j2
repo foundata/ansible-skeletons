@@ -25,8 +25,8 @@ from ansible_collections.{{ namespace }}.\
         Resource,
     )
 from ansible_collections.{{ namespace }}.\
-    {{ collection_name }}.plugins.module_utils._family import (
-        Family,
+    {{ collection_name }}.plugins.module_utils._binding import (
+        Binding,
     )
 from ansible_collections.{{ namespace }}.\
     {{ collection_name }}.plugins.module_utils._lifecycle import (
@@ -538,7 +538,7 @@ def test_engine_info_probes_before_product_reads(
     )
     record = {"id": 1, "name": "a"}
 
-    def compatibility(self: Family, operation: str) -> None:
+    def compatibility(self: Binding, operation: str) -> None:
         events.append(operation)
         if refused:
             raise Failure(category="compatibility", code="ineligible")
@@ -547,8 +547,8 @@ def test_engine_info_probes_before_product_reads(
         events.append("lookup")
         return record
 
-    monkeypatch.setattr(Family, "compatibility_always", always)
-    monkeypatch.setattr(Family, "compatibility", compatibility)
+    monkeypatch.setattr(Binding, "compatibility_always", always)
+    monkeypatch.setattr(Binding, "compatibility", compatibility)
     client = SimpleNamespace(probe=events.append, lookup=lookup)
     engine = Engine(SimpleNamespace(params={"name": "a"}), resource, client)
     assert not events

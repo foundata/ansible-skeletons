@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Binding of the skeleton's lifecycle base to this collection; internal.
 
-Handwritten families subclass :class:`Family`: the client, the public error
+Handwritten families subclass :class:`Binding`: the client, the public error
 schema and the compatibility check are this collection's own.
 """
 
@@ -30,7 +30,7 @@ from ansible_collections.{{ namespace }}.\
 # fmt: on
 
 
-class Family(Lifecycle):
+class Binding(Lifecycle):
     schema = SCHEMA
 
     # When true, every module checks the product version before its first
