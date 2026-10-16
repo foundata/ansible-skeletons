@@ -54,7 +54,20 @@ which is what `.releasing.toml` declares.
 
 ## Getting started<a id="getting-started"></a>
 
-Run the quick checks after editing templates or tooling:
+While editing templates or tooling, check what your changes affect:
+
+```sh
+./scripts/check.sh --changed
+```
+
+This runs the static checks, the repository tests, and the lanes and module
+skeletons whose sources differ from `HEAD` in the index or working tree. A
+change in `role_default/` or `collection_default/` selects the role and
+collection lanes and `generated-lint`; a change in a module skeleton selects
+that skeleton. A change anywhere else, such as `scripts/`, `tests/`,
+`pyproject.toml` or `uv.lock`, selects everything. The run prints the checks it
+skipped and never writes a passing `checks.json`. Before each commit, run the
+full quick check:
 
 ```sh
 ./scripts/check.sh
@@ -322,7 +335,8 @@ skeleton-specific gate (`scripts/release.py check`).
 
 ### Release checklist<a id="release-checklist"></a>
 
-1. Run `./scripts/check.sh` during development and resolve failures.
+1. Run `./scripts/check.sh --changed` while editing and `./scripts/check.sh`
+   before each commit, and resolve failures.
 2. Choose the next Semantic Versioning `X.Y.Z` version and move the Unreleased
    entries into a dated section. The command writes the section, its release
    link and the Unreleased comparison link, and leaves the placeholder entry

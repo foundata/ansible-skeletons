@@ -55,6 +55,9 @@ and the project adheres to
 - checks: `--resume <output>` reruns only the failed and missing steps of an
   earlier run of the same sources; `scripts.release check --resume` does the
   same for the evidence of the same commit.
+- checks: `--changed` runs the static checks, the repository tests and only
+  the lanes and module skeletons whose sources differ from `HEAD`; it never
+  writes a passing report.
 - Both module variants: skeleton-owned `_lifecycle.py`, a product-bound
   `_family.py`, and synthetic `test_lifecycle.py` coverage for family hooks,
   custom operations, staged writes and lost-response settlement.

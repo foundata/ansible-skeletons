@@ -8,6 +8,7 @@ import json
 import os
 import platform
 import shutil
+import subprocess
 import sys
 import tempfile
 import threading
@@ -45,6 +46,17 @@ from scripts.controller import (
 )
 from scripts.render import MODULE_PROFILES
 from scripts.smoke import IDENTITIES
+
+# Source paths, and the checks a change below them needs besides the static
+# checks and the repository tests. "lanes" are the role and collection lanes.
+# A change anywhere else, in scripts/, tests/, pyproject.toml, uv.lock or a
+# shared file, needs every check.
+CHANGED_SCOPES = {
+    "role_default/": ("lanes", "generated-lint"),
+    "collection_default/": ("lanes", "generated-lint"),
+    "collection_modules/": ("collection_modules",),
+    "collection_modules_appliance/": ("collection_modules_appliance",),
+}
 
 
 def default_lane() -> Lane:
@@ -499,6 +511,48 @@ def plan(
     return steps
 
 
+def changed_paths(root: Path = ROOT) -> list[str]:
+    """List the paths that differ from HEAD in the index or the working tree."""
+    if not (root / ".git").exists():
+        raise GateError("--changed needs a Git checkout")
+    names: set[str] = set()
+    for command in (
+        ["git", "diff", "--name-only", "--no-renames", "HEAD"],
+        ["git", "ls-files", "--others", "--exclude-standard"],
+    ):
+        listing = subprocess.run(
+            command, cwd=root, check=True, capture_output=True, text=True, timeout=60
+        )
+        names.update(listing.stdout.splitlines())
+    return sorted(names)
+
+
+def changed_only(steps: list[Step], paths: list[str]) -> list[Step]:
+    """Keep the steps that changes below these paths need, in the plan's order.
+
+    The static checks and the repository tests always run.
+    """
+    lanes = {lane.name for lane in matrix()}
+    needed = {"static", *[step.name for step in steps if step.name.startswith("unit-")]}
+    for path in paths:
+        scope = next(
+            (
+                checks
+                for prefix, checks in CHANGED_SCOPES.items()
+                if path.startswith(prefix)
+            ),
+            None,
+        )
+        if scope is None:
+            return steps
+        for check in scope:
+            needed.update(lanes if check == "lanes" else {check})
+    kept = [step for step in steps if step.check is None or step.check in needed]
+    # Preparation steps run only for the steps that wait for them.
+    waited = {name for step in kept for name in step.after}
+    return [step for step in kept if step.check is not None or step.name in waited]
+
+
 def duration(seconds: float) -> str:
     """Format a step's wall time for the progress lines."""
     minutes, rest = divmod(round(seconds), 60)
@@ -680,12 +734,16 @@ def check(
     utils_source: Path | None = None,
     jobs: int | None = None,
     resume: bool = False,
+    changed: bool = False,
 ) -> None:
     """Run required stages and emit a complete report only after all succeed.
 
     With ``resume``, the existing output's passed records of the same sources
-    are reused and every other step runs.
+    are reused and every other step runs. With ``changed``, only the steps
+    that the sources changed since HEAD need run, and no report is written.
     """
+    if changed and (resume or backends):
+        raise GateError("--changed combines with neither --resume nor --integration")
     selected = backends or []
     if foundata_wheel is not None and (
         not foundata_wheel.is_file() or foundata_wheel.suffix != ".whl"
@@ -699,6 +757,20 @@ def check(
     steps = plan(
         full=full, backends=selected, packages=packages, utils_source=utils_source
     )
+    if changed:
+        paths = changed_paths()
+        kept = changed_only(steps, paths)
+        skipped = [
+            check
+            for check in required_checks(full=full, backends=selected)
+            if check not in {step.check for step in kept}
+        ]
+        print(
+            f"{len(paths)} paths differ from HEAD. Skipped, sources unchanged: "
+            f"{', '.join(skipped) or 'nothing'}",
+            flush=True,
+        )
+        steps = kept
     source = source_digest()
     if resume:
         try:
@@ -716,7 +788,7 @@ def check(
     controller_environment(output, {})
     write_json(
         output / "run.json",
-        {"source": source, "full": full, "backends": selected},
+        {"source": source, "full": full, "backends": selected, "changed": changed},
     )
     began = time.monotonic()
     print(
@@ -735,6 +807,7 @@ def check(
                     "source": None,
                     "full": full,
                     "backends": selected,
+                    "changed": changed,
                 },
             )
             print(
@@ -745,6 +818,13 @@ def check(
     if failed:
         raise GateError(f"Failed: {', '.join(failed)}; logs in {output / 'logs'}")
     checks = completed_checks(steps, status)
+    if changed:
+        # A partial run never writes a passing report.
+        print(
+            f"Changed-only checks passed in {duration(time.monotonic() - began)}. "
+            "Run the full quick check before committing."
+        )
+        return
     if checks != required_checks(full=full, backends=selected):
         raise GateError("Incomplete check run")
     for profile in MODULE_PROFILES:
@@ -805,6 +885,11 @@ def main() -> int:
         help="Rerun the failed and missing steps of a retained output",
     )
     parser.add_argument(
+        "--changed",
+        action="store_true",
+        help="Check only what the changes since HEAD affect; writes no report",
+    )
+    parser.add_argument(
         "--jobs",
         type=int,
         default=default_jobs(),
@@ -829,6 +914,7 @@ def main() -> int:
         foundata_wheel=args.foundata_wheel,
         utils_source=args.utils_source,
         jobs=args.jobs,
+        changed=args.changed,
     )
     try:
         if args.resume:

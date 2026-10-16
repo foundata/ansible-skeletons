@@ -18,6 +18,8 @@ from scripts.check import (
     Context,
     Runner,
     Step,
+    changed_only,
+    changed_paths,
     check_output_layout,
     completed_checks,
     default_lane,
@@ -25,7 +27,7 @@ from scripts.check import (
     plan,
     required_checks,
 )
-from scripts.common import GateError, source_digest
+from scripts.common import GateError, matrix, source_digest
 from scripts.render import MODULE_PROFILES
 
 
@@ -416,3 +418,113 @@ def test_exported_sources_use_the_supplied_digest(
         source_digest(tmp_path)
     monkeypatch.setenv("SKELETONS_SOURCE_DIGEST", "a" * 64)
     assert source_digest(tmp_path) == "a" * 64
+
+
+@pytest.mark.parametrize(
+    ("paths", "checks"),
+    [
+        ([], set()),
+        (["role_default/tasks/main.yml.j2"], {"lanes", "generated-lint"}),
+        (["collection_default/galaxy.yml.j2"], {"lanes", "generated-lint"}),
+        (["collection_modules/noxfile.py.j2"], {"collection_modules"}),
+        (
+            ["collection_modules_appliance/FIXME.md.j2"],
+            {"collection_modules_appliance"},
+        ),
+        (
+            ["collection_modules/galaxy.yml.j2", "role_default/README.md.j2"],
+            {"lanes", "generated-lint", "collection_modules"},
+        ),
+        (["scripts/smoke.py"], {"all"}),
+        (["tests/unit/test_runner.py"], {"all"}),
+        (["uv.lock"], {"all"}),
+        (["README.md", "role_default/meta/main.yml.j2"], {"all"}),
+    ],
+)
+@pytest.mark.parametrize("full", [False, True])
+def test_changed_sources_select_their_checks(
+    paths: list[str], checks: set[str], full: bool
+) -> None:
+    steps = plan(full=full, backends=[], packages=[], utils_source=None)
+    lanes = {lane.name for lane in (matrix() if full else [default_lane()])}
+    every = set(required_checks(full=full, backends=[]))
+    always = {"static", *[check for check in every if check.startswith("unit-")]}
+    expected = (
+        every
+        if "all" in checks
+        else always | (lanes if "lanes" in checks else set()) | (checks - {"lanes"})
+    )
+    kept = changed_only(steps, paths)
+    assert {step.check for step in kept if step.check} == expected
+    # Preparation runs only for the steps that wait for it, in the plan's order.
+    assert [step.name for step in kept] == [step.name for step in steps if step in kept]
+    assert ("galaxy" in [step.name for step in kept]) == any(
+        "galaxy" in step.after for step in kept
+    )
+
+
+def test_changed_paths_cover_index_working_tree_and_untracked_files(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "repository"
+    root.mkdir()
+    for command in (
+        ["init", "--quiet"],
+        ["config", "user.email", "test@example.com"],
+        ["config", "user.name", "Test"],
+        ["config", "commit.gpgsign", "false"],
+    ):
+        subprocess.run(["git", *command], cwd=root, check=True)
+    for name in ("staged.txt", "edited.txt", "deleted.txt", "same.txt"):
+        (root / name).write_text("one\n", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=root, check=True)
+    subprocess.run(["git", "commit", "--quiet", "-m", "base"], cwd=root, check=True)
+    (root / "staged.txt").write_text("two\n", encoding="utf-8")
+    subprocess.run(["git", "add", "staged.txt"], cwd=root, check=True)
+    (root / "edited.txt").write_text("two\n", encoding="utf-8")
+    (root / "deleted.txt").unlink()
+    (root / "new.txt").write_text("new\n", encoding="utf-8")
+    assert changed_paths(root) == [
+        "deleted.txt",
+        "edited.txt",
+        "new.txt",
+        "staged.txt",
+    ]
+    with pytest.raises(GateError, match="Git checkout"):
+        changed_paths(tmp_path)
+
+
+@pytest.mark.usefixtures("unbudgeted")
+def test_a_changed_only_run_writes_no_report(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    ran: list[str] = []
+    steps = [
+        Step("static", recorder(ran, "static"), check="static"),
+        Step("lint", recorder(ran, "lint"), check="generated-lint"),
+        Step("module", recorder(ran, "module"), check="collection_modules"),
+    ]
+    monkeypatch.setattr(check_module, "plan", plan_of(steps))
+    monkeypatch.setattr(check_module, "source_digest", lambda: "tree")
+    monkeypatch.setattr(
+        check_module, "changed_paths", lambda: ["collection_modules/galaxy.yml.j2"]
+    )
+    output = tmp_path / "o"
+    check_module.check(output, jobs=1, changed=True)
+    assert ran == ["static", "module"]
+    assert not (output / "checks.json").exists()
+    printed = capsys.readouterr().out
+    assert "Skipped, sources unchanged: " in printed
+    assert "generated-lint" in printed.split("Skipped, sources unchanged: ")[1]
+    assert "Run the full quick check before committing." in printed
+
+
+@pytest.mark.parametrize("options", [{"resume": True}, {"backends": ["podman"]}])
+def test_changed_only_runs_neither_resume_nor_infrastructure(
+    tmp_path: Path, options: dict[str, object]
+) -> None:
+    with pytest.raises(GateError, match="--changed"):
+        check_module.check(tmp_path / "o", changed=True, **options)  # type: ignore[arg-type]
+    assert not (tmp_path / "o").exists()
