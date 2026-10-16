@@ -35,6 +35,10 @@ and the project adheres to
 - checks: independent steps run at the same time, `--jobs N` at once and by
   default half the CPUs, each with its own log under `logs/` and its own
   temporary directory; infrastructure tiers stay one at a time.
+- checks: one download of the pinned Galaxy collections per run serves the
+  generated lint, the module renders and the infrastructure tiers. The module
+  renders' ansible-test containers use a Podman store of each render's own
+  that reads your images read-only instead of pulling them again.
 
 ### Fixed
 

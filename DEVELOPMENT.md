@@ -250,6 +250,11 @@ configuration is strict. Required suites must execute without failures or skips.
 The matrix is defined in `[tool.skeletons]` in `pyproject.toml`. Each lane uses
 a separate locked environment; no lane upgrades dependencies during a run.
 
+The module renders' ansible-test lanes run their containers in a Podman store
+of each render's own. It reads the images of your own Podman store read-only,
+so an image already there is not pulled again; a missing image is pulled into
+the render's store and removed with the output.
+
 Review the matrix against the
 [upstream maintenance policy](https://docs.ansible.com/ansible/latest/reference_appendices/release_and_maintenance.html#ansible-core-support-matrix)
 when updating dependencies. Update the README compatibility statement together
@@ -283,10 +288,12 @@ uv run --locked --group core221 --group lint --group integration \
 ```
 
 Tests need network access for pinned Galaxy collections, container images, and,
-for libvirt, the cloud image. `SKELETONS_VM_IMAGE` can name an absolute path to
-an existing Debian-compatible cloud-init image. Each run uses unique VM and
-container names. Podman tests use a separate disposable storage configuration,
-including the execution-environment build and its image cleanup.
+for libvirt, the cloud image. A check downloads the pinned Galaxy collections
+once, into `galaxy/` below its output, and every later step installs them from
+there. `SKELETONS_VM_IMAGE` can name an absolute path to an existing
+Debian-compatible cloud-init image. Each run uses unique VM and container
+names. Podman tests use a separate disposable storage configuration, including
+the execution-environment build and its image cleanup.
 
 
 ### Updating dependencies<a id="updating-dependencies"></a>

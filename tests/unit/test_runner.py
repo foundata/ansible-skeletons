@@ -216,7 +216,9 @@ def test_each_module_identity_is_its_own_step() -> None:
     for profile in MODULE_PROFILES:
         identities = [steps[identity_step(profile, index)] for index in (0, 1)]
         assert [step.check for step in identities] == [profile, profile]
-        assert all(step.long and step.after == ("controller",) for step in identities)
+        assert all(
+            step.long and step.after == ("controller", "galaxy") for step in identities
+        )
 
 
 def test_infrastructure_tiers_wait_for_the_quick_checks_one_at_a_time() -> None:
@@ -225,7 +227,27 @@ def test_infrastructure_tiers_wait_for_the_quick_checks_one_at_a_time() -> None:
     assert [step.name for step in tiers] == ["integration-podman", "integration-ee"]
     for tier in tiers:
         assert tier.serial
-        assert set(tier.after) == {"static", "unit-python3.14", default_lane().name}
+        assert set(tier.after) == {
+            "static",
+            "galaxy",
+            "unit-python3.14",
+            default_lane().name,
+        }
+
+
+@pytest.mark.parametrize("full", [False, True])
+def test_only_steps_that_install_collections_wait_for_the_download(full: bool) -> None:
+    steps = plan(full=full, backends=["podman"], packages=[], utils_source=None)
+    waiting = {step.name for step in steps if "galaxy" in step.after}
+    assert waiting == {
+        "generated-lint",
+        "integration-podman",
+        *[
+            identity_step(profile, index)
+            for profile in MODULE_PROFILES
+            for index in (0, 1)
+        ],
+    }
 
 
 def test_invalid_jobs_are_rejected_before_any_output(tmp_path: Path) -> None:

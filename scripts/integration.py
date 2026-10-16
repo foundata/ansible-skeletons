@@ -23,6 +23,7 @@ from scripts.controller import (
     controller_environment,
 )
 from scripts.render import Rendered, example_metadata, render
+from scripts.smoke import pinned_archives
 
 
 def mapping(value: object) -> dict[str, object]:
@@ -291,8 +292,12 @@ def molecule_command(action: str, scenario: str) -> list[str]:
     return ["molecule", action, "--scenario-name", scenario]
 
 
-def integration(backend: str, output: Path) -> None:
-    """Run both generated projects; keep failures and always destroy the targets."""
+def integration(backend: str, output: Path, collections: Path | None = None) -> None:
+    """Run both generated projects; keep failures and always destroy the targets.
+
+    ``collections`` names the run's downloads of the pinned Galaxy collections;
+    without it, they come from Galaxy.
+    """
     check_socket_layout(output, SSH_CONTROL_LAYOUT)
     require_tools("molecule", "ansible-galaxy", "ansible-lint")
     if backend in ("podman", "ee"):
@@ -323,8 +328,11 @@ def integration(backend: str, output: Path) -> None:
             "collection",
             "install",
             "--no-deps",
-            "--requirements-file",
-            str(ROOT / "tests/requirements.yml"),
+            *(
+                [str(archive) for archive in pinned_archives(collections).values()]
+                if collections
+                else ["--requirements-file", str(ROOT / "tests/requirements.yml")]
+            ),
         ],
         cwd=output,
         env=env,
@@ -385,9 +393,18 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("backend", choices=["podman", "libvirt", "ee"])
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument(
+        "--collections",
+        type=Path,
+        help="The run's downloads of the pinned Galaxy collections",
+    )
     args = parser.parse_args()
     try:
-        integration(args.backend, args.output.resolve())
+        integration(
+            args.backend,
+            args.output.resolve(),
+            args.collections.resolve() if args.collections else None,
+        )
     except (GateError, OSError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

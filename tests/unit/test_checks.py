@@ -28,10 +28,13 @@ from scripts.smoke import (
     check_tree,
     default_sessions,
     identity_sessions,
+    install_utils,
     lint_constraints,
     lint_project,
+    lint_resources,
     module_smoke,
     newest_released_core,
+    pinned_archives,
     pinned_utils_version,
     private_podman_store,
 )
@@ -641,6 +644,71 @@ def test_module_render_keeps_its_podman_run_state_to_itself(tmp_path: Path) -> N
     assert Path(storage["graphroot"]).is_relative_to(tmp_path / "home")
     assert Path(storage["runroot"]).is_relative_to(tmp_path)
     assert not Path(storage["runroot"]).is_relative_to(tmp_path / "home")
+    assert "options" not in config.read_text(encoding="utf-8")
+    private_podman_store(rendered, "/user/store")
+    options = tomllib.loads(config.read_text(encoding="utf-8"))["storage"]["options"]
+    # ansible-test finds the user's images there and pulls nothing.
+    assert options == {"additionalimagestores": ["/user/store"]}
+
+
+def write_pinned_archives(directory: Path) -> None:
+    directory.mkdir()
+    for archive in (
+        "containers-podman-1.20.2.tar.gz",
+        "community-crypto-3.3.0.tar.gz",
+        "community-general-13.2.0.tar.gz",
+        "foundata-utils-1.0.0.tar.gz",
+    ):
+        (directory / archive).write_bytes(b"archive")
+
+
+def test_pinned_archives_follow_the_requirements(tmp_path: Path) -> None:
+    downloads = tmp_path / "collections"
+    write_pinned_archives(downloads)
+    archives = pinned_archives(downloads)
+    assert list(archives) == [
+        "containers.podman",
+        "community.crypto",
+        "community.general",
+        "foundata.utils",
+    ]
+    assert archives["foundata.utils"] == downloads / "foundata-utils-1.0.0.tar.gz"
+    (downloads / "community-crypto-3.3.0.tar.gz").unlink()
+    with pytest.raises(GateError, match=re.escape("community.crypto 3.3.0")):
+        pinned_archives(downloads)
+
+
+def test_downloaded_collections_replace_galaxy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    downloads = tmp_path / "collections"
+    write_pinned_archives(downloads)
+    commands: list[list[str]] = []
+
+    def record(command: list[str], **_options: object) -> str:
+        commands.append(command)
+        return ""
+
+    monkeypatch.setattr("scripts.smoke.run", record)
+    monkeypatch.setattr("scripts.smoke.lint_project", lambda *_: None)
+    monkeypatch.setattr("scripts.smoke.check_fix_stability", lambda *_: None)
+    monkeypatch.setattr("scripts.smoke.check_nox_gate", lambda _rendered: None)
+    rendered = Rendered(
+        tmp_path,
+        tmp_path / "role",
+        tmp_path / "collection",
+        {"ANSIBLE_COLLECTIONS_PATH": str(tmp_path / "installed")},
+    )
+    install_utils(rendered, collections=downloads)
+    lint_resources(rendered, downloads)
+    installs = [
+        command
+        for command in commands
+        if command[:3] == ["ansible-galaxy", "collection", "install"]
+    ]
+    assert installs[0][-1] == str(downloads / "foundata-utils-1.0.0.tar.gz")
+    assert sorted(installs[1][4:]) == sorted(str(path) for path in downloads.iterdir())
+    assert not any("requirements" in part for command in installs for part in command)
 
 
 def test_newest_released_core_follows_the_matrix(tmp_path: Path) -> None:

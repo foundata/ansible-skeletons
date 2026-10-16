@@ -358,8 +358,29 @@ def pinned_utils_version(root: Path = ROOT) -> str:
     return versions[0]
 
 
-def install_utils(rendered: Rendered, source: Path | None = None) -> None:
-    """Install the pinned foundata.utils release, or build a local source instead."""
+def pinned_archives(directory: Path, root: Path = ROOT) -> dict[str, Path]:
+    """Map each pinned Galaxy collection to its archive downloaded for this run."""
+    requirements = yaml.safe_load(
+        (root / "tests/requirements.yml").read_text(encoding="utf-8")
+    )
+    archives = {}
+    for entry in requirements.get("collections", []):
+        name, version = str(entry["name"]), str(entry["version"])
+        archive = directory / f"{name.replace('.', '-')}-{version}.tar.gz"
+        if not archive.is_file():
+            raise GateError(f"The run's Galaxy downloads lack {name} {version}")
+        archives[name] = archive
+    return archives
+
+
+def install_utils(
+    rendered: Rendered, source: Path | None = None, collections: Path | None = None
+) -> None:
+    """Install the pinned foundata.utils release, or build a local source instead.
+
+    ``collections`` names the run's downloads of the pinned collections; without
+    it, the pinned release comes from Galaxy.
+    """
     if source is None:
         run(
             [
@@ -369,7 +390,9 @@ def install_utils(rendered: Rendered, source: Path | None = None) -> None:
                 "--no-deps",
                 "-p",
                 rendered.env["ANSIBLE_COLLECTIONS_PATH"],
-                f"foundata.utils:=={pinned_utils_version()}",
+                str(pinned_archives(collections)["foundata.utils"])
+                if collections
+                else f"foundata.utils:=={pinned_utils_version()}",
             ],
             env=rendered.env,
         )
@@ -490,12 +513,24 @@ def identity_sessions(index: int, *, full: bool) -> list[list[str]]:
     return [[], [f"ansible-test-sanity-{newest_released_core()}"]]
 
 
-def private_podman_store(rendered: Rendered) -> None:
+def user_image_store() -> str | None:
+    """Return the graph root of the user's own Podman store, if Podman runs."""
+    if shutil.which("podman") is None:
+        return None
+    store = run(
+        ["podman", "info", "--format", "{{.Store.GraphRoot}}"], capture=True
+    ).strip()
+    return store if Path(store).is_dir() else None
+
+
+def private_podman_store(rendered: Rendered, images: str | None = None) -> None:
     """Keep the Podman store of a render's ansible-test containers to itself.
 
     Rootless Podman keeps images and containers below the relocated HOME, but
     every store of the user shares one run root. Identities that run at the
-    same time must not share the run state of their stores.
+    same time must not share the run state of their stores. ``images`` adds a
+    store read-only, so ansible-test finds the images it already holds instead
+    of pulling every image again into each render.
     """
     home = Path(rendered.env["HOME"])
     config = home / ".config/containers/storage.conf"
@@ -504,7 +539,12 @@ def private_podman_store(rendered: Rendered) -> None:
         "[storage]\n"
         'driver = "overlay"\n'
         f"graphroot = {json.dumps(str(home / '.local/share/containers/storage'))}\n"
-        f"runroot = {json.dumps(str(rendered.work / 'podman-run'))}\n",
+        f"runroot = {json.dumps(str(rendered.work / 'podman-run'))}\n"
+        + (
+            f"\n[storage.options]\nadditionalimagestores = {json.dumps([images])}\n"
+            if images
+            else ""
+        ),
         encoding="utf-8",
     )
 
@@ -516,6 +556,7 @@ def module_smoke(
     profile: str = "collection_modules_appliance",
     full: bool = False,
     identity: int | None = None,
+    collections: Path | None = None,
 ) -> None:
     """Render distinct identities and exercise the installed module skeleton.
 
@@ -528,7 +569,12 @@ def module_smoke(
         check_missing_product(output, profile)
     for index in indexes:
         module_identity(
-            output, index, utils_source=utils_source, profile=profile, full=full
+            output,
+            index,
+            utils_source=utils_source,
+            profile=profile,
+            full=full,
+            collections=collections,
         )
     if identity is None:
         write_json(output / "profile.json", {"profile": profile, "full": full})
@@ -563,6 +609,7 @@ def module_identity(
     utils_source: Path | None,
     profile: str,
     full: bool,
+    collections: Path | None = None,
 ) -> None:
     """Render one identity and run its checks, build and installed modules."""
     namespace, name = IDENTITIES[index]
@@ -634,8 +681,8 @@ def module_identity(
         raise GateError("REUSE metadata changed company")
     check_attribution(rendered.collection, metadata)
     check_holders(rendered.collection, holder(metadata))
-    install_utils(rendered, utils_source)
-    private_podman_store(rendered)
+    install_utils(rendered, utils_source, collections)
+    private_podman_store(rendered, user_image_store())
     run(["git", "init", "--quiet"], cwd=rendered.collection)
     run(["git", "add", "."], cwd=rendered.collection)
     for sessions in identity_sessions(index, full=full):
@@ -877,7 +924,7 @@ def check_molecule_contract(rendered: Rendered) -> None:
             raise GateError("Domain template lost platform settings")
 
 
-def smoke(output: Path, *, lint: bool = False) -> None:
+def smoke(output: Path, *, lint: bool = False, collections: Path | None = None) -> None:
     """Run a complete rendering and consumer smoke test in the current lane."""
     output.mkdir(parents=True, exist_ok=False)
     names = ("skeleton_test", "example_app", "example_role")
@@ -914,11 +961,11 @@ def smoke(output: Path, *, lint: bool = False) -> None:
         if metadata is not None:
             check_metadata(rendered, metadata)
         if case == "long-names" and lint:
-            lint_resources(rendered)
+            lint_resources(rendered, collections)
         if case != "explicit":
             continue
         if lint:
-            lint_resources(rendered)
+            lint_resources(rendered, collections)
         check_molecule_contract(rendered)
         build_collection(rendered)
         exercise_role(rendered, collection=False)
@@ -937,17 +984,21 @@ def smoke(output: Path, *, lint: bool = False) -> None:
     )
 
 
-def lint_resources(rendered: Rendered) -> None:
+def lint_resources(rendered: Rendered, collections: Path | None = None) -> None:
     """Lint generated resources, Molecule included, with their own configuration."""
-    # The syntax check of the Molecule playbooks needs the collections they use.
+    # The syntax check of the Molecule playbooks needs the collections they use,
+    # from the run's downloads when there are any.
     run(
         [
             "ansible-galaxy",
             "collection",
             "install",
             "--no-deps",
-            "--requirements-file",
-            str(ROOT / "tests/requirements.yml"),
+            *(
+                [str(archive) for archive in pinned_archives(collections).values()]
+                if collections
+                else ["--requirements-file", str(ROOT / "tests/requirements.yml")]
+            ),
         ],
         cwd=rendered.work,
         env=rendered.env,
@@ -1159,6 +1210,11 @@ def main() -> int:
     )
     parser.add_argument("--ansible-tests", action="store_true")
     parser.add_argument(
+        "--collections",
+        type=Path,
+        help="The run's downloads of the pinned Galaxy collections",
+    )
+    parser.add_argument(
         "--identity",
         type=int,
         choices=range(len(IDENTITIES)),
@@ -1173,9 +1229,14 @@ def main() -> int:
                 profile=args.profile,
                 full=args.ansible_tests,
                 identity=args.identity,
+                collections=args.collections.resolve() if args.collections else None,
             )
         else:
-            smoke(args.output.resolve(), lint=args.lint)
+            smoke(
+                args.output.resolve(),
+                lint=args.lint,
+                collections=args.collections.resolve() if args.collections else None,
+            )
     except (GateError, OSError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

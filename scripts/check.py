@@ -28,6 +28,7 @@ from scripts.common import (
     Lane,
     configuration,
     digest,
+    isolated_environment,
     matrix,
     require_tools,
     run,
@@ -224,6 +225,39 @@ def check_controllers(
         )
 
 
+def download_collections(context: Context) -> None:
+    """Download the pinned Galaxy collections once for every step of the run."""
+    work = context.output / "galaxy"
+    env = isolated_environment(work)
+    # Ansible keeps to its isolated configuration; uv keeps its own cache.
+    for name in ("HOME", "XDG_CACHE_HOME"):
+        if name in context.env:
+            env[name] = context.env[name]
+        else:
+            env.pop(name, None)
+    env["TMPDIR"] = context.env["TMPDIR"]
+    run(
+        uv_command(
+            default_lane(),
+            "ansible-galaxy",
+            "collection",
+            "download",
+            "--no-deps",
+            "--requirements-file",
+            str(ROOT / "tests/requirements.yml"),
+            "--download-path",
+            str(collections_path(context.output)),
+        ),
+        env=env,
+        log=context.log,
+    )
+
+
+def collections_path(output: Path) -> Path:
+    """Return where a run keeps its downloads of the pinned Galaxy collections."""
+    return output / "galaxy/collections"
+
+
 def unit_tests(context: Context, *, python: str) -> None:
     """Run the repository's regression tests in one controller Python."""
     result = context.output / f"unit-python{python}.xml"
@@ -270,6 +304,8 @@ def generated_lint(context: Context, *, packages: list[str]) -> None:
             "-m",
             "scripts.smoke",
             "--lint",
+            "--collections",
+            str(collections_path(context.output)),
             "--output",
             str(context.output / "generated-lint"),
             groups=["lint"],
@@ -300,6 +336,8 @@ def module_identity(
             profile,
             "--identity",
             str(index),
+            "--collections",
+            str(collections_path(context.output)),
             *(["--utils-source", str(utils_source.resolve())] if utils_source else []),
             "--output",
             str(context.output / profile),
@@ -331,6 +369,8 @@ def integration_tier(
             "-m",
             "scripts.integration",
             backend,
+            "--collections",
+            str(collections_path(context.output)),
             "--output",
             str(output),
             groups=["integration", "lint"],
@@ -374,6 +414,7 @@ def plan(
             owns=("controller-python*.json",),
             inputs=json.dumps(pythons),
         ),
+        Step("galaxy", download_collections, owns=("galaxy",)),
     ]
     for python, name in zip(pythons, units, strict=True):
         steps.append(
@@ -399,7 +440,7 @@ def plan(
         Step(
             "generated-lint",
             partial(generated_lint, packages=packages),
-            ("controller",),
+            ("controller", "galaxy"),
             "generated-lint",
             long=True,
             owns=("generated-lint",),
@@ -419,7 +460,7 @@ def plan(
                         full=full,
                         utils_source=utils_source,
                     ),
-                    ("controller",),
+                    ("controller", "galaxy"),
                     profile,
                     long=True,
                     owns=(
@@ -441,7 +482,7 @@ def plan(
                     packages=packages,
                     pythons=pythons,
                 ),
-                ("static", *units, default_lane().name),
+                ("static", "galaxy", *units, default_lane().name),
                 name,
                 serial=True,
                 owns=(name, f"controller-checks/{name}"),
@@ -690,7 +731,11 @@ def check(
             # Records no longer say which sources their steps checked.
             write_json(
                 output / "run.json",
-                {"source": None, "full": full, "backends": selected},
+                {
+                    "source": None,
+                    "full": full,
+                    "backends": selected,
+                },
             )
             print(
                 "warning: the sources changed during the run; it cannot be resumed",
