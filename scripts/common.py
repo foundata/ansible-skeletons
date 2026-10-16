@@ -11,6 +11,7 @@ import tomllib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TextIO
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -65,9 +66,14 @@ def run(
     timeout: int = 600,
     capture: bool = False,
     allowed_exit_codes: tuple[int, ...] = (0,),
+    log: TextIO | None = None,
 ) -> str:
-    """Run a bounded command, raising on failure and preserving its diagnostics."""
-    print(f"+ {' '.join(command)}", flush=True)
+    """Run a bounded command, raising on failure and preserving its diagnostics.
+
+    With ``log``, the command line and its output go to that stream instead of
+    the inherited standard output and error.
+    """
+    print(f"+ {' '.join(command)}", file=log, flush=True)
     try:
         result = subprocess.run(
             command,
@@ -77,8 +83,8 @@ def run(
             timeout=timeout,
             text=True,
             encoding="utf-8",
-            stdout=subprocess.PIPE if capture else None,
-            stderr=subprocess.STDOUT if capture else None,
+            stdout=subprocess.PIPE if capture else log,
+            stderr=subprocess.STDOUT if capture or log else None,
         )
         if result.returncode not in allowed_exit_codes:
             raise subprocess.CalledProcessError(
@@ -86,7 +92,7 @@ def run(
             )
     except subprocess.CalledProcessError as exc:
         if exc.stdout:
-            print(exc.stdout, flush=True)
+            print(exc.stdout, file=log, flush=True)
         raise GateError(
             f"{command[0]} failed with exit status {exc.returncode}"
         ) from exc

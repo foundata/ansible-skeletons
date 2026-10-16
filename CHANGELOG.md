@@ -32,6 +32,9 @@ and the project adheres to
   sessions, build and installed modules, plus one ansible-test sanity run on
   the newest released core. Sanity, units and integration on every core stay
   with the first identity.
+- checks: independent steps run at the same time, `--jobs N` at once and by
+  default half the CPUs, each with its own log under `logs/` and its own
+  temporary directory; infrastructure tiers stay one at a time.
 
 ### Fixed
 

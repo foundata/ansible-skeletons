@@ -187,6 +187,16 @@ normal and check mode. They do not qualify a product's console recovery;
 that drill belongs to the collection's authorized lab before a family's first
 management-path write.
 
+The check runs independent steps at the same time: the repository test runs,
+the lanes, `generated-lint`, and each identity of both module skeletons.
+`--jobs N` sets how many run at once, by default half the CPUs; `--jobs 1` runs
+them one after another in a fixed order. Each step writes its output to
+`logs/<step>.log` below the check's output and prints one line when it starts
+and one when it ends, with its duration. A failing step prints the end of its
+log and the log's path. After a failure no further step starts; steps already
+running finish. Without `--output`, the logs are removed with the temporary
+directory.
+
 To test a future release candidate, build its wheel and override the released
 package. Example:
 
@@ -245,6 +255,10 @@ Overview:
 ./scripts/check.sh --integration libvirt
 ./scripts/check.sh --integration ee
 ```
+
+Tiers share Podman and libvirt state and run one at a time. They start once
+the static checks, the repository tests and the default lane pass, while the
+other quick steps continue.
 
 For an infrastructure-only iteration:
 
@@ -324,7 +338,8 @@ skeleton-specific gate (`scripts/release.py check`).
    starts. Do not use a tmpfs such as `/tmp`: the integration tests keep their
    container storage below the output. The gate can run for several hours.
 
-   Inspect `check.log` while the gate runs. A successful run creates
+   `check.log` shows one line per step as it starts and ends; each step's
+   output is in `checks/logs/<step>.log`. A successful run creates
    `report.json`; a failure retains diagnostics but creates no passing report.
    Keep the whole evidence directory, including its `checks/` subdirectory.
 5. Create and inspect the local annotated tag:
@@ -400,5 +415,5 @@ validated commit and rerun publication verification when complete.
   while developing on a machine without those capabilities, then run the full
   release gate on a suitable host.
 - A release check takes longer because it provisions targets and builds
-  execution environments. Its `check.log` holds command output, including the
-  failing command's diagnostics.
+  execution environments. Each step's log in `checks/logs/` holds its command
+  output, including the failing command's diagnostics.

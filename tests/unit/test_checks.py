@@ -8,6 +8,7 @@ import os
 import re
 import subprocess
 import sys
+import tomllib
 from collections.abc import Callable
 from pathlib import Path
 from types import SimpleNamespace
@@ -29,8 +30,10 @@ from scripts.smoke import (
     identity_sessions,
     lint_constraints,
     lint_project,
+    module_smoke,
     newest_released_core,
     pinned_utils_version,
+    private_podman_store,
 )
 
 
@@ -602,6 +605,42 @@ def test_module_identities_split_the_ansible_test_lanes() -> None:
     # The second identity's long names reach validate-modules and ansible-doc
     # in sanity, once, on the newest released core of the matrix.
     assert identity_sessions(1, full=True) == [[], ["ansible-test-sanity-2.21"]]
+
+
+@pytest.mark.parametrize("identity", [None, 0, 1])
+def test_module_identities_run_alone_or_together(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, identity: int | None
+) -> None:
+    calls: list[object] = []
+    monkeypatch.setattr(
+        "scripts.smoke.check_missing_product",
+        lambda _output, _profile: calls.append("missing"),
+    )
+    monkeypatch.setattr(
+        "scripts.smoke.module_identity",
+        lambda _output, index, **_options: calls.append(index),
+    )
+    output = tmp_path / "collection_modules"
+    if identity is not None:
+        # The other identity's step may have created the directory first.
+        output.mkdir()
+    module_smoke(output, profile="collection_modules", identity=identity)
+    assert calls == {None: ["missing", 0, 1], 0: ["missing", 0], 1: [1]}[identity]
+    # The check writes the profile record once both identity steps passed.
+    assert (output / "profile.json").exists() == (identity is None)
+
+
+def test_module_render_keeps_its_podman_run_state_to_itself(tmp_path: Path) -> None:
+    env = isolated_environment(tmp_path)
+    rendered = Rendered(
+        tmp_path, tmp_path / "role", tmp_path / "collection", env, "collection_modules"
+    )
+    private_podman_store(rendered)
+    config = tmp_path / "home/.config/containers/storage.conf"
+    storage = tomllib.loads(config.read_text(encoding="utf-8"))["storage"]
+    assert Path(storage["graphroot"]).is_relative_to(tmp_path / "home")
+    assert Path(storage["runroot"]).is_relative_to(tmp_path)
+    assert not Path(storage["runroot"]).is_relative_to(tmp_path / "home")
 
 
 def test_newest_released_core_follows_the_matrix(tmp_path: Path) -> None:

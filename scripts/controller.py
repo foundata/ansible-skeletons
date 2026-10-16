@@ -15,10 +15,13 @@ from scripts.common import GateError, write_json
 SOCKET_LIMIT = 104
 # Python 3.12/3.13 use listener-XXXXXXXX; 3.14 uses sock-XXXXXXXXXXXX.
 CONTROLLER_SUFFIX = "pymp-xxxxxxxx/listener-xxxxxxxx"
-# Generated collections' nox environments live below TMPDIR, and Python 3.14
-# binds the docs-check forkserver socket in the session's own tmp directory.
-NOX_ENVDIR_PREFIX = "nox-"
-NOX_LAYOUT = f"t/{NOX_ENVDIR_PREFIX}xxxxxxxx/docs-check-3-14/tmp/{CONTROLLER_SUFFIX}"
+# Each step of a check run has its own TMPDIR, t/<slot>, one character each.
+STEP_SLOTS = "0123456789abcdefghijklmnopqrstuvwxyz"
+# Generated collections' nox environments live below the step's TMPDIR, and
+# Python 3.14 binds the docs-check forkserver socket in the session's own tmp
+# directory. The short prefix pays for the slot directory.
+NOX_ENVDIR_PREFIX = "n"
+NOX_LAYOUT = f"t/x/{NOX_ENVDIR_PREFIX}xxxxxxxx/docs-check-3-14/tmp/{CONTROLLER_SUFFIX}"
 # Molecule names SSH control sockets %h-%p-%r; OpenSSH binds the master socket
 # under a 16-character temporary suffix first.
 SSH_CONTROL_DIRECTORY = "s"

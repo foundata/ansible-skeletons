@@ -490,15 +490,52 @@ def identity_sessions(index: int, *, full: bool) -> list[list[str]]:
     return [[], [f"ansible-test-sanity-{newest_released_core()}"]]
 
 
+def private_podman_store(rendered: Rendered) -> None:
+    """Keep the Podman store of a render's ansible-test containers to itself.
+
+    Rootless Podman keeps images and containers below the relocated HOME, but
+    every store of the user shares one run root. Identities that run at the
+    same time must not share the run state of their stores.
+    """
+    home = Path(rendered.env["HOME"])
+    config = home / ".config/containers/storage.conf"
+    config.parent.mkdir(parents=True, exist_ok=True)
+    config.write_text(
+        "[storage]\n"
+        'driver = "overlay"\n'
+        f"graphroot = {json.dumps(str(home / '.local/share/containers/storage'))}\n"
+        f"runroot = {json.dumps(str(rendered.work / 'podman-run'))}\n",
+        encoding="utf-8",
+    )
+
+
 def module_smoke(
     output: Path,
     *,
     utils_source: Path | None = None,
     profile: str = "collection_modules_appliance",
     full: bool = False,
+    identity: int | None = None,
 ) -> None:
-    """Render distinct identities and exercise the installed module skeleton."""
-    output.mkdir(parents=True, exist_ok=False)
+    """Render distinct identities and exercise the installed module skeleton.
+
+    With ``identity``, only that one runs, beside the other identity's own run
+    in the same output directory; the check runs each identity as a step.
+    """
+    output.mkdir(parents=True, exist_ok=identity is not None)
+    indexes = range(len(IDENTITIES)) if identity is None else (identity,)
+    if 0 in indexes:
+        check_missing_product(output, profile)
+    for index in indexes:
+        module_identity(
+            output, index, utils_source=utils_source, profile=profile, full=full
+        )
+    if identity is None:
+        write_json(output / "profile.json", {"profile": profile, "full": full})
+
+
+def check_missing_product(output: Path, profile: str) -> None:
+    """Require initialization without metadata to name the product variable."""
     missing = run(
         [
             "ansible-galaxy",
@@ -517,102 +554,108 @@ def module_smoke(
         raise GateError(
             "Name-only initialization did not identify the missing product variable"
         )
-    for index, (namespace, name) in enumerate(IDENTITIES):
-        metadata = example_metadata(punctuation=bool(index))
-        if index == 0:
-            # The first identity also lints foundata's own README variant.
-            metadata["company"] = FOUNDATA_COMPANY
-            metadata["company_url"] = FOUNDATA_URL
-        # A double quote in the second name must survive every rendered file.
-        metadata["product"] = (
-            PRODUCTS[profile] if index == 0 else 'Other "Quoted" Product'
-        )
-        if index == 0:
-            metadata.pop("version")
-            metadata.pop("min_ansible_version")
-        else:
-            metadata["version"] = "2.3.0"
-            metadata["min_ansible_version"] = "2.19.1"
-        metadata["skeleton_revision"] = skeleton_revision()
-        rendered = render(
-            output / name,
-            namespace=namespace,
-            collection_name=name,
-            metadata=metadata,
-            profile=profile,
-        )
-        check_tree(ROOT / profile, rendered.collection)
-        for package in (rendered.collection / "tests/unit").rglob("__init__.py"):
-            if package.stat().st_size:
-                raise GateError(f"Unit package marker is not empty: {package}")
-        galaxy = yaml.safe_load((rendered.collection / "galaxy.yml").read_text())
-        if galaxy["dependencies"] != {"foundata.utils": ">=1.0.0,<2.0.0"}:
-            raise GateError("Module profile omitted the utility dependency")
-        if galaxy["version"] != metadata.get("version", "1.0.0"):
-            raise GateError("Module profile changed the collection version")
-        client = (rendered.collection / "plugins/module_utils/_client.py").read_text()
-        if f'USER_AGENT = "{namespace}.{name}/{galaxy["version"]}"' not in client:
-            raise GateError(
-                "Module user agent must identify the collection and its version"
-            )
-        scenario = rendered.collection / "extensions/molecule/default"
-        molecule = yaml.safe_load((scenario / "molecule.yml").read_text())
-        inventory = scenario / molecule["provisioner"]["inventory"]["links"]["hosts"]
-        if inventory.name != "hosts.yml" or "{{ ansible_playbook_python }}" not in (
-            inventory.read_text()
-        ):
-            raise GateError(
-                "Molecule inventory changed its filename or runtime expressions"
-            )
-        runtime = yaml.safe_load((rendered.collection / "meta/runtime.yml").read_text())
-        if runtime["requires_ansible"] != ">=" + str(
-            metadata.get("min_ansible_version", "2.19.0")
-        ):
-            raise GateError("Module profile changed the core floor")
-        for removed in (
-            "roles",
-            "meta/execution-environment.yml",
-            ".ansible-docsmith.toml",
-            "extensions/molecule/ee",
-        ):
-            if (rendered.collection / removed).exists():
-                raise GateError(f"Module profile retained {removed}")
-        if any(
-            path.is_dir() and not any(path.iterdir())
-            for path in rendered.collection.rglob("*")
-        ):
-            raise GateError("Module render contains empty directories")
-        with (rendered.collection / "REUSE.toml").open("rb") as stream:
-            reuse = tomllib.load(stream)
-        if reuse["SPDX-PackageSupplier"] != holder(metadata):
-            raise GateError("REUSE metadata changed company")
-        check_attribution(rendered.collection, metadata)
-        check_holders(rendered.collection, holder(metadata))
-        install_utils(rendered, utils_source)
-        run(["git", "init", "--quiet"], cwd=rendered.collection)
-        run(["git", "add", "."], cwd=rendered.collection)
-        for sessions in identity_sessions(index, full=full):
-            run(
-                [
-                    "uv",
-                    "run",
-                    "--python",
-                    "3.13",
-                    "noxfile.py",
-                    *(["-s", *sessions] if sessions else []),
-                ],
-                cwd=rendered.collection,
-                env={**rendered.env, "CI": "true"},
-                timeout=7200,
-            )
-        if full and index == 0:
-            molecule_with_fake(rendered)
-        build_collection(rendered)
-        exercise_modules(rendered)
-    write_json(
-        output / "profile.json",
-        {"profile": profile, "full": full},
+
+
+def module_identity(
+    output: Path,
+    index: int,
+    *,
+    utils_source: Path | None,
+    profile: str,
+    full: bool,
+) -> None:
+    """Render one identity and run its checks, build and installed modules."""
+    namespace, name = IDENTITIES[index]
+    metadata = example_metadata(punctuation=bool(index))
+    if index == 0:
+        # The first identity also lints foundata's own README variant.
+        metadata["company"] = FOUNDATA_COMPANY
+        metadata["company_url"] = FOUNDATA_URL
+    # A double quote in the second name must survive every rendered file.
+    metadata["product"] = PRODUCTS[profile] if index == 0 else 'Other "Quoted" Product'
+    if index == 0:
+        metadata.pop("version")
+        metadata.pop("min_ansible_version")
+    else:
+        metadata["version"] = "2.3.0"
+        metadata["min_ansible_version"] = "2.19.1"
+    metadata["skeleton_revision"] = skeleton_revision()
+    rendered = render(
+        output / name,
+        namespace=namespace,
+        collection_name=name,
+        metadata=metadata,
+        profile=profile,
     )
+    check_tree(ROOT / profile, rendered.collection)
+    for package in (rendered.collection / "tests/unit").rglob("__init__.py"):
+        if package.stat().st_size:
+            raise GateError(f"Unit package marker is not empty: {package}")
+    galaxy = yaml.safe_load((rendered.collection / "galaxy.yml").read_text())
+    if galaxy["dependencies"] != {"foundata.utils": ">=1.0.0,<2.0.0"}:
+        raise GateError("Module profile omitted the utility dependency")
+    if galaxy["version"] != metadata.get("version", "1.0.0"):
+        raise GateError("Module profile changed the collection version")
+    client = (rendered.collection / "plugins/module_utils/_client.py").read_text()
+    if f'USER_AGENT = "{namespace}.{name}/{galaxy["version"]}"' not in client:
+        raise GateError(
+            "Module user agent must identify the collection and its version"
+        )
+    scenario = rendered.collection / "extensions/molecule/default"
+    molecule = yaml.safe_load((scenario / "molecule.yml").read_text())
+    inventory = scenario / molecule["provisioner"]["inventory"]["links"]["hosts"]
+    if inventory.name != "hosts.yml" or "{{ ansible_playbook_python }}" not in (
+        inventory.read_text()
+    ):
+        raise GateError(
+            "Molecule inventory changed its filename or runtime expressions"
+        )
+    runtime = yaml.safe_load((rendered.collection / "meta/runtime.yml").read_text())
+    if runtime["requires_ansible"] != ">=" + str(
+        metadata.get("min_ansible_version", "2.19.0")
+    ):
+        raise GateError("Module profile changed the core floor")
+    for removed in (
+        "roles",
+        "meta/execution-environment.yml",
+        ".ansible-docsmith.toml",
+        "extensions/molecule/ee",
+    ):
+        if (rendered.collection / removed).exists():
+            raise GateError(f"Module profile retained {removed}")
+    if any(
+        path.is_dir() and not any(path.iterdir())
+        for path in rendered.collection.rglob("*")
+    ):
+        raise GateError("Module render contains empty directories")
+    with (rendered.collection / "REUSE.toml").open("rb") as stream:
+        reuse = tomllib.load(stream)
+    if reuse["SPDX-PackageSupplier"] != holder(metadata):
+        raise GateError("REUSE metadata changed company")
+    check_attribution(rendered.collection, metadata)
+    check_holders(rendered.collection, holder(metadata))
+    install_utils(rendered, utils_source)
+    private_podman_store(rendered)
+    run(["git", "init", "--quiet"], cwd=rendered.collection)
+    run(["git", "add", "."], cwd=rendered.collection)
+    for sessions in identity_sessions(index, full=full):
+        run(
+            [
+                "uv",
+                "run",
+                "--python",
+                "3.13",
+                "noxfile.py",
+                *(["-s", *sessions] if sessions else []),
+            ],
+            cwd=rendered.collection,
+            env={**rendered.env, "CI": "true"},
+            timeout=7200,
+        )
+    if full and index == 0:
+        molecule_with_fake(rendered)
+    build_collection(rendered)
+    exercise_modules(rendered)
 
 
 def exercise_role(rendered: Rendered, *, collection: bool) -> None:
@@ -1115,6 +1158,12 @@ def main() -> int:
         help="Local foundata.utils source to test instead of the pinned release",
     )
     parser.add_argument("--ansible-tests", action="store_true")
+    parser.add_argument(
+        "--identity",
+        type=int,
+        choices=range(len(IDENTITIES)),
+        help="Run only this module identity; both run by default",
+    )
     args = parser.parse_args()
     try:
         if args.profile in MODULE_PROFILES:
@@ -1123,6 +1172,7 @@ def main() -> int:
                 utils_source=args.utils_source.resolve() if args.utils_source else None,
                 profile=args.profile,
                 full=args.ansible_tests,
+                identity=args.identity,
             )
         else:
             smoke(args.output.resolve(), lint=args.lint)
