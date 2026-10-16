@@ -1,5 +1,7 @@
-# Build-session tool: drill one selected family before its first write.
-# MOLECULE_RECOVERY_FAMILIES must name exactly one family.
+# Run one scenario's recovery drill without the rest of its test sequence.
+# MOLECULE_RECOVERY_SCENARIO names the scenario whose tasks/recovery/ hooks
+# to use; MOLECULE_SCENARIO_DIRECTORY points at any scenario of this
+# collection.
 #
 # SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
@@ -11,7 +13,7 @@
   gather_facts: false
   no_log: "{{ molecule_no_log | ansible.builtin.default(false) }}"
   tasks:
-    - name: "Molecule | Recovery | Find the registered families"
+    - name: "Molecule | Recovery | Find the scenarios with recovery hooks"
       delegate_to: "localhost"
       ansible.builtin.find:
         paths: "{{ lookup('ansible.builtin.env', 'MOLECULE_SCENARIO_DIRECTORY') | ansible.builtin.dirname }}"
@@ -20,7 +22,7 @@
         recurse: true
       register: __recovery_found
 
-    - name: "Molecule | Recovery | Select the families"
+    - name: "Molecule | Recovery | Select the scenario"
       ansible.builtin.set_fact:
         __recovery_molecule: "{{ lookup('ansible.builtin.env', 'MOLECULE_SCENARIO_DIRECTORY') | ansible.builtin.dirname }}"
         __recovery_registered: >-
@@ -29,26 +31,21 @@
              | ansible.builtin.map('ansible.builtin.dirname') | ansible.builtin.map('ansible.builtin.dirname')
              | ansible.builtin.map('ansible.builtin.dirname') | ansible.builtin.map('ansible.builtin.basename')
              | ansible.builtin.unique | ansible.builtin.sort }}
-        __recovery_selected: >-
-          {{ lookup('ansible.builtin.env', 'MOLECULE_RECOVERY_FAMILIES') | ansible.builtin.split(',')
-             | ansible.builtin.map('ansible.builtin.trim') | ansible.builtin.select | ansible.builtin.list }}
+        __recovery_scenario: "{{ lookup('ansible.builtin.env', 'MOLECULE_RECOVERY_SCENARIO') | ansible.builtin.trim }}"
 
-    - name: "Molecule | Recovery | Require registered families"
+    - name: "Molecule | Recovery | Require a scenario with recovery hooks"
       ansible.builtin.assert:
         that:
-          - __recovery_registered | ansible.builtin.length > 0
-          - __recovery_selected | ansible.builtin.length == 1
-          - __recovery_selected | ansible.builtin.difference(__recovery_registered) | ansible.builtin.length == 0
-        fail_msg: "Registered families: {{ __recovery_registered | ansible.builtin.join(', ') }}"
+          - __recovery_scenario in __recovery_registered
+        fail_msg: >-
+          Set MOLECULE_RECOVERY_SCENARIO to one of:
+          {{ __recovery_registered | ansible.builtin.join(', ') }}
         quiet: true
 
-    - name: "Molecule | Recovery | Drill each family"
+    - name: "Molecule | Recovery | Drill the scenario's family"
       ansible.builtin.include_tasks:
         file: "{{ __recovery_molecule }}/shared/tasks/recovery.yml"
       vars:
-        recovery_family: "{{ __recovery_family }}"
-        recovery_hooks: "{{ __recovery_molecule }}/{{ __recovery_family }}/tasks/recovery"
-      loop: "{{ __recovery_selected }}"
-      loop_control:
-        loop_var: "__recovery_family"
+        recovery_family: "{{ __recovery_scenario }}"
+        recovery_hooks: "{{ __recovery_molecule }}/{{ __recovery_scenario }}/tasks/recovery"
 {% endraw %}
