@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+---
+- name: "Remove only loss-harness fixtures"
+  module_defaults:
+    group/{{ namespace }}.{{ collection_name }}.api: >-
+      {{ '{{ product_connection }}' }}
+  block:
+    - name: "Remove the definition fixture"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        name: "molecule_fixture_loss"
+        state: "absent"
+
+    - name: "Remove the nested family fixture"
+      {{ namespace }}.{{ collection_name }}.fixture_family:
+        name: "molecule_fixture_family_loss"
+        state: "absent"
+{# skeleton-variant: loss-cleanup-activation #}
+
+    - name: "Activate deletion of the loss fixture"
+      {{ namespace }}.{{ collection_name }}.fixture_apply:
+        verify:
+          - "molecule_fixture_loss"
+{# end skeleton-variant #}

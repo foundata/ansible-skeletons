@@ -1,0 +1,57 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+---
+- name: "Settle lost replies for both fixture families"
+  ansible.builtin.command:
+    argv:
+      - "{{ '{{ ansible_playbook_python }}' }}"
+      - "{{ '{{ molecule_scenario_directory }}' }}/../shared/files/loss.py"
+    stdin: >-
+      {{ '{{' }}
+        {'module': __loss_case['module'],
+         'identity': {'name': __loss_case['name']},
+         'params': product_connection | ansible.builtin.combine(
+           {'name': __loss_case['name']}, __loss_case['declaration'])}
+        | ansible.builtin.to_json
+      {{ '}}' }}
+  environment:
+    ANSIBLE_REMOTE_TMP: "{{ '{{ molecule_ephemeral_directory }}' }}/loss-remote"
+  changed_when:
+    - true
+  loop:
+    - module: "{{ namespace }}.{{ collection_name }}.fixture"
+      name: "molecule_fixture_loss"
+      declaration:
+        value: "first"
+    - module: "{{ namespace }}.{{ collection_name }}.fixture"
+      name: "molecule_fixture_loss"
+      declaration:
+        value: "second"
+    - module: "{{ namespace }}.{{ collection_name }}.fixture"
+      name: "molecule_fixture_loss"
+      declaration:
+        state: "absent"
+    - module: "{{ namespace }}.{{ collection_name }}.fixture_family"
+      name: "molecule_fixture_family_loss"
+      declaration:
+        settings:
+          port: 8080
+    - module: "{{ namespace }}.{{ collection_name }}.fixture_family"
+      name: "molecule_fixture_family_loss"
+      declaration:
+        settings:
+          port: 9090
+    - module: "{{ namespace }}.{{ collection_name }}.fixture_family"
+      name: "molecule_fixture_family_loss"
+      declaration:
+        state: "absent"
+  loop_control:
+    loop_var: "__loss_case"
+    label: "{{ '{{' }} __loss_case['module'] {{ '}}' }}"
+  no_log: true
+
+- name: "Report lost-response coverage"
+  ansible.builtin.debug:
+    msg: "Lost create, update and delete replies settled for both fixture families, with one write each."
+    verbosity: 0

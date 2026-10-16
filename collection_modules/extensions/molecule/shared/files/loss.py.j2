@@ -1,0 +1,91 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Drop one completed product response, then prove read-back without a retry.
+
+Input is a JSON object with module (FQCN), identity and params. The transport
+proxy calls the real client first. Only its first successful mutation response
+is replaced with a timeout; no synthetic product result is supplied.
+"""
+
+from __future__ import annotations
+
+import contextlib
+import importlib
+import io
+import json
+import os
+import re
+import sys
+from typing import Any, Callable
+
+from ansible.module_utils import basic
+from ansible.plugins.loader import init_plugin_loader
+
+
+def invoke(entry: Callable[[], None], params: dict[str, Any]) -> dict[str, Any]:
+    basic._ANSIBLE_ARGS = json.dumps(
+        {
+            "ANSIBLE_MODULE_ARGS": {
+                **params,
+                "_ansible_remote_tmp": os.environ["ANSIBLE_REMOTE_TMP"],
+            }
+        }
+    ).encode()
+    if hasattr(basic, "_ANSIBLE_PROFILE"):
+        basic._ANSIBLE_PROFILE = "legacy"
+    output = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(output):
+            entry()
+    except SystemExit:
+        pass
+    result: dict[str, Any] = json.loads(output.getvalue())
+    return result
+
+
+def main() -> None:
+    request = json.load(sys.stdin)
+    fqcn = request["module"]
+    if not re.fullmatch(r"[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*", fqcn):
+        raise ValueError("Expected a module FQCN")
+    identity = request["identity"]
+    params = request["params"]
+    if not identity or any(params.get(key) != value for key, value in identity.items()):
+        raise ValueError("Identity must be explicit in the module parameters")
+    init_plugin_loader()
+    errors = importlib.import_module(
+        "ansible_collections.foundata.utils.plugins.module_utils.errors"
+    )
+    namespace, collection, name = fqcn.split(".")
+    package = f"ansible_collections.{namespace}.{collection}.plugins"
+    client = importlib.import_module(package + ".module_utils._client")
+    module = importlib.import_module(package + ".modules." + name)
+    original = client.Client.write
+    writes = 0
+    dropped = False
+
+    def write(instance: Any, *args: Any, **kwargs: Any) -> Any:
+        nonlocal writes, dropped
+        writes += 1
+        response = original(instance, *args, **kwargs)
+        if not dropped:
+            dropped = True
+            raise errors.TransportTimeout(code="socket_timeout")
+        return response
+
+    client.Client.write = write
+    try:
+        result = invoke(module.main, params)
+        assert dropped and writes == 1, "Expected exactly one real mutation"
+        assert not result.get("failed") and result["changed"]
+        assert result["verified"] == "observed"
+        observed = invoke(module.main, params)
+        assert not observed.get("failed") and not observed["changed"]
+        assert observed["verified"] == "observed" and writes == 1
+    finally:
+        client.Client.write = original
+    print(json.dumps({"verified": True, "writes": writes, "module": fqcn}))
+
+
+if __name__ == "__main__":
+    main()
