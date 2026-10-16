@@ -135,9 +135,10 @@ def run(
             apply(client)
             applied = True
         except errors.ApiError as error:
-            # A reply lost after sending, by timeout, a dropped connection or an
-            # undecodable body: only the observed resolution of the drift it was
-            # run for establishes the effect. An already matching state cannot.
+            # A reply lost after sending (timeout, dropped connection, undecodable
+            # body) is settled by the read-back only when something had drifted:
+            # that drift's resolution proves the effect. Without a prior drift a
+            # matching state proves nothing, so the failure stands.
             if error.category not in ("transport", "timeout", "response") or (
                 "drift" not in before.values()
             ):

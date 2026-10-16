@@ -214,8 +214,8 @@ class Client:
         if status == 404:
             raise ProductError(code="endpoint_not_found", status=status)
         if status >= 400:
-            # A UserException: the product refused the request, for example a
-            # deletion of an object still referenced elsewhere.
+            # The product refused the request, for example the deletion of an
+            # object still referenced elsewhere.
             raise ProductError(
                 code="validation_failed" if status == 422 else "rejected", status=status
             )
