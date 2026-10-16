@@ -25,10 +25,10 @@ Paths are relative to this directory unless stated otherwise.
     - [With Molecule directly](#usage-molecule)
   - [Test sequence](#usage-sequence)
 {# skeleton-variant: recovery-contract-toc #}
-  - [Recovery contract](#usage-recovery-contract)
+  - [Recovery drill](#usage-recovery)
 {# end skeleton-variant #}
 {# skeleton-variant: recovery-tool-toc #}
-  - [Drill one family before its first write](#usage-family-drill)
+  - [Drill one family on its own](#usage-family-drill)
 {# end skeleton-variant #}
   - [Write tests](#usage-add-tests)
   - [Provision your own target](#usage-owned-target)
@@ -136,84 +136,75 @@ or destroy:
 {# skeleton-variant: activation-sequence #}
 `converge`, `side_effect` and `cleanup` run
 `{{ namespace }}.{{ collection_name }}.fixture_apply`
-after saving, so each change also becomes active. `verify` compares the
-effective state with the saved state in check mode, without writing. With
-`activate: "auto"`, the apply module changes nothing when both already match, so
-`idempotence` stays clean.
+after each change, so the change is active as well as saved. `verify` runs it
+in check mode and compares the active state with the saved state. With
+`activate: "auto"`, the default, it changes nothing when both match, which
+keeps `idempotence` clean.
 
 {# end skeleton-variant #}
 
 
-The shared loss helper forwards the real client write, drops exactly one
-completed response, and requires an observed result. A fresh module invocation
-then reads the same declaration without another write. It does not replay the
-lost request.
+The lost-reply checks in `side_effect` let one write reach the product and
+replace its reply with a timeout. The module must settle the outcome by reading
+back (`verified: observed`), and a second run with the same arguments must
+report no change without writing again.
 
 {# skeleton-variant: recovery-sequence #}
-The appliance's final side-effect stage is `zz_recovery.yml`. It rehearses
-the selected family's console restore only when the credentials file carries
-`console`; otherwise it prints the missing-console reason and skips. The
-fake-product gate takes this skip path. A supplied contract requires qualified
-native commands and recovery hooks; the shipped placeholders fail closed.
+The last `side_effect` file, `zz_recovery.yml`, runs the
+[recovery drill](#usage-recovery) when the credentials file names a console
+endpoint, and otherwise prints why it skipped.
 
 {# end skeleton-variant #}
 {# skeleton-variant: recovery-contract #}
-### Recovery contract<a id="usage-recovery-contract"></a>
+### Recovery drill<a id="usage-recovery"></a>
 
-The default scenario ends its side effects with the family's recovery drill.
-If the credentials file has no `console` entry, it prints the skip reason.
-A present but invalid console contract fails the drill. The FIXME hooks and
-native backup, restore and discard commands must be qualified before using it.
+The drill proves that you can get the appliance back after a change cuts off
+its management access. It backs up the configuration through the appliance's
+console, makes the family's change that breaks API access, and restores the
+backup through the console. Then it requires a fresh API login, a fresh DNS
+answer for the management name, and the change to be gone. The console only
+backs up and restores; every check goes through the API and DNS.
 
-Read the lab's `state/private/contract.json` through
-`MOLECULE_PRODUCT_CREDENTIALS`. The restored lab supplies these entries beside
-`key` and `secret`; do not compose a second contract:
+Before the drill can run:
 
-- `console.argv`: the command line, for example
-  `["python3", "<skill>/scripts/baseline_lab.py", "console", "<manifest>"]`.
-  Send one JSON object on stdin:
-  `{"label": "family-backup", "commands": ["<qualified guest command>"]}`.
-  Labels match `[a-z0-9][a-z0-9-]{0,47}`. There are at most 32 commands,
-  each printable and at most 200 bytes. They run in order in the appliance's
-  root shell, stopping at the first nonzero exit.
-- `dns`: `host` and `port` of a TCP DNS endpoint reaching the appliance's
-  resolver over the management path, and the management `name`.
-- `management`: the `address` that name must resolve to, and the `client`
-  address the appliance sees management traffic come from.
+1. Replace the stubs in `default/tasks/recovery/`: `induce.yml` makes the
+   change that loses access, `absent.yml` proves it is gone. Both fail until
+   you replace them.
+2. Replace the `backup`, `restore` and `discard` commands under
+   `recovery_defaults` in `default/inventory/hosts.yml`. They run `false`
+   until you replace them.
+3. Add three entries to the credentials file:
+   - `console`: `argv`, a command that runs commands in the appliance's root
+     shell. The drill writes `{"label": "...", "commands": ["..."]}` to its
+     standard input, fails unless it exits with status 0, and records its
+     output, which must be one JSON line.
+   - `dns`: `host` and `port` of a TCP DNS server that reaches the
+     appliance's resolver over the management path, and the management
+     `name`.
+   - `management`: the `address` that name must resolve to, and the `client`
+     address the appliance sees management traffic come from.
 
-The console returns one JSON line:
-`{"label": "...", "commands": 1, "status": "ok", "seconds": 0.0}`.
-Exit 0 means `ok`; exit 1 means `failed` or `not_ready`; exit 2 means
-`invalid`. The root password and console transcript remain private to the
-lab. The contract file is mode 0600 and does not contain the root password.
-
-Console commands only back up and restore. Assertions use fresh authenticated
-API connections and fresh DNS queries, then the family's absence hook. A
-product whose native configuration has history must restore through its
-native save mechanism rather than copying bytes alone. FIXME Qualify the
-commands and independent saved and active state checks for this appliance.
+Without `console` the drill is skipped; with an incomplete entry it fails. The
+drill never needs the appliance's root credential, so keep that in the console
+endpoint.
 
 {# end skeleton-variant #}
 {# skeleton-variant: recovery-tool #}
-### Drill one family before its first write<a id="usage-family-drill"></a>
+### Drill one family on its own<a id="usage-family-drill"></a>
 
-Use the shared playbook as a build-session tool against an already restored,
-disposable lab. It is not a Molecule scenario. Implement the selected family's
-`tasks/recovery/induce.yml` and `absent.yml`, and qualify the inventory's
-`recovery_defaults` before running it. Exactly one family must be selected.
-Run these commands from the collection root:
+`shared/playbooks/recovery.yml` runs one scenario's recovery hooks without the
+rest of the test sequence, for example to rehearse a new family before it
+writes anything that affects the management path. It needs the same
+`MOLECULE_PRODUCT_*` variables as the scenario. Run it from the collection root
+against a lab you can afford to lose:
 
 ```sh
 export MOLECULE_SCENARIO_DIRECTORY="$PWD/extensions/molecule/default"
-export MOLECULE_RECOVERY_FAMILIES="default"
+export MOLECULE_RECOVERY_SCENARIO="default"
 ansible-playbook \
   -i extensions/molecule/default/inventory/hosts.yml \
   extensions/molecule/shared/playbooks/recovery.yml
 ```
-
-Use the installed development environment and the same credential contract
-as the default scenario. Do not write the family's management-path changes
-until this drill has demonstrated loss, independent recovery and fresh access.
 
 {# end skeleton-variant #}
 ### Write tests<a id="usage-add-tests"></a>

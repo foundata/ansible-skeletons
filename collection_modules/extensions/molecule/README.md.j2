@@ -133,10 +133,10 @@ or destroy:
 {# end skeleton-variant #}
 
 
-The shared loss helper forwards the real client write, drops exactly one
-completed response, and requires an observed result. A fresh module invocation
-then reads the same declaration without another write. It does not replay the
-lost request.
+The lost-reply checks in `side_effect` let one write reach the product and
+replace its reply with a timeout. The module must settle the outcome by reading
+back (`verified: observed`), and a second run with the same arguments must
+report no change without writing again.
 
 {# skeleton-variant: recovery-sequence #}
 {# end skeleton-variant #}
