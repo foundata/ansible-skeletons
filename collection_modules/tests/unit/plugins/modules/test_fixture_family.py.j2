@@ -1,0 +1,147 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Nested family contracts exercised through the real client and module parser."""
+
+from __future__ import annotations
+
+import json
+
+import pytest
+
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.modules import (
+        fixture_family,
+    )
+# isort: on
+# fmt: on
+
+from ..conftest import RunModule
+from ..fake_product import OLD_SECRET, FakeProduct, lost_response
+
+
+def test_nested_create_and_partial_update(
+    fake: FakeProduct, run_module: RunModule
+) -> None:
+    created = run_module(
+        fixture_family.main,
+        name="Nested",
+        settings={"network": "198.51.100.9/24", "port": 8080},
+        _ansible_diff=True,
+    )
+    assert created["changed"] and created["verified"] == "observed"
+    assert created["changed_fields"] == []
+    assert created["fixture_family"]["name"] == "nested"
+    assert created["fixture_family"]["settings"]["network"] == "198.51.100.0/24"
+    assert not run_module(fixture_family.main, name="NESTED", settings={"port": 8080})[
+        "changed"
+    ]
+    updated = run_module(
+        fixture_family.main, name="nested", settings={"port": 9090}, _ansible_diff=True
+    )
+    assert updated["changed_fields"] == ["settings.port"]
+    assert updated["diff"]["before"]["settings"]["port"] == 8080
+    assert updated["diff"]["after"]["settings"] == {
+        "network": "198.51.100.0/24",
+        "port": 9090,
+    }
+    assert fake.families["nested"]["settings"]["unmanaged"] == "kept"
+    assert fake.families["nested"]["secret"] == OLD_SECRET
+    for result in (created, updated):
+        assert OLD_SECRET not in json.dumps(result)
+        assert "unmanaged" not in json.dumps(result)
+
+
+@pytest.mark.parametrize("exists", [False, True])
+def test_prediction_never_writes(
+    fake: FakeProduct, run_module: RunModule, exists: bool
+) -> None:
+    if exists:
+        run_module(fixture_family.main, name="nested", settings={"port": 8080})
+    before = len(fake.writes())
+    result = run_module(
+        fixture_family.main,
+        name="nested",
+        settings={"port": 9090},
+        _ansible_check_mode=True,
+        _ansible_diff=True,
+    )
+    assert result["changed"] and result["verified"] == "predicted"
+    assert result["fixture_family"]["settings"]["port"] == 9090
+    assert len(fake.writes()) == before
+
+
+def test_omitted_members_and_delete(fake: FakeProduct, run_module: RunModule) -> None:
+    run_module(fixture_family.main, name="nested", settings={"port": 8080})
+    assert not run_module(fixture_family.main, name="nested", settings={"port": None})[
+        "changed"
+    ]
+    predicted = run_module(
+        fixture_family.main, name="nested", state="absent", _ansible_check_mode=True
+    )
+    assert predicted["changed"] and "nested" in fake.families
+    removed = run_module(fixture_family.main, name="nested", state="absent")
+    assert removed["changed"] and removed["fixture_family"] is None
+    assert removed["changed_fields"] == []
+    assert not run_module(fixture_family.main, name="nested", state="absent")["changed"]
+
+
+@pytest.mark.parametrize("operation", ["create", "update", "delete"])
+def test_lost_reply_settles_without_retry(
+    fake: FakeProduct, run_module: RunModule, operation: str
+) -> None:
+    if operation != "create":
+        run_module(fixture_family.main, name="nested", settings={"port": 8080})
+    before = len(fake.writes())
+    fake.lose_next(operation, lost_response)
+    params = (
+        {"settings": {"port": 9090}} if operation != "delete" else {"state": "absent"}
+    )
+    result = run_module(fixture_family.main, name="nested", **params)
+    assert result["changed"] and not result.get("failed")
+    assert result["verified"] == "observed"
+    assert len(fake.writes()) == before + 1
+    assert not run_module(fixture_family.main, name="nested", **params)["changed"]
+
+
+@pytest.mark.parametrize(
+    "params,field",
+    [
+        ({"name": "bad/name"}, "name"),
+        ({"settings": {"network": "not a network"}}, "settings.network"),
+        ({"settings": {"port": 0}}, "settings.port"),
+    ],
+)
+def test_invalid_declarations_make_no_request(
+    fake: FakeProduct, run_module: RunModule, params: dict, field: str
+) -> None:
+    result = run_module(fixture_family.main, **{"name": "nested", **params})
+    assert result["failed"] and result["outcome"] == "unchanged"
+    assert result["fields"] == [field]
+    assert not fake.requests
+
+
+def test_refuse_concurrent_unmanaged_change(
+    fake: FakeProduct, run_module: RunModule
+) -> None:
+    run_module(fixture_family.main, name="nested", settings={"port": 8080})
+    before = len(fake.writes())
+    reads = 0
+
+    def concurrent_change() -> None:
+        nonlocal reads
+        reads += 1
+        if reads == 2:
+            fake.families["nested"]["settings"]["unmanaged"] = "peer"
+
+{# skeleton-variant: family-stale-route #}
+    route = "/families/nested"
+{# end skeleton-variant #}
+    fake.faults[route] = concurrent_change
+    result = run_module(fixture_family.main, name="nested", settings={"port": 9090})
+    assert result["failed"] and result["error_code"] == "stale"
+    assert result["outcome"] == "unchanged"
+    assert len(fake.writes()) == before
+    assert fake.families["nested"]["settings"]["unmanaged"] == "peer"

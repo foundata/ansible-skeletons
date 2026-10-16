@@ -19,6 +19,7 @@ from typing import Any, ClassVar
 
 class Handler(BaseHTTPRequestHandler):
     credentials = ""
+    families: ClassVar[dict[str, dict[str, Any]]] = {}
     # Shared by all requests: the server creates one handler per request.
     records: ClassVar[dict[str, dict[str, str]]] = {}
     active: ClassVar[dict[str, dict[str, str]]] = {}
@@ -33,6 +34,31 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def family_request(self, action: str, name: str, data: dict[str, Any]) -> None:
+        if action == "get_item":
+            self.send_json(200, {"family": self.families.get(name)})
+            return
+        if action == "del_item":
+            self.families.pop(name, None)
+        else:
+            record = copy.deepcopy(
+                self.families.get(
+                    name,
+                    {
+                        "name": name,
+                        "settings": {
+                            "network": "198.51.100.0/24",
+                            "port": 8080,
+                            "unmanaged": "kept",
+                        },
+                        "secret": "SYNTHETIC-OLD-SECRET",
+                    },
+                )
+            )
+            record["settings"].update(data.get("settings", {}))
+            self.families[name] = record
+        self.send_json(200, {"status": "ok"})
 
     def dispatch(self) -> None:
         expected = "Basic " + base64.b64encode(self.credentials.encode()).decode()
@@ -64,6 +90,10 @@ class Handler(BaseHTTPRequestHandler):
                     "rows": rows[(page - 1) * page_size : page * page_size],
                 },
             )
+            return
+        if self.path.startswith("/api/family/"):
+            _, _, _, action, name = self.path.split("/")
+            self.family_request(action, name, data.get("family", {}))
             return
         match = re.fullmatch(
             r"/api/fixture/(get_item|add_item|set_item|del_item)(?:/([^/]+))?",

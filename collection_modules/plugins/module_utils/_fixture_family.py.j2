@@ -1,0 +1,233 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Copy this family and edit its hooks, never the lifecycle sequence.
+
+The fixture has nested settings with partial declarations. A definition's flat
+field mapping cannot preserve their unmanaged members. The inherited base owns
+validation order, guards, prediction, write settlement and public failures.
+"""
+
+from __future__ import annotations
+
+import copy
+import ipaddress
+import re
+from typing import Any
+
+from ansible_collections.foundata.utils.plugins.module_utils import errors
+
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._client import (
+        ProductError,
+        api_argument_spec,
+    )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._family import (
+        Family,
+    )
+# isort: on
+# fmt: on
+
+
+def argument_spec() -> dict[str, Any]:
+    return {
+        **api_argument_spec(),
+        "name": {"type": "str", "required": True},
+        "settings": {
+            "type": "dict",
+            "options": {
+                "network": {"type": "str"},
+                "port": {"type": "int"},
+            },
+        },
+        "state": {
+            "type": "str",
+            "default": "present",
+            "choices": ["present", "absent"],
+        },
+    }
+
+
+class FixtureFamily(Family):
+    """A nested resource; replace product hooks when copying this scaffold."""
+
+    result_key = "fixture_family"
+    compatibility_id = "fixture_family"
+    identity_options = ("name",)
+    whole_diff = True
+    recheck_code = "stale"
+
+    def connect(self) -> Any:
+        """Construct the bound client after request-free declaration validation."""
+        return super().connect()
+
+    def compatibility(self, operation: str) -> None:
+        """Refuse excluded operations; do not write or change declared state."""
+        super().compatibility(operation)
+
+    def identify(self) -> str:
+        """Validate and canonicalize the immutable identity without a request."""
+        name = self.params["name"]
+        if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{0,63}", name):
+            raise ProductError(
+                category="argument", code="invalid_identity", fields=["name"]
+            )
+        return str(name.casefold())
+
+    def declared(self) -> dict[str, Any]:
+        """Validate nested declarations; omitted and null members stay unmanaged."""
+        values = {
+            name: value
+            for name, value in (self.params.get("settings") or {}).items()
+            if value is not None
+        }
+        if "network" in values:
+            try:
+                values["network"] = str(
+                    ipaddress.ip_network(values["network"], strict=False)
+                )
+            except ValueError as failure:
+                raise ProductError(
+                    category="argument",
+                    code="invalid_field",
+                    fields=["settings.network"],
+                ) from failure
+        if "port" in values and not 1 <= values["port"] <= 65535:
+            raise ProductError(
+                category="argument",
+                code="invalid_field",
+                fields=["settings.port"],
+            )
+        return {"name": self.key, **({"settings": values} if values else {})}
+
+    def lookup(self) -> Any:
+        """Read the complete named object or None, including on lost replies."""
+{# skeleton-variant: family-read #}
+        reply = self.client.read(f"/families/{self.key}")
+{# end skeleton-variant #}
+        if not isinstance(reply, dict) or "family" not in reply:
+            raise ProductError(category="response", code="schema")
+        record = reply["family"]
+        if record is None:
+            return None
+        if (
+            not isinstance(record, dict)
+            or record.get("name") != self.key
+            or not isinstance(record.get("settings"), dict)
+        ):
+            raise ProductError(category="response", code="schema")
+        settings = record["settings"]
+        try:
+            ipaddress.ip_network(settings["network"])
+            port = settings["port"]
+            if isinstance(port, bool) or not isinstance(port, int):
+                raise ValueError
+            if not 1 <= port <= 65535:
+                raise ValueError
+        except (KeyError, TypeError, ValueError) as failure:
+            raise ProductError(category="response", code="schema") from failure
+        return record
+
+    def managed(self, record: Any) -> Any:
+        """Project only public comparable state, excluding private wire members."""
+        return {
+            "name": record["name"],
+            "settings": {
+                name: record["settings"][name] for name in ("network", "port")
+            },
+        }
+
+    def same(self, name: str, current: Any, desired: Any) -> bool:
+        """Compare only declared nested members, not the whole settings object."""
+        if name == "settings":
+            return isinstance(current, dict) and all(
+                current.get(member) == value for member, value in desired.items()
+            )
+        return super().same(name, current, desired)
+
+    def difference(self) -> dict[str, Any]:
+        """Calculate the minimum declared difference from the initial snapshot."""
+        return super().difference()
+
+    def protect(self) -> None:
+        """Refuse unsafe transitions before prediction, including check mode."""
+        super().protect()
+{# skeleton-variant: family-protect #}
+{# end skeleton-variant #}
+
+    def secret(self, name: str) -> bool:
+        """Identify write-only fields; this public fixture has none."""
+        return False
+
+    def predict(self) -> Any:
+        """Merge public nested state for check mode without inventing defaults."""
+        predicted = copy.deepcopy(self.current or {"name": self.key})
+        settings = self.delta.get("settings")
+        if settings:
+            predicted["settings"] = {**predicted.get("settings", {}), **settings}
+        return predicted
+
+    def public(self, record: Any) -> Any:
+        """Project observed output without private or unmanaged wire members."""
+        return self.managed(record)
+
+    def diff(self) -> dict[str, Any] | None:
+        """Publish complete public before and after objects, never wire secrets."""
+        return super().diff()
+
+    def recheck(self) -> None:
+        """Refuse a stale snapshot just before a write; never retry the write."""
+        super().recheck()
+
+    def write(self) -> None:
+        """Send exactly one mutation, preserving unmanaged nested members."""
+        record = copy.deepcopy(self.record or {"name": self.key, "settings": {}})
+        record["settings"].update(self.delta.get("settings", {}))
+{# skeleton-variant: family-write #}
+        method = "DELETE" if self.absent else ("POST" if self.record is None else "PUT")
+        reply = self.client.write(method, f"/families/{self.key}", record)
+{# end skeleton-variant #}
+        if not isinstance(reply, dict) or reply.get("status") != "ok":
+            raise ProductError(category="product", code="rejected")
+
+    def started(self) -> bool:
+        """Tell the base whether a failed request may have reached the product."""
+        return super().started()
+
+    def lost(self, failure: errors.ApiError) -> bool:
+        """Classify an uncertain reply that read-back may settle without retry."""
+        return super().lost(failure)
+
+    def moved(self, observed: Any) -> bool:
+        """Compare the full snapshot because a write carries unmanaged members."""
+        return bool(observed != self.record)
+
+    def verify(self, record: Any, desired: dict[str, Any], absent: bool) -> None:
+        """Prove declared state or raise a shared verification verdict."""
+        super().verify(record, desired, absent)
+
+    def changed_fields(self) -> list[str]:
+        """Name changed declared leaves on updates, empty on create or delete."""
+        if self.record is None or self.absent:
+            return []
+        current = (self.current or {}).get("settings", {})
+        return sorted(
+            f"settings.{name}"
+            for name, value in self.delta.get("settings", {}).items()
+            if current.get(name) != value
+        )
+
+    def finish(self, result: dict[str, Any]) -> dict[str, Any]:
+        """Complete successful output once; never hide an uncertain outcome."""
+        return super().finish(result)
+
+    def operation_id(self) -> str:
+        """Name the operation used by the collection compatibility policy."""
+        return super().operation_id()
+
+    def identity_fields(self) -> dict[str, Any]:
+        """Return only identity fields allowed by the collection error schema."""
+        return super().identity_fields()

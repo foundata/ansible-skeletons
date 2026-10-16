@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+---
+- name: "Exercise a nested fixture update"
+  module_defaults:
+    group/{{ namespace }}.{{ collection_name }}.api: >-
+      {{ '{{ product_connection }}' }}
+  block:
+    - name: "Change one nested member"
+      {{ namespace }}.{{ collection_name }}.fixture_family:
+        name: "molecule_fixture_family"
+        settings:
+          port: 9090
+      diff: true
+      register: __testing_family_updated
+
+    - name: "Assert the nested update"
+      ansible.builtin.assert:
+        that:
+          - __testing_family_updated['changed_fields'] == ['settings.port']
+          - __testing_family_updated['fixture_family']['settings']['network'] == '198.51.100.0/24'

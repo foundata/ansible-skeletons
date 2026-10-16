@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+---
+- name: "Clean up the scenario family"
+  module_defaults:
+    group/{{ namespace }}.{{ collection_name }}.api: >-
+      {{ '{{ product_connection }}' }}
+  block:
+    - name: "Delete the scenario family"
+      {{ namespace }}.{{ collection_name }}.fixture_family:
+        name: "molecule_fixture_family"
+        state: "absent"

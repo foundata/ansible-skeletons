@@ -43,7 +43,7 @@ _SEGMENT = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$")
 ERROR_CODES: dict[str, frozenset[str | None]] = {
     "internal": frozenset({None}),
     "argument": frozenset({"invalid_field", "invalid_identity"}),
-    "eligibility": frozenset({"referenced", "internal_object"}),
+    "eligibility": frozenset({"referenced", "internal_object", "stale"}),
     "auth": frozenset({"unauthenticated", "forbidden"}),
     "product": frozenset(
         {

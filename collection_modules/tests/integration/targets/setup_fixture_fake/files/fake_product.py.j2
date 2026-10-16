@@ -32,6 +32,7 @@ class FakeProduct:
 
     def __init__(self) -> None:
         self.version = "1.0.0"
+        self.families: dict[str, dict[str, Any]] = {}
         self.credentials = f"{KEY}:{SECRET}"
         self.rows: dict[int, dict[str, Any]] = {}
         self.parents: dict[int, dict[str, Any]] = {
@@ -47,6 +48,33 @@ class FakeProduct:
         self.faults: dict[str, Callable[[], Response | None]] = {}
         self.after_write: dict[str, Callable[[], Response | None]] = {}
         self.dropped: set[str] = set()
+
+    def family_request(self, method: str, name: str, data: dict[str, Any]) -> Response:
+        if method == "GET":
+            return Response(200, {"family": self.families.get(name)})
+        operation = {"POST": "create", "PUT": "update", "DELETE": "delete"}[method]
+        if operation == "delete":
+            self.families.pop(name, None)
+        else:
+            record = copy.deepcopy(
+                self.families.get(
+                    name,
+                    {
+                        "name": name,
+                        "settings": {
+                            "network": "198.51.100.0/24",
+                            "port": 8080,
+                            "unmanaged": "kept",
+                        },
+                        "secret": OLD_SECRET,
+                    },
+                )
+            )
+            record["settings"].update(data.get("settings", {}))
+            self.families[name] = record
+        hook = self.after_write.pop(operation, None)
+        replacement = hook() if hook else None
+        return Response(200, {"status": "ok"}) if replacement is None else replacement
 
     def add(self, **values: Any) -> int:
         self.counter += 1
@@ -102,6 +130,8 @@ class FakeProduct:
                     == data.get("password")
                 },
             )
+        if len(pieces) == 2 and pieces[0] == "families":
+            return self.family_request(method, pieces[1], data)
         family = {
             "fixtures": self.rows,
             "parents": self.parents,
