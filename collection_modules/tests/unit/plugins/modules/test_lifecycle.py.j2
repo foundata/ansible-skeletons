@@ -249,6 +249,8 @@ def test_secret_is_unverifiable_and_rotates_only_when_asked(
     store: Store, run_module: RunModule
 ) -> None:
     created = run_module(main, name="a", secret="s3")
+    registered = created.pop("_ansible_new_secrets", [])
+    assert set(registered) <= {"s3"}
     assert created["verified"] == "unverifiable" and "s3" not in str(created)
     assert not run_module(main, name="a", secret="s4")["changed"]
     rotated = run_module(main, name="a", secret="s4", update_password="always")
@@ -373,7 +375,10 @@ def test_whole_object_diff_contains_only_public_state(
         "before": {"name": "a", "value": "2"},
         "after": {},
     }
-    assert "private" not in str((result, created, deleted))
+    for response in (result, created, deleted):
+        registered = response.pop("_ansible_new_secrets", [])
+        assert set(registered) <= {"private"}
+        assert "private" not in str(response)
 
 
 @pytest.mark.parametrize("existing", [False, True])
