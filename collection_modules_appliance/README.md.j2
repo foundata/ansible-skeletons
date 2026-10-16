@@ -57,6 +57,20 @@ Modules run on the execution host against an existing API endpoint. Use
 `connection: local` or an authorized delegate. Installation, bootstrap,
 credentials and TLS trust are caller prerequisites.
 
+### Management path and recovery
+
+The managed configuration carries the management path. Activation is global
+within its subsystem, and console recovery is rehearsed for each family
+before that family makes its first management-path write. A grid-shaped API
+alone does not establish these properties.
+
+Coordinate one writer for saved and pending configuration, including work
+saved outside this collection. Prepare independent console or management
+access, working credentials, a usable backup and a responsible operator
+before a disruptive change. The modules provide no timed rollback and no
+confirmation switch. Recovery from a wrong activation uses that independent
+access. Modules do not verify these prerequisites.
+
 ### Identity
 
 An exact immutable name identifies one record. A rename creates another record;
@@ -74,6 +88,14 @@ Resource writes save state. Run `fixture_apply` with `activate: auto` and a
 `verify` list on every workflow execution. It consumes all pending changes in
 the family, compares only the named objects, and waits for observed convergence.
 `always` forces activation.
+
+A family without an authoritative effective-state probe uses act-once
+activation: preflight, at most one activation request per explicit invocation,
+and optional bounded readiness checks. Normal mode reports
+`verified: unverifiable`; readiness is not a loaded-state receipt. Check mode
+reports `verified: predicted`. A lost activation response leaves the outcome
+unknown and is never retried. FIXME State the family's activation scope,
+probe limits and recovery prerequisites.
 
 ### Check and diff mode
 
