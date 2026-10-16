@@ -1,5 +1,5 @@
-# Recovery drill of one family: lose the management path through the
-# family's own change, restore it through the lab's console endpoint and
+# Recovery drill of one area: lose the management path through the
+# area's own change, restore it through the lab's console endpoint and
 # prove fresh API and DNS access through the automation account.
 #
 # The console endpoint comes from the lab contract. It reads a label and a
@@ -8,11 +8,11 @@
 # console only backs up and restores; every assertion goes through the API
 # and DNS.
 #
-# Set "recovery_family" (a label) and "recovery_hooks" (a directory) when
+# Set "recovery_area" (a label) and "recovery_hooks" (a directory) when
 # including this file. "recovery_defaults" comes from the inventory: the lab
 # contract ("lab"), the fresh authenticated read ("probe") and the guest
 # commands that save ("backup"), restore ("restore") and remove ("discard")
-# the good configuration. The hooks directory holds the family's part:
+# the good configuration. The hooks directory holds the area's part:
 # induce.yml makes the change and may set "recovery_reload", guest commands
 # that run after the restore; absent.yml proves the fixture is gone from
 # saved and loaded state.
@@ -45,13 +45,13 @@
 - name: "Molecule | Recovery | Back the good configuration up through the console"
   ansible.builtin.command:
     argv: "{{ recovery_defaults['lab']['console']['argv'] }}"
-    stdin: "{{ {'label': recovery_family ~ '-backup', 'commands': recovery_defaults['backup']} | ansible.builtin.to_json }}"
+    stdin: "{{ {'label': recovery_area ~ '-backup', 'commands': recovery_defaults['backup']} | ansible.builtin.to_json }}"
   changed_when:
     - true
 
 - name: "Molecule | Recovery | Lose the management path and restore it"
   block:
-    - name: "Molecule | Recovery | Induce the loss through the family"
+    - name: "Molecule | Recovery | Induce the loss through the area"
       ansible.builtin.include_tasks:
         file: "{{ recovery_hooks }}/induce.yml"
 
@@ -81,7 +81,7 @@
       ansible.builtin.command:
         argv: "{{ recovery_defaults['lab']['console']['argv'] }}"
         stdin: >-
-          {{ {'label': recovery_family ~ '-restore',
+          {{ {'label': recovery_area ~ '-restore',
               'commands': recovery_defaults['restore'] + recovery_reload + recovery_defaults['discard']}
              | ansible.builtin.to_json }}
       changed_when:
@@ -102,7 +102,7 @@
   ansible.builtin.assert:
     that:
       - __recovery_loss['status'] | ansible.builtin.default(-1) != 200
-    fail_msg: "The family's change did not cost fresh API access; the drill proves nothing."
+    fail_msg: "The area's change did not cost fresh API access; the drill proves nothing."
     quiet: true
 
 - name: "Molecule | Recovery | Prove the fixture is gone"
@@ -112,7 +112,7 @@
 - name: "Molecule | Recovery | Record the drill"
   ansible.builtin.debug:
     msg: >-
-      {{ {'family': recovery_family,
+      {{ {'area': recovery_area,
           'lost_api_status': __recovery_loss['status'] | ansible.builtin.default(-1),
           'loss_reads': __recovery_loss['attempts'] | ansible.builtin.default(1),
           'restored_api_and_dns': true,

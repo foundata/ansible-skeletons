@@ -7,7 +7,7 @@ Before a write, read the product's listener and defaults, then reject a rule
 covering that tuple. Never infer management ingress from a default route.
 Deletion removes coverage and is allowed. Check mode uses the same guard.
 
-This is a scaffold, not a complete lockout guarantee. A copied family must
+This is a scaffold, not a complete lockout guarantee. A copied resource must
 qualify its listener and ingress evidence, aliases, translations and activation
 scope from the product. Proxies and another writer's pending configuration can
 invalidate that evidence; independent recovery and one writer remain required.

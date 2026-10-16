@@ -29,9 +29,9 @@ invented fixture contract below after qualifying the first product resource.
 |      Module      | Purpose |
 | ---------------- | ------- |
 | `fixture`        | Converge one saved record |
-| `fixture_nested` | Manage a nested family through lifecycle hooks |
+| `fixture_nested` | Manage a nested resource through lifecycle hooks |
 | `fixture_info`   | Read its public saved state |
-| `fixture_apply`  | Activate the fixture family and verify named records |
+| `fixture_apply`  | Activate the fixture area and verify named records |
 <!-- END MODULE TABLE -->
 
 This table is maintained by hand. Module documentation is authoritative:
@@ -60,8 +60,8 @@ credentials and TLS trust are caller prerequisites.
 ### Management path and recovery
 
 The managed configuration carries the management path. Activation is global
-within its subsystem, and console recovery is rehearsed for each family
-before that family makes its first management-path write. A grid-shaped API
+within its subsystem, and console recovery is rehearsed for each area before
+that area makes its first management-path write. A grid-shaped API
 alone does not establish these properties.
 
 Coordinate one writer for saved and pending configuration, including work
@@ -86,15 +86,15 @@ writers, including inventory aliases that address the same endpoint.
 
 Resource writes save state. Run `fixture_apply` with `activate: auto` and a
 `verify` list on every workflow execution. It consumes all pending changes in
-the family, compares only the named objects, and waits for observed convergence.
+the area, compares only the named objects, and waits for observed convergence.
 `always` forces activation.
 
-A family without an authoritative effective-state probe uses act-once
+An area without an authoritative effective-state probe uses act-once
 activation: preflight, at most one activation request per explicit invocation,
 and optional bounded readiness checks. Normal mode reports
 `verified: unverifiable`; readiness is not a loaded-state receipt. Check mode
 reports `verified: predicted`. A lost activation response leaves the outcome
-unknown and is never retried. FIXME State the family's activation scope,
+unknown and is never retried. FIXME State the area's activation scope,
 probe limits and recovery prerequisites.
 
 ### Check and diff mode
@@ -153,10 +153,10 @@ carries the endpoint's variables:
 
 ### FIXME Name the administration task<a id="usage-fixture"></a>
 
-FIXME Two to four sentences: what the family manages, what it refuses and why,
-what the caller prepares, and when to run the apply module. A rule a single
-module enforces belongs in that module's documentation, not here. One section
-per administration task of the plan, in its order.
+FIXME Two to four sentences: what the task's modules manage, what they refuse
+and why, what the caller prepares, and when to run the apply module. A rule
+a single module enforces belongs in that module's documentation, not here.
+One section per administration task of the plan, in its order.
 
 ```yaml
 - name: "Save the record"
@@ -173,14 +173,14 @@ per administration task of the plan, in its order.
 
 Modules: `fixture`, `fixture_apply`, `fixture_info`.
 
-### FIXME Name the nested family task<a id="usage-fixture-nested"></a>
+### FIXME Name the nested resource task<a id="usage-fixture-nested"></a>
 
 FIXME Replace this scaffold example and the module's notes with the researched
-family's identity, ownership, eligibility and concurrency contract. Copy the
-family utility and edit hooks, never the shared lifecycle sequence.
+resource's identity, ownership, eligibility and concurrency contract. Copy the
+resource utility and edit hooks, never the shared lifecycle sequence.
 
 ```yaml
-- name: "Manage one nested family"
+- name: "Manage one nested resource"
   {{ namespace }}.{{ collection_name }}.fixture_nested:
     name: "example"
     settings:

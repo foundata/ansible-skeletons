@@ -29,7 +29,7 @@ invented fixture contract below after qualifying the first product resource.
 |      Module      | Purpose |
 | ---------------- | ------- |
 | `fixture`        | Converge one saved record |
-| `fixture_nested` | Manage a nested family through lifecycle hooks |
+| `fixture_nested` | Manage a nested resource through lifecycle hooks |
 | `fixture_info`   | Read its public saved state |
 <!-- END MODULE TABLE -->
 
@@ -127,10 +127,10 @@ carries the endpoint's variables:
 
 ### FIXME Name the administration task<a id="usage-fixture"></a>
 
-FIXME Two to four sentences: what the family manages, what it refuses and why,
-what the caller prepares, and when to run the apply module. A rule a single
-module enforces belongs in that module's documentation, not here. One section
-per administration task of the plan, in its order.
+FIXME Two to four sentences: what the task's modules manage, what they refuse
+and why, what the caller prepares, and when to run the apply module. A rule
+a single module enforces belongs in that module's documentation, not here.
+One section per administration task of the plan, in its order.
 
 ```yaml
 - name: "Save the record"
@@ -141,14 +141,14 @@ per administration task of the plan, in its order.
 
 Modules: `fixture`, `fixture_info`.
 
-### FIXME Name the nested family task<a id="usage-fixture-nested"></a>
+### FIXME Name the nested resource task<a id="usage-fixture-nested"></a>
 
 FIXME Replace this scaffold example and the module's notes with the researched
-family's identity, ownership, eligibility and concurrency contract. Copy the
-family utility and edit hooks, never the shared lifecycle sequence.
+resource's identity, ownership, eligibility and concurrency contract. Copy the
+resource utility and edit hooks, never the shared lifecycle sequence.
 
 ```yaml
-- name: "Manage one nested family"
+- name: "Manage one nested resource"
   {{ namespace }}.{{ collection_name }}.fixture_nested:
     name: "example"
     settings:

@@ -28,7 +28,7 @@ Paths are relative to this directory unless stated otherwise.
   - [Recovery drill](#usage-recovery)
 {# end skeleton-variant #}
 {# skeleton-variant: recovery-tool-toc #}
-  - [Drill one family on its own](#usage-family-drill)
+  - [Drill one area on its own](#usage-area-drill)
 {# end skeleton-variant #}
   - [Write tests](#usage-add-tests)
   - [Provision your own target](#usage-owned-target)
@@ -127,10 +127,10 @@ or destroy:
 | ------------- | ------------ |
 | `syntax`      | Checks the playbooks. |
 | `cleanup`     | Removes records an aborted earlier run left behind. |
-| `converge`    | Creates definition-driven and nested-family fixture records. |
+| `converge`    | Creates definition-driven and nested fixture records. |
 | `idempotence` | Runs converge again; any reported change fails the test. |
 | `verify`      | Reads the saved state back and asserts it. |
-| `side_effect` | Checks updates and diffs, then lost create, update and delete replies for both families. |
+| `side_effect` | Checks updates and diffs, then lost create, update and delete replies for both fixtures. |
 | `cleanup`     | Removes the fixture records. |
 
 {# skeleton-variant: activation-sequence #}
@@ -160,7 +160,7 @@ endpoint, and otherwise prints why it skipped.
 
 The drill proves that you can get the appliance back after a change cuts off
 its management access. It backs up the configuration through the appliance's
-console, makes the family's change that breaks API access, and restores the
+console, makes the area's change that breaks API access, and restores the
 backup through the console. Then it requires a fresh API login, a fresh DNS
 answer for the management name, and the change to be gone. The console only
 backs up and restores; every check goes through the API and DNS.
@@ -190,10 +190,10 @@ endpoint.
 
 {# end skeleton-variant #}
 {# skeleton-variant: recovery-tool #}
-### Drill one family on its own<a id="usage-family-drill"></a>
+### Drill one area on its own<a id="usage-area-drill"></a>
 
 `shared/playbooks/recovery.yml` runs one scenario's recovery hooks without the
-rest of the test sequence, for example to rehearse a new family before it
+rest of the test sequence, for example to rehearse a new area before it
 writes anything that affects the management path. It needs the same
 `MOLECULE_PRODUCT_*` variables as the scenario. Run it from the collection root
 against a lab you can afford to lose:
@@ -220,12 +220,12 @@ task files of a directory under `default/tasks/`, in alphabetical order:
 | `tasks/cleanup/`     | Remove the fixture records. It also runs first, so absence is not an error. |
 
 The `fixture.yml` files exercise a definition-driven resource;
-`fixture_nested.yml` exercises the copyable nested family. Copy that utility,
-module and its task files per family, edit hooks rather than the lifecycle
-sequence, and replace the verifier slot with independent product evidence.
-Parameterize `zz_loss.yml` for the copied module and its identity; keep
-`shared/files/loss.py` unchanged. Set the connection once per block with
-`module_defaults` for the
+`fixture_nested.yml` exercises the copyable hook-based resource. Copy that
+utility, module and its task files per hook-based resource, edit hooks rather
+than the lifecycle sequence, and replace the verifier slot with independent
+product evidence. Parameterize `zz_loss.yml` for the copied module and its
+identity; keep `shared/files/loss.py` unchanged. Set the connection once per
+block with `module_defaults` for the
 `{{ namespace }}.{{ collection_name }}.api`
 action group and the `product_connection` inventory variable. When adding tests:
 

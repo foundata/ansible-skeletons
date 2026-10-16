@@ -2,12 +2,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
-- name: "Clean up the scenario family"
+- name: "Clean up the nested scenario fixture"
   module_defaults:
     group/{{ namespace }}.{{ collection_name }}.api: >-
       {{ '{{ product_connection }}' }}
   block:
-    - name: "Delete the scenario family"
+    - name: "Delete the nested scenario fixture"
       {{ namespace }}.{{ collection_name }}.fixture_nested:
         name: "molecule_fixture_nested"
         state: "absent"

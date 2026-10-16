@@ -10,11 +10,11 @@
   when:
     - "'console' not in __product_credentials"
 
-- name: "Molecule | Side effect | Run the family recovery drill last"
+- name: "Molecule | Side effect | Run the area's recovery drill last"
   ansible.builtin.include_tasks:
     file: "{{ lookup('ansible.builtin.env', 'MOLECULE_SCENARIO_DIRECTORY') }}/../shared/tasks/recovery.yml"
   vars:
-    recovery_family: "fixture-family"
+    recovery_area: "fixture"
     recovery_hooks: "{{ lookup('ansible.builtin.env', 'MOLECULE_SCENARIO_DIRECTORY') }}/tasks/recovery"
   when:
     - "'console' in __product_credentials"

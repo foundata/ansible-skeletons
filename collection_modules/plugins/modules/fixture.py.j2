@@ -14,7 +14,7 @@ description:
   - "Adopts the unique record with O(name); a rename creates a different record. Ambiguous and internal identities are refused."
   - "Only declared fields are managed. Omitted and null options are unmanaged; empty values clear a field."
   - "Writes take effect immediately; no apply module is needed. Deletion is refused while a dependent record refers to this fixture."
-  - "O(state=absent) deletes only the named record. Writers must coordinate access to this family."
+  - "O(state=absent) deletes only the named record. Writers must coordinate access to this resource."
 version_added: "{{ version | default('1.0.0') }}"
 author:
 {% for author in authors %}

@@ -24,8 +24,8 @@ SPDX-License-Identifier: GPL-3.0-or-later
 - The shared `_activation.py` is unused here. Add a scope-named apply module
   only where saved and active state differ, with compare, apply and settle
   probes.
-- Copy `plugins/module_utils/_fixture_nested.py` for each family that a flat
-  definition cannot express. Edit its hooks and their contracts, never the
+- Copy `plugins/module_utils/_fixture_nested.py` for each resource that a
+  flat definition cannot express. Edit its hooks and their contracts, never the
   lifecycle sequence. Keep `_lifecycle.py` and the shared tests unchanged.
   Bind the client, schema and compatibility policy once in `_binding.py`.
   Copy the `fixture_nested` module, unit test, file-only integration target

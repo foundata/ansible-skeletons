@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
-- name: "Exercise the nested family lifecycle"
+- name: "Exercise the nested fixture lifecycle"
   module_defaults:
     group/{{ namespace }}.{{ collection_name }}.api: >-
       {{ '{{ fixture_fake_connection }}' }}

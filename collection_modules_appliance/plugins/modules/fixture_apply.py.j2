@@ -2,18 +2,18 @@
 # SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
 # SPDX-License-Identifier: GPL-3.0-or-later
-# FIXME Replace family activation with the researched scope and effective-state probe.
+# FIXME Replace area activation with the researched scope and effective-state probe.
 
 from __future__ import annotations
 
 DOCUMENTATION = r"""
 ---
 module: fixture_apply
-short_description: Activate the fixture family
+short_description: Activate the fixture area
 description:
-  - "Compares saved and active state of O(verify) and activates the family on drift or with O(activate=always)."
+  - "Compares saved and active state of O(verify) and activates the area on drift or with O(activate=always)."
   - "Call on every workflow execution, including when resource tasks report no changes, to recover pending work."
-  - "Activation consumes all pending changes in the fixture family. Coordinate writers; verification covers only the named objects."
+  - "Activation consumes all pending changes in the fixture area. Coordinate writers; verification covers only the named objects."
   - "After activation, polls the active state within the shared deadline. Failure to observe convergence fails the module."
 version_added: "{{ version | default('1.0.0') }}"
 author:
@@ -102,7 +102,7 @@ def main() -> None:
     _activation.run(
         module,
         operation_id="fixture_apply",
-        label="fixture family",
+        label="fixture area",
         name_pattern=FIXTURE.keys[0].pattern,
         compare=_fixture_activation.compare_fixture,
         apply=_fixture_activation.apply_fixture,

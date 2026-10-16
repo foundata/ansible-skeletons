@@ -12,7 +12,7 @@
         name: "molecule_fixture_loss"
         state: "absent"
 
-    - name: "Remove the nested family fixture"
+    - name: "Remove the nested fixture"
       {{ namespace }}.{{ collection_name }}.fixture_nested:
         name: "molecule_fixture_nested_loss"
         state: "absent"

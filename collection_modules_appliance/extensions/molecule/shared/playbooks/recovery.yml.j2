@@ -42,10 +42,10 @@
           {{ __recovery_registered | ansible.builtin.join(', ') }}
         quiet: true
 
-    - name: "Molecule | Recovery | Drill the scenario's family"
+    - name: "Molecule | Recovery | Drill the scenario's area"
       ansible.builtin.include_tasks:
         file: "{{ __recovery_molecule }}/shared/tasks/recovery.yml"
       vars:
-        recovery_family: "{{ __recovery_scenario }}"
+        recovery_area: "{{ __recovery_scenario }}"
         recovery_hooks: "{{ __recovery_molecule }}/{{ __recovery_scenario }}/tasks/recovery"
 {% endraw %}

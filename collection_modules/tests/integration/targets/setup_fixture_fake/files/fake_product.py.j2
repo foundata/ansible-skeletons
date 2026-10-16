@@ -132,18 +132,18 @@ class FakeProduct:
             )
         if len(pieces) == 2 and pieces[0] == "nested":
             return self.nested_request(method, pieces[1], data)
-        family = {
+        table = {
             "fixtures": self.rows,
             "parents": self.parents,
             "dependents": self.dependents,
         }.get(pieces[0])
-        if family is None:
+        if table is None:
             return Response(404, None, raw=b"Not found")
         if method == "GET":
             if len(pieces) == 3 and pieces[1] == "by-name":
                 rows = [
                     row
-                    for row in family.values()
+                    for row in table.values()
                     if row["name"].casefold() == unquote(pieces[2]).casefold()
                 ]
                 if len(rows) > 1:
@@ -154,14 +154,14 @@ class FakeProduct:
                     else Response(404, None, raw=b"Not found")
                 )
             if len(pieces) == 2 and pieces[1].isdigit():
-                row = family.get(int(pieces[1]))
+                row = table.get(int(pieces[1]))
                 return (
                     Response(200, row) if row else Response(404, None, raw=b"Not found")
                 )
             query = parse_qs(parsed.query)
             page = int(query.get("page", ["1"])[0])
             size = min(self.page_size, int(query.get("per_page", ["100"])[0]))
-            rows = list(family.values())
+            rows = list(table.values())
             start = 0 if self.incomplete else (page - 1) * size
             return Response(200, rows[start : start + size])
         identity = int(pieces[1]) if len(pieces) == 2 and pieces[1].isdigit() else None
@@ -176,7 +176,7 @@ class FakeProduct:
             if "delete" in self.dropped:
                 self.dropped.discard("delete")
                 return Response(200, {})
-            family.pop(identity, None)
+            table.pop(identity, None)
             self.passwords.pop(identity, None)
             response = Response(200, {})
             operation = "delete"
@@ -186,20 +186,20 @@ class FakeProduct:
             if method == "POST":
                 identity = self.add()
                 operation = "create"
-            elif identity not in family:
+            elif identity not in table:
                 return Response(404, None, raw=b"Not found")
             else:
                 operation = "update"
                 if operation in self.dropped:
                     self.dropped.discard(operation)
-                    return Response(200, family[identity])
-            row = copy.deepcopy(family[identity])
+                    return Response(200, table[identity])
+            row = copy.deepcopy(table[identity])
             password = data.pop("password", None)
             if password is not None:
                 self.passwords[identity] = password
             row.update(data)
             row["value"] = row["value"].strip().lower()
-            family[identity] = row
+            table[identity] = row
             response = Response(201 if operation == "create" else 200, row)
         else:
             return Response(405, None)

@@ -17,7 +17,7 @@ description:
     Saves without activation. Run
     M({{ namespace }}.{{ collection_name }}.fixture_apply)
     after all writes, on every play execution.
-  - "O(state=absent) deletes only the named record and refuses while a dependent record refers to it. Writers must coordinate access to this family."
+  - "O(state=absent) deletes only the named record and refuses while a dependent record refers to it. Writers must coordinate access to this resource."
 version_added: "{{ version | default('1.0.0') }}"
 author:
 {% for author in authors %}

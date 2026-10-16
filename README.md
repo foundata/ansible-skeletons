@@ -200,10 +200,10 @@ rules run.
 ### `collection_modules`<a id="collection_modules"></a>
 
 A module-first skeleton with one skeleton-owned lifecycle base for both
-definition-driven resources and handwritten families. The engine supplies
-hooks to that base; a second, nested fixture family shows how to copy a family
-utility and edit its hooks without changing the sequence. Both fixtures use
-one lost-response harness for create, update and delete.
+definition-driven and hook-based resources. The engine supplies hooks to
+that base; a second, nested fixture shows how to copy a hook-based
+resource's utility and edit its hooks without changing the sequence. Both
+fixtures use one lost-response harness for create, update and delete.
 
 Its REST fixture uses server-assigned integer identifiers, case-insensitive
 names, by-key 404 absence, empty-page pagination, native JSON and
@@ -232,22 +232,23 @@ Follow the rendered `FIXME.md` to replace the fixture with product evidence.
 
 A module-first skeleton for appliances whose managed configuration carries
 the management path, whose activation is global, and whose console recovery
-is rehearsed per family. Choose it by those traits, not by the API's endpoint
+is rehearsed per area. Choose it by those traits, not by the API's endpoint
 shape.
 
 It ships the same skeleton-owned lifecycle base, definition engine, copyable
-family scaffold and loss harness as `collection_modules`. It adds act-once
-activation for scopes without an authoritative loaded-state receipt, a
-management-path guard scaffold, and a recovery drill with a lab contract.
-Independent recovery and a single writer are prerequisites. Act-once reports
-`verified: unverifiable`, not proof that the requested state became active.
+hook-based resource scaffold and loss harness as `collection_modules`. It
+adds act-once activation for scopes without an authoritative loaded-state
+receipt, a management-path guard scaffold, and a recovery drill with a lab
+contract. Independent recovery and a single writer are prerequisites.
+Act-once reports `verified: unverifiable`, not proof that the requested state
+became active.
 
 Its replaceable resource, info and verifying activation modules exercise a
 grid-style fake API: UUID identifiers, paginated `search_item` listings with a
 declared total, `add_item`, `set_item` and `del_item` actions, string-encoded
 values and fixed response envelopes. A dependent record blocks deletion.
 The second fixture has nested values that a flat definition cannot express.
-The external-endpoint Molecule scenario runs both families and skips the
+The external-endpoint Molecule scenario runs both fixtures and skips the
 recovery stage with a reason when no console contract is supplied. It
 contains no deployment role.
 

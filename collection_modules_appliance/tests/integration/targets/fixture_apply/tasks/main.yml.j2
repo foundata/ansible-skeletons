@@ -20,7 +20,7 @@
       check_mode: true
       register: __fixture_apply_prediction
 
-    - name: "Activate the family"
+    - name: "Activate the area"
       {{ namespace }}.{{ collection_name }}.fixture_apply:
         activate: "auto"
         verify:

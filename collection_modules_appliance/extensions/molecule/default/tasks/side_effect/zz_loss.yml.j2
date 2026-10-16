@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
-- name: "Settle lost replies for both fixture families"
+- name: "Settle lost replies for both fixtures"
   ansible.builtin.command:
     argv:
       - "{{ '{{ ansible_playbook_python }}' }}"
@@ -53,5 +53,5 @@
 
 - name: "Report lost-response coverage"
   ansible.builtin.debug:
-    msg: "Lost create, update and delete replies settled for both fixture families, with one write each."
+    msg: "Lost create, update and delete replies settled for both fixtures, with one write each."
     verbosity: 0

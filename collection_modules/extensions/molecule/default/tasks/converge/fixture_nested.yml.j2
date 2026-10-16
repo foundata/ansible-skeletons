@@ -2,12 +2,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
-- name: "Converge the nested fixture family"
+- name: "Converge the nested fixture"
   module_defaults:
     group/{{ namespace }}.{{ collection_name }}.api: >-
       {{ '{{ product_connection }}' }}
   block:
-    - name: "Save the scenario family"
+    - name: "Save the nested scenario fixture"
       {{ namespace }}.{{ collection_name }}.fixture_nested:
         name: "molecule_fixture_nested"
         settings:

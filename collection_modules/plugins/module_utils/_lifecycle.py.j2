@@ -2,15 +2,15 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Skeleton-owned lifecycle of one declared object or operation; internal.
 
-A family subclasses :class:`Lifecycle` once per collection binding (the
-rendered ``_binding.py``) and supplies the product steps as hooks. The base
-owns the order and the result and failure contracts, so that no family
-implements them again:
+A resource subclasses :class:`Lifecycle` through the collection's binding
+(the rendered ``_binding.py``) and supplies the product steps as hooks. The
+base owns the order and the result and failure contracts, so that no
+resource implements them again:
 
 ``reconcile`` validates the declaration without a request (``identify``,
 ``declared``), connects, reads the object completely (``lookup``) and
 projects it (``managed``), computes the minimal difference, runs the
-family's guards (``protect``) and predicts the result. Unless
+resource's guards (``protect``) and predicts the result. Unless
 ``compatibility_always`` is set, an unchanged run
 returns without discovering the product version; check mode returns
 after the eligibility check. Otherwise ``recheck`` repeats a guard right
@@ -84,7 +84,7 @@ class Lifecycle:
     recheck_category = "eligibility"
     identity_options: tuple[str, ...] = ()
     steps: tuple[tuple[str, str], ...] = ()
-    """Base steps a family reports under another public name."""
+    """Base steps a resource reports under another public name."""
 
     def __init__(self, module: Any) -> None:
         self.module, self.params = module, module.params

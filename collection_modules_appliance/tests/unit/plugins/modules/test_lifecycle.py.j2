@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Lifecycle base invariants over a synthetic family and in-memory product."""
+"""Lifecycle base invariants over a synthetic resource and in-memory product."""
 
 from __future__ import annotations
 
@@ -448,8 +448,8 @@ def test_refusal_can_measure_progress_over_the_whole_context(
 def action_main(action: Callable[[Synthetic], dict[str, Any]]) -> Callable[[], None]:
     def entrypoint() -> None:
         module = AnsibleModule(argument_spec=spec(), supports_check_mode=True)
-        family = Synthetic(module)
-        family.execute(action=lambda: action(family))
+        subject = Synthetic(module)
+        subject.execute(action=lambda: action(subject))
 
     return entrypoint
 
@@ -461,9 +461,9 @@ def action_main(action: Callable[[Synthetic], dict[str, Any]]) -> Callable[[], N
 def test_custom_operation_uses_the_same_failure_boundary(
     run_module: RunModule, attempted: bool, confirmed: bool, outcome: str
 ) -> None:
-    def action(family: Synthetic) -> dict[str, Any]:
-        family.operation = "job"
-        family.attempted, family.confirmed = attempted, confirmed
+    def action(subject: Synthetic) -> dict[str, Any]:
+        subject.operation = "job"
+        subject.attempted, subject.confirmed = attempted, confirmed
         raise Failure(category="product", code="rejected")
 
     result = run_module(action_main(action), name="a")
@@ -477,7 +477,7 @@ def test_custom_operation_finishes_its_result(
     monkeypatch.setattr(
         Synthetic, "finish", lambda self, result: {**result, "receipt": "complete"}
     )
-    result = run_module(action_main(lambda family: {"changed": False}), name="a")
+    result = run_module(action_main(lambda subject: {"changed": False}), name="a")
     assert not result["changed"] and result["receipt"] == "complete"
 
 
@@ -492,13 +492,13 @@ def test_custom_operation_probes_before_action(
 ) -> None:
     monkeypatch.setattr(Synthetic, "compatibility_always", always)
 
-    def action(family: Synthetic) -> dict[str, Any]:
+    def action(subject: Synthetic) -> dict[str, Any]:
         assert store.versions == int(always)
         if always:
-            assert family.client is store
-            family.ensure_compatible(family.operation_id())
+            assert subject.client is store
+            subject.ensure_compatible(subject.operation_id())
         else:
-            assert family.client is None
+            assert subject.client is None
         return {"changed": False}
 
     result = run_module(action_main(action), name="a", _ansible_check_mode=check_mode)
@@ -514,7 +514,7 @@ def test_custom_operation_refuses_before_action(
     def ineligible(self: Synthetic, operation: str) -> None:
         raise Failure(category="compatibility", code="ineligible")
 
-    def action(family: Synthetic) -> dict[str, Any]:
+    def action(subject: Synthetic) -> dict[str, Any]:
         raise AssertionError("An ineligible action must not run")
 
     monkeypatch.setattr(Synthetic, "compatibility", ineligible)
@@ -602,13 +602,13 @@ def test_act_once_probes_before_preflight(
 
     def entrypoint() -> None:
         module = AnsibleModule(argument_spec=spec(), supports_check_mode=True)
-        family = Activation(module)
+        subject = Activation(module)
         if entry == "direct":
-            module.exit_json(**family.act_once())
+            module.exit_json(**subject.act_once())
         elif entry == "action":
-            family.execute(family.act_once)
+            subject.execute(subject.act_once)
         else:
-            family.execute(activation=True)
+            subject.execute(activation=True)
 
     result = run_module(entrypoint, _ansible_check_mode=check_mode)
     expected = ["synthetic_apply", "preflight"]
@@ -654,22 +654,22 @@ def test_stages_keep_confirmed_progress_and_never_repeat_a_write(
     if second == "not_started":
         monkeypatch.setattr(Synthetic, "started", lambda self: False)
 
-    def action(family: Synthetic) -> dict[str, Any]:
-        family.client = family.connect()
-        family.key = family.identify()
-        family.want = family.delta = {"value": "1"}
-        family.step("create")
-        observed = family.stage(family.write)
-        family.record = observed
-        family.current = family.managed(observed)
-        family.want = family.delta = {"value": "2"}
+    def action(subject: Synthetic) -> dict[str, Any]:
+        subject.client = subject.connect()
+        subject.key = subject.identify()
+        subject.want = subject.delta = {"value": "1"}
+        subject.step("create")
+        observed = subject.stage(subject.write)
+        subject.record = observed
+        subject.current = subject.managed(observed)
+        subject.want = subject.delta = {"value": "2"}
         store.drop = second in ("lost_without_effect", "refused", "not_started")
         if second == "refused":
             store.after = refuse
         elif second != "success":
             store.after = lose
-        family.step("update")
-        observed = family.stage(family.write)
+        subject.step("update")
+        observed = subject.stage(subject.write)
         return {"changed": True, "verified": "observed", "synthetic": observed}
 
     result = run_module(action_main(action), name="a")

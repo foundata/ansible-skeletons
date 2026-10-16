@@ -124,9 +124,9 @@ Both module variants own one `_lifecycle.py` sequence and result boundary.
 The product binding `_binding.py` supplies its client, error schema and
 compatibility policy. `_engine.py` implements definition-driven hooks;
 `_fixture_nested.py` demonstrates nested values through the same base. Copy
-that family utility per family and edit hooks, not the sequence. The shared
-loss harness proves lost create, update and delete settlement for both
-fixtures. Only the appliance variant carries act-once activation, the
+that utility for each hook-based resource and edit hooks, not the sequence.
+The shared loss harness proves lost create, update and delete settlement for
+both fixtures. Only the appliance variant carries act-once activation, the
 management-path guard scaffold and recovery machinery. Its default scenario
 skips the last recovery stage with a reason when credentials have no console
 contract, so the fake-product gate needs no lab.
@@ -191,7 +191,7 @@ limited to):
   Repository checks require successful foundata rule verification.
 - Both module skeletons under two identities: their default Nox sessions in
   check-only mode (Ruff and mypy including the integration targets' Python),
-  a build, and the installed definition-driven and nested-family modules.
+  a build, and the installed definition-driven and hook-based modules.
 
 The full matrix also executes both module scenarios against their own fake
 products, including the six lost-response cases and the appliance's explicit
@@ -200,7 +200,7 @@ its recovery drill, which skips without a console contract. The fake product
 has no console, so the checks exercise only the skip; they do not qualify a
 live drill. Unit tests cover management-listener refusal in normal and check
 mode. They do not qualify a product's console recovery; that drill belongs to
-the collection's authorized lab before a family's first management-path write.
+the collection's authorized lab before an area's first management-path write.
 
 The check runs independent steps at the same time: the repository test runs,
 the lanes, `generated-lint`, and each identity of both module skeletons.

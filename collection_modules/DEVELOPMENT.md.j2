@@ -53,12 +53,20 @@ Run container-backed sessions sequentially.
 
 ## Boundaries<a id="boundaries"></a>
 
+A resource is one kind of product object and the module that manages it.
+A definition in `_definitions.py` describes a definition-driven resource,
+and `_engine.py` runs it. A hook-based resource needs more than a definition
+can express, such as nested values, so its own module utility implements the
+lifecycle's hooks. An area is a group of modules that share one module
+utility, one activation scope and usually one Molecule scenario, such as the
+modules for routes, gateways and their activation.
+
 Replace the [fixture](plugins/modules/fixture.py), its definition and tests
 together. Bind the shared contract tests in
-`tests/unit/plugins/modules/contract_subject.py`. For a family a definition
-cannot express, copy `_fixture_nested.py`, its module and its tests. Edit hooks,
-never the lifecycle sequence. The synthetic base and engine tests remain
-independent of the product's fixtures.
+`tests/unit/plugins/modules/contract_subject.py`. For a hook-based resource,
+copy `_fixture_nested.py`, its module and its tests. Edit hooks, never the
+lifecycle sequence. The synthetic base and engine tests remain independent
+of the product's fixtures.
 
 The following files are skeleton-owned invariants. Keep them byte-identical
 to the selected render; a required change goes through the skeleton:
@@ -77,13 +85,13 @@ the product; `_binding.py` binds the lifecycle to its client, error schema and
 compatibility policy. Bring those bindings forward with product values kept.
 
 `foundata.utils` owns byte transport, deadlines, JSON decoding and safe error
-translation. The client, definitions, copied family utilities, guard rules,
+translation. The client, definitions, copied resource utilities, guard rules,
 modules, documentation fragments, fake product, scenario hooks and inventory
 extractor are product-owned. The extractor writes
 `tools/inventory/<series>.yml` beside itself. That inventory is development
 evidence: it never ships and nothing reads it at runtime.
 
-FIXME State which families use hooks rather than definitions and why, and
+FIXME State which resources use hooks rather than definitions and why, and
 which writers and prerequisites the caller supplies. Each enforced rule and
 its reason belong in its utility's docstring.
 

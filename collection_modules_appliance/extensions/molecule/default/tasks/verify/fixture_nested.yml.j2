@@ -1,9 +1,9 @@
 # SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# FIXME Add an independent product verifier when copying this family.
+# FIXME Add an independent product verifier when copying this resource.
 ---
-- name: "Verify the nested fixture family"
+- name: "Verify the nested fixture"
   module_defaults:
     group/{{ namespace }}.{{ collection_name }}.api: >-
       {{ '{{ product_connection }}' }}

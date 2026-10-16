@@ -18,7 +18,7 @@ and the project adheres to
 
 - Rename `collection_modules_grid` to `collection_modules_appliance`. Select
   the variant by management-path configuration, global activation and
-  per-family console recovery, not by a grid-style API.
+  per-area console recovery, not by a grid-style API.
 - Both module variants: replace the definition engine's independent
   `Engine.run` and result boundary with hooks on one lifecycle base. Keep
   `Engine(module, resource, client)` for definition-driven reads.
@@ -59,19 +59,20 @@ and the project adheres to
   the lanes and module skeletons whose sources differ from `HEAD`; it never
   writes a passing report.
 - Both module variants: skeleton-owned `_lifecycle.py`, a product-bound
-  `_binding.py`, and synthetic `test_lifecycle.py` coverage for family hooks,
+  `_binding.py`, and synthetic `test_lifecycle.py` coverage for resource hooks,
   custom operations, staged writes and lost-response settlement.
-- Both module variants: a nested family scaffold with hook contracts, module
-  documentation, unit and file-only integration tests, default scenario
-  tasks, a verifier slot, a Usage placeholder and a copy checklist.
+- Both module variants: a hook-based resource scaffold, `fixture_nested`, with
+  hook contracts, module documentation, unit and file-only integration tests,
+  default scenario tasks, a verifier slot, a Usage placeholder and a copy
+  checklist.
 - Both module variants: one parameterized response-loss harness, exercised
-  for create, update and delete by both fixture families.
+  for create, update and delete by both fixtures.
 - Appliance variant: `_act_once.py` with preflight and bounded readiness
   hooks, its shared tests, a management-path guard scaffold, recovery and
   single-writer prerequisites, and `verified: unverifiable` semantics.
 - Appliance variant: a conditional last-stage recovery drill, generic fresh
-  API and DNS probes, fail-closed family hooks, the console lab contract and
-  a standalone single-family drill playbook. No recovery scenario is added.
+  API and DNS probes, fail-closed area hooks, the console lab contract and
+  a standalone drill playbook for one area. No recovery scenario is added.
 - Rendered Boundaries documentation names the base, engine, activation,
   harnesses and shared tests as skeleton-owned invariants, plus the
   appliance-only activation and drill files.
@@ -98,8 +99,8 @@ and the project adheres to
 - The `collection_modules_grid` initialization path; use
   `collection_modules_appliance`.
 - The engine's separate lifecycle sequence and local client/schema binding.
-  Invariant tests and product bindings migrate to `_binding.py`; family
-  implementations use the base's hooks rather than patching `_engine`.
+  Invariant tests and product bindings migrate to `_binding.py`; hook-based
+  resources use the base's hooks rather than patching `_engine`.
 
 
 ## [2.10.0] - 2026-10-15
