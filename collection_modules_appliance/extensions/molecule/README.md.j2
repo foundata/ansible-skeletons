@@ -136,10 +136,10 @@ or destroy:
 {# skeleton-variant: activation-sequence #}
 `converge`, `side_effect` and `cleanup` run
 `{{ namespace }}.{{ collection_name }}.fixture_apply`
-after each change, so the change is active as well as saved. `verify` runs it
-in check mode and compares the active state with the saved state. With
-`activate: "auto"`, the default, it changes nothing when both match, which
-keeps `idempotence` clean.
+after each change, so the change is active as well as saved. `verify` runs it in
+check mode and compares the active state with the saved state. With
+`activate: "auto"`, the default, it changes nothing when both match, which keeps
+`idempotence` clean.
 
 {# end skeleton-variant #}
 
