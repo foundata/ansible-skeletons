@@ -24,6 +24,10 @@ and the project adheres to
   `Engine(module, resource, client)` for definition-driven reads.
 - Separate activation ownership: the verifying helper stays shared; act-once
   activation and its hooks ship only in the appliance variant.
+- collection_default, collection_modules, collection_modules_appliance: the
+  noxfile sets `nox.options.default_venv_backend = "uv|virtualenv"`. Nox
+  creates session environments with uv when it is installed and falls back
+  to virtualenv otherwise; `--default-venv-backend` still overrides it.
 
 ### Fixed
 

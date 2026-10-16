@@ -36,6 +36,7 @@ def noxfile(
         return lambda function: function
 
     nox = ModuleType("nox")
+    nox.options = SimpleNamespace()  # type: ignore[attr-defined]
     nox.session = decorator  # type: ignore[attr-defined]
     nox.Session = Mock  # type: ignore[attr-defined]
     antsibull = ModuleType("antsibull_nox")
@@ -59,6 +60,18 @@ def noxfile(
 @pytest.fixture
 def lint_session(noxfile: dict[str, object]) -> Callable[[Mock], None]:
     return cast(Callable[[Mock], None], noxfile["ansible_lint"])
+
+
+@pytest.mark.parametrize(
+    "noxfile",
+    ["collection_default", "collection_modules", "collection_modules_appliance"],
+    indirect=True,
+)
+def test_sessions_prefer_uv_and_fall_back_to_virtualenv(
+    noxfile: dict[str, object],
+) -> None:
+    nox = cast(SimpleNamespace, noxfile["nox"])
+    assert nox.options.default_venv_backend == "uv|virtualenv"
 
 
 @pytest.mark.parametrize(

@@ -40,6 +40,11 @@ import yaml  # a dependency of antsibull-nox
 # ANTSIBULL_NOX_CONTAINER_ENGINE=auto-prefer-docker.
 os.environ.setdefault("ANTSIBULL_NOX_CONTAINER_ENGINE", "auto-prefer-podman")
 
+# uv creates and fills the session environments much faster than virtualenv
+# and pip. Without uv, nox falls back to virtualenv; --default-venv-backend
+# on the command line still chooses another backend.
+nox.options.default_venv_backend = "uv|virtualenv"
+
 antsibull_nox.load_antsibull_nox_toml()
 
 # True when CI=true is set: check only, never rewrite. Same switch as antsibull-nox.
