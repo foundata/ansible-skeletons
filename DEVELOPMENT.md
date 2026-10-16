@@ -211,6 +211,13 @@ order is fixed. With several, every step whose prerequisites passed still runs,
 so a resumed run, described below, repeats only what failed. Without
 `--output`, the logs are removed with the temporary directory.
 
+On a 16-core workstation with the default eight jobs, a quick check took about
+5.5 minutes in October 2026, `--matrix` about 13, a quick check with all three
+infrastructure tiers about 11, and `--matrix` with all three tiers about 15.
+The longest chain of steps sets the time: `generated-lint` in a quick check,
+the first module identity in the matrix, and the tiers, one after another,
+once they run.
+
 To test a future release candidate, build its wheel and override the released
 package. Example:
 
@@ -374,7 +381,8 @@ skeleton-specific gate (`scripts/release.py check`).
    generated collection's `docs-check` workers and Molecule's SSH connections
    bind Unix sockets below it, and the gate refuses a longer path before it
    starts. Do not use a tmpfs such as `/tmp`: the integration tests keep their
-   container storage below the output. The gate can run for several hours.
+   container storage below the output. On a 16-core workstation, the gate's
+   checks with all three tiers took about 15 minutes in October 2026.
 
    `check.log` shows one line per step as it starts and ends; each step's
    output is in `checks/logs/<step>.log`. A successful run creates
