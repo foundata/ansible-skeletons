@@ -33,6 +33,10 @@ from ansible_collections.{{ namespace }}.\
 class Family(Lifecycle):
     schema = SCHEMA
 
+    # True checks the product version before every module's first request,
+    # including unchanged and read-only runs.
+    compatibility_always = False
+
     def connect(self) -> Any:
         return Client(self.params)
 

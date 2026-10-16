@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Any, Callable
 
 import pytest
@@ -15,6 +16,18 @@ from ansible_collections.foundata.utils.plugins.module_utils import errors
 # Preserve wrapping for maximum-length Galaxy identities.
 # fmt: off
 # isort: off
+{# skeleton-variant: activation-import #}
+{# end skeleton-variant #}
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._engine import (
+        Engine,
+        Key,
+        Resource,
+    )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._family import (
+        Family,
+    )
 from ansible_collections.{{ namespace }}.\
     {{ collection_name }}.plugins.module_utils._lifecycle import (
         Failure,
@@ -464,6 +477,101 @@ def test_custom_operation_finishes_its_result(
     assert not result["changed"] and result["receipt"] == "complete"
 
 
+@pytest.mark.parametrize("always", [False, True])
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_custom_operation_probes_before_action(
+    store: Store,
+    run_module: RunModule,
+    monkeypatch: pytest.MonkeyPatch,
+    always: bool,
+    check_mode: bool,
+) -> None:
+    monkeypatch.setattr(Synthetic, "compatibility_always", always)
+
+    def action(family: Synthetic) -> dict[str, Any]:
+        assert store.versions == int(always)
+        if always:
+            assert family.client is store
+            family.ensure_compatible(family.operation_id())
+        else:
+            assert family.client is None
+        return {"changed": False}
+
+    result = run_module(action_main(action), name="a", _ansible_check_mode=check_mode)
+    assert not result["changed"] and store.versions == int(always)
+    assert not store.writes
+
+
+def test_custom_operation_refuses_before_action(
+    store: Store, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(Synthetic, "compatibility_always", True)
+
+    def ineligible(self: Synthetic, operation: str) -> None:
+        raise Failure(category="compatibility", code="ineligible")
+
+    def action(family: Synthetic) -> dict[str, Any]:
+        raise AssertionError("An ineligible action must not run")
+
+    monkeypatch.setattr(Synthetic, "compatibility", ineligible)
+    result = run_module(action_main(action), name="a")
+    assert result["error_code"] == "ineligible"
+    assert result["operation"] == "compatibility"
+    assert result["outcome"] == "unchanged" and not store.writes
+
+
+@pytest.mark.parametrize("always", [False, True])
+@pytest.mark.parametrize("refused", [False, True])
+def test_engine_info_probes_before_product_reads(
+    monkeypatch: pytest.MonkeyPatch, always: bool, refused: bool
+) -> None:
+    events: list[str] = []
+    resource = Resource(
+        name="synthetic",
+        route="synthetic",
+        keys=(Key("name", "Name"),),
+        fields=(),
+        result_key="synthetic",
+        identifier=Key("id", "Identifier", kind="int"),
+        lookup="by_key",
+        permission_probe="read",
+    )
+    record = {"id": 1, "name": "a"}
+
+    def compatibility(self: Family, operation: str) -> None:
+        events.append(operation)
+        if refused:
+            raise Failure(category="compatibility", code="ineligible")
+
+    def lookup(definition: Resource, ident: dict[str, str]) -> dict[str, Any]:
+        events.append("lookup")
+        return record
+
+    monkeypatch.setattr(Family, "compatibility_always", always)
+    monkeypatch.setattr(Family, "compatibility", compatibility)
+    client = SimpleNamespace(probe=events.append, lookup=lookup)
+    engine = Engine(SimpleNamespace(params={"name": "a"}), resource, client)
+    assert not events
+    if always and refused:
+        with pytest.raises(Failure):
+            engine.find({"name": "a"})
+        assert events == ["synthetic_info"]
+        assert engine.operation == "compatibility"
+        return
+    for operation in ("find", "verify"):
+        engine.operation = operation
+        assert engine.find({"name": "a"}) == record
+        assert engine.operation == operation
+    assert events == (["synthetic_info"] if always else []) + [
+        "read",
+        "lookup",
+        "read",
+        "lookup",
+    ]
+
+
+{# skeleton-variant: activation-policy #}
+{# end skeleton-variant #}
 @pytest.mark.parametrize(
     "second",
     ["success", "lost", "lost_without_effect", "refused", "not_started"],

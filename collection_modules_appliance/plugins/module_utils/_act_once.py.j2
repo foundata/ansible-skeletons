@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Act once when saved identities cannot prove the loaded state; internal.
 
-Preflight checks the saved state before compatibility and check-mode prediction.
+Preflight checks the saved state before check-mode prediction. Compatibility
+precedes preflight when the binding requires a probe before every product read.
 Normal mode activates once and reports verified: unverifiable. A lost reply
 leaves the outcome unknown. Effective may check bounded readiness without
 claiming a loaded-state receipt. Families supply the product hooks and binding.
@@ -40,8 +41,7 @@ class ActOnce(Lifecycle):
         return self.compatibility_id + "_apply"
 
     def act_once(self) -> dict[str, Any]:
-        self.step("connect")
-        self.client = self.connect()
+        self.prepare(self.activation_id())
         self.step("protect")
         self.preflight()
         self.step("compatibility")
@@ -66,8 +66,11 @@ class ActOnce(Lifecycle):
         action: Callable[[], dict[str, Any]] | None = None,
         *,
         activation: bool = False,
+        compatibility_operation: str | None = None,
     ) -> None:
         """Select act-once when requested, then use the base's result boundary."""
         if action is None and activation:
             action = self.act_once
-        super().execute(action)
+        if action == self.act_once:
+            compatibility_operation = self.activation_id()
+        super().execute(action, compatibility_operation=compatibility_operation)

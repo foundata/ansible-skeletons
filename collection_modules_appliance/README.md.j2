@@ -116,8 +116,13 @@ returned in listings.
 
 ### Version check
 
-A read-only probe precedes writes. Untested series warn once and proceed;
-evidence-backed operation exclusions fail before writing.
+FIXME: Keep one of the next two sentences to match `_family.py`.
+A read-only probe precedes writes.
+Every module checks the product version before its first request, including
+unchanged and read-only runs.
+
+Untested series warn once and proceed; evidence-backed operation exclusions
+fail before writing.
 
 
 

@@ -73,7 +73,7 @@ class Lifecycle:
     """Option whose value ``absent`` requests deletion; empty for none."""
 
     compatibility_always = False
-    """Check compatibility before the first lookup, including unchanged runs."""
+    """Check compatibility before product reads, including unchanged runs."""
 
     whole_diff = False
     """Publish the whole public object in a diff instead of changed fields."""
@@ -234,6 +234,14 @@ class Lifecycle:
             self.compatibility(operation)
             self.compatible.add(operation)
 
+    def prepare(self, operation: str) -> None:
+        self.step("connect")
+        if self.client is None or not self.compatibility_always:
+            self.client = self.connect()
+        if self.compatibility_always:
+            self.step("compatibility")
+            self.ensure_compatible(operation)
+
     def visible(self) -> dict[str, Any]:
         return {k: v for k, v in self.delta.items() if not self.secret(k)}
 
@@ -276,11 +284,7 @@ class Lifecycle:
         self.step("validate")
         self.key = self.identify()
         self.want = self.declared()
-        self.step("connect")
-        self.client = self.connect()
-        if self.compatibility_always:
-            self.step("compatibility")
-            self.ensure_compatible(self.operation_id())
+        self.prepare(self.operation_id())
         self.step("lookup")
         self.record = self.lookup()
         self.current = None if self.record is None else self.managed(self.record)
@@ -355,9 +359,16 @@ class Lifecycle:
             fields=fields,
         )
 
-    def execute(self, action: Callable[[], dict[str, Any]] | None = None) -> None:
+    def execute(
+        self,
+        action: Callable[[], dict[str, Any]] | None = None,
+        *,
+        compatibility_operation: str | None = None,
+    ) -> None:
         """Run a resource or supplied operation under the failure boundary."""
         try:
+            if action is not None and self.compatibility_always:
+                self.prepare(compatibility_operation or self.operation_id())
             sequence = action if action is not None else self.reconcile
             result = self.finish(sequence())
         except errors.ApiError as failure:

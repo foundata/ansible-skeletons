@@ -30,6 +30,10 @@ from ansible_collections.{{ namespace }}.\
         build_spec,
         run_resource,
     )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._family import (
+        Family,
+    )
 # isort: on
 # fmt: on
 
@@ -261,15 +265,26 @@ def test_check_mode_and_secrets(
     )
 
 
-def test_info_reads_without_writing_or_discovering_version(
-    fake: Any, run_module: RunModule
+@pytest.mark.parametrize("flip_policy", [False, True], ids=["binding", "flipped"])
+def test_info_follows_binding_probe_policy_without_writing(
+    fake: Any,
+    run_module: RunModule,
+    monkeypatch: pytest.MonkeyPatch,
+    flip_policy: bool,
 ) -> None:
+    if flip_policy:
+        monkeypatch.setattr(
+            Family, "compatibility_always", not Family.compatibility_always
+        )
     main = info_main()
     subject.add(fake, **arguments())
     result = run_module(main, **{subject.KEY: subject.IDENTITIES[0]})
     assert not result["changed"] and result["verified"] == "observed"
     assert result[subject.RESULT][subject.KEY] == subject.IDENTITIES[0]
-    assert not fake.writes() and not subject.requested(fake, subject.VERSION_PATH)
+    assert not fake.writes()
+    assert subject.requested(fake, subject.VERSION_PATH) == int(
+        Family.compatibility_always
+    )
 
 
 def test_info_failure_keeps_identity(fake: Any, run_module: RunModule) -> None:
@@ -281,10 +296,22 @@ def test_info_failure_keeps_identity(fake: Any, run_module: RunModule) -> None:
     assert not fake.writes() and "resource" not in result
 
 
-def test_noop_does_not_discover_version(fake: Any, run_module: RunModule) -> None:
+@pytest.mark.parametrize("flip_policy", [False, True], ids=["binding", "flipped"])
+def test_noop_follows_binding_probe_policy(
+    fake: Any,
+    run_module: RunModule,
+    monkeypatch: pytest.MonkeyPatch,
+    flip_policy: bool,
+) -> None:
+    if flip_policy:
+        monkeypatch.setattr(
+            Family, "compatibility_always", not Family.compatibility_always
+        )
     subject.add(fake, **arguments())
     assert not run_module(subject.main, **arguments())["changed"]
-    assert not subject.requested(fake, subject.VERSION_PATH)
+    assert subject.requested(fake, subject.VERSION_PATH) == int(
+        Family.compatibility_always
+    )
 
 
 def test_check_prediction_validates_eligibility(

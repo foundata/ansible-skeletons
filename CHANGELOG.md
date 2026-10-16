@@ -27,6 +27,9 @@ and the project adheres to
 
 ### Fixed
 
+- Both module variants: honour `Family.compatibility_always` on lifecycle
+  entry points and information reads, and make the shared noop and info
+  contract tests follow that policy.
 - collection_default, collection_modules, collection_modules_grid: the
   runtime check's `subprocess.run` call passes `check=False`, which pylint's
   `subprocess-run-check` demanded in every ansible-test sanity lane of a

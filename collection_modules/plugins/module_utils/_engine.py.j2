@@ -417,6 +417,15 @@ class Engine(Family):
 
     def find(self, ident: dict[str, str]) -> dict[str, Any] | None:
         resource = self.resource
+        if self.compatibility_always:
+            operation = self.operation
+            self.step("compatibility")
+            self.ensure_compatible(
+                self.operation_id()
+                if self.state_option in self.params
+                else resource.name + "_info"
+            )
+            self.operation = operation
         if resource.permission_probe:
             self.client.probe(resource.permission_probe)
         if resource.lookup == "by_key":
