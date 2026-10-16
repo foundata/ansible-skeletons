@@ -20,7 +20,7 @@ from pathlib import Path
 
 import yaml
 
-from scripts.common import ROOT, GateError, run, write_json
+from scripts.common import ROOT, GateError, matrix, run, write_json
 from scripts.controller import NOX_ENVDIR_PREFIX
 from scripts.render import (
     MODULE_PROFILES,
@@ -451,6 +451,45 @@ def exercise_modules(rendered: Rendered) -> None:
     )
 
 
+# Namespace and name of each module render. The second identity has
+# maximum-length names and a quoted product.
+IDENTITIES = (("skeleton_test", "module_fixture"), ("n" * 64, "c" * 64))
+
+
+def newest_released_core(root: Path = ROOT) -> str:
+    """Return the newest ansible-core series of the locked matrix, such as 2.21."""
+    series = []
+    for lane in matrix(root):
+        match = re.fullmatch(r"core([1-9])([0-9]+)", lane.group)
+        if match is None:
+            raise GateError(f"Matrix group does not name a core series: {lane.group}")
+        series.append((int(match[1]), int(match[2])))
+    major, minor = max(series)
+    return f"{major}.{minor}"
+
+
+def identity_sessions(index: int, *, full: bool) -> list[list[str]]:
+    """Return the nox session sets of one identity; an empty set is the defaults.
+
+    Every check runs the default sessions (lint, docs, licenses, Markdown,
+    changelog) in check-only mode; the full matrix adds ansible-test lanes. The
+    first identity runs sanity, units and integration on every core. The second
+    identity tests the render, and of those lanes only sanity reads its names,
+    through validate-modules and ansible-doc. It runs sanity once, on the newest
+    released core, instead of every lane on every core.
+    """
+    if not full:
+        return [[]]
+    if index == 0:
+        return [
+            [],
+            ["ansible-test-sanity"],
+            ["ansible-test-units"],
+            ["ansible-test-integration"],
+        ]
+    return [[], [f"ansible-test-sanity-{newest_released_core()}"]]
+
+
 def module_smoke(
     output: Path,
     *,
@@ -478,9 +517,7 @@ def module_smoke(
         raise GateError(
             "Name-only initialization did not identify the missing product variable"
         )
-    for index, (namespace, name) in enumerate(
-        (("skeleton_test", "module_fixture"), ("n" * 64, "c" * 64))
-    ):
+    for index, (namespace, name) in enumerate(IDENTITIES):
         metadata = example_metadata(punctuation=bool(index))
         if index == 0:
             # The first identity also lints foundata's own README variant.
@@ -554,16 +591,7 @@ def module_smoke(
         install_utils(rendered, utils_source)
         run(["git", "init", "--quiet"], cwd=rendered.collection)
         run(["git", "add", "."], cwd=rendered.collection)
-        # Every check runs the default sessions (lint, docs, licenses, Markdown,
-        # changelog) in check-only mode; the full matrix adds the ansible-test lanes.
-        session_sets: list[list[str]] = [[]]
-        if full:
-            session_sets += [
-                ["ansible-test-sanity"],
-                ["ansible-test-units"],
-                ["ansible-test-integration"],
-            ]
-        for sessions in session_sets:
+        for sessions in identity_sessions(index, full=full):
             run(
                 [
                     "uv",

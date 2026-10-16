@@ -26,8 +26,10 @@ from scripts.smoke import (
     check_nox_gate,
     check_tree,
     default_sessions,
+    identity_sessions,
     lint_constraints,
     lint_project,
+    newest_released_core,
     pinned_utils_version,
 )
 
@@ -584,6 +586,42 @@ def test_module_checks_need_exactly_one_utils_pin(tmp_path: Path, pins: int) -> 
     else:
         with pytest.raises(GateError, match="exactly once"):
             pinned_utils_version(tmp_path)
+
+
+def test_module_identities_split_the_ansible_test_lanes() -> None:
+    # Quick checks run the default sessions only.
+    assert identity_sessions(0, full=False) == [[]]
+    assert identity_sessions(1, full=False) == [[]]
+    # The first identity runs every lane on every core.
+    assert identity_sessions(0, full=True) == [
+        [],
+        ["ansible-test-sanity"],
+        ["ansible-test-units"],
+        ["ansible-test-integration"],
+    ]
+    # The second identity's long names reach validate-modules and ansible-doc
+    # in sanity, once, on the newest released core of the matrix.
+    assert identity_sessions(1, full=True) == [[], ["ansible-test-sanity-2.21"]]
+
+
+def test_newest_released_core_follows_the_matrix(tmp_path: Path) -> None:
+    assert newest_released_core() == "2.21"
+    (tmp_path / "pyproject.toml").write_text(
+        "[tool.skeletons]\n"
+        "matrix = [\n"
+        '  { python = "3.14", group = "core221" },\n'
+        '  { python = "3.14", group = "core310" },\n'
+        '  { python = "3.12", group = "core219" },\n'
+        "]\n",
+        encoding="utf-8",
+    )
+    assert newest_released_core(tmp_path) == "3.10"
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.skeletons]\nmatrix = [{ python = "3.14", group = "lint" }]\n',
+        encoding="utf-8",
+    )
+    with pytest.raises(GateError, match="core series"):
+        newest_released_core(tmp_path)
 
 
 @pytest.mark.parametrize(

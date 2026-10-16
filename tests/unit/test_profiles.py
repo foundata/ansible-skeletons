@@ -13,6 +13,7 @@ import pytest
 
 from scripts.common import ROOT, GateError
 from scripts.render import example_metadata, render
+from scripts.smoke import identity_sessions
 
 
 @pytest.mark.parametrize(
@@ -62,22 +63,8 @@ def test_inventory_product_literal_preserves_content_and_formatting(
     "profile", ["collection_modules_appliance", "collection_modules"]
 )
 def test_release_gate_runs_unrestricted_sanity_for_every_series(profile: str) -> None:
-    tree = ast.parse((ROOT / "scripts/smoke.py").read_text())
-    function = next(
-        node
-        for node in tree.body
-        if isinstance(node, ast.FunctionDef) and node.name == "module_smoke"
-    )
-    selections = [
-        node.value
-        for node in ast.walk(function)
-        if isinstance(node, ast.AugAssign)
-        and isinstance(node.target, ast.Name)
-        and node.target.id == "session_sets"
-    ]
-    assert len(selections) == 1
-    sessions = ast.literal_eval(selections[0])
-    assert sessions == [
+    # The first identity runs the meta sessions, which cover every series.
+    assert identity_sessions(0, full=True)[1:] == [
         ["ansible-test-sanity"],
         ["ansible-test-units"],
         ["ansible-test-integration"],

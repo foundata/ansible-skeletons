@@ -28,6 +28,10 @@ and the project adheres to
   noxfile sets `nox.options.default_venv_backend = "uv|virtualenv"`. Nox
   creates session environments with uv when it is installed and falls back
   to virtualenv otherwise; `--default-venv-backend` still overrides it.
+- checks: the second module identity keeps its render checks, default Nox
+  sessions, build and installed modules, plus one ansible-test sanity run on
+  the newest released core. Sanity, units and integration on every core stay
+  with the first identity.
 
 ### Fixed
 

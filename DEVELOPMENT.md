@@ -101,9 +101,11 @@ Edit each skeleton directly in its own directory.
 `--profile collection_modules` selects a module skeleton. Both variants run
 through the render and release gates; the unit tests enforce their shared-file
 list without a composition layer. Quick checks run their default nox sessions
-in check-only mode; full matrix checks add the sanity, unit and integration
-sessions, one chain at a time, and the Molecule scenario against the first
-identity's own fake product.
+in check-only mode. Full matrix checks add the first identity's sanity, unit
+and integration sessions on every core and the Molecule scenario against its
+own fake product. The second identity tests the render with maximum-length
+names and a quoted product; of the ansible-test lanes only sanity reads those
+names, so it runs once, on the newest released core of the matrix.
 
 Both module variants own one `_lifecycle.py` sequence and result boundary.
 The product binding `_family.py` supplies its client, error schema and
