@@ -14,6 +14,13 @@ and the project adheres to
 
 ## [Unreleased]
 
+### Fixed
+
+- collection_default, collection_modules, collection_modules_grid: the
+  runtime check's `subprocess.run` call passes `check=False`, which pylint's
+  `subprocess-run-check` demanded in every ansible-test sanity lane of a
+  rendered collection.
+
 ### Added
 
 - collection_default, collection_modules, collection_modules_grid: a default

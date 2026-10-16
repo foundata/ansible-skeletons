@@ -71,7 +71,13 @@ def run(command: list[str], work: Path, env: dict[str, str]) -> str:
     """Keep diagnostics on failure and bound each check's execution time."""
     print("+ " + " ".join(command), flush=True)
     result = subprocess.run(
-        command, cwd=work, env=env, text=True, capture_output=True, timeout=1800
+        command,
+        cwd=work,
+        env=env,
+        text=True,
+        capture_output=True,
+        timeout=1800,
+        check=False,
     )
     if result.returncode:
         raise RuntimeError(result.stdout + result.stderr)
