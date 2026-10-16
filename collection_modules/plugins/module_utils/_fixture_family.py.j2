@@ -28,6 +28,8 @@ from ansible_collections.{{ namespace }}.\
     {{ collection_name }}.plugins.module_utils._family import (
         Family,
     )
+{# skeleton-variant: family-guard-import #}
+{# end skeleton-variant #}
 # isort: on
 # fmt: on
 
@@ -181,6 +183,8 @@ class FixtureFamily(Family):
     def recheck(self) -> None:
         """Refuse a stale snapshot just before a write; never retry the write."""
         super().recheck()
+{# skeleton-variant: family-recheck #}
+{# end skeleton-variant #}
 
     def write(self) -> None:
         """Send exactly one mutation, preserving unmanaged nested members."""

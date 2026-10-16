@@ -1,0 +1,55 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Management-path refusals run through the appliance family and its fake."""
+
+from __future__ import annotations
+
+import pytest
+
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.modules import (
+        fixture_family,
+    )
+# isort: on
+# fmt: on
+
+from ..conftest import RunModule
+from ..fake_product import FakeProduct
+
+
+@pytest.mark.parametrize("check", [False, True])
+@pytest.mark.parametrize("exists", [False, True])
+def test_refuse_listener_coverage(
+    fake: FakeProduct, run_module: RunModule, check: bool, exists: bool
+) -> None:
+    if exists:
+        run_module(fixture_family.main, name="guarded", settings={"port": 8080})
+    before = len(fake.writes())
+    result = run_module(
+        fixture_family.main,
+        name="guarded",
+        settings={"network": "192.0.2.0/24", "port": 443},
+        _ansible_check_mode=check,
+    )
+    assert result["failed"] and not result["changed"]
+    assert result["outcome"] == "unchanged"
+    assert result["error_category"] == "eligibility"
+    assert result["error_code"] == "management_path"
+    assert len(fake.writes()) == before
+
+
+def test_guard_matches_address_and_port(
+    fake: FakeProduct, run_module: RunModule
+) -> None:
+    result = run_module(
+        fixture_family.main,
+        name="guarded",
+        settings={"network": "192.0.2.0/24", "port": 8443},
+    )
+    assert result["changed"] and not result.get("failed")
+    fake.families["guarded"]["settings"]["port"] = 443
+    removed = run_module(fixture_family.main, name="guarded", state="absent")
+    assert removed["changed"] and "guarded" not in fake.families

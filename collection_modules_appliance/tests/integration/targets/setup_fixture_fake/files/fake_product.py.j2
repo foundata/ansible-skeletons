@@ -18,6 +18,7 @@ from typing import Any, ClassVar
 
 
 class Handler(BaseHTTPRequestHandler):
+    server: HTTPServer
     credentials = ""
     families: ClassVar[dict[str, dict[str, Any]]] = {}
     # Shared by all requests: the server creates one handler per request.
@@ -88,6 +89,18 @@ class Handler(BaseHTTPRequestHandler):
                     "current": page,
                     "total": len(rows),
                     "rows": rows[(page - 1) * page_size : page * page_size],
+                },
+            )
+            return
+        if self.path == "/api/family/context":
+            self.send_json(
+                200,
+                {
+                    "listener": {
+                        "address": "127.0.0.1",
+                        "port": self.server.server_port,
+                    },
+                    "defaults": {"network": "198.51.100.0/24", "port": 8080},
                 },
             )
             return

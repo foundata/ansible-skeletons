@@ -121,6 +121,20 @@ def test_act_once_is_appliance_only() -> None:
             assert f"def {hook}(" not in base
 
 
+def test_management_guard_is_appliance_only() -> None:
+    for profile in ("collection_modules", "collection_modules_appliance"):
+        skeleton = ROOT / profile
+        appliance = profile.endswith("_appliance")
+        assert (
+            skeleton / "plugins/module_utils/_management_guard.py.j2"
+        ).is_file() is appliance
+        assert (
+            skeleton / "tests/unit/plugins/modules/test_management_guard.py.j2"
+        ).is_file() is appliance
+        family = (skeleton / "plugins/module_utils/_fixture_family.py.j2").read_text()
+        assert ("protect_listener" in family) is appliance
+
+
 def test_recovery_stage_is_appliance_only() -> None:
     paths = (
         "shared/tasks/recovery.yml.j2",

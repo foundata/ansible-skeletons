@@ -1,0 +1,55 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Refuse a configuration write that would cover the management listener.
+
+The fixture's nested rule matches an address network and a TCP port together.
+Before a write, read the product's listener and defaults, then reject a rule
+covering that tuple. Never infer management ingress from a default route.
+Deletion removes coverage and is allowed. Check mode uses the same guard.
+
+This is a scaffold, not a complete lockout guarantee. A copied family must
+qualify its listener and ingress evidence, aliases, translations and activation
+scope from the product. Proxies and another writer's pending configuration can
+invalidate that evidence; independent recovery and one writer remain required.
+"""
+
+from __future__ import annotations
+
+import ipaddress
+from typing import Any
+
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._client import (
+        ProductError,
+    )
+# isort: on
+# fmt: on
+
+
+def protect_listener(client: Any, predicted: dict[str, Any], absent: bool) -> None:
+    """Read the current listener and refuse overlapping address and port values."""
+    if absent:
+        return
+    context = client.read("GET", "/family/context")
+    try:
+        listener = context["listener"]
+        address = ipaddress.ip_address(listener["address"])
+        port = listener["port"]
+        settings = {**context["defaults"], **predicted.get("settings", {})}
+        network = ipaddress.ip_network(settings["network"])
+        for value in (port, settings["port"]):
+            if isinstance(value, bool) or not isinstance(value, int):
+                raise ValueError
+            if not 1 <= value <= 65535:
+                raise ValueError
+    except (KeyError, TypeError, ValueError) as failure:
+        raise ProductError(category="response", code="schema") from failure
+    if address in network and settings["port"] == port:
+        raise ProductError(
+            category="eligibility",
+            code="management_path",
+            fields=["settings.network", "settings.port"],
+        )

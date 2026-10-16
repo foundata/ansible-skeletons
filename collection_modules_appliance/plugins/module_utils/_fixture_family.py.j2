@@ -28,6 +28,12 @@ from ansible_collections.{{ namespace }}.\
     {{ collection_name }}.plugins.module_utils._family import (
         Family,
     )
+{# skeleton-variant: family-guard-import #}
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._management_guard import (
+        protect_listener,
+    )
+{# end skeleton-variant #}
 # isort: on
 # fmt: on
 
@@ -156,6 +162,8 @@ class FixtureFamily(Family):
         """Refuse unsafe transitions before prediction, including check mode."""
         super().protect()
 {# skeleton-variant: family-protect #}
+        if self.record is None or self.delta:
+            protect_listener(self.client, self.predict(), self.absent)
 {# end skeleton-variant #}
 
     def secret(self, name: str) -> bool:
@@ -181,6 +189,9 @@ class FixtureFamily(Family):
     def recheck(self) -> None:
         """Refuse a stale snapshot just before a write; never retry the write."""
         super().recheck()
+{# skeleton-variant: family-recheck #}
+        self.protect()
+{# end skeleton-variant #}
 
     def write(self) -> None:
         """Send exactly one mutation, preserving unmanaged nested members."""
