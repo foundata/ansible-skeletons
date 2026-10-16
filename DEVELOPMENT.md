@@ -239,9 +239,11 @@ interrupted or failed run, for example after a network timeout:
 ```
 
 The resumed run reuses every passed record and reruns the failed and missing
-steps, replacing what their earlier attempt left. It refuses when the sources
-changed since. Pass the same options as before; a step whose options changed,
-such as a module identity resumed with `--matrix`, runs again.
+steps, replacing what their earlier attempt left. An interrupted ansible-test
+can leave containers running in a module render's own Podman store; the rerun
+removes them first. The resume refuses when the sources changed since. Pass
+the same options as before; a step whose options changed, such as a module
+identity resumed with `--matrix`, runs again.
 
 Run only the helper regression suite with:
 

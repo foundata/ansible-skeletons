@@ -559,6 +559,31 @@ def duration(seconds: float) -> str:
     return f"{minutes} min {rest} s" if minutes else f"{rest} s"
 
 
+def remove_render_containers(render: Path, log: TextIO) -> None:
+    """Remove containers that an interrupted ansible-test left in a render's store.
+
+    Only a store below the render qualifies; the user's own store never does.
+    """
+    home = render / "home"
+    if not (home / ".config/containers/storage.conf").is_file():
+        return
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if not key.startswith(("CONTAINER", "XDG_CONFIG_HOME", "XDG_DATA_HOME"))
+    }
+    env["HOME"] = str(home)
+    store = run(
+        ["podman", "info", "--format", "{{.Store.GraphRoot}}"],
+        env=env,
+        capture=True,
+        log=log,
+    ).strip()
+    if not Path(store).resolve().is_relative_to(render.resolve()):
+        raise GateError(f"Podman did not select the render's own store: {store}")
+    run(["podman", "rm", "--all", "--force", "--time", "0"], env=env, log=log)
+
+
 def remove_earlier(path: Path, output: Path, log: TextIO) -> None:
     """Remove what an earlier attempt of a step left below the run's output."""
     if not path.exists() and not path.is_symlink():
@@ -570,6 +595,7 @@ def remove_earlier(path: Path, output: Path, log: TextIO) -> None:
     if path.is_file():
         path.unlink()
         return
+    remove_render_containers(path, log)
     try:
         shutil.rmtree(path)
     except PermissionError:
@@ -928,6 +954,11 @@ def main() -> int:
     except (GateError, OSError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
+    except KeyboardInterrupt:
+        print(
+            "Interrupted. A retained output continues with --resume.", file=sys.stderr
+        )
+        return 130
     return 0
 
 

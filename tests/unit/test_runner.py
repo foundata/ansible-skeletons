@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Check step scheduling, per-step logs and per-step temporary directories."""
 
+import io
 import json
 import subprocess
 import sys
@@ -10,6 +11,7 @@ import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -25,6 +27,7 @@ from scripts.check import (
     default_lane,
     identity_step,
     plan,
+    remove_earlier,
     required_checks,
 )
 from scripts.common import GateError, matrix, source_digest
@@ -539,3 +542,66 @@ def test_changed_only_runs_neither_resume_nor_infrastructure(
     with pytest.raises(GateError, match="--changed"):
         check_module.check(tmp_path / "o", changed=True, **options)  # type: ignore[arg-type]
     assert not (tmp_path / "o").exists()
+
+
+def fake_podman(
+    monkeypatch: pytest.MonkeyPatch, store: Path
+) -> list[tuple[list[str], dict[str, str]]]:
+    calls: list[tuple[list[str], dict[str, str]]] = []
+
+    def run(command: list[str], **options: Any) -> str:
+        calls.append((command, dict(options.get("env") or {})))
+        return f"{store}\n" if command[:2] == ["podman", "info"] else ""
+
+    monkeypatch.setattr(check_module, "run", run)
+    return calls
+
+
+def render_with_store(output: Path) -> Path:
+    render = output / "collection_modules/module_fixture"
+    config = render / "home/.config/containers/storage.conf"
+    config.parent.mkdir(parents=True)
+    config.write_text("[storage]\n", encoding="utf-8")
+    return render
+
+
+def test_a_rerun_removes_containers_from_the_render_store(
+    output: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    render = render_with_store(output)
+    calls = fake_podman(monkeypatch, render / "home/.local/share/containers/storage")
+    monkeypatch.setenv("XDG_CONFIG_HOME", "/user/config")
+    monkeypatch.setenv("CONTAINERS_STORAGE_CONF", "/user/storage.conf")
+    remove_earlier(render, output.resolve(), io.StringIO())
+    assert [command[:3] for command, _env in calls] == [
+        ["podman", "info", "--format"],
+        ["podman", "rm", "--all"],
+    ]
+    env = calls[1][1]
+    assert env["HOME"] == str(render / "home")
+    assert "XDG_CONFIG_HOME" not in env
+    assert "CONTAINERS_STORAGE_CONF" not in env
+    assert not render.exists()
+
+
+def test_a_rerun_never_removes_containers_from_another_store(
+    output: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    render = render_with_store(output)
+    calls = fake_podman(monkeypatch, Path("/home/user/.local/share/containers/storage"))
+    with pytest.raises(GateError, match="own store"):
+        remove_earlier(render, output.resolve(), io.StringIO())
+    assert [command[:2] for command, _env in calls] == [["podman", "info"]]
+    assert render.exists()
+
+
+def test_an_interrupted_check_says_how_to_continue(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def interrupt(_output: Path, **_options: object) -> None:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(check_module, "check", interrupt)
+    monkeypatch.setattr(sys, "argv", ["check", "--output", "/unused"])
+    assert check_module.main() == 130
+    assert "--resume" in capsys.readouterr().err
