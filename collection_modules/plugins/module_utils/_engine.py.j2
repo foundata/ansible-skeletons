@@ -1,6 +1,11 @@
 # SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Shared lifecycle over curated definitions, as the skeleton ships it; internal.
+"""Definition-driven family of the lifecycle base, as the skeleton ships it; internal.
+
+``_lifecycle`` owns the sequence, the settlement of a lost reply and the
+result and failure contracts; this module supplies the steps from a curated
+definition. The rendered ``_family`` binding supplies the product client,
+error schema and compatibility check.
 
 Client contract (exercised by tests/unit/plugins/modules/test_contract.py):
 ``list(definition)`` returns a complete listing or raises; ``lookup(definition,
@@ -34,20 +39,20 @@ from ansible_collections.foundata.utils.plugins.module_utils import errors
 # fmt: off
 # isort: off
 from ansible_collections.{{ namespace }}.\
-    {{ collection_name }}.plugins.module_utils import (
-        _compat,
-    )
-from ansible_collections.{{ namespace }}.\
     {{ collection_name }}.plugins.module_utils._client import (
-        SCHEMA,
-        Client,
         ProductError,
         api_argument_spec,
     )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._family import (
+        Family,
+    )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._lifecycle import (
+        MISSING,
+    )
 # isort: on
 # fmt: on
-
-MISSING = object()
 
 
 @dataclass(frozen=True)
@@ -301,15 +306,19 @@ def equal(field: Field, current: Any, desired: Any) -> bool:
     return bool(current == desired)
 
 
-class Engine:
+class Engine(Family):
     """Plan one minimal write and recover by the declared lookup, never by retry."""
 
-    def __init__(self, module: Any, resource: Resource, client: Client) -> None:
-        self.module, self.resource, self.client = module, resource, client
+    message = "Resource reconciliation failed; see error_category and error_code"
+    steps = (("lookup", "find"), ("protect", "find"))
+
+    def __init__(self, module: Any, resource: Resource, client: Any = None) -> None:
+        super().__init__(module)
+        self.resource, self.client = resource, client
+        self.result_key = resource.result_key
+        self.compatibility_id = resource.name
+        self.identity_options = tuple(key.name for key in resource.keys)
         self._reference_maps: dict[Reference, dict[str, str | int | None]] = {}
-        self.operation = "validate"
-        self.write_attempted = False
-        self.confirmed = False
 
     def reference_map(self, ref: Reference) -> dict[str, str | int | None]:
         if ref not in self._reference_maps:
@@ -466,31 +475,8 @@ class Engine:
             body[wire] = self.client.encode(field, value)
         return body
 
-    def verify(
-        self, record: dict[str, Any] | None, desired: dict[str, Any], absent: bool
-    ) -> None:
-        if absent:
-            if record is not None:
-                raise ProductError(category="verification", code="still_present")
-            return
-        if record is None:
-            raise ProductError(category="verification", code="missing_after_write")
-        current = self.project(record)
-        mismatch = [
-            key
-            for key, value in desired.items()
-            if self.resource.get_field(key).kind != "secret"
-            and not equal(
-                self.resource.get_field(key), current.get(key, MISSING), value
-            )
-        ]
-        if mismatch:
-            raise ProductError(
-                category="verification", code="not_persisted", fields=sorted(mismatch)
-            )
-
-    def run(self) -> dict[str, Any]:
-        params, resource = self.module.params, self.resource
+    def identify(self) -> dict[str, str]:
+        params, resource = self.params, self.resource
         ident = {
             key.name: canonical(params[key.name], "lower")
             if key.canonical == "lower"
@@ -501,24 +487,33 @@ class Engine:
             raise ProductError(
                 code="validation_failed", fields=[k.name for k in resource.keys]
             )
-        desired = {
-            field.name: normalize(field, params[field.name], input_value=True)
-            for field in resource.fields
-            if params.get(field.name) is not None
+        return ident
+
+    def declared(self) -> dict[str, Any]:
+        return {
+            field.name: normalize(field, self.params[field.name], input_value=True)
+            for field in self.resource.fields
+            if self.params.get(field.name) is not None
         }
-        self.operation = "find"
-        found = self.find(ident)
-        current = self.project(found) if found else {}
-        absent = params["state"] == "absent"
-        if found is not None and params.get("update_password") == "on_create":
-            desired = {
-                k: v
-                for k, v in desired.items()
-                if resource.get_field(k).kind != "secret"
-            }
+
+    def lookup(self) -> dict[str, Any] | None:
+        return self.find(self.key)
+
+    def managed(self, record: dict[str, Any]) -> dict[str, Any]:
+        return self.project(record)
+
+    def secret(self, name: str) -> bool:
+        return self.resource.get_field(name).kind == "secret"
+
+    def same(self, name: str, current: Any, desired: Any) -> bool:
+        return equal(self.resource.get_field(name), current, desired)
+
+    def protect(self) -> None:
+        resource, desired, found = self.resource, self.want, self.record
+        current = self.current or {}
         for field, prerequisite, value in resource.prerequisites:
             if (
-                not absent
+                not self.absent
                 and desired.get(field)
                 and value
                 not in desired.get(prerequisite, current.get(prerequisite, []))
@@ -528,7 +523,7 @@ class Engine:
                     code="invalid_field",
                     fields=[field, prerequisite],
                 )
-        if found and not absent:
+        if found and not self.absent:
             for key in resource.keys:
                 linked = key.follows_field
                 if (
@@ -540,7 +535,7 @@ class Engine:
                     raise ProductError(
                         category="argument", code="invalid_identity", fields=[linked]
                     )
-        if absent and found is not None:
+        if self.absent and found is not None:
             for guard in resource.refuse_delete_when:
                 refs = self.client.decode(
                     Field(guard.field, guard.kind, guard.field), found.get(guard.field)
@@ -556,81 +551,21 @@ class Engine:
                     if record[guard.foreign_key] == found[resource.identifier.name]:
                         raise ProductError(category="eligibility", code="referenced")
         self.operation = "references"
-        if not absent:
+        if not self.absent:
             self.payload(desired)
-        delta = (
-            {}
-            if absent
-            else {
-                k: v
-                for k, v in desired.items()
-                if resource.get_field(k).kind == "secret"
-                or not equal(resource.get_field(k), current.get(k, MISSING), v)
-            }
-        )
-        changed = found is not None if absent else found is None or bool(delta)
-        result: dict[str, Any] = {
-            "changed": changed,
-            "changed_fields": sorted(delta) if found is not None and not absent else [],
-            "verified": "predicted"
-            if self.module.check_mode and changed
-            else "observed",
-        }
-        public_delta = {
-            k: v for k, v in delta.items() if resource.get_field(k).kind != "secret"
-        }
-        if self.module._diff and changed:
-            before = (
-                current
-                if absent
-                else {k: current[k] for k in public_delta if k in current}
-            )
-            result["diff"] = {"before": before, "after": {} if absent else public_delta}
-        if changed:
-            self.operation = "compatibility"
-            _compat.check(
-                self.module, self.client, f"{resource.name}:{params['state']}"
-            )
-        if self.module.check_mode or not changed:
-            result[resource.result_key] = (
-                None if absent else {**ident, **current, **public_delta}
-            )
-            return result
+
+    def predict(self) -> dict[str, Any]:
+        return {**self.key, **(self.current or {}), **self.visible()}
+
+    def write(self) -> None:
+        resource, found = self.resource, self.record
         target = found[resource.identifier.name] if found else None
-        self.operation = "delete" if absent else "create" if found is None else "update"
-        self.write_attempted = True
-        secret_write = any(resource.get_field(k).kind == "secret" for k in delta)
-        try:
-            if absent:
-                self.client.delete(resource, target)
-            elif found is None:
-                self.client.create(resource, self.payload(delta, ident))
-            else:
-                self.client.update(resource, target, self.payload(delta))
-        except errors.ApiError as failure:
-            self.operation = "reconcile"
-            observed = self.find(ident)
-            public = self.project(observed) if observed else {}
-            if failure.category not in ("transport", "timeout", "response"):
-                if not secret_write and public == current:
-                    self.write_attempted = False
-                elif public != current:
-                    self.confirmed = True
-                raise
-            self.verify(observed, desired, absent)
-            if secret_write:
-                raise ProductError(
-                    category="verification", code="create_unknown"
-                ) from None
+        if self.absent:
+            self.client.delete(resource, target)
+        elif found is None:
+            self.client.create(resource, self.payload(self.delta, self.key))
         else:
-            self.operation = "verify"
-            observed = self.find(ident)
-            self.verify(observed, desired, absent)
-        self.confirmed = True
-        result[resource.result_key] = self.project(observed) if observed else None
-        if secret_write:
-            result["verified"] = "unverifiable"
-        return result
+            self.client.update(resource, target, self.payload(self.delta))
 
 
 def fail(
@@ -644,69 +579,30 @@ def fail(
 ) -> NoReturn:
     """Fail through the error schema, never raising instead after a write.
 
-    A diagnostic field the schema cannot publish is left out; the failure
-    keeps its own category and code, and ``changed`` and ``outcome`` stay.
-    ``foundata.utils`` applies the same rule to whatever reaches it.
+    ``foundata.utils`` leaves out a diagnostic field the schema cannot
+    publish; the failure keeps its own category and code, and ``changed``
+    and ``outcome`` stay.
     """
-    reportable: dict[str, Any] = {}
-    for key, value in fields.items():
-        validate = SCHEMA.field_validators.get(key)
-        if validate is None:
-            continue
-        try:
-            reportable[key] = validate(value)
-        except (TypeError, ValueError):
-            continue
     errors.fail_from(
         module,
         failure,
-        schema=SCHEMA,
+        schema=Family.schema,
         msg=msg,
         changed=changed,
         outcome=outcome,
-        fields=reportable,
+        fields=fields,
     )
 
 
 def identity_fields(params: dict[str, Any], resource: Resource) -> dict[str, Any]:
-    """The caller's identity options that the error schema can publish.
-
-    An identity the schema rejects is left out; the failure stays specific.
-    """
-    identity: dict[str, Any] = {}
-    for key in resource.keys:
-        validate = SCHEMA.field_validators.get(key.name)
-        if validate is None or params.get(key.name) is None:
-            continue
-        try:
-            identity[key.name] = validate(params[key.name])
-        except (TypeError, ValueError):
-            continue
-    return identity
+    """The caller's identity options; the error schema publishes the valid ones."""
+    return {
+        key.name: params[key.name]
+        for key in resource.keys
+        if params.get(key.name) is not None
+    }
 
 
 def run_resource(module: Any, resource: Resource) -> None:
     """One sanitized operational catch boundary after real argument parsing."""
-    engine = None
-    try:
-        engine = Engine(module, resource, Client(module.params))
-        result = engine.run()
-    except errors.ApiError as failure:
-        attempted = engine is not None and engine.write_attempted
-        confirmed = engine is not None and engine.confirmed
-        fields: dict[str, Any] = {
-            "operation": engine.operation if engine else "connect",
-            **identity_fields(module.params, resource),
-        }
-        if isinstance(failure, ProductError) and failure.fields:
-            fields["fields"] = failure.fields
-        fail(
-            module,
-            failure,
-            msg="Resource reconciliation failed; see error_category and error_code",
-            changed=attempted,
-            outcome="changed" if confirmed else "unknown" if attempted else "unchanged",
-            fields=fields,
-        )
-    else:
-        module.exit_json(**result)
+    Engine(module, resource).execute()

@@ -19,6 +19,7 @@ from ansible_collections.foundata.utils.plugins.module_utils import errors
 from ansible_collections.{{ namespace }}.\
     {{ collection_name }}.plugins.module_utils import (
         _engine,
+        _family,
     )
 from ansible_collections.{{ namespace }}.\
     {{ collection_name }}.plugins.module_utils._engine import (
@@ -150,11 +151,11 @@ def synthetic(monkeypatch: pytest.MonkeyPatch) -> SyntheticClient:
         fallback=("product", None),
         field_validators={"operation": name, "label": name, "fields": names},
     )
-    monkeypatch.setattr(_engine, "Client", lambda params: client)
+    monkeypatch.setattr(_family, "Client", lambda params: client)
     monkeypatch.setattr(_engine, "ProductError", ProductError)
-    monkeypatch.setattr(_engine, "SCHEMA", schema)
+    monkeypatch.setattr(_family.Family, "schema", schema)
     monkeypatch.setattr(_engine, "api_argument_spec", dict)
-    monkeypatch.setattr(_engine._compat, "check", lambda *args: None)
+    monkeypatch.setattr(_family._compat, "check", lambda *args: None)
     return client
 
 
@@ -337,7 +338,7 @@ def test_unpublishable_identity_preserves_specific_error(
     def reject(*args: Any) -> None:
         raise ProductError(code="rejected")
 
-    monkeypatch.setattr(_engine._compat, "check", reject)
+    monkeypatch.setattr(_family._compat, "check", reject)
     result = run_module(entry(resource), label="")
     assert result["failed"] and "label" not in result
     assert result["error_code"] == "rejected" and result["outcome"] == "unchanged"
