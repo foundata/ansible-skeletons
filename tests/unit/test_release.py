@@ -3,6 +3,8 @@
 """Exercise release refusals using real disposable Git repositories."""
 
 import json
+import subprocess
+from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
@@ -282,3 +284,94 @@ def test_changes_require_affected_backend_tests(
 
 def test_first_release_requires_all_backends() -> None:
     assert required_backends([], initial=True) == ["podman", "libvirt", "ee"]
+
+
+def fake_inner_check(
+    monkeypatch: pytest.MonkeyPatch, outcomes: list[bool]
+) -> list[list[str]]:
+    """Stand in for scripts.check, passing or failing in the given order."""
+    real = subprocess.run
+    calls: list[list[str]] = []
+
+    def run(command: Sequence[str], *args: object, **kwargs: object) -> object:
+        if "scripts.check" not in command:
+            return real(command, *args, **kwargs)  # type: ignore[call-overload]
+        calls.append(list(command))
+        flag = "--resume" if "--resume" in command else "--output"
+        checks = Path(command[list(command).index(flag) + 1])
+        checks.mkdir(exist_ok=True)
+        if not outcomes.pop(0):
+            raise subprocess.CalledProcessError(1, command)
+        artifact = checks / "collection.tar.gz"
+        artifact.write_bytes(b"retained test artifact")
+        backends = json.loads((checks.parent / "gate.json").read_text())["backends"]
+        write_json(
+            checks / "checks.json",
+            {
+                "checks": required_checks(full=True, backends=backends),
+                "artifacts": {artifact.name: digest(artifact)},
+            },
+        )
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(subprocess, "run", run)
+    return calls
+
+
+@pytest.fixture
+def gate(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("SKELETONS_UTILS_SOURCE", raising=False)
+    # pytest's temporary paths exceed the socket budget, which is not under test.
+    monkeypatch.setattr("scripts.release.check_output_layout", lambda *_: None)
+
+
+@pytest.mark.usefixtures("gate")
+def test_a_resumed_release_report_matches_a_fresh_one(
+    repository: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = fake_inner_check(monkeypatch, [True, False, True])
+    fresh, resumed = tmp_path / "fresh", tmp_path / "resumed"
+    check_release("1.1.0", fresh, repository)
+    with pytest.raises(GateError, match="Release checks failed"):
+        check_release("1.1.0", resumed, repository)
+    assert not (resumed / "report.json").exists()
+    check_release("1.1.0", resumed, repository, resume=True)
+    assert [call[call.index("--matrix") + 1 :][:2] for call in calls] == [
+        ["--output", str(fresh / "checks")],
+        ["--output", str(resumed / "checks")],
+        ["--resume", str(resumed / "checks")],
+    ]
+    reports = [
+        json.loads((directory / "report.json").read_text(encoding="utf-8"))
+        for directory in (fresh, resumed)
+    ]
+    for report in reports:
+        report.pop("completed_at")
+    assert reports[0] == reports[1]
+    validate_report(resumed / "report.json", repository)
+
+
+@pytest.mark.usefixtures("gate")
+def test_release_resume_never_moves_evidence_to_another_commit(
+    repository: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake_inner_check(monkeypatch, [False])
+    evidence = tmp_path / "evidence"
+    with pytest.raises(GateError, match="Release checks failed"):
+        check_release("1.1.0", evidence, repository)
+    (repository / "content.txt").write_text("changed\n", encoding="utf-8")
+    git("commit", "--all", "-m", "test: change content", root=repository)
+    with pytest.raises(GateError, match="another release check"):
+        check_release("1.1.0", evidence, repository, resume=True)
+    with pytest.raises(GateError, match="No release gate to resume"):
+        check_release("1.1.0", tmp_path / "missing", repository, resume=True)
+
+
+@pytest.mark.usefixtures("gate")
+def test_a_passed_release_check_is_not_resumed(
+    repository: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake_inner_check(monkeypatch, [True])
+    check_release("1.1.0", tmp_path / "evidence", repository)
+    with pytest.raises(GateError, match="already passed"):
+        check_release("1.1.0", tmp_path / "evidence", repository, resume=True)

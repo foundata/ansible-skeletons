@@ -193,9 +193,10 @@ the lanes, `generated-lint`, and each identity of both module skeletons.
 them one after another in a fixed order. Each step writes its output to
 `logs/<step>.log` below the check's output and prints one line when it starts
 and one when it ends, with its duration. A failing step prints the end of its
-log and the log's path. After a failure no further step starts; steps already
-running finish. Without `--output`, the logs are removed with the temporary
-directory.
+log and the log's path. With one job, the first failure ends the run, as the
+order is fixed. With several, every step whose prerequisites passed still runs,
+so a resumed run, described below, repeats only what failed. Without
+`--output`, the logs are removed with the temporary directory.
 
 To test a future release candidate, build its wheel and override the released
 package. Example:
@@ -214,6 +215,20 @@ Keep the absolute output path at most 29 bytes and outside tmpfs. Nox's
 nested virtual environments and Podman's storage need a short filesystem
 path. Choose a fresh directory; remove obsolete outputs after retaining the
 result you need.
+
+Each finished step leaves a record in `records/` below the output. The record
+names the digest of the sources it checked: path, mode and content of the
+tracked files and of the untracked files Git does not ignore. To continue an
+interrupted or failed run, for example after a network timeout:
+
+```sh
+./scripts/check.sh --resume "${HOME}/sk-check-1"
+```
+
+The resumed run reuses every passed record and reruns the failed and missing
+steps, replacing what their earlier attempt left. It refuses when the sources
+changed since. Pass the same options as before; a step whose options changed,
+such as a module identity resumed with `--matrix`, runs again.
 
 Run only the helper regression suite with:
 
@@ -342,6 +357,17 @@ skeleton-specific gate (`scripts/release.py check`).
    output is in `checks/logs/<step>.log`. A successful run creates
    `report.json`; a failure retains diagnostics but creates no passing report.
    Keep the whole evidence directory, including its `checks/` subdirectory.
+
+   When a step fails for a reason outside the sources, such as a network
+   timeout, rerun the failed and missing steps into the same evidence:
+
+   ```sh
+   uv run --locked python -m scripts.release check "${version}" \
+     --resume "${evidence}"
+   ```
+
+   The gate resumes only evidence of the same commit, base and backends. A
+   resumed gate's report has the same form as a fresh one.
 5. Create and inspect the local annotated tag:
 
    ```sh
@@ -390,8 +416,9 @@ is needed. Any future CI should call the same commands.
 ### Recovery<a id="recovery"></a>
 
 For a failed check, inspect its log, fix the cause, commit source changes, and
-run the gate into a new evidence directory. Never edit a report to turn a
-failure into success or carry it forward to another commit.
+run the gate into a new evidence directory. `--resume` serves failures outside
+the sources on the same commit only. Never edit a report or a step record to
+turn a failure into success or carry it forward to another commit.
 
 While no GitHub release exists, `uv run --locked release tag delete
 "${version}"` removes a wrong tag locally and on the remote; it refuses once a
@@ -406,7 +433,8 @@ validated commit and rerun publication verification when complete.
 ## Troubleshooting<a id="troubleshooting"></a>
 
 - An existing output path is an error. Choose a new path; helpers never merge
-  a new result into an older run.
+  a new result into an older run. `--resume` is the exception: it replaces
+  each rerun step's earlier output and keeps the rest.
 - A lock mismatch is an error. Review dependency changes and regenerate the
   lock deliberately; release checks use `--locked`.
 - Use retained output to inspect generated YAML, the isolated `ansible.cfg`,

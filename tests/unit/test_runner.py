@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Check step scheduling, per-step logs and per-step temporary directories."""
 
+import json
+import subprocess
 import sys
 import tempfile
 import threading
@@ -23,7 +25,7 @@ from scripts.check import (
     plan,
     required_checks,
 )
-from scripts.common import GateError
+from scripts.common import GateError, source_digest
 from scripts.render import MODULE_PROFILES
 
 
@@ -31,6 +33,17 @@ from scripts.render import MODULE_PROFILES
 def output(tmp_path: Path) -> Path:
     (tmp_path / "t").mkdir(mode=0o700)
     return tmp_path
+
+
+@pytest.fixture
+def unbudgeted(monkeypatch: pytest.MonkeyPatch) -> None:
+    # pytest's temporary paths exceed the socket budget, which is not under test.
+    def private_temporary(output: Path, env: dict[str, str]) -> dict[str, str]:
+        (output / "t").mkdir(mode=0o700, exist_ok=True)
+        return env
+
+    monkeypatch.setattr(check_module, "check_output_layout", lambda *_: None)
+    monkeypatch.setattr(check_module, "controller_environment", private_temporary)
 
 
 def recorder(log: list[str], name: str) -> Callable[[Context], None]:
@@ -73,32 +86,25 @@ def test_long_steps_start_first_with_several_jobs(output: Path) -> None:
     assert started[0] == "long"
 
 
-def test_a_failure_starts_nothing_new_but_lets_running_steps_finish(
-    output: Path,
+@pytest.mark.parametrize("jobs", [1, 2])
+def test_a_failure_stops_one_job_and_spares_independent_parallel_steps(
+    output: Path, jobs: int
 ) -> None:
-    failed = threading.Event()
-    runner: Runner
-
     def fail(context: Context) -> None:
         print("diagnostics", file=context.log)
-        failed.set()
         raise GateError("broken")
 
-    def slow(_context: Context) -> None:
-        assert failed.wait(10)
-        # Let the runner record the failure before this step completes.
-        deadline = time.monotonic() + 10
-        while runner.status.get("fail") != "failed" and time.monotonic() < deadline:
-            time.sleep(0.01)
-
     steps = [
-        Step("slow", slow, long=True),
         Step("fail", fail),
         Step("later", recorder([], "later")),
+        Step("dependent", recorder([], "dependent"), ("fail",)),
     ]
-    runner = Runner(output, steps, jobs=2)
-    status = runner.execute()
-    assert status == {"slow": "passed", "fail": "failed", "later": "not run"}
+    status = Runner(output, steps, jobs=jobs).execute()
+    assert status == {
+        "fail": "failed",
+        "later": "not run" if jobs == 1 else "passed",
+        "dependent": "not run",
+    }
 
 
 def test_dependents_of_a_failed_step_never_start(output: Path) -> None:
@@ -243,3 +249,148 @@ def test_temporary_output_fits_the_socket_budget(
     assert check_module.main() == 0
     assert len(used) == 1
     assert used[0].parent.name.startswith("sk-")
+
+
+def test_passed_records_of_the_same_sources_are_reused(output: Path) -> None:
+    ran: list[str] = []
+
+    def fail_once(context: Context) -> None:
+        ran.append("b")
+        (context.output / "b-output").mkdir()
+        if ran.count("b") == 1:
+            raise GateError("interrupted")
+
+    steps = [
+        Step("a", recorder(ran, "a"), inputs="one"),
+        Step("b", fail_once, owns=("b-output",)),
+        Step("c", recorder(ran, "c"), ("b",)),
+    ]
+    first = Runner(output, steps, jobs=1, source="tree").execute()
+    assert first == {"a": "passed", "b": "failed", "c": "not run"}
+    # The rerun replaces what the failed attempt left; "a" is not run again.
+    second = Runner(output, steps, jobs=1, source="tree").execute()
+    assert second == {"a": "passed", "b": "passed", "c": "passed"}
+    assert ran == ["a", "b", "b", "c"]
+    record = json.loads((output / "records/b.json").read_text(encoding="utf-8"))
+    assert {key: record[key] for key in ("step", "status", "source")} == {
+        "step": "b",
+        "status": "passed",
+        "source": "tree",
+    }
+
+
+@pytest.mark.parametrize(("source", "inputs"), [("other", "one"), ("tree", "two")])
+def test_records_of_other_sources_or_inputs_are_not_reused(
+    output: Path, source: str, inputs: str
+) -> None:
+    ran: list[str] = []
+    Runner(
+        output, [Step("a", recorder(ran, "a"), inputs="one")], jobs=1, source="tree"
+    ).execute()
+    step = Step("a", recorder(ran, "a"), inputs=inputs)
+    assert Runner(output, [step], jobs=1, source=source).execute() == {"a": "passed"}
+    assert ran == ["a", "a"]
+
+
+def plan_of(steps: list[Step]) -> Callable[..., list[Step]]:
+    def fake(**_options: object) -> list[Step]:
+        return steps
+
+    return fake
+
+
+@pytest.mark.usefixtures("unbudgeted")
+def test_resume_reruns_only_what_did_not_pass(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ran: list[str] = []
+
+    def flaky(_context: Context) -> None:
+        ran.append("flaky")
+        if ran.count("flaky") == 1:
+            raise GateError("network")
+
+    steps = [
+        Step("static", recorder(ran, "static"), check="static"),
+        Step("flaky", flaky, check="flaky"),
+    ]
+    monkeypatch.setattr(check_module, "plan", plan_of(steps))
+    monkeypatch.setattr(check_module, "source_digest", lambda: "tree")
+    monkeypatch.setattr(
+        check_module, "required_checks", lambda **_options: ["static", "flaky"]
+    )
+    output = tmp_path / "o"
+    with pytest.raises(GateError, match="Failed: flaky"):
+        check_module.check(output, jobs=1)
+    assert not (output / "checks.json").exists()
+    check_module.check(output, jobs=1, resume=True)
+    assert ran == ["static", "flaky", "flaky"]
+    checks = json.loads((output / "checks.json").read_text(encoding="utf-8"))
+    assert checks["checks"] == ["static", "flaky"]
+
+
+@pytest.mark.usefixtures("unbudgeted")
+def test_resume_refuses_changed_sources_and_missing_runs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fail(_context: Context) -> None:
+        raise GateError("broken")
+
+    monkeypatch.setattr(check_module, "plan", plan_of([Step("a", fail, check="a")]))
+    monkeypatch.setattr(check_module, "source_digest", lambda: "before")
+    output = tmp_path / "o"
+    with pytest.raises(GateError, match="Failed: a"):
+        check_module.check(output, jobs=1)
+    monkeypatch.setattr(check_module, "source_digest", lambda: "after")
+    with pytest.raises(GateError, match="sources differ"):
+        check_module.check(output, jobs=1, resume=True)
+    with pytest.raises(GateError, match="No check run to resume"):
+        check_module.check(tmp_path / "missing", jobs=1, resume=True)
+
+
+@pytest.mark.usefixtures("unbudgeted")
+def test_sources_changed_during_a_run_cannot_be_resumed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    digests = iter(["before", "after"])
+    monkeypatch.setattr(check_module, "source_digest", lambda: next(digests))
+    monkeypatch.setattr(
+        check_module, "plan", plan_of([Step("a", recorder([], "a"), check="a")])
+    )
+    monkeypatch.setattr(check_module, "required_checks", lambda **_options: ["a"])
+    output = tmp_path / "o"
+    check_module.check(output, jobs=1)
+    assert json.loads((output / "run.json").read_text())["source"] is None
+
+
+def test_source_digest_follows_content_mode_and_untracked_files(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "repository"
+    root.mkdir()
+    subprocess.run(["git", "init", "--quiet"], cwd=root, check=True)
+    (root / "tracked.txt").write_text("one\n", encoding="utf-8")
+    (root / ".gitignore").write_text("ignored.txt\n", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=root, check=True)
+    digests = [source_digest(root)]
+    (root / "ignored.txt").write_text("cache\n", encoding="utf-8")
+    assert source_digest(root) == digests[0]
+    (root / "tracked.txt").write_text("two\n", encoding="utf-8")
+    digests.append(source_digest(root))
+    (root / "tracked.txt").chmod(0o755)
+    digests.append(source_digest(root))
+    (root / "new.txt").write_text("untracked\n", encoding="utf-8")
+    digests.append(source_digest(root))
+    (root / "tracked.txt").unlink()
+    digests.append(source_digest(root))
+    assert len(set(digests)) == len(digests)
+
+
+def test_exported_sources_use_the_supplied_digest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("SKELETONS_SOURCE_DIGEST", raising=False)
+    with pytest.raises(GateError, match="outside a Git checkout"):
+        source_digest(tmp_path)
+    monkeypatch.setenv("SKELETONS_SOURCE_DIGEST", "a" * 64)
+    assert source_digest(tmp_path) == "a" * 64

@@ -7,6 +7,7 @@ import importlib.metadata
 import json
 import os
 import platform
+import shutil
 import sys
 import tempfile
 import threading
@@ -16,6 +17,7 @@ import xml.etree.ElementTree as ET
 from collections.abc import Callable, Sequence
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
 from typing import TextIO
@@ -29,6 +31,7 @@ from scripts.common import (
     matrix,
     require_tools,
     run,
+    source_digest,
     uv_command,
     write_json,
 )
@@ -185,6 +188,11 @@ class Step:
     serial: bool = False
     # Long steps start first when several steps run at a time.
     long: bool = False
+    # Output paths, as globs below the run's output, that a rerun replaces.
+    owns: tuple[str, ...] = ()
+    # Options besides the sources that decide this step's result. A record
+    # with other inputs is not reused.
+    inputs: str = ""
 
 
 def identity_step(profile: str, index: int) -> str:
@@ -334,6 +342,15 @@ def integration_tier(
     )
 
 
+def utils_identity(source: Path | None) -> str | None:
+    """Identify a local foundata.utils source; one outside Git is never reused."""
+    if source is None:
+        return None
+    if (source / ".git").exists():
+        return source_digest(source.resolve())
+    return f"unversioned {time.time_ns()}"
+
+
 def plan(
     *,
     full: bool,
@@ -344,6 +361,7 @@ def plan(
     """List the steps of a run in the order a single job runs them."""
     pythons = python_versions(full=full)
     units = [f"unit-python{python}" for python in pythons]
+    wheels = json.dumps([digest(Path(package)) for package in packages])
     steps = [
         Step(
             "static",
@@ -353,15 +371,29 @@ def plan(
         Step(
             "controller",
             lambda context: check_controllers(context, context.output, pythons=pythons),
+            owns=("controller-python*.json",),
+            inputs=json.dumps(pythons),
         ),
     ]
     for python, name in zip(pythons, units, strict=True):
         steps.append(
-            Step(name, partial(unit_tests, python=python), ("controller",), name)
+            Step(
+                name,
+                partial(unit_tests, python=python),
+                ("controller",),
+                name,
+                owns=(f"{name}.xml",),
+            )
         )
     for lane in matrix() if full else [default_lane()]:
         steps.append(
-            Step(lane.name, partial(lane_smoke, lane=lane), ("controller",), lane.name)
+            Step(
+                lane.name,
+                partial(lane_smoke, lane=lane),
+                ("controller",),
+                lane.name,
+                owns=(lane.name,),
+            )
         )
     steps.append(
         Step(
@@ -370,10 +402,13 @@ def plan(
             ("controller",),
             "generated-lint",
             long=True,
+            owns=("generated-lint",),
+            inputs=wheels,
         )
     )
+    utils = json.dumps({"full": full, "utils-source": utils_identity(utils_source)})
     for profile in MODULE_PROFILES:
-        for index in range(len(IDENTITIES)):
+        for index, (_namespace, name) in enumerate(IDENTITIES):
             steps.append(
                 Step(
                     identity_step(profile, index),
@@ -387,6 +422,11 @@ def plan(
                     ("controller",),
                     profile,
                     long=True,
+                    owns=(
+                        f"{profile}/{name}",
+                        *([f"{profile}/missing-metadata"] if index == 0 else []),
+                    ),
+                    inputs=utils,
                 )
             )
     # Infrastructure tiers wait for the checks that would fail them anyway.
@@ -404,6 +444,8 @@ def plan(
                 ("static", *units, default_lane().name),
                 name,
                 serial=True,
+                owns=(name, f"controller-checks/{name}"),
+                inputs=wheels,
             )
         )
     known: set[str] = set()
@@ -422,15 +464,60 @@ def duration(seconds: float) -> str:
     return f"{minutes} min {rest} s" if minutes else f"{rest} s"
 
 
-class Runner:
-    """Run steps in dependency order, a limited number at a time."""
+def remove_earlier(path: Path, output: Path, log: TextIO) -> None:
+    """Remove what an earlier attempt of a step left below the run's output."""
+    if not path.exists() and not path.is_symlink():
+        return
+    resolved = path.resolve()
+    if path.is_symlink() or resolved == output or not resolved.is_relative_to(output):
+        raise GateError(f"Refusing to remove {path} before a rerun")
+    print(f"Removing the earlier attempt's {path}", file=log, flush=True)
+    if path.is_file():
+        path.unlink()
+        return
+    try:
+        shutil.rmtree(path)
+    except PermissionError:
+        # Podman stores below a render hold files of subordinate users.
+        run(["podman", "unshare", "rm", "-rf", "--", str(path)], log=log)
 
-    def __init__(self, output: Path, steps: Sequence[Step], *, jobs: int) -> None:
+
+class Runner:
+    """Run steps in dependency order, a limited number at a time.
+
+    Every finished step leaves a record bound to the digest of the sources it
+    checked. A passed record with the same sources and inputs is reused.
+    """
+
+    def __init__(
+        self, output: Path, steps: Sequence[Step], *, jobs: int, source: str = ""
+    ) -> None:
         self.output = output
         self.steps = list(steps)
         self.jobs = jobs
+        self.source = source
         self.status: dict[str, str] = {}
         self.lock = threading.Lock()
+
+    def record(self, step: Step) -> Path:
+        """Return the path of a step's record."""
+        return self.output / "records" / f"{step.name}.json"
+
+    def reusable(self, step: Step) -> dict[str, object] | None:
+        """Return a step's passed record for these sources and inputs, if any."""
+        try:
+            record = json.loads(self.record(step).read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            return None
+        if not isinstance(record, dict):
+            return None
+        if (record.get("status"), record.get("source"), record.get("inputs")) != (
+            "passed",
+            self.source,
+            step.inputs,
+        ):
+            return None
+        return record
 
     def say(self, message: str) -> None:
         """Print one progress line; steps finish in any order."""
@@ -438,15 +525,20 @@ class Runner:
             print(f"{time.strftime('%H:%M:%S')} {message}", flush=True)
 
     def run_step(self, step: Step) -> bool:
-        """Run one step with its own log and TMPDIR; report its outcome."""
+        """Run one step with its own log and TMPDIR; record its outcome."""
         log_path = self.output / "logs" / f"{step.name}.log"
         temporary = self.output / "t" / STEP_SLOTS[self.steps.index(step)]
-        temporary.mkdir(mode=0o700, exist_ok=True)
         env = {**os.environ, "TMPDIR": str(temporary)}
+        self.record(step).unlink(missing_ok=True)
         self.say(f"start  {step.name}")
         began = time.monotonic()
         with log_path.open("a", encoding="utf-8") as log:
             try:
+                for pattern in step.owns:
+                    for path in sorted(self.output.glob(pattern)):
+                        remove_earlier(path, self.output, log)
+                remove_earlier(temporary, self.output, log)
+                temporary.mkdir(mode=0o700)
                 step.action(Context(self.output, log, env))
                 passed = True
             # Any exception fails this step alone; the run reports it.
@@ -455,7 +547,19 @@ class Runner:
                     traceback.print_exc(file=log)
                 print(f"error: {exc}", file=log, flush=True)
                 passed = False
-        took = duration(time.monotonic() - began)
+        seconds = time.monotonic() - began
+        write_json(
+            self.record(step),
+            {
+                "step": step.name,
+                "status": "passed" if passed else "failed",
+                "source": self.source,
+                "inputs": step.inputs,
+                "seconds": round(seconds, 1),
+                "finished": datetime.now(UTC).isoformat(timespec="seconds"),
+            },
+        )
+        took = duration(seconds)
         if passed:
             self.say(f"passed {step.name} in {took}")
         else:
@@ -473,6 +577,16 @@ class Runner:
     def execute(self) -> dict[str, str]:
         """Run every step that can run; return each step's status."""
         (self.output / "logs").mkdir(exist_ok=True)
+        (self.output / "records").mkdir(exist_ok=True)
+        for step in self.steps:
+            record = self.reusable(step)
+            if record is not None:
+                self.status[step.name] = "passed"
+                seconds = record.get("seconds")
+                took = duration(seconds) if isinstance(seconds, int | float) else "?"
+                self.say(
+                    f"reused {step.name}, passed in {took} at {record.get('finished')}"
+                )
         # One job keeps the plan's order. More jobs start long steps first.
         order = (
             self.steps
@@ -483,8 +597,9 @@ class Runner:
         running: dict[Future[bool], Step] = {}
         with ThreadPoolExecutor(max_workers=self.jobs) as pool:
             while True:
-                # After a failure no step starts; running steps still finish.
-                if "failed" not in self.status.values():
+                # One job stops at the first failure. Several jobs start every
+                # step whose prerequisites passed, so a resume reruns little.
+                if self.jobs > 1 or "failed" not in self.status.values():
                     for step in list(waiting):
                         if len(running) >= self.jobs:
                             break
@@ -523,8 +638,13 @@ def check(
     foundata_wheel: Path | None = None,
     utils_source: Path | None = None,
     jobs: int | None = None,
+    resume: bool = False,
 ) -> None:
-    """Run required stages and emit a complete report only after all succeed."""
+    """Run required stages and emit a complete report only after all succeed.
+
+    With ``resume``, the existing output's passed records of the same sources
+    are reused and every other step runs.
+    """
     selected = backends or []
     if foundata_wheel is not None and (
         not foundata_wheel.is_file() or foundata_wheel.suffix != ".whl"
@@ -538,15 +658,44 @@ def check(
     steps = plan(
         full=full, backends=selected, packages=packages, utils_source=utils_source
     )
-    output.mkdir(parents=True, exist_ok=False)
+    source = source_digest()
+    if resume:
+        try:
+            earlier = json.loads((output / "run.json").read_text(encoding="utf-8"))
+        except FileNotFoundError as exc:
+            raise GateError(f"No check run to resume in {output}") from exc
+        if earlier.get("source") != source:
+            raise GateError(
+                "The sources differ from the run being resumed; "
+                "check them into a new output"
+            )
+        (output / "checks.json").unlink(missing_ok=True)
+    else:
+        output.mkdir(parents=True, exist_ok=False)
     controller_environment(output, {})
+    write_json(
+        output / "run.json",
+        {"source": source, "full": full, "backends": selected},
+    )
     began = time.monotonic()
     print(
         f"Running {len(steps)} steps, up to {jobs} at a time; "
         f"logs in {output / 'logs'}",
         flush=True,
     )
-    status = Runner(output, steps, jobs=jobs).execute()
+    try:
+        status = Runner(output, steps, jobs=jobs, source=source).execute()
+    finally:
+        if source_digest() != source:
+            # Records no longer say which sources their steps checked.
+            write_json(
+                output / "run.json",
+                {"source": None, "full": full, "backends": selected},
+            )
+            print(
+                "warning: the sources changed during the run; it cannot be resumed",
+                file=sys.stderr,
+            )
     failed = [name for name, outcome in status.items() if outcome == "failed"]
     if failed:
         raise GateError(f"Failed: {', '.join(failed)}; logs in {output / 'logs'}")
@@ -554,9 +703,10 @@ def check(
     if checks != required_checks(full=full, backends=selected):
         raise GateError("Incomplete check run")
     for profile in MODULE_PROFILES:
-        write_json(
-            output / profile / "profile.json", {"profile": profile, "full": full}
-        )
+        if (output / profile).is_dir():
+            write_json(
+                output / profile / "profile.json", {"profile": profile, "full": full}
+            )
     artifacts = {
         str(path.relative_to(output)): digest(path)
         for path in output.rglob("artifacts/*.tar.gz")
@@ -599,7 +749,16 @@ def main() -> int:
         choices=["podman", "libvirt", "ee"],
         default=[],
     )
-    parser.add_argument("--output", type=Path, help="Retain results in a new directory")
+    destination = parser.add_mutually_exclusive_group()
+    destination.add_argument(
+        "--output", type=Path, help="Retain results in a new directory"
+    )
+    destination.add_argument(
+        "--resume",
+        type=Path,
+        metavar="OUTPUT",
+        help="Rerun the failed and missing steps of a retained output",
+    )
     parser.add_argument(
         "--jobs",
         type=int,
@@ -627,7 +786,9 @@ def main() -> int:
         jobs=args.jobs,
     )
     try:
-        if args.output:
+        if args.resume:
+            run_check(args.resume.resolve(), resume=True)
+        elif args.output:
             run_check(args.output.resolve())
         else:
             # A short name keeps the temporary output within the socket budget.

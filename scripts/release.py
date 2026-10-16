@@ -14,7 +14,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from scripts.check import check_output_layout, default_lane, required_checks
-from scripts.common import ROOT, GateError, digest, run, uv_command, write_json
+from scripts.common import (
+    ROOT,
+    GateError,
+    digest,
+    run,
+    source_digest,
+    uv_command,
+    write_json,
+)
 from scripts.render import MODULE_PROFILES
 
 REPOSITORY = "foundata/ansible-skeletons"
@@ -126,8 +134,14 @@ def export_revision(
         bundle.extractall(destination, filter="data")
 
 
-def check_release(version: str, output: Path, root: Path = ROOT) -> None:
-    """Validate one clean commit; retain evidence without tagging or publishing."""
+def check_release(
+    version: str, output: Path, root: Path = ROOT, *, resume: bool = False
+) -> None:
+    """Validate one clean commit; retain evidence without tagging or publishing.
+
+    With ``resume``, an earlier gate's evidence of the same commit keeps its
+    passed steps and the gate reruns the others.
+    """
     if os.environ.get("SKELETONS_UTILS_SOURCE"):
         raise GateError(
             "Release checks use the pinned foundata.utils release; "
@@ -138,11 +152,40 @@ def check_release(version: str, output: Path, root: Path = ROOT) -> None:
     if output.is_relative_to(root.resolve()):
         raise GateError("Release evidence must be outside the working tree")
     check_output_layout(output / "checks", backends)
-    output.mkdir(parents=True, exist_ok=False)
+    gate = {
+        "version": version,
+        "revision": revision,
+        "base": base,
+        "backends": backends,
+        "source": source_digest(root),
+    }
+    if resume:
+        try:
+            earlier = json.loads((output / "gate.json").read_text(encoding="utf-8"))
+        except FileNotFoundError as exc:
+            raise GateError(f"No release gate to resume in {output}") from exc
+        # Records never move to another commit, base or set of backends.
+        if {key: earlier.get(key) for key in gate} != gate:
+            raise GateError(
+                "This evidence belongs to another release check; "
+                "run the gate into a new output"
+            )
+        if (output / "report.json").exists():
+            raise GateError("This release check already passed")
+    else:
+        output.mkdir(parents=True, exist_ok=False)
     archive = output / "source.tar"
     with tempfile.TemporaryDirectory(prefix="ansible-skeletons-release-") as temporary:
         source = Path(temporary) / "source"
-        export_revision(revision, archive, source, root)
+        if resume:
+            exported = Path(temporary) / "source.tar"
+            export_revision(revision, exported, source, root)
+            fresh = digest(exported)
+            if fresh != earlier.get("source_sha256") or fresh != digest(archive):
+                raise GateError("The exported source differs from the retained one")
+        else:
+            export_revision(revision, archive, source, root)
+            write_json(output / "gate.json", {**gate, "source_sha256": digest(archive)})
         command = [
             "uv",
             "run",
@@ -152,7 +195,7 @@ def check_release(version: str, output: Path, root: Path = ROOT) -> None:
             "-m",
             "scripts.check",
             "--matrix",
-            "--output",
+            "--resume" if resume else "--output",
             str(output / "checks"),
         ]
         for backend in backends:
@@ -179,6 +222,8 @@ def check_release(version: str, output: Path, root: Path = ROOT) -> None:
                 "MYPY_CACHE_DIR": str(Path(temporary) / "mypy-cache"),
                 "UV_LINK_MODE": "copy",
                 "SKELETONS_REVISION": revision,
+                # The export has no Git metadata to identify its sources.
+                "SKELETONS_SOURCE_DIGEST": str(gate["source"]),
             }
         )
         log = output / "check.log"
@@ -186,7 +231,7 @@ def check_release(version: str, output: Path, root: Path = ROOT) -> None:
             f"Checking {revision}; required backends: {', '.join(backends)}\nLog: {log}",
             flush=True,
         )
-        with log.open("w", encoding="utf-8") as stream:
+        with log.open("a" if resume else "w", encoding="utf-8") as stream:
             try:
                 subprocess.run(
                     command,
@@ -402,14 +447,23 @@ def main() -> int:
     subparsers = parser.add_subparsers(dest="command", required=True)
     check_parser = subparsers.add_parser("check", help="Validate a committed release")
     check_parser.add_argument("version")
-    check_parser.add_argument("--output", required=True, type=Path)
+    evidence = check_parser.add_mutually_exclusive_group(required=True)
+    evidence.add_argument("--output", type=Path, help="A new evidence directory")
+    evidence.add_argument(
+        "--resume",
+        type=Path,
+        metavar="OUTPUT",
+        help="Rerun the failed and missing steps of this commit's evidence",
+    )
     for command in ("tag", "verify"):
         child = subparsers.add_parser(command)
         child.add_argument("report", type=Path)
     args = parser.parse_args()
     try:
         if args.command == "check":
-            check_release(args.version, args.output)
+            check_release(
+                args.version, args.resume or args.output, resume=bool(args.resume)
+            )
         elif args.command == "tag":
             create_tag(args.report)
         else:

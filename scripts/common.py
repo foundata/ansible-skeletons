@@ -5,6 +5,7 @@
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import tomllib
@@ -112,6 +113,42 @@ def digest(path: Path) -> str:
     """Return a file's SHA-256 without loading the file into memory."""
     with path.open("rb") as stream:
         return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
+def source_digest(root: Path = ROOT) -> str:
+    """Digest the sources a check reads: each file's path, mode and content.
+
+    A checkout contributes its tracked files and the untracked ones Git does
+    not ignore, as they are in the working tree. An exported release has no
+    Git metadata; the release helper supplies the digest of its clean checkout
+    in SKELETONS_SOURCE_DIGEST.
+    """
+    if not (root / ".git").exists():
+        supplied = os.environ.get("SKELETONS_SOURCE_DIGEST", "")
+        if not re.fullmatch(r"[0-9a-f]{64}", supplied):
+            raise GateError("Cannot identify the sources outside a Git checkout")
+        return supplied
+    listing = subprocess.run(
+        ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        timeout=60,
+    ).stdout
+    total = hashlib.sha256()
+    for name in sorted(set(listing.split(b"\0")) - {b""}):
+        path = root / os.fsdecode(name)
+        if path.is_symlink():
+            kind, content = b"link", os.fsencode(path.readlink())
+        elif path.is_file():
+            executable = path.stat().st_mode & 0o111
+            kind, content = (b"exec" if executable else b"file"), path.read_bytes()
+        else:
+            # A tracked file deleted from the working tree.
+            kind, content = b"gone", b""
+        total.update(name + b"\0" + kind + b"\0")
+        total.update(hashlib.sha256(content).digest())
+    return total.hexdigest()
 
 
 def write_json(path: Path, value: object) -> None:

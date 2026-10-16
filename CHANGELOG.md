@@ -48,6 +48,9 @@ and the project adheres to
 
 ### Added
 
+- checks: `--resume <output>` reruns only the failed and missing steps of an
+  earlier run of the same sources; `scripts.release check --resume` does the
+  same for the evidence of the same commit.
 - Both module variants: skeleton-owned `_lifecycle.py`, a product-bound
   `_family.py`, and synthetic `test_lifecycle.py` coverage for family hooks,
   custom operations, staged writes and lost-response settlement.
