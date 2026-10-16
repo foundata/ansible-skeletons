@@ -24,6 +24,12 @@ Paths are relative to this directory unless stated otherwise.
     - [Through nox](#usage-nox)
     - [With Molecule directly](#usage-molecule)
   - [Test sequence](#usage-sequence)
+{# skeleton-variant: recovery-contract-toc #}
+  - [Recovery contract](#usage-recovery-contract)
+{# end skeleton-variant #}
+{# skeleton-variant: recovery-tool-toc #}
+  - [Drill one family before its first write](#usage-family-drill)
+{# end skeleton-variant #}
   - [Write tests](#usage-add-tests)
   - [Provision your own target](#usage-owned-target)
     - [Container platforms (`type: "podman"`)](#usage-owned-podman)
@@ -138,6 +144,65 @@ effective state with the saved state in check mode, without writing. With
 {# end skeleton-variant #}
 
 
+{# skeleton-variant: recovery-contract #}
+### Recovery contract<a id="usage-recovery-contract"></a>
+
+The default scenario ends its side effects with the family's recovery drill.
+If the credentials file has no `console` entry, it prints the skip reason.
+A present but invalid console contract fails the drill. The FIXME hooks and
+native backup, restore and discard commands must be qualified before using it.
+
+Read the lab's `state/private/contract.json` through
+`MOLECULE_PRODUCT_CREDENTIALS`. The restored lab supplies these entries beside
+`key` and `secret`; do not compose a second contract:
+
+- `console.argv`: the command line, for example
+  `["python3", "<skill>/scripts/baseline_lab.py", "console", "<manifest>"]`.
+  Send one JSON object on stdin:
+  `{"label": "family-backup", "commands": ["<qualified guest command>"]}`.
+  Labels match `[a-z0-9][a-z0-9-]{0,47}`. There are at most 32 commands,
+  each printable and at most 200 bytes. They run in order in the appliance's
+  root shell, stopping at the first nonzero exit.
+- `dns`: `host` and `port` of a TCP DNS endpoint reaching the appliance's
+  resolver over the management path, and the management `name`.
+- `management`: the `address` that name must resolve to, and the `client`
+  address the appliance sees management traffic come from.
+
+The console returns one JSON line:
+`{"label": "...", "commands": 1, "status": "ok", "seconds": 0.0}`.
+Exit 0 means `ok`; exit 1 means `failed` or `not_ready`; exit 2 means
+`invalid`. The root password and console transcript remain private to the
+lab. The contract file is mode 0600 and does not contain the root password.
+
+Console commands only back up and restore. Assertions use fresh authenticated
+API connections and fresh DNS queries, then the family's absence hook. A
+product whose native configuration has history must restore through its
+native save mechanism rather than copying bytes alone. FIXME Qualify the
+commands and independent saved and active state checks for this appliance.
+
+{# end skeleton-variant #}
+{# skeleton-variant: recovery-tool #}
+### Drill one family before its first write<a id="usage-family-drill"></a>
+
+Use the shared playbook as a build-session tool against an already restored,
+disposable lab. It is not a Molecule scenario. Implement the selected family's
+`tasks/recovery/induce.yml` and `absent.yml`, and qualify the inventory's
+`recovery_defaults` before running it. Exactly one family must be selected.
+Run these commands from the collection root:
+
+```sh
+export MOLECULE_SCENARIO_DIRECTORY="$PWD/extensions/molecule/default"
+export MOLECULE_RECOVERY_FAMILIES="default"
+ansible-playbook \
+  -i extensions/molecule/default/inventory/hosts.yml \
+  extensions/molecule/shared/playbooks/recovery.yml
+```
+
+Use the installed development environment and the same credential contract
+as the default scenario. Do not write the family's management-path changes
+until this drill has demonstrated loss, independent recovery and fresh access.
+
+{# end skeleton-variant #}
 ### Write tests<a id="usage-add-tests"></a>
 
 The playbooks in `shared/playbooks/` run each step. Each step also includes the

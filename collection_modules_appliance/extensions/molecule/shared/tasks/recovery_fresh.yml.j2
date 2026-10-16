@@ -1,0 +1,40 @@
+# Fresh management access for the recovery drill: an authenticated API read
+# and a DNS query for the management name, each on a new connection, retried
+# once a second for "__recovery_retries" seconds.
+#
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+{% raw %}
+---
+- name: "Molecule | Recovery | Read the API on a fresh connection"
+  ansible.builtin.uri:
+    url: "{{ recovery_defaults['probe']['url'] }}"
+    force_basic_auth: true
+    timeout: 3
+    url_password: "{{ recovery_defaults['probe']['password'] }}"
+    url_username: "{{ recovery_defaults['probe']['username'] }}"
+    validate_certs: "{{ recovery_defaults['probe']['validate_certs'] }}"
+  until:
+    - __recovery_api['status'] | ansible.builtin.default(-1) == 200
+  retries: "{{ __recovery_retries }}"
+  delay: 1
+  register: __recovery_api
+  no_log: true
+
+- name: "Molecule | Recovery | Resolve the management name with a fresh query"
+  ansible.builtin.command:
+    argv:
+      - "{{ ansible_playbook_python }}"
+      - "{{ __recovery_shared }}/files/recovery_dns.py"
+      - "{{ recovery_defaults['lab']['dns']['host'] }}"
+      - "{{ recovery_defaults['lab']['dns']['port'] }}"
+      - "{{ recovery_defaults['lab']['dns']['name'] }}"
+  changed_when:
+    - false
+  until:
+    - recovery_defaults['lab']['management']['address'] in __recovery_dns['stdout_lines'] | ansible.builtin.default([])
+  retries: "{{ __recovery_retries }}"
+  delay: 1
+  register: __recovery_dns
+{% endraw %}

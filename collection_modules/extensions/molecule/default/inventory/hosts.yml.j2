@@ -17,6 +17,10 @@ all:
             api_key: "{{ __product_credentials['key'] }}"
             api_secret: "{{ __product_credentials['secret'] }}"
             validate_certs: "{{ lookup('ansible.builtin.env', 'MOLECULE_PRODUCT_VALIDATE_CERTS', default='true') | ansible.builtin.bool }}"
+{% endraw %}
+{# skeleton-variant: recovery-defaults #}
+{# end skeleton-variant #}
+{% raw %}
           __product_credentials: >-
             {{ lookup('ansible.builtin.file', lookup('ansible.builtin.env', 'MOLECULE_PRODUCT_CREDENTIALS')) | ansible.builtin.from_json }}
 {% endraw %}

@@ -1,0 +1,66 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Print the IPv4 answers for one name, asked over a new TCP connection.
+
+Usage: recovery_dns.py HOST PORT NAME. TCP because a forwarded lab resolver
+need not carry UDP replies; a new connection per call because a drill must
+prove the resolver answers now, not that an old connection survived.
+"""
+
+from __future__ import annotations
+
+import secrets
+import socket
+import struct
+import sys
+
+
+def skip_name(message: bytes, offset: int) -> int:
+    """Return the offset after a possibly compressed domain name."""
+    while True:
+        length = message[offset]
+        if length & 0xC0 == 0xC0:
+            return offset + 2
+        if length == 0:
+            return offset + 1
+        offset += 1 + length
+
+
+def main() -> int:
+    host, port, name = sys.argv[1], int(sys.argv[2]), sys.argv[3]
+    identity = secrets.randbelow(65536)
+    question = b"".join(
+        bytes([len(label)]) + label.encode("ascii")
+        for label in name.rstrip(".").split(".")
+    )
+    query = struct.pack("!6H", identity, 0x0100, 1, 0, 0, 0)
+    query += question + b"\0" + struct.pack("!2H", 1, 1)
+    with socket.create_connection((host, port), timeout=3) as connection:
+        connection.sendall(struct.pack("!H", len(query)) + query)
+        data = b""
+        while len(data) < 2 or len(data) < 2 + struct.unpack("!H", data[:2])[0]:
+            chunk = connection.recv(4096)
+            if not chunk:
+                print("connection closed before the answer", file=sys.stderr)
+                return 1
+            data += chunk
+    reply = data[2:]
+    answer, flags, questions, answers = struct.unpack("!4H", reply[:8])
+    if answer != identity or not flags & 0x8000 or flags & 0x000F:
+        print("no valid answer", file=sys.stderr)
+        return 1
+    offset = 12
+    for _ in range(questions):
+        offset = skip_name(reply, offset) + 4
+    for _ in range(answers):
+        offset = skip_name(reply, offset)
+        kind, klass, _ttl, length = struct.unpack("!2HIH", reply[offset : offset + 10])
+        offset += 10
+        if kind == 1 and klass == 1 and length == 4:
+            print(socket.inet_ntoa(reply[offset : offset + 4]))
+        offset += length
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

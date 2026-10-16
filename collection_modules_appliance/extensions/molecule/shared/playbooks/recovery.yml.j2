@@ -1,0 +1,54 @@
+# Build-session tool: drill one selected family before its first write.
+# MOLECULE_RECOVERY_FAMILIES must name exactly one family.
+#
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+{% raw %}
+---
+- name: "Molecule | Recovery"
+  hosts: "molecule"
+  gather_facts: false
+  no_log: "{{ molecule_no_log | ansible.builtin.default(false) }}"
+  tasks:
+    - name: "Molecule | Recovery | Find the registered families"
+      delegate_to: "localhost"
+      ansible.builtin.find:
+        paths: "{{ lookup('ansible.builtin.env', 'MOLECULE_SCENARIO_DIRECTORY') | ansible.builtin.dirname }}"
+        depth: 4
+        patterns: "induce.yml"
+        recurse: true
+      register: __recovery_found
+
+    - name: "Molecule | Recovery | Select the families"
+      ansible.builtin.set_fact:
+        __recovery_molecule: "{{ lookup('ansible.builtin.env', 'MOLECULE_SCENARIO_DIRECTORY') | ansible.builtin.dirname }}"
+        __recovery_registered: >-
+          {{ __recovery_found['files'] | ansible.builtin.map(attribute='path')
+             | ansible.builtin.select('ansible.builtin.match', '.*/tasks/recovery/induce\.yml$')
+             | ansible.builtin.map('ansible.builtin.dirname') | ansible.builtin.map('ansible.builtin.dirname')
+             | ansible.builtin.map('ansible.builtin.dirname') | ansible.builtin.map('ansible.builtin.basename')
+             | ansible.builtin.unique | ansible.builtin.sort }}
+        __recovery_selected: >-
+          {{ lookup('ansible.builtin.env', 'MOLECULE_RECOVERY_FAMILIES') | ansible.builtin.split(',')
+             | ansible.builtin.map('ansible.builtin.trim') | ansible.builtin.select | ansible.builtin.list }}
+
+    - name: "Molecule | Recovery | Require registered families"
+      ansible.builtin.assert:
+        that:
+          - __recovery_registered | ansible.builtin.length > 0
+          - __recovery_selected | ansible.builtin.length == 1
+          - __recovery_selected | ansible.builtin.difference(__recovery_registered) | ansible.builtin.length == 0
+        fail_msg: "Registered families: {{ __recovery_registered | ansible.builtin.join(', ') }}"
+        quiet: true
+
+    - name: "Molecule | Recovery | Drill each family"
+      ansible.builtin.include_tasks:
+        file: "{{ __recovery_molecule }}/shared/tasks/recovery.yml"
+      vars:
+        recovery_family: "{{ __recovery_family }}"
+        recovery_hooks: "{{ __recovery_molecule }}/{{ __recovery_family }}/tasks/recovery"
+      loop: "{{ __recovery_selected }}"
+      loop_control:
+        loop_var: "__recovery_family"
+{% endraw %}

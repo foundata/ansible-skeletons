@@ -121,6 +121,29 @@ def test_act_once_is_appliance_only() -> None:
             assert f"def {hook}(" not in base
 
 
+def test_recovery_stage_is_appliance_only() -> None:
+    paths = (
+        "shared/tasks/recovery.yml.j2",
+        "shared/tasks/recovery_fresh.yml.j2",
+        "shared/playbooks/recovery.yml.j2",
+        "shared/files/recovery_dns.py.j2",
+        "default/tasks/recovery/induce.yml.j2",
+        "default/tasks/recovery/absent.yml.j2",
+        "default/tasks/side_effect/zz_recovery.yml.j2",
+    )
+    for profile in ("collection_modules", "collection_modules_appliance"):
+        molecule = ROOT / profile / "extensions/molecule"
+        for relative in paths:
+            assert (molecule / relative).is_file() is profile.endswith("_appliance")
+        assert not (molecule / "recovery/molecule.yml.j2").exists()
+    scenario = ROOT / "collection_modules_appliance/extensions/molecule/default"
+    stages = sorted((scenario / "tasks/side_effect").glob("*.yml.j2"))
+    assert stages[-1].name == "zz_recovery.yml.j2"
+    stage = stages[-1].read_text()
+    assert "'console' not in __product_credentials" in stage
+    assert "Recovery drill skipped:" in stage
+
+
 # REUSE-IgnoreStart
 @pytest.mark.parametrize("name", ["collection_modules_appliance", "collection_modules"])
 def test_python_templates_carry_the_license_header(name: str) -> None:

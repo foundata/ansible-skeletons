@@ -17,6 +17,29 @@ all:
             api_key: "{{ __product_credentials['key'] }}"
             api_secret: "{{ __product_credentials['secret'] }}"
             validate_certs: "{{ lookup('ansible.builtin.env', 'MOLECULE_PRODUCT_VALIDATE_CERTS', default='true') | ansible.builtin.bool }}"
+{% endraw %}
+{# skeleton-variant: recovery-defaults #}
+{% raw %}
+          # FIXME Qualify the product probe and native recovery commands.
+          recovery_defaults:
+            lab:
+              console: "{{ __product_credentials['console'] | ansible.builtin.default({}) }}"
+              dns: "{{ __product_credentials['dns'] | ansible.builtin.default({}) }}"
+              management: "{{ __product_credentials['management'] | ansible.builtin.default({}) }}"
+            probe:
+              url: "{{ product_connection['url'] }}/system/version"
+              username: "{{ product_connection['api_key'] }}"
+              password: "{{ product_connection['api_secret'] }}"
+              validate_certs: "{{ product_connection['validate_certs'] }}"
+            backup:
+              - "false" # FIXME Save the good configuration with native semantics.
+            restore:
+              - "false" # FIXME Restore it, including the product's history.
+            discard:
+              - "false" # FIXME Remove only the drill's saved configuration.
+{% endraw %}
+{# end skeleton-variant #}
+{% raw %}
           __product_credentials: >-
             {{ lookup('ansible.builtin.file', lookup('ansible.builtin.env', 'MOLECULE_PRODUCT_CREDENTIALS')) | ansible.builtin.from_json }}
 {% endraw %}

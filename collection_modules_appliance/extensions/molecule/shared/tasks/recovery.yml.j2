@@ -1,0 +1,123 @@
+# Recovery drill of one family: lose the management path through the
+# family's own change, restore it through the lab's console endpoint and
+# prove fresh API and DNS access through the automation account.
+#
+# The console endpoint comes from the lab contract. It reads a label and a
+# list of guest commands as JSON on stdin and prints one status line, so the
+# serial protocol and the root credential stay in the lab's tooling. The
+# console only backs up and restores; every assertion goes through the API
+# and DNS.
+#
+# Set "recovery_family" (a label) and "recovery_hooks" (a directory) when
+# including this file. "recovery_defaults" comes from the inventory: the lab
+# contract ("lab"), the fresh authenticated read ("probe") and the guest
+# commands that save ("backup"), restore ("restore") and remove ("discard")
+# the good configuration. The hooks directory holds the family's part:
+# induce.yml makes the change and may set "recovery_reload", guest commands
+# that run after the restore; absent.yml proves the fixture is gone from
+# saved and loaded state.
+#
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+{% raw %}
+---
+- name: "Molecule | Recovery | Locate the shared files"
+  ansible.builtin.set_fact:
+    __recovery_shared: "{{ lookup('ansible.builtin.env', 'MOLECULE_SCENARIO_DIRECTORY') }}/../shared"
+    recovery_reload: []
+
+- name: "Molecule | Recovery | Require the lab contract"
+  ansible.builtin.assert:
+    that:
+      - recovery_defaults['lab']['console']['argv'] | ansible.builtin.default([]) | ansible.builtin.length > 0
+      - recovery_defaults['lab']['dns']['name'] | ansible.builtin.default('') | ansible.builtin.length > 0
+      - recovery_defaults['lab']['management']['address'] | ansible.builtin.default('') | ansible.builtin.length > 0
+    fail_msg: "The lab contract needs console, dns and management entries; see extensions/molecule/README.md."
+    quiet: true
+
+- name: "Molecule | Recovery | Require fresh access before the drill"
+  ansible.builtin.include_tasks:
+    file: "{{ __recovery_shared }}/tasks/recovery_fresh.yml"
+  vars:
+    __recovery_retries: 30
+
+- name: "Molecule | Recovery | Back the good configuration up through the console"
+  ansible.builtin.command:
+    argv: "{{ recovery_defaults['lab']['console']['argv'] }}"
+    stdin: "{{ {'label': recovery_family ~ '-backup', 'commands': recovery_defaults['backup']} | ansible.builtin.to_json }}"
+  changed_when:
+    - true
+
+- name: "Molecule | Recovery | Lose the management path and restore it"
+  block:
+    - name: "Molecule | Recovery | Induce the loss through the family"
+      ansible.builtin.include_tasks:
+        file: "{{ recovery_hooks }}/induce.yml"
+
+    - name: "Molecule | Recovery | Observe the loss on fresh connections"
+      ansible.builtin.uri:
+        url: "{{ recovery_defaults['probe']['url'] }}"
+        force_basic_auth: true
+        timeout: 3
+        url_password: "{{ recovery_defaults['probe']['password'] }}"
+        url_username: "{{ recovery_defaults['probe']['username'] }}"
+        validate_certs: "{{ recovery_defaults['probe']['validate_certs'] }}"
+      failed_when:
+        - false
+      until:
+        - __recovery_loss['status'] | ansible.builtin.default(-1) != 200
+      retries: 15
+      delay: 1
+      register: __recovery_loss
+      no_log: true
+
+  always:
+    - name: "Molecule | Recovery | Note when the restore starts"
+      ansible.builtin.set_fact:
+        __recovery_started: "{{ now().timestamp() }}"
+
+    - name: "Molecule | Recovery | Restore the good configuration through the console"
+      ansible.builtin.command:
+        argv: "{{ recovery_defaults['lab']['console']['argv'] }}"
+        stdin: >-
+          {{ {'label': recovery_family ~ '-restore',
+              'commands': recovery_defaults['restore'] + recovery_reload + recovery_defaults['discard']}
+             | ansible.builtin.to_json }}
+      changed_when:
+        - true
+      register: __recovery_console
+
+    - name: "Molecule | Recovery | Wait for fresh access"
+      ansible.builtin.include_tasks:
+        file: "{{ __recovery_shared }}/tasks/recovery_fresh.yml"
+      vars:
+        __recovery_retries: 90
+
+    - name: "Molecule | Recovery | Measure the recovery"
+      ansible.builtin.set_fact:
+        __recovery_seconds: "{{ (now().timestamp() - __recovery_started | ansible.builtin.float) | ansible.builtin.round(3) }}"
+
+- name: "Molecule | Recovery | Require the observed loss"
+  ansible.builtin.assert:
+    that:
+      - __recovery_loss['status'] | ansible.builtin.default(-1) != 200
+    fail_msg: "The family's change did not cost fresh API access; the drill proves nothing."
+    quiet: true
+
+- name: "Molecule | Recovery | Prove the fixture is gone"
+  ansible.builtin.include_tasks:
+    file: "{{ recovery_hooks }}/absent.yml"
+
+- name: "Molecule | Recovery | Record the drill"
+  ansible.builtin.debug:
+    msg: >-
+      {{ {'family': recovery_family,
+          'lost_api_status': __recovery_loss['status'] | ansible.builtin.default(-1),
+          'loss_reads': __recovery_loss['attempts'] | ansible.builtin.default(1),
+          'restored_api_and_dns': true,
+          'fixture_absent': true,
+          'recovery_seconds': __recovery_seconds,
+          'console': __recovery_console['stdout'] | ansible.builtin.from_json} | ansible.builtin.to_json }}
+    verbosity: 0
+{% endraw %}
