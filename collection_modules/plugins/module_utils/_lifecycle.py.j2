@@ -1,0 +1,419 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Skeleton-owned lifecycle of one declared object or activation; internal.
+
+A family subclasses :class:`Lifecycle` once per collection binding (the
+rendered ``_family.py``) and supplies the product steps as hooks. The base
+owns the order and the result and failure contracts, so that no family
+implements them again:
+
+``reconcile`` validates the declaration without a request (``identify``,
+``declared``), connects, reads the object completely (``lookup``) and
+projects it (``managed``), computes the minimal difference, runs the
+family's guards (``protect``) and predicts the result. Unless
+``compatibility_always`` is set, an unchanged run
+returns without discovering the product version; check mode returns
+after the eligibility check. Otherwise ``recheck`` repeats a guard right
+before the single ``write``. Afterwards the object is read again by the
+same lookup and checked (``verify``); a write never repeats.
+
+A reply lost after sending (category ``transport``, ``timeout`` or
+``response``) proves nothing: the read-back alone decides, and a
+declaration it cannot confirm fails with the outcome unknown. A definitive
+refusal is reported as refused; the read-back only tells whether something
+changed anyway. A write that the client reports as never started
+(``started``) is unchanged. A field the product never returns (``secret``)
+is always written, to an existing object only with ``update_password:
+always``; it makes a successful write ``unverifiable`` and a lost one
+unknown.
+
+``act_once`` is the activation of a family whose loaded state cannot be
+tied to saved identities: it checks the saved state (``preflight``),
+activates on every run (``activate``) and reports ``changed``,
+``activated`` and ``verified: unverifiable``, or ``predicted`` in check
+mode. A lost reply leaves the outcome unknown and is never sent again;
+``effective`` may add a bounded readiness check without claiming more.
+
+Failures go through the binding's error schema with ``operation``,
+``outcome`` (``unchanged``, ``unknown`` or ``changed``), the identity
+options the schema accepts and the fields the failure names. Hooks keep
+their state on the instance; a hook may refine ``operation`` within its
+step and may set ``confirmed`` when its own evidence proves an effect.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Callable
+
+from ansible_collections.foundata.utils.plugins.module_utils import errors
+
+LOSS = frozenset({"transport", "timeout", "response"})
+"""Failure categories of a reply lost after the request may have been sent."""
+
+MISSING = object()
+
+
+class Failure(errors.ApiError):
+    """A verdict the base reaches itself, such as a missing read-back."""
+
+    def __init__(
+        self, *, category: str, code: str, fields: list[str] | None = None
+    ) -> None:
+        super().__init__("Lifecycle verdict", category=category, code=code)
+        self.fields = fields or []
+
+
+class Lifecycle:
+    """One module invocation; subclasses supply the product steps."""
+
+    schema: Any = None
+    """The collection's public error schema, set by the binding."""
+
+    result_key = ""
+    """Singular product key of the public object; empty for none."""
+
+    compatibility_id = ""
+    """Operation name for the compatibility check, without the state."""
+
+    message = "Operation failed; see error_category and error_code"
+    state_option = "state"
+    """Option whose value ``absent`` requests deletion; empty for none."""
+
+    compatibility_always = False
+    """Check compatibility before the first lookup, including unchanged runs."""
+
+    whole_diff = False
+    """Publish the whole public object in a diff instead of changed fields."""
+
+    recheck_code = ""
+    """Refuse a moved record before writing when this error code is set."""
+
+    recheck_category = "eligibility"
+    identity_options: tuple[str, ...] = ()
+    steps: tuple[tuple[str, str], ...] = ()
+    """Base steps a family reports under another public name."""
+
+    def __init__(self, module: Any) -> None:
+        self.module, self.params = module, module.params
+        self.client: Any = None
+        self.operation = "validate"
+        self.attempted = self.confirmed = False
+        self.settling = False
+        self.compatible: set[str] = set()
+        self.absent = bool(self.state_option) and (
+            self.params.get(self.state_option) == "absent"
+        )
+        self.key: Any = None
+        self.want: dict[str, Any] = {}
+        self.record: Any = None
+        self.current: Any = None
+        self.delta: dict[str, Any] = {}
+
+    # Binding: one implementation per collection.
+
+    def connect(self) -> Any:
+        raise NotImplementedError
+
+    def compatibility(self, operation: str) -> None:
+        raise NotImplementedError
+
+    # Product steps of a resource.
+
+    def identify(self) -> Any:
+        """Validate and canonicalize the identity options; no request."""
+        return None
+
+    def declared(self) -> dict[str, Any]:
+        """Validate the declared managed values; no request."""
+        return {}
+
+    def lookup(self) -> Any:
+        """Read the object of ``self.key`` completely, or None when absent."""
+        raise NotImplementedError
+
+    def managed(self, record: Any) -> Any:
+        """Project a stored object onto the comparable managed values."""
+        return record
+
+    def same(self, name: str, current: Any, desired: Any) -> bool:
+        """Whether a stored managed value already satisfies the declared one."""
+        return bool(current == desired)
+
+    def difference(self) -> dict[str, Any]:
+        if (
+            self.record is not None
+            and self.params.get("update_password") == "on_create"
+        ):
+            self.want = {k: v for k, v in self.want.items() if not self.secret(k)}
+        current = self.current or {}
+        return {
+            key: value
+            for key, value in self.want.items()
+            if self.record is None
+            or self.secret(key)
+            or not self.same(key, current.get(key, MISSING), value)
+        }
+
+    def protect(self) -> None:
+        """Refuse an ineligible change before the result is predicted."""
+
+    def secret(self, name: str) -> bool:
+        """Whether a managed field is written but never read back."""
+        return False
+
+    def predict(self) -> Any:
+        return {**(self.current or {}), **self.visible()}
+
+    def public(self, record: Any) -> Any:
+        return self.managed(record)
+
+    def diff(self) -> dict[str, Any] | None:
+        if self.whole_diff:
+            return {
+                "before": self.current or {},
+                "after": {} if self.absent else self.predict(),
+            }
+        if self.absent:
+            return {"before": self.current, "after": {}}
+        visible, current = self.visible(), self.current or {}
+        before = {key: current[key] for key in visible if key in current}
+        return {"before": before, "after": visible}
+
+    def recheck(self) -> None:
+        """Read again and refuse a moved record when recheck_code is configured."""
+        if self.recheck_code and self.moved(self.lookup()):
+            raise Failure(category=self.recheck_category, code=self.recheck_code)
+
+    def write(self) -> None:
+        raise NotImplementedError
+
+    def started(self) -> bool:
+        """Whether a failed write may have reached the product."""
+        return True
+
+    def lost(self, failure: errors.ApiError) -> bool:
+        """Whether read-back alone may settle this uncertain write response."""
+        return failure.category in LOSS
+
+    def moved(self, observed: Any) -> bool:
+        """Whether read-back proves an effect relative to this stage's snapshot."""
+        return (None if observed is None else self.managed(observed)) != self.current
+
+    def changed_fields(self) -> list[str]:
+        """Return public field names for an update, or an empty list otherwise."""
+        return sorted(self.delta) if self.record is not None and not self.absent else []
+
+    def finish(self, result: dict[str, Any]) -> dict[str, Any]:
+        """Complete every successful result before execute passes it to exit_json."""
+        return result
+
+    def verify(self, record: Any, desired: dict[str, Any], absent: bool) -> None:
+        if absent:
+            if record is not None:
+                raise Failure(category="verification", code="still_present")
+            return
+        if record is None:
+            raise Failure(category="verification", code="missing_after_write")
+        observed = self.managed(record) or {}
+        mismatch = sorted(
+            key
+            for key, value in desired.items()
+            if not self.secret(key)
+            and not self.same(key, observed.get(key, MISSING), value)
+        )
+        if mismatch:
+            raise Failure(
+                category="verification", code="not_persisted", fields=mismatch
+            )
+
+    # Product steps of an activation that cannot observe its effect.
+
+    def preflight(self) -> None:
+        """Check the saved state the activation would load."""
+
+    def activate(self) -> None:
+        raise NotImplementedError
+
+    def effective(self) -> dict[str, Any]:
+        """Optional bounded readiness check; returns extra result keys."""
+        return {}
+
+    # The sequence.
+
+    def step(self, name: str) -> None:
+        self.operation = dict(self.steps).get(name, name)
+
+    def operation_id(self) -> str:
+        if self.state_option:
+            return f"{self.compatibility_id}:{self.params[self.state_option]}"
+        return self.compatibility_id
+
+    def activation_id(self) -> str:
+        return self.compatibility_id + "_apply"
+
+    def ensure_compatible(self, operation: str) -> None:
+        if operation not in self.compatible:
+            self.compatibility(operation)
+            self.compatible.add(operation)
+
+    def visible(self) -> dict[str, Any]:
+        return {k: v for k, v in self.delta.items() if not self.secret(k)}
+
+    def write_only(self) -> bool:
+        return any(self.secret(key) for key in self.delta)
+
+    def stage(self, request: Callable[[], None]) -> Any:
+        """Write once and settle against the current stage's declared state.
+
+        Set record, current, want, delta and absent for this stage before calling.
+        The returned read-back can seed the next stage. Confirmed progress survives
+        a later refusal, uncertain response or request that never started.
+        """
+        self.attempted = True
+        try:
+            request()
+        except errors.ApiError as failure:
+            if not self.started():
+                self.attempted = self.confirmed
+                raise
+            self.step("reconcile")
+            self.settling = True
+            observed = self.lookup()
+            if not self.lost(failure):
+                self.confirmed = self.confirmed or self.moved(observed)
+                self.attempted = self.confirmed or self.write_only()
+                raise
+            self.verify(observed, self.want, self.absent)
+            if self.write_only():
+                raise Failure(category="verification", code="create_unknown") from None
+        else:
+            self.step("verify")
+            self.settling = True
+            observed = self.lookup()
+            self.verify(observed, self.want, self.absent)
+        self.confirmed = True
+        return observed
+
+    def reconcile(self) -> dict[str, Any]:
+        self.step("validate")
+        self.key = self.identify()
+        self.want = self.declared()
+        self.step("connect")
+        self.client = self.connect()
+        if self.compatibility_always:
+            self.step("compatibility")
+            self.ensure_compatible(self.operation_id())
+        self.step("lookup")
+        self.record = self.lookup()
+        self.current = None if self.record is None else self.managed(self.record)
+        self.delta = {} if self.absent else self.difference()
+        changed = (
+            self.record is not None
+            if self.absent
+            else self.record is None or bool(self.delta)
+        )
+        self.step("protect")
+        self.protect()
+        result: dict[str, Any] = {
+            "changed": changed,
+            "changed_fields": self.changed_fields(),
+            "verified": "predicted"
+            if self.module.check_mode and changed
+            else "observed",
+        }
+        if self.result_key:
+            result[self.result_key] = None if self.absent else self.predict()
+        diff = self.diff() if self.module._diff and changed else None
+        if diff is not None:
+            result["diff"] = diff
+        if not changed:
+            return result
+        self.step("compatibility")
+        self.ensure_compatible(self.operation_id())
+        if self.module.check_mode:
+            return result
+        self.step("recheck")
+        self.recheck()
+        self.step(
+            "delete" if self.absent else "create" if self.record is None else "update"
+        )
+        observed = self.stage(self.write)
+        if self.result_key:
+            result[self.result_key] = (
+                None if observed is None else self.public(observed)
+            )
+        if self.write_only():
+            result["verified"] = "unverifiable"
+        return result
+
+    def act_once(self) -> dict[str, Any]:
+        self.step("connect")
+        self.client = self.connect()
+        self.step("protect")
+        self.preflight()
+        self.step("compatibility")
+        self.ensure_compatible(self.activation_id())
+        result: dict[str, Any] = {
+            "changed": True,
+            "activated": True,
+            "verified": "predicted" if self.module.check_mode else "unverifiable",
+        }
+        if self.module.check_mode:
+            return result
+        self.step("apply")
+        self.attempted = True
+        self.activate()
+        self.step("verify")
+        result.update(self.effective())
+        self.confirmed = True
+        return result
+
+    # The catch boundary.
+
+    def identity_fields(self) -> dict[str, Any]:
+        return {
+            name: self.params[name]
+            for name in self.identity_options
+            if self.params.get(name) is not None
+        }
+
+    def fail(self, failure: errors.ApiError) -> None:
+        fields: dict[str, Any] = {
+            "operation": self.operation,
+            **self.identity_fields(),
+        }
+        named = getattr(failure, "fields", None)
+        if named:
+            fields["fields"] = named
+        errors.fail_from(
+            self.module,
+            failure,
+            schema=self.schema,
+            msg=self.message,
+            changed=self.attempted,
+            outcome="changed"
+            if self.confirmed
+            else "unknown"
+            if self.attempted
+            else "unchanged",
+            fields=fields,
+        )
+
+    def execute(
+        self,
+        action: Callable[[], dict[str, Any]] | None = None,
+        *,
+        activation: bool = False,
+    ) -> None:
+        """Run the selected sequence under the shared failure boundary."""
+        try:
+            sequence = (
+                action
+                if action is not None
+                else (self.act_once if activation else self.reconcile)
+            )
+            result = self.finish(sequence())
+        except errors.ApiError as failure:
+            self.fail(failure)
+        else:
+            self.module.exit_json(**result)

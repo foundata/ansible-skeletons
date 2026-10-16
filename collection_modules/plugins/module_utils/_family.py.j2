@@ -1,0 +1,40 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Binding of the skeleton's lifecycle base to this collection; internal.
+
+Handwritten families subclass :class:`Family`: the client, the public error
+schema and the compatibility check are this collection's own.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils import (
+        _compat,
+    )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._client import (
+        SCHEMA,
+        Client,
+    )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._lifecycle import (
+        Lifecycle,
+    )
+# isort: on
+# fmt: on
+
+
+class Family(Lifecycle):
+    schema = SCHEMA
+
+    def connect(self) -> Any:
+        return Client(self.params)
+
+    def compatibility(self, operation: str) -> None:
+        _compat.check(self.module, self.client, operation)
