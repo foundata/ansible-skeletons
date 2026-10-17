@@ -35,6 +35,29 @@ their state on the instance; a hook may refine ``operation`` within its
 step and may set ``confirmed`` when its own evidence proves an effect.
 ``changed`` tells ``protect`` and every later hook whether the declaration
 changes anything.
+
+A subclass overrides hooks and settings and may add names of its own; it
+never redefines the sequence, its helpers or the instance state, and a class
+that does fails when it is created, at import:
+
+- Hooks, methods to override: ``connect`` and ``compatibility`` (the
+  binding), ``identify``, ``declared``, ``lookup``, ``managed``, ``same``,
+  ``difference``, ``protect``, ``secret``, ``predict``, ``public``,
+  ``diff``, ``recheck``, ``write``, ``started``, ``lost``, ``moved``,
+  ``verify``, ``changed_fields``, ``finish``, ``operation_id`` and
+  ``identity_fields``; ``__init__`` for per-instance state, calling the
+  base first.
+- Settings, class attributes to set: ``schema``, ``result_key``,
+  ``compatibility_id``, ``message``, ``state_option``,
+  ``compatibility_always``, ``whole_diff``, ``recheck_code``,
+  ``recheck_category``, ``identity_options`` and ``steps``.
+- Reserved, never redefined: the sequence ``reconcile``, ``stage`` and
+  ``execute``; its helpers ``step``, ``prepare``, ``ensure_compatible``,
+  ``visible``, ``write_only`` and ``fail``; the instance state ``module``,
+  ``params``, ``client``, ``operation``, ``attempted``, ``confirmed``,
+  ``settling``, ``compatible``, ``absent``, ``key``, ``want``, ``record``,
+  ``current``, ``delta`` and ``changed``, which hooks read and assign as
+  their step requires.
 """
 
 from __future__ import annotations
@@ -45,6 +68,73 @@ from ansible_collections.foundata.utils.plugins.module_utils import errors
 
 LOSS = frozenset({"transport", "timeout", "response"})
 """Failure categories of a reply lost after the request may have been sent."""
+
+HOOKS = frozenset(
+    {
+        "connect",
+        "compatibility",
+        "identify",
+        "declared",
+        "lookup",
+        "managed",
+        "same",
+        "difference",
+        "protect",
+        "secret",
+        "predict",
+        "public",
+        "diff",
+        "recheck",
+        "write",
+        "started",
+        "lost",
+        "moved",
+        "verify",
+        "changed_fields",
+        "finish",
+        "operation_id",
+        "identity_fields",
+    }
+)
+"""Methods a subclass may override."""
+
+SETTINGS = frozenset(
+    {
+        "schema",
+        "result_key",
+        "compatibility_id",
+        "message",
+        "state_option",
+        "compatibility_always",
+        "whole_diff",
+        "recheck_code",
+        "recheck_category",
+        "identity_options",
+        "steps",
+    }
+)
+"""Class attributes a subclass may set."""
+
+STATE = frozenset(
+    {
+        "module",
+        "params",
+        "client",
+        "operation",
+        "attempted",
+        "confirmed",
+        "settling",
+        "compatible",
+        "absent",
+        "key",
+        "want",
+        "record",
+        "current",
+        "delta",
+        "changed",
+    }
+)
+"""Instance state the sequence owns; hooks assign it, no subclass redefines it."""
 
 MISSING = object()
 
@@ -61,6 +151,9 @@ class Failure(errors.ApiError):
 
 class Lifecycle:
     """One module invocation; subclasses supply the product steps."""
+
+    _sequence: tuple[str, ...] = ()
+    """Reserved names a skeleton-owned extension adds; see __init_subclass__."""
 
     schema: Any = None
     """The collection's public error schema, set by the binding."""
@@ -105,6 +198,32 @@ class Lifecycle:
         self.record: Any = None
         self.current: Any = None
         self.delta: dict[str, Any] = {}
+
+    def __init_subclass__(
+        cls, *, sequence: tuple[str, ...] = (), **kwargs: Any
+    ) -> None:
+        """Refuse a subclass that redefines a reserved name.
+
+        ``sequence`` is for the skeleton's own extensions of the sequence, such
+        as act-once activation: they may define those reserved names, which
+        stay reserved for their subclasses.
+        """
+        super().__init_subclass__(**kwargs)
+        reserved = set(STATE) | (
+            {name for name in vars(Lifecycle) if not name.startswith("__")}
+            - HOOKS
+            - SETTINGS
+        )
+        for base in cls.__mro__[1:]:
+            reserved.update(vars(base).get("_sequence", ()))
+        clash = sorted(set(vars(cls)) & (reserved - set(sequence)))
+        if clash:
+            raise TypeError(
+                f"{cls.__qualname__} redefines names the lifecycle base reserves: "
+                + ", ".join(clash)
+                + "; rename them (see the _lifecycle module docstring)"
+            )
+        cls._sequence = tuple(sequence)
 
     # Binding: one implementation per collection.
 

@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import sys
 from types import SimpleNamespace
 from typing import Any, Callable
 
@@ -34,6 +35,9 @@ from ansible_collections.{{ namespace }}.\
     )
 from ansible_collections.{{ namespace }}.\
     {{ collection_name }}.plugins.module_utils._lifecycle import (
+        HOOKS,
+        SETTINGS,
+        STATE,
         Failure,
         Lifecycle,
     )
@@ -142,6 +146,29 @@ class Synthetic(Lifecycle):
             )
         else:
             self.client.write("update", lambda: rows[key].update(delta))
+
+
+@pytest.mark.parametrize(
+    "name", ["key", "prepare", "stage", "record", "execute", "changed", "step"]
+)
+def test_redefining_a_reserved_name_fails_when_the_class_is_created(
+    name: str,
+) -> None:
+    with pytest.raises(TypeError, match=f"reserves: {name};"):
+        type("Colliding", (Synthetic,), {name: None})
+
+
+def test_hooks_settings_and_new_names_may_be_defined() -> None:
+    namespace: dict[str, Any] = dict.fromkeys((*HOOKS, *SETTINGS))
+    namespace.update(refresh=None, calendar_key="x")
+    assert issubclass(type("Allowed", (Synthetic,), namespace), Synthetic)
+
+
+def test_the_base_docstring_names_every_hook_setting_and_reserved_name() -> None:
+    sequence = {name for name in vars(Lifecycle) if not name.startswith("_")}
+    documentation = sys.modules[Lifecycle.__module__].__doc__ or ""
+    for name in sequence | HOOKS | SETTINGS | STATE:
+        assert f"``{name}``" in documentation, name
 
 
 def spec() -> dict[str, Any]:

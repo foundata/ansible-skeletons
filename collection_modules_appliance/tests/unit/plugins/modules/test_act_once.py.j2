@@ -73,6 +73,12 @@ def store(monkeypatch: pytest.MonkeyPatch) -> ActivationStore:
     return instance
 
 
+def test_act_once_keeps_its_sequence_reserved() -> None:
+    for name in ("act_once", "execute"):
+        with pytest.raises(TypeError, match=f"reserves: {name};"):
+            type("Colliding", (ActOnce, Synthetic), {name: None})
+
+
 def test_act_once(store: ActivationStore, run_module: RunModule) -> None:
     predicted = run_module(main, apply=True, _ansible_check_mode=True)
     assert predicted["changed"] and predicted["activated"]

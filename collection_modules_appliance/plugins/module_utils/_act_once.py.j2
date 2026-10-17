@@ -25,7 +25,7 @@ from ansible_collections.{{ namespace }}.\
 # fmt: on
 
 
-class ActOnce(Lifecycle):
+class ActOnce(Lifecycle, sequence=("act_once", "execute")):
     """Mixin for an appliance area with an unobservable activation receipt."""
 
     def preflight(self) -> None:

@@ -70,6 +70,11 @@ and the project adheres to
 
 ### Added
 
+- Both module variants: the lifecycle base's docstring lists the hooks and
+  settings a subclass may override and the names it reserves: the sequence,
+  its helpers and the instance state. A subclass that redefines a reserved
+  name, such as a class attribute `key` or a method `prepare`, fails when
+  its class is created, at import.
 - checks: `--resume <output>` reruns only the failed and missing steps of an
   earlier run of the same sources; `scripts.release check --resume` does the
   same for the evidence of the same commit.
