@@ -72,6 +72,10 @@ and the project adheres to
 - All skeletons: `requirements.txt` says to list additional Python packages
   or, when there are none, to keep the file with a comment saying so, which
   is what every `FIXME.md` now says.
+- Appliance variant: the README template keeps the one-writer and recovery
+  prerequisites in a Requirements section, where product READMEs keep them,
+  and its "Management path and recovery" contract points there instead of
+  repeating them.
 
 ### Fixed
 

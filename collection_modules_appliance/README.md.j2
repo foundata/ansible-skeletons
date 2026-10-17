@@ -16,6 +16,7 @@ invented fixture contract below after qualifying the first product resource.
 - [Dependencies](#dependencies)
 - [Collection contract](#collection-contract)
 - [Usage](#usage)
+- [Requirements](#requirements)
 - [Compatibility](#compatibility)
 - [Versioning and deprecation](#versioning-deprecation)
 - [Licensing, copyright](#licensing-copyright)
@@ -61,15 +62,9 @@ credentials and TLS trust are caller prerequisites.
 
 The managed configuration carries the management path. Activation is global
 within its subsystem, and console recovery is rehearsed for each area before
-that area makes its first management-path write. A grid-shaped API
-alone does not establish these properties.
-
-Coordinate one writer for saved and pending configuration, including work
-saved outside this collection. Prepare independent console or management
-access, working credentials, a usable backup and a responsible operator
-before a disruptive change. The modules provide no timed rollback and no
-confirmation switch. Recovery from a wrong activation uses that independent
-access. Modules do not verify these prerequisites.
+that area makes its first management-path write. A grid-shaped API alone does
+not establish these properties. What they ask of the caller is listed under
+[Requirements](#requirements).
 
 ### Identity
 
@@ -189,6 +184,23 @@ resource utility and edit hooks, never the shared lifecycle sequence.
 ```
 
 Modules: `fixture_nested`.
+
+
+
+## Requirements<a id="requirements"></a>
+
+- One writer and out-of-band recovery. Coordinate one writer for saved and
+  pending configuration, including work saved outside this collection. Prepare
+  independent console or management access, working credentials, a usable
+  backup and a responsible operator before a disruptive change. The modules
+  provide no timed rollback and no confirmation switch; recovery from a wrong
+  activation uses that independent access. Modules do not verify these
+  prerequisites.
+- FIXME List the product's other requirements, such as the automation account
+  and its privileges, trust in the appliance's TLS certificate and the
+  packages in [`requirements.txt`](./requirements.txt).
+
+
 
 ## Compatibility<a id="compatibility"></a>
 
