@@ -66,6 +66,7 @@ def test_ambient_ansible_configuration_is_not_inherited(
     assert env["ANSIBLE_ROLES_PATH"] == str(tmp_path / "roles")
     assert "ANSIBLE_EXTRA_VARS" not in env
     assert Path(env["HOME"]) == tmp_path / "home"
+    assert env["ANSIBLE_REMOTE_TMP"] == str(tmp_path / "remote-tmp")
     assert Path(env["HOME"]).is_dir()
     assert Path(env["XDG_CACHE_HOME"]).is_dir()
     assert os.environ["ANSIBLE_CONFIG"] == "/unexpected/ansible.cfg"

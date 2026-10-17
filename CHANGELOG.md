@@ -48,6 +48,9 @@ and the project adheres to
   Podman and Molecule's SSH connections bind their Unix sockets in a short
   directory that the check creates in `XDG_RUNTIME_DIR` and removes at the
   end. Without `--output`, the check works below `/var/tmp` instead of `/tmp`.
+- checks: Ansible's module files go to `remote-tmp` in each step's work
+  directory; a local connection's `remote_tmp` ignores the relocated `HOME`
+  and had put them below the user's own `~/.ansible/tmp`.
 - Both module variants: a failed write whose read-back moved reports
   `outcome: changed`, after a lost reply and after an acknowledged write
   alike. A read-back that did not move stays `unknown`.

@@ -228,6 +228,9 @@ def isolated_environment(work: Path) -> dict[str, str]:
             "ANSIBLE_COLLECTIONS_SCAN_SYS_PATH": "false",
             "ANSIBLE_ROLES_PATH": str(work / "roles"),
             "ANSIBLE_LOCAL_TEMP": str(work / "local-tmp"),
+            # A local connection's remote_tmp ignores HOME and would use the
+            # user's own ~/.ansible/tmp.
+            "ANSIBLE_REMOTE_TMP": str(work / "remote-tmp"),
             "ANSIBLE_NOCOLOR": "true",
             "PYTHONNOUSERSITE": "1",
             "UV_LINK_MODE": "copy",
