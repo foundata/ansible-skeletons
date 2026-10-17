@@ -104,3 +104,49 @@ def test_lost_reply_requires_each_triggering_object_observed_in_sync(
         assert not result.get("failed") and result["verified"] == "observed"
     else:
         assert result["failed"] and result["outcome"] == "unknown"
+
+
+@pytest.mark.parametrize(
+    "always,drift,expected",
+    [
+        (False, False, ["compare"]),
+        (False, True, ["compare", "compatibility", "apply", "compare"]),
+        (True, False, ["compatibility", "compare"]),
+        (True, True, ["compatibility", "compare", "apply", "compare"]),
+    ],
+)
+def test_activation_follows_the_binding_probe_policy(
+    run_module: RunModule,
+    monkeypatch: pytest.MonkeyPatch,
+    always: bool,
+    drift: bool,
+    expected: list[str],
+) -> None:
+    events: list[str] = []
+    monkeypatch.setattr(_activation.Binding, "compatibility_always", always)
+    monkeypatch.setattr(
+        _activation._compat, "check", lambda *args: events.append("compatibility")
+    )
+
+    def compare(client: Any, names: list[str]) -> dict[str, str]:
+        events.append("compare")
+        stale = drift and "apply" not in events
+        return dict.fromkeys(names, "drift" if stale else "in_sync")
+
+    def main() -> None:
+        module = AnsibleModule(
+            argument_spec=_activation.argument_spec(), supports_check_mode=True
+        )
+        _activation.run(
+            module,
+            operation_id="synthetic_apply",
+            label="synthetic state",
+            name_pattern=r"[a-z]+",
+            compare=compare,
+            apply=lambda client: events.append("apply"),
+            settle=compare,
+        )
+
+    result = run_module(main, verify=["one"])
+    assert result["changed"] is drift and not result.get("failed")
+    assert events == expected

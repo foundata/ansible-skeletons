@@ -63,6 +63,9 @@ and the project adheres to
 - Both module variants: honour `Binding.compatibility_always` on lifecycle
   entry points and information reads, and make the shared noop and info
   contract tests follow that policy.
+- Both module variants: the verifying activation helper `_activation.run`
+  honours `Binding.compatibility_always` and checks the product version
+  before its comparison when the binding asks for it.
 - collection_default, collection_modules, collection_modules_grid: the
   runtime check's `subprocess.run` call passes `check=False`, which pylint's
   `subprocess-run-check` demanded in every ansible-test sanity lane of a

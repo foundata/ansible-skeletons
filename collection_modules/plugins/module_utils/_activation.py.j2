@@ -12,6 +12,10 @@ convergence shows that the apply ran, and a drifting object that stays out
 of sync fails as not effective. Without such a difference, for example
 ``activate: always`` on objects already in sync, the module fails with the
 outcome unknown and never sends the apply again.
+
+The binding's ``compatibility_always`` decides when the product version is
+checked: before the comparison when it is set, otherwise only before an
+apply.
 """
 
 from __future__ import annotations
@@ -30,6 +34,10 @@ from ansible_collections.foundata.utils.plugins.module_utils import errors
 from ansible_collections.{{ namespace }}.\
     {{ collection_name }}.plugins.module_utils import (
         _compat,
+    )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._binding import (
+        Binding,
     )
 from ansible_collections.{{ namespace }}.\
     {{ collection_name }}.plugins.module_utils._client import (
@@ -110,6 +118,9 @@ def run(
         ):
             raise ProductError(code="validation_failed", fields=["verify"])
         client = Client(module.params)
+        if Binding.compatibility_always:
+            operation = "compatibility"
+            _compat.check(module, client, operation_id)
         operation = "compare"
         before = compare(client, names)
         needed = module.params["activate"] == "always" or "drift" in before.values()
@@ -125,7 +136,7 @@ def run(
             ),
             "verification": before,
         }
-        if needed:
+        if needed and not Binding.compatibility_always:
             operation = "compatibility"
             _compat.check(module, client, operation_id)
         if module.check_mode or not needed:
