@@ -524,6 +524,44 @@ def install_utils(
     )
 
 
+def install_scenario_collections(rendered: Rendered, collections: Path) -> None:
+    """Install the Molecule scenario's collections from the run's downloads.
+
+    antsibull-nox then finds them installed beside foundata.utils and calls
+    Galaxy for none of them. A scenario collection that tests/requirements.yml
+    does not pin is an error.
+    """
+    requirements = yaml.safe_load(
+        (
+            rendered.collection / "extensions/molecule/default/requirements.yml"
+        ).read_text(encoding="utf-8")
+    )
+    names = [
+        entry if isinstance(entry, str) else str(entry["name"])
+        for entry in requirements.get("collections") or []
+    ]
+    archives = pinned_archives(collections)
+    missing = sorted(set(names) - set(archives))
+    if missing:
+        raise GateError(
+            "Pin the Molecule scenario's collections in tests/requirements.yml: "
+            + ", ".join(missing)
+        )
+    if names:
+        run(
+            [
+                "ansible-galaxy",
+                "collection",
+                "install",
+                "--no-deps",
+                "-p",
+                rendered.env["ANSIBLE_COLLECTIONS_PATH"],
+                *(str(archives[name]) for name in names),
+            ],
+            env=rendered.env,
+        )
+
+
 def exercise_modules(rendered: Rendered) -> None:
     """Resolve docs; run the installed fixture payload against its loopback server."""
     namespace, name = rendered.collection.parent.name, rendered.collection.name
@@ -831,6 +869,8 @@ def module_identity(
     check_attribution(rendered.collection, metadata)
     check_holders(rendered.collection, holder(metadata))
     install_utils(rendered, utils_source, collections)
+    if collections is not None:
+        install_scenario_collections(rendered, collections)
     private_podman_store(rendered, runtime / f"p{index}", user_image_store())
     run(["git", "init", "--quiet"], cwd=rendered.collection)
     run(["git", "add", "."], cwd=rendered.collection)

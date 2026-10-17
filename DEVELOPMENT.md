@@ -351,7 +351,10 @@ uv run --locked --group core221 --group lint --group integration \
 Tests need network access for pinned Galaxy collections, container images, and,
 for libvirt, the cloud image. A check downloads the pinned Galaxy collections
 once, into `galaxy/` below its output, and every later step installs them from
-there. `SKELETONS_VM_IMAGE` can name an absolute path to an existing
+there. The module renders install their Molecule scenario's collections from
+there too, so no render calls Galaxy; the scenario therefore runs with the
+versions pinned in `tests/requirements.yml`, which must list every collection
+it requires. `SKELETONS_VM_IMAGE` can name an absolute path to an existing
 Debian-compatible cloud-init image. Each run uses unique VM and container
 names. Podman tests use a separate disposable storage configuration, including
 the execution-environment build and its image cleanup.

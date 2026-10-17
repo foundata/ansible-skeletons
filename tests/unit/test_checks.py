@@ -29,6 +29,7 @@ from scripts.smoke import (
     check_tree,
     default_sessions,
     identity_sessions,
+    install_scenario_collections,
     install_utils,
     lint_constraints,
     lint_project,
@@ -745,6 +746,53 @@ def test_downloaded_collections_replace_galaxy(
     assert installs[0][-1] == str(downloads / "foundata-utils-1.0.0.tar.gz")
     assert sorted(installs[1][4:]) == sorted(str(path) for path in downloads.iterdir())
     assert not any("requirements" in part for command in installs for part in command)
+
+
+def test_the_scenario_collections_come_from_the_run_downloads(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    downloads = tmp_path / "collections"
+    write_pinned_archives(downloads)
+    scenario = tmp_path / "collection/extensions/molecule/default"
+    scenario.mkdir(parents=True)
+    requirements = scenario / "requirements.yml"
+    requirements.write_text(
+        "collections:\n"
+        '  - "containers.podman"\n'
+        '  - name: "community.crypto"\n'
+        '  - "community.general"\n',
+        encoding="utf-8",
+    )
+    commands: list[list[str]] = []
+
+    def record(command: list[str], **_options: object) -> str:
+        commands.append(command)
+        return ""
+
+    monkeypatch.setattr("scripts.smoke.run", record)
+    rendered = Rendered(
+        tmp_path,
+        tmp_path / "role",
+        tmp_path / "collection",
+        {"ANSIBLE_COLLECTIONS_PATH": str(tmp_path / "installed")},
+    )
+    install_scenario_collections(rendered, downloads)
+    assert commands == [
+        [
+            "ansible-galaxy",
+            "collection",
+            "install",
+            "--no-deps",
+            "-p",
+            str(tmp_path / "installed"),
+            str(downloads / "containers-podman-1.20.2.tar.gz"),
+            str(downloads / "community-crypto-3.3.0.tar.gz"),
+            str(downloads / "community-general-13.2.0.tar.gz"),
+        ]
+    ]
+    requirements.write_text('collections:\n  - "ansible.posix"\n', encoding="utf-8")
+    with pytest.raises(GateError, match=r"tests/requirements.yml: ansible\.posix"):
+        install_scenario_collections(rendered, downloads)
 
 
 def test_newest_released_core_follows_the_matrix(tmp_path: Path) -> None:

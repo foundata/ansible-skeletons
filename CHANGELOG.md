@@ -38,7 +38,11 @@ and the project adheres to
 - checks: one download of the pinned Galaxy collections per run serves the
   generated lint, the module renders and the infrastructure tiers. The module
   renders' ansible-test containers use a Podman store of each render's own
-  that reads your images read-only instead of pulling them again.
+  that reads your images read-only instead of pulling them again. The module
+  renders install their Molecule scenario's collections from that download as
+  well, so antsibull-nox finds them installed and no render calls Galaxy; a
+  scenario collection that `tests/requirements.yml` does not pin fails the
+  render.
 - checks: an output may have any path; the 29-byte limit is gone. Python's
   multiprocessing listeners, the generated collection's `docs-check` workers,
   Podman and Molecule's SSH connections bind their Unix sockets in a short
