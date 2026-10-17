@@ -78,6 +78,14 @@ and the project adheres to
 
 ### Added
 
+- Both module variants: a `stages()` hook splits one declared change into
+  several writes that `reconcile()` runs in order, such as creating an
+  object disabled and enabling it, or disabling it before deleting it. Each
+  stage names its step, the state its read-back must show (`want` and
+  `absent`) and its request; each later stage starts from the read-back of
+  the one before. A lost reply is settled by its own stage's read-back, and
+  a failing stage keeps the outcome the earlier stages confirmed. The default
+  is the single `write`.
 - Both module variants: the lifecycle base's docstring lists the hooks and
   settings a subclass may override and the names it reserves: the sequence,
   its helpers and the instance state. A subclass that redefines a reserved

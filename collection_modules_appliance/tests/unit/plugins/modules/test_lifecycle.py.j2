@@ -41,6 +41,7 @@ from ansible_collections.{{ namespace }}.\
         STATE,
         Failure,
         Lifecycle,
+        Stage,
     )
 # isort: on
 # fmt: on
@@ -781,3 +782,115 @@ def test_stages_keep_confirmed_progress_and_never_repeat_a_write(
             else ("socket_timeout" if second == "not_started" else "not_persisted")
         )
         assert result["error_code"] == expected
+
+
+class Staged(Synthetic):
+    """Created inactive and enabled in a second write; disabled before deletion."""
+
+    def declared(self) -> dict[str, Any]:
+        return {**super().declared(), "active": True}
+
+    def managed(self, record: dict[str, Any]) -> dict[str, Any]:
+        return {**super().managed(record), "active": record.get("active", False)}
+
+    def request(
+        self, kind: str, change: Callable[[dict[str, Any]], None]
+    ) -> Callable[[], None]:
+        return lambda: self.client.write(kind, lambda: change(self.client.rows))
+
+    def stages(self) -> list[Stage]:
+        key, current = self.key, self.current or {}
+        if self.absent:
+            plan: list[Stage] = []
+            if current.get("active"):
+                plan.append(
+                    (
+                        "disable",
+                        {**current, "active": False},
+                        False,
+                        self.request(
+                            "disable", lambda rows: rows[key].update(active=False)
+                        ),
+                    )
+                )
+            plan.append(
+                ("delete", {}, True, self.request("delete", lambda rows: rows.pop(key)))
+            )
+            return plan
+        if self.record is None:
+            value = self.want.get("value")
+            return [
+                (
+                    "create",
+                    {**self.want, "active": False},
+                    False,
+                    self.request(
+                        "create",
+                        lambda rows: rows.update(
+                            {key: {"name": key, "value": value, "active": False}}
+                        ),
+                    ),
+                ),
+                (
+                    "enable",
+                    self.want,
+                    False,
+                    self.request("enable", lambda rows: rows[key].update(active=True)),
+                ),
+            ]
+        return super().stages()
+
+
+def staged_main() -> None:
+    module = AnsibleModule(argument_spec=spec(), supports_check_mode=True)
+    Staged(module).execute()
+
+
+def test_stages_run_in_order_and_settle_each_write(
+    store: Store, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(Staged, "connect", lambda self: store)
+    predicted = run_module(staged_main, name="a", value="1", _ansible_check_mode=True)
+    assert predicted["changed"] and not store.writes
+    created = run_module(staged_main, name="a", value="1")
+    assert created["verified"] == "observed" and created["synthetic"]["active"]
+    assert store.writes == ["create", "enable"]
+    assert not run_module(staged_main, name="a", value="1")["changed"]
+    updated = run_module(staged_main, name="a", value="2")
+    assert updated["changed_fields"] == ["value"] and store.rows["a"]["active"]
+    deleted = run_module(staged_main, name="a", state="absent")
+    assert deleted["synthetic"] is None and "a" not in store.rows
+    assert store.writes == ["create", "enable", "update", "disable", "delete"]
+
+
+@pytest.mark.parametrize(
+    "second", ["lost", "lost_without_effect", "refused", "not_started"]
+)
+def test_a_failing_stage_keeps_the_progress_of_earlier_ones(
+    store: Store,
+    run_module: RunModule,
+    monkeypatch: pytest.MonkeyPatch,
+    second: str,
+) -> None:
+    monkeypatch.setattr(Staged, "connect", lambda self: store)
+    if second == "not_started":
+        monkeypatch.setattr(Staged, "started", lambda self: False)
+
+    def after_first() -> None:
+        store.drop = second != "lost"
+        store.after = refuse if second == "refused" else lose
+
+    store.after = after_first
+    result = run_module(staged_main, name="a", value="1")
+    assert store.writes == ["create", "enable"]
+    if second == "lost":
+        assert not result.get("failed") and store.rows["a"]["active"]
+        return
+    assert result["failed"] and result["changed"] and result["outcome"] == "changed"
+    assert not store.rows["a"]["active"]
+    expected = {
+        "lost_without_effect": ("not_persisted", "reconcile"),
+        "refused": ("rejected", "enable"),
+        "not_started": ("socket_timeout", "enable"),
+    }[second]
+    assert (result["error_code"], result["operation"]) == expected

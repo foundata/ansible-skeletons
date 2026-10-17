@@ -13,9 +13,17 @@ projects it (``managed``), computes the minimal difference, runs the
 resource's guards (``protect``) and predicts the result. Unless
 ``compatibility_always`` is set, an unchanged run returns without
 discovering the product version; check mode returns after the eligibility
-check. Otherwise ``recheck`` repeats a guard right before the single
-``write``. Afterwards the object is read again by the same lookup and
-checked (``verify``); a write never repeats.
+check. Otherwise ``recheck`` repeats a guard right before the writes.
+After each write the object is read again by the same lookup and checked
+(``verify``); a write never repeats.
+
+A change is one ``write`` unless ``stages`` splits it into several, such as
+creating an object disabled and enabling it, or disabling it before it is
+deleted. Each stage names its step, the state its read-back must show
+(``want`` and ``absent``) and its request; the stages run in order, and each
+later one starts from the read-back of the one before (``record`` and
+``current``). A lost reply is settled by its own stage's read-back, and a
+failing stage ends the run with the outcome the earlier ones confirmed.
 
 ``compatibility_always`` decides when the version is checked: before the
 first read when it is set, otherwise only before a write or a changed
@@ -62,9 +70,9 @@ that does fails when it is created, at import:
 - Hooks, methods to override: ``connect`` and ``compatibility`` (the
   binding), ``identify``, ``declared``, ``lookup``, ``managed``, ``same``,
   ``difference``, ``protect``, ``secret``, ``predict``, ``public``,
-  ``diff``, ``recheck``, ``write``, ``started``, ``lost``, ``moved``,
-  ``verify``, ``changed_fields``, ``finish``, ``operation_id`` and
-  ``identity_fields``; ``__init__`` for per-instance state, calling the
+  ``diff``, ``recheck``, ``write``, ``stages``, ``started``, ``lost``,
+  ``moved``, ``verify``, ``changed_fields``, ``finish``, ``operation_id``
+  and ``identity_fields``; ``__init__`` for per-instance state, calling the
   base first.
 - Settings, class attributes to set: ``schema``, ``result_key``,
   ``compatibility_id``, ``message``, ``state_option``,
@@ -105,6 +113,7 @@ HOOKS = frozenset(
         "diff",
         "recheck",
         "write",
+        "stages",
         "started",
         "lost",
         "moved",
@@ -156,6 +165,9 @@ STATE = frozenset(
 """Instance state the sequence owns; hooks assign it, no subclass redefines it."""
 
 MISSING = object()
+
+Stage = tuple[str, dict[str, Any], bool, Callable[[], None]]
+"""One write of a change: step, wanted state, whether absent, request."""
 
 
 class Failure(errors.ApiError):
@@ -322,6 +334,19 @@ class Lifecycle:
     def write(self) -> None:
         raise NotImplementedError
 
+    def stages(self) -> list[Stage]:
+        """The writes of the declared change, in order; never empty.
+
+        The default is the single ``write`` under the step ``create``,
+        ``update`` or ``delete`` with the declared ``want`` and ``absent``. A
+        request reads ``record`` and ``current`` when it runs, so a later stage
+        sees the read-back of the stage before it.
+        """
+        step = (
+            "delete" if self.absent else "create" if self.record is None else "update"
+        )
+        return [(step, self.want, self.absent, self.write)]
+
     def started(self) -> bool:
         """Whether a failed write may have reached the product."""
         return True
@@ -468,10 +493,19 @@ class Lifecycle:
             return result
         self.step("recheck")
         self.recheck()
-        self.step(
-            "delete" if self.absent else "create" if self.record is None else "update"
-        )
-        observed = self.stage(self.write)
+        plan = self.stages()
+        if not plan:
+            raise ValueError("stages() returned no write for a change")
+        declared, absent = self.want, self.absent
+        observed: Any = None
+        for index, (step, want, gone, request) in enumerate(plan):
+            if index:
+                self.record = observed
+                self.current = None if observed is None else self.managed(observed)
+            self.want, self.absent = want, gone
+            self.step(step)
+            observed = self.stage(request)
+        self.want, self.absent = declared, absent
         if self.result_key:
             result[self.result_key] = (
                 None if observed is None else self.public(observed)
