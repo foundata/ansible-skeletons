@@ -18,10 +18,13 @@ Sessions defined here are foundata's own. The others come from antsibull-nox
 and are configured in antsibull-nox.toml.
 """
 
+import atexit
 import json
 import os
+import shutil
 import sys
 import tarfile
+import tempfile
 from pathlib import Path
 
 import nox
@@ -44,6 +47,51 @@ os.environ.setdefault("ANTSIBULL_NOX_CONTAINER_ENGINE", "auto-prefer-podman")
 # and pip. Without uv, nox falls back to virtualenv; --default-venv-backend
 # on the command line still chooses another backend.
 nox.options.default_venv_backend = "uv|virtualenv"
+
+# Python's multiprocessing binds Unix sockets below TMPDIR (its forkserver is
+# the default from Python 3.14 on), and Linux allows 108 bytes for a socket
+# path. Below a deep checkout the sessions' TMPDIR is too long for that, so the
+# sessions see a short link to the same directory instead, in a private
+# directory below XDG_RUNTIME_DIR (or /tmp). Files stay on disk; the links go
+# when nox ends.
+TMPDIR_LIMIT = 64
+"""Longest TMPDIR that leaves room for the socket names below it."""
+_SHORT: list[Path] = []
+
+
+def _short_path(directory: str) -> str:
+    """Return ``directory``, or a short link to it when its path is too long."""
+    target = Path(directory).absolute()
+    if len(str(target)) <= TMPDIR_LIMIT:
+        return str(target)
+    try:
+        if not _SHORT:
+            runtime = Path(os.environ.get("XDG_RUNTIME_DIR", ""))
+            usable = runtime.is_absolute() and runtime.is_dir()
+            parent = runtime if usable else Path("/tmp")
+            _SHORT.append(Path(tempfile.mkdtemp(prefix="nox-", dir=parent)))
+            atexit.register(shutil.rmtree, _SHORT[0], True)
+        link = _SHORT[0] / str(len(list(_SHORT[0].iterdir())))
+        link.symlink_to(target, target_is_directory=True)
+    except OSError:
+        # Without a writable short directory the long path is all there is.
+        return str(target)
+    return str(link)
+
+
+_create_tmp = nox.Session.create_tmp
+
+
+def _create_tmp_on_a_short_path(self: nox.Session) -> str:
+    """Create the session's temporary directory and name it by a short path."""
+    tmpdir = _create_tmp(self)
+    self.env["TMPDIR"] = _short_path(tmpdir)
+    return tmpdir
+
+
+nox.Session.create_tmp = _create_tmp_on_a_short_path
+if os.environ.get("TMPDIR"):
+    os.environ["TMPDIR"] = _short_path(os.environ["TMPDIR"])
 
 antsibull_nox.load_antsibull_nox_toml()
 

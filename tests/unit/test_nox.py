@@ -35,10 +35,22 @@ def noxfile(
             assert kwargs["default"] is True
         return lambda function: function
 
+    class Session:
+        """The part of nox.Session the noxfile changes."""
+
+        def __init__(self, tmpdir: Path) -> None:
+            self.env: dict[str, str] = {}
+            self.tmpdir = tmpdir
+
+        def create_tmp(self) -> str:
+            self.tmpdir.mkdir(parents=True, exist_ok=True)
+            self.env["TMPDIR"] = str(self.tmpdir)
+            return str(self.tmpdir)
+
     nox = ModuleType("nox")
     nox.options = SimpleNamespace()  # type: ignore[attr-defined]
     nox.session = decorator  # type: ignore[attr-defined]
-    nox.Session = Mock  # type: ignore[attr-defined]
+    nox.Session = Session  # type: ignore[attr-defined]
     antsibull = ModuleType("antsibull_nox")
     sessions = ModuleType("antsibull_nox.sessions")
     sessions.install_packages = decorator  # type: ignore[attr-defined]
@@ -51,10 +63,44 @@ def noxfile(
     for module in (nox, antsibull, sessions):
         monkeypatch.setitem(sys.modules, module.__name__, module)
     monkeypatch.chdir(tmp_path)
+    # Loading shortens an inherited TMPDIR; keep the test process's own.
+    monkeypatch.delenv("TMPDIR", raising=False)
     profile = getattr(request, "param", "collection_default")
     loaded = runpy.run_path(str(ROOT / profile / "noxfile.py.j2"))
     assert ["ansible-lint-foundata"] in installed_packages
     return loaded
+
+
+@pytest.mark.parametrize(
+    "noxfile",
+    ["collection_default", "collection_modules", "collection_modules_appliance"],
+    indirect=True,
+)
+def test_a_deep_temporary_directory_gets_a_short_path(
+    noxfile: dict[str, object], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runtime = tmp_path / "run"
+    runtime.mkdir()
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(runtime))
+    cleanups: list[object] = []
+    monkeypatch.setattr(
+        "atexit.register", lambda *arguments: cleanups.append(arguments)
+    )
+    short = Path("/s")
+    short_path = cast(Callable[[str], str], noxfile["_short_path"])
+    assert short_path(str(short)) == str(short)
+    deep = tmp_path / ("d" * 70) / "tmp"
+    deep.mkdir(parents=True)
+    session = cast(SimpleNamespace, noxfile["nox"]).Session(deep)
+    assert session.create_tmp() == str(deep)
+    link = Path(session.env["TMPDIR"])
+    assert link.parent.parent == runtime and link.resolve() == deep.resolve()
+    assert len(cleanups) == 1
+    link.parent.chmod(0o500)
+    try:
+        assert short_path(str(deep)) == str(deep)
+    finally:
+        link.parent.chmod(0o700)
 
 
 @pytest.fixture

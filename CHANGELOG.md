@@ -79,6 +79,12 @@ and the project adheres to
 - collection_default, collection_modules, collection_modules_appliance: the
   rendered `DEVELOPMENT.md` says to run the sessions of one ansible-core
   release while editing and the default sessions before a commit.
+- collection_default, collection_modules, collection_modules_appliance: the
+  rendered noxfile gives a session whose `TMPDIR` is too long for a Unix
+  socket path a short link to it in a private directory below
+  `XDG_RUNTIME_DIR` (or `/tmp`), removed when nox ends. Python's
+  multiprocessing, which `reuse lint` and `docs-check` use, binds its sockets
+  there, so the default sessions also pass in a deeply nested checkout.
 
 ### Fixed
 
