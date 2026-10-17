@@ -79,6 +79,12 @@ def test_act_once_keeps_its_sequence_reserved() -> None:
             type("Colliding", (ActOnce, Synthetic), {name: None})
 
 
+def test_act_once_comes_before_the_classes_it_extends() -> None:
+    with pytest.raises(TypeError, match=r"lists Synthetic before ActOnce"):
+        type("Wrong", (Synthetic, ActOnce), {})
+    assert issubclass(type("Area", (SyntheticActivation,), {}), ActOnce)
+
+
 def test_act_once(store: ActivationStore, run_module: RunModule) -> None:
     predicted = run_module(main, apply=True, _ansible_check_mode=True)
     assert predicted["changed"] and predicted["activated"]

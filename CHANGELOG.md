@@ -75,6 +75,10 @@ and the project adheres to
   its helpers and the instance state. A subclass that redefines a reserved
   name, such as a class attribute `key` or a method `prepare`, fails when
   its class is created, at import.
+- Appliance variant: `ActOnce` refuses to come after another lifecycle class
+  in a subclass's bases and says why in its docstring: listed after the
+  binding or a resource class, any member of the same name there would
+  replace the activation's silently. Declare `class Apply(ActOnce, Binding)`.
 - checks: `--resume <output>` reruns only the failed and missing steps of an
   earlier run of the same sources; `scripts.release check --resume` does the
   same for the evidence of the same commit.

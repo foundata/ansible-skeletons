@@ -25,9 +25,10 @@ SPDX-License-Identifier: GPL-3.0-or-later
 - Keep a scope-named apply module only where saved and active state differ.
   Use the shared verifying `_activation.py` workflow when a product probe
   proves the loaded state. Otherwise compose `ActOnce` from `_act_once.py`
-  with the product binding and implement its preflight, activate, effective
-  and activation_id hooks. It reports `verified: unverifiable`, never a
-  loaded-state receipt; readiness is not that proof.
+  with the product binding, ActOnce first (`class Apply(ActOnce, Binding)`),
+  and implement its preflight, activate, effective and activation_id hooks on
+  that class. It reports `verified: unverifiable`, never a loaded-state
+  receipt; readiness is not that proof.
 - Qualify `_management_guard.py` and the `protect` hook that calls it
   against the actual listener, ingress, aliases, translations and activation
   scope. Test refusal in normal and check mode. Do not infer ingress from a

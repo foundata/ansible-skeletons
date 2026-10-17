@@ -26,7 +26,30 @@ from ansible_collections.{{ namespace }}.\
 
 
 class ActOnce(Lifecycle, sequence=("act_once", "execute")):
-    """Mixin for an appliance area with an unobservable activation receipt."""
+    """Mixin for an appliance area with an unobservable activation receipt.
+
+    List it first, ``class Apply(ActOnce, Binding)``. A mixin extends the class
+    it is mixed into: its ``execute`` and ``act_once`` and its hook defaults
+    must come before the binding and every resource class in the method
+    resolution order. Listed after one of them, any member that class defines
+    under the same name would replace the activation's without an error, so
+    a class that lists another lifecycle class before ActOnce fails when it is
+    created. Define the activation hooks on the area class itself.
+    """
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
+        order = cls.__mro__
+        early = [
+            base.__name__
+            for base in order[1 : order.index(ActOnce)]
+            if issubclass(base, Lifecycle) and not issubclass(base, ActOnce)
+        ]
+        if early:
+            raise TypeError(
+                f"{cls.__qualname__} lists {', '.join(early)} before ActOnce; "
+                f"declare class {cls.__name__}(ActOnce, {early[0]})"
+            )
 
     def preflight(self) -> None:
         """Check the saved state the activation would load."""
