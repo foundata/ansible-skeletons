@@ -71,6 +71,22 @@ def noxfile(
     return loaded
 
 
+def test_the_locked_nox_still_sets_tmpdir_where_the_noxfile_expects(
+    tmp_path: Path,
+) -> None:
+    # The rendered noxfile wraps nox.Session.create_tmp and relies on it to
+    # create <envdir>/tmp, set the session's TMPDIR to it and return it. A nox
+    # upgrade that changes this fails here; the check's TMPDIR probe covers the
+    # nox a collection resolves at run time.
+    from nox.sessions import Session as RealSession
+
+    runner = SimpleNamespace(envdir=str(tmp_path / "env"), venv=SimpleNamespace(env={}))
+    session = RealSession(runner)  # type: ignore[arg-type]
+    tmpdir = session.create_tmp()
+    assert Path(tmpdir) == tmp_path / "env/tmp" and Path(tmpdir).is_dir()
+    assert session.env["TMPDIR"] == str(tmp_path / "env/tmp")
+
+
 @pytest.mark.parametrize(
     "noxfile",
     ["collection_default", "collection_modules", "collection_modules_appliance"],

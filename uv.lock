@@ -354,6 +354,7 @@ core221 = [
 ]
 dev = [
     { name = "mypy" },
+    { name = "nox" },
     { name = "pytest" },
     { name = "pyyaml" },
     { name = "releasing" },
@@ -384,6 +385,7 @@ core220 = [{ name = "ansible-core", specifier = ">=2.20,<2.21" }]
 core221 = [{ name = "ansible-core", specifier = ">=2.21,<2.22" }]
 dev = [
     { name = "mypy" },
+    { name = "nox", specifier = ">=2025.2.9" },
     { name = "pytest", specifier = ">=9" },
     { name = "pyyaml" },
     { name = "releasing", specifier = ">=7.0.0,<8" },

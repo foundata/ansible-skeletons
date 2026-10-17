@@ -11,6 +11,8 @@ dependencies = []
 [dependency-groups]
 dev = [
   "mypy",
+  # The unit tests check the nox contract the rendered noxfiles rely on.
+  "nox>=2025.02.09",
   "pytest>=9",
   "PyYAML",
   "releasing>=7.0.0,<8",

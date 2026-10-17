@@ -888,12 +888,94 @@ def module_identity(
             env={**rendered.env, "CI": "true"},
             timeout=7200,
         )
+    if index == 0:
+        check_short_tmpdir(rendered)
     if full and index == 0:
         molecule_with_fake(rendered)
     build_collection(rendered)
     exercise_modules(rendered)
     if full and index == 0 and profile == "collection_modules_appliance":
         drill_alone(rendered)
+
+
+# Runs as a noxfile beside the render's own, which it loads first, so the
+# session below meets the render's TMPDIR handling under the real nox.
+TMPDIR_PROBE = """\
+# /// script
+# dependencies = ["nox>=2025.02.09", "antsibull-nox"]
+# ///
+import os
+import runpy
+import sys
+
+import nox
+
+# nox works in the probe's directory; the render's noxfile reads its own.
+os.chdir(os.environ["PROBE_COLLECTION"])
+runpy.run_path("noxfile.py")
+
+PROOF = \"\"\"
+import multiprocessing, os
+from multiprocessing.managers import BaseManager
+temporary = os.environ["TMPDIR"]
+assert len(os.fsencode(temporary)) <= 64, temporary
+assert os.path.realpath(temporary) == os.path.realpath(os.environ["PROBE_TMP"])
+with BaseManager(ctx=multiprocessing.get_context("spawn")) as manager:
+    address = manager.address
+assert isinstance(address, str), address
+assert address.startswith(os.path.join(temporary, "")), (address, temporary)
+\"\"\"
+
+
+@nox.session(name="tmpdir-probe", python=False, default=False)
+def tmpdir_probe(session: nox.Session) -> None:
+    tmpdir = session.create_tmp()
+    session.run(
+        sys.executable, "-c", PROOF, env={"PROBE_TMP": tmpdir}, external=True
+    )
+
+
+if __name__ == "__main__":
+    nox.main()
+"""
+
+
+def check_short_tmpdir(rendered: Rendered) -> None:
+    """Prove that a render's nox sessions bind sockets below a short TMPDIR.
+
+    The rendered noxfile shortens each session's TMPDIR by wrapping
+    nox.Session.create_tmp. The probe runs a real session from an environment
+    directory too deep for a socket path and starts a real multiprocessing
+    manager there; a nox or antsibull-nox change that bypasses the wrapper
+    fails here, not silently in a collection.
+    """
+    probe = rendered.work / "tmpdir_probe.py"
+    probe.write_text(TMPDIR_PROBE, encoding="utf-8")
+    envdir = rendered.work / ("deep-" + "d" * 80)
+    if len(os.fsencode(envdir / "tmpdir-probe/tmp")) <= 64:
+        raise GateError("The TMPDIR probe's environment is not deep enough")
+    run(
+        [
+            "uv",
+            "run",
+            "--python",
+            "3.13",
+            str(probe),
+            "-f",
+            str(probe),
+            "-s",
+            "tmpdir-probe",
+            "--envdir",
+            str(envdir),
+        ],
+        cwd=rendered.collection,
+        env={
+            **rendered.env,
+            "CI": "true",
+            "PROBE_COLLECTION": str(rendered.collection),
+        },
+        timeout=1800,
+    )
 
 
 def exercise_role(rendered: Rendered, *, collection: bool) -> None:
