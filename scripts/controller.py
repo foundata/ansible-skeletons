@@ -1,72 +1,146 @@
 # SPDX-FileCopyrightText: foundata GmbH <https://foundata.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Budget and exercise run-private controller and Podman Unix sockets."""
+"""Give a check's Unix sockets short private paths and exercise them."""
 
 import argparse
 import multiprocessing
 import os
 import platform
 import sys
+import tempfile
+from collections.abc import Iterator
+from contextlib import contextmanager
 from multiprocessing.managers import BaseManager
 from pathlib import Path
 
-from scripts.common import GateError, write_json
+from scripts.common import GateError, remove_tree, write_json
 
 SOCKET_LIMIT = 104
-# Python 3.12/3.13 use listener-XXXXXXXX; 3.14 uses sock-XXXXXXXXXXXX.
+# Python 3.12 uses listener-XXXXXXXX; 3.13 and 3.14 use sock-XXXXXXXXXXXX.
 CONTROLLER_SUFFIX = "pymp-xxxxxxxx/listener-xxxxxxxx"
-# Each step of a check run has its own TMPDIR, t/<slot>, one character each.
+# Each step of a check run has its own runtime directory, <runtime>/<slot>, and
+# its own TMPDIR, t/<slot> in the output; one character per slot.
 STEP_SLOTS = "0123456789abcdefghijklmnopqrstuvwxyz"
-# Generated collections' nox environments live below the step's TMPDIR, and
+# A check's sockets bind below a short directory of its own in the user's
+# runtime directory; tempfile adds eight random characters to the prefix.
+RUNTIME_PREFIX = "sk-"
+RUNTIME_PLACEHOLDER = f"{RUNTIME_PREFIX}xxxxxxxx"
+# Where a check tells each step, and the tools it runs, its runtime directory.
+RUNTIME_VARIABLE = "SKELETONS_RUNTIME_DIR"
+# TMPDIR is a link of this name in the step's runtime directory. Bulky
+# temporary files stay on disk in the output; sockets get a short path.
+TEMPORARY_LINK = "t"
+# An infrastructure tier links a TMPDIR of its own below its output.
+TIER_TEMPORARY_LINK = "i"
+CONTROLLER_LAYOUT = f"{TEMPORARY_LINK}/{CONTROLLER_SUFFIX}"
 # Python 3.14 binds the docs-check forkserver socket in the session's own tmp
-# directory. The short prefix pays for the slot directory.
-NOX_ENVDIR_PREFIX = "n"
-NOX_LAYOUT = f"t/x/{NOX_ENVDIR_PREFIX}xxxxxxxx/docs-check-3-14/tmp/{CONTROLLER_SUFFIX}"
-# Molecule names SSH control sockets %h-%p-%r; OpenSSH binds the master socket
-# under a 16-character temporary suffix first.
+# directory, inside its environment. The generated collection's nox
+# environments stay in the render; nox reaches them through this link.
+NOX_LINK = "n"
+NOX_LAYOUT = f"{NOX_LINK}/docs-check-3-14/tmp/{CONTROLLER_SUFFIX}"
+# An infrastructure tier's Podman keeps its XDG_RUNTIME_DIR, run root and
+# temporary directory here, and would bind its API socket below it.
+PODMAN_RUNTIME = "r"
+PODMAN_LAYOUT = f"{PODMAN_RUNTIME}/podman/podman.sock"
+# Molecule's SSH control sockets bind in this directory of an infrastructure
+# tier's runtime directory. Molecule names them %h-%p-%r; OpenSSH binds the
+# master socket under a 16-character temporary suffix first.
 SSH_CONTROL_DIRECTORY = "s"
 SSH_CONTROL_LAYOUT = f"{SSH_CONTROL_DIRECTORY}/127.0.0.1-65535-molecule.{'x' * 16}"
 
 
-def check_socket_layout(output: Path, *layouts: str) -> None:
-    """Reject layouts before any matrix work or runtime state is created."""
-    output = output.resolve()
-    for relative in (f"t/{CONTROLLER_SUFFIX}", "r/podman/podman.sock", *layouts):
-        path = output / relative
-        if not path.resolve().is_relative_to(output):
-            raise GateError("Socket directory is outside this run")
+def check_runtime_layout(runtime: Path, *layouts: str) -> None:
+    """Reject socket paths below a step's runtime directory that are too long."""
+    for relative in (CONTROLLER_LAYOUT, *layouts):
+        path = runtime / relative
         if len(os.fsencode(path)) >= SOCKET_LIMIT:
             raise GateError(
-                "Use a shorter output path for private controller and Podman sockets"
+                f"The socket path {path} exceeds {SOCKET_LIMIT - 1} bytes; "
+                "XDG_RUNTIME_DIR is too long"
             )
 
 
-def controller_environment(output: Path, env: dict[str, str]) -> dict[str, str]:
-    """Allocate a short temporary directory shared by controller subprocesses."""
-    output = output.resolve()
-    check_socket_layout(output)
-    temporary = output / "t"
-    temporary.mkdir(mode=0o700, parents=True, exist_ok=True)
-    if temporary.stat().st_mode & 0o077:
-        raise GateError("Controller temporary directory must be private to its owner")
-    return {**env, "TMPDIR": str(temporary)}
+def runtime_base() -> Path:
+    """Return the user's runtime directory, or /tmp where there is none."""
+    value = os.environ.get("XDG_RUNTIME_DIR", "")
+    return Path(value) if value and Path(value).is_absolute() else Path("/tmp")
+
+
+def private_directory(path: Path) -> Path:
+    """Create a directory only its owner may use, or refuse an existing one."""
+    path.mkdir(mode=0o700, parents=True, exist_ok=True)
+    status = path.lstat()
+    if path.is_symlink() or status.st_uid != os.getuid() or status.st_mode & 0o077:
+        raise GateError(f"{path} must be a directory private to its owner")
+    return path
+
+
+@contextmanager
+def new_runtime_directory() -> Iterator[Path]:
+    """Create a short private directory below XDG_RUNTIME_DIR; remove it after."""
+    runtime = Path(tempfile.mkdtemp(prefix=RUNTIME_PREFIX, dir=runtime_base()))
+    try:
+        yield runtime
+    finally:
+        # Podman leaves files of subordinate users in its run state.
+        remove_tree(runtime)
+
+
+@contextmanager
+def runtime_directory() -> Iterator[Path]:
+    """Yield the short private directory for this process's Unix sockets.
+
+    A check gives each step its own in SKELETONS_RUNTIME_DIR. A tool run on
+    its own creates one and removes it at the end.
+    """
+    given = os.environ.get(RUNTIME_VARIABLE)
+    if given:
+        yield private_directory(Path(given))
+        return
+    with new_runtime_directory() as runtime:
+        yield runtime
+
+
+@contextmanager
+def linked(link: Path, target: Path) -> Iterator[Path]:
+    """Reach a deep directory through a short link while a tool runs there."""
+    link.symlink_to(target, target_is_directory=True)
+    try:
+        yield link
+    finally:
+        link.unlink()
+
+
+def temporary_environment(
+    temporary: Path, link: Path, env: dict[str, str]
+) -> dict[str, str]:
+    """Point TMPDIR at a private directory in the output through a short link."""
+    private_directory(temporary)
+    link.symlink_to(temporary, target_is_directory=True)
+    return {**env, "TMPDIR": str(link)}
 
 
 def check_controller(output: Path) -> None:
-    """Start a real RPC worker and reject tempfile's system-directory fallback."""
-    output = output.resolve()
-    env = controller_environment(output, dict(os.environ))
-    os.environ["TMPDIR"] = env["TMPDIR"]
+    """Start a real RPC worker and reject tempfile's system-directory fallback.
+
+    Python 3.13 and later bind below /tmp instead when TMPDIR is too long.
+    """
+    temporary = os.environ.get("TMPDIR", "")
+    if not Path(temporary).is_absolute():
+        raise GateError("The controller check needs an absolute TMPDIR")
+    private_directory(Path(temporary).resolve())
     with BaseManager(ctx=multiprocessing.get_context("spawn")) as manager:
         address = manager.address
         if not isinstance(address, str):
             raise GateError("Controller did not allocate a Unix socket")
-        path = Path(address).resolve()
-        if not path.is_relative_to(Path(env["TMPDIR"])):
+        # The socket's path as bound, through the link, is what the limit counts.
+        path = Path(address)
+        if not path.is_relative_to(temporary):
             raise GateError(f"Controller socket escaped its private directory: {path}")
         length = len(os.fsencode(path))
         if length >= SOCKET_LIMIT:
             raise GateError(f"Controller socket exceeds its path budget: {path}")
+        output.mkdir(parents=True, exist_ok=True)
         write_json(
             output / f"controller-python{platform.python_version()}.json",
             {

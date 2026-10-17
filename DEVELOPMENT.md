@@ -211,7 +211,8 @@ and one when it ends, with its duration. A failing step prints the end of its
 log and the log's path. With one job, the first failure ends the run, as the
 order is fixed. With several, every step whose prerequisites passed still runs,
 so a resumed run, described below, repeats only what failed. Without
-`--output`, the logs are removed with the temporary directory.
+`--output`, the check works in a temporary directory below `/var/tmp` and
+removes it, logs included, at the end.
 
 On a 16-core workstation with the default eight jobs, a quick check took about
 5.5 minutes in October 2026, `--matrix` about 13, a quick check with all three
@@ -227,16 +228,28 @@ package. Example:
 ./scripts/check.sh --foundata-wheel /absolute/path/to/ansible_lint_foundata-1.1.0rc1-py3-none-any.whl
 ```
 
-To retain results, including generated projects and collection archives:
+To retain results, including generated projects and collection archives, name
+a new directory:
 
 ```sh
-./scripts/check.sh --output "${HOME}/sk-check-1"
+output="${XDG_STATE_HOME:-${HOME}/.local/state}/ansible-skeletons/check-1"
+./scripts/check.sh --output "${output}"
 ```
 
-Keep the absolute output path at most 29 bytes and outside tmpfs. Nox's
-nested virtual environments and Podman's storage need a short filesystem
-path. Choose a fresh directory; remove obsolete outputs after retaining the
-result you need.
+Any path works, as long as it is not on a tmpfs such as `/tmp`: an output holds
+several gigabytes, container storage included. Remove obsolete outputs after
+retaining the result you need.
+
+The check's Unix sockets bind elsewhere, in a short private directory that the
+check creates in `XDG_RUNTIME_DIR` (or `/tmp` without one) and removes at the
+end, also after a failure or an interrupt. Each step has a subdirectory there.
+The step's `TMPDIR` is a link from that subdirectory to `t/<slot>` in the
+output, so Python's multiprocessing listeners get short socket paths and
+temporary files stay on disk. The generated collection's Nox environments stay
+in its render; Nox reaches them through a second link in the subdirectory,
+where the `docs-check` workers bind. Podman keeps its run state there, and
+Molecule its SSH control sockets. The check refuses to start when one of these
+socket paths would be longer than 103 bytes; Linux allows 108.
 
 Each finished step leaves a record in `records/` below the output. The record
 names the digest of the sources it checked: path, mode and content of the
@@ -244,7 +257,7 @@ tracked files and of the untracked files Git does not ignore. To continue an
 interrupted or failed run, for example after a network timeout:
 
 ```sh
-./scripts/check.sh --resume "${HOME}/sk-check-1"
+./scripts/check.sh --resume "${output}"
 ```
 
 The resumed run reuses every passed record and reruns the failed and missing
@@ -308,7 +321,8 @@ For an infrastructure-only iteration:
 
 ```sh
 uv run --locked --group core221 --group lint --group integration \
-  python -m scripts.integration podman --output /tmp/skeleton-podman-results
+  python -m scripts.integration podman \
+  --output "${XDG_STATE_HOME:-${HOME}/.local/state}/ansible-skeletons/podman-1"
 ```
 
 Tests need network access for pinned Galaxy collections, container images, and,
@@ -374,15 +388,13 @@ skeleton-specific gate (`scripts/release.py check`).
 4. Run the release gate into a new output directory outside the checkout:
 
    ```sh
-   evidence="${HOME}/sk-${version}"
+   state="${XDG_STATE_HOME:-${HOME}/.local/state}"
+   evidence="${state}/ansible-skeletons/release-${version}"
    uv run --locked python -m scripts.release check "${version}" \
      --output "${evidence}"
    ```
 
-   Keep the resolved path at 29 bytes or shorter. The controller, Podman, the
-   generated collection's `docs-check` workers and Molecule's SSH connections
-   bind Unix sockets below it, and the gate refuses a longer path before it
-   starts. Do not use a tmpfs such as `/tmp`: the integration tests keep their
+   Do not use a tmpfs such as `/tmp`: the integration tests keep their
    container storage below the output. On a 16-core workstation, the gate's
    checks with all three tiers took about 15 minutes in October 2026.
 

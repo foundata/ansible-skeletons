@@ -23,6 +23,7 @@ from scripts.check import check, require_complete_tests
 from scripts.common import ROOT, GateError, Lane, isolated_environment, run, uv_command
 from scripts.render import Rendered, render
 from scripts.smoke import (
+    IDENTITIES,
     check_fix_stability,
     check_nox_gate,
     check_tree,
@@ -128,11 +129,15 @@ def test_socket_layout_is_rejected_before_matrix(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     def unexpected() -> None:
-        pytest.fail("Checks started before rejecting the output layout")
+        pytest.fail("Checks started before rejecting the socket layout")
 
     monkeypatch.setattr("scripts.check.check_static", unexpected)
-    output = tmp_path / ("x" * 104)
-    with pytest.raises(GateError, match="shorter"):
+    # The check's runtime directory would be too deep for its sockets.
+    base = tmp_path / ("x" * 104)
+    base.mkdir()
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(base))
+    output = tmp_path / "output"
+    with pytest.raises(GateError, match="exceeds"):
         check(
             output,
             full=True,
@@ -140,6 +145,7 @@ def test_socket_layout_is_rejected_before_matrix(
             utils_source=tmp_path,
         )
     assert not output.exists()
+    assert not list(base.iterdir())
 
 
 @pytest.mark.parametrize("wheel", [False, True])
@@ -174,6 +180,7 @@ def test_nox_gate_isolates_stock_passthrough(
     )
     nox_runs = []
     config_lints = []
+    envdirs: set[Path] = set()
 
     def run(command: list[str], **kwargs: object) -> str:
         if command[0] == "antsibull-nox":
@@ -193,6 +200,12 @@ def test_nox_gate_isolates_stock_passthrough(
         if command[0] == "nox":
             nox_runs.append(command)
             assert "--no-venv" not in command
+            # The environments stay in the render, reached through a short link.
+            envdir = Path(command[command.index("--envdir") + 1])
+            assert envdir.is_symlink()
+            assert envdir.resolve() == tmp_path / "nox"
+            assert envdir.parent.name.startswith("sk-")
+            envdirs.add(envdir)
             env = kwargs["env"]
             assert isinstance(env, dict)
             assert env["CI"] == "true"
@@ -223,6 +236,8 @@ def test_nox_gate_isolates_stock_passthrough(
     check_nox_gate(rendered)
     assert len(nox_runs) == 3
     assert config_lints == [["antsibull-nox", "lint-config"]]
+    assert len(envdirs) == 1
+    assert not envdirs.pop().parent.exists()
 
 
 @pytest.mark.parametrize("failure", [None, "verification", "lint"])
@@ -632,19 +647,41 @@ def test_module_identities_run_alone_or_together(
     assert (output / "profile.json").exists() == (identity is None)
 
 
+def test_an_interrupted_identity_removes_its_containers_and_runtime_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, runtime_base: Path
+) -> None:
+    runtimes: list[Path] = []
+    removed: list[Path] = []
+
+    def interrupted(_output: Path, index: int, *, runtime: Path, **_: object) -> None:
+        runtimes.append(runtime)
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr("scripts.smoke.module_identity", interrupted)
+    monkeypatch.setattr("scripts.smoke.remove_render_containers", removed.append)
+    output = tmp_path / "collection_modules"
+    with pytest.raises(KeyboardInterrupt):
+        module_smoke(output, profile="collection_modules", identity=1)
+    assert removed == [output / IDENTITIES[1][1]]
+    assert runtimes[0].parent == runtime_base
+    assert not runtimes[0].exists()
+
+
 def test_module_render_keeps_its_podman_run_state_to_itself(tmp_path: Path) -> None:
     env = isolated_environment(tmp_path)
     rendered = Rendered(
         tmp_path, tmp_path / "role", tmp_path / "collection", env, "collection_modules"
     )
-    private_podman_store(rendered)
+    run_root = tmp_path / "runtime/p0"
+    private_podman_store(rendered, run_root)
     config = tmp_path / "home/.config/containers/storage.conf"
     storage = tomllib.loads(config.read_text(encoding="utf-8"))["storage"]
     assert Path(storage["graphroot"]).is_relative_to(tmp_path / "home")
-    assert Path(storage["runroot"]).is_relative_to(tmp_path)
-    assert not Path(storage["runroot"]).is_relative_to(tmp_path / "home")
+    # The run state goes to the runtime directory; Podman creates it on use.
+    assert storage["runroot"] == str(run_root)
+    assert not run_root.exists()
     assert "options" not in config.read_text(encoding="utf-8")
-    private_podman_store(rendered, "/user/store")
+    private_podman_store(rendered, run_root, "/user/store")
     options = tomllib.loads(config.read_text(encoding="utf-8"))["storage"]["options"]
     # ansible-test finds the user's images there and pulls nothing.
     assert options == {"additionalimagestores": ["/user/store"]}

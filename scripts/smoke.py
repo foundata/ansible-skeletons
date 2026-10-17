@@ -12,16 +12,16 @@ import shutil
 import subprocess
 import sys
 import tarfile
-import tempfile
 import time
 import tomllib
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from typing import TextIO
 
 import yaml
 
 from scripts.common import ROOT, GateError, matrix, run, write_json
-from scripts.controller import NOX_ENVDIR_PREFIX
+from scripts.controller import NOX_LINK, linked, runtime_directory
 from scripts.render import (
     MODULE_PROFILES,
     PRODUCTS,
@@ -523,14 +523,17 @@ def user_image_store() -> str | None:
     return store if Path(store).is_dir() else None
 
 
-def private_podman_store(rendered: Rendered, images: str | None = None) -> None:
+def private_podman_store(
+    rendered: Rendered, run_root: Path, images: str | None = None
+) -> None:
     """Keep the Podman store of a render's ansible-test containers to itself.
 
     Rootless Podman keeps images and containers below the relocated HOME, but
     every store of the user shares one run root. Identities that run at the
-    same time must not share the run state of their stores. ``images`` adds a
-    store read-only, so ansible-test finds the images it already holds instead
-    of pulling every image again into each render.
+    same time must not share the run state of their stores, so each gets a run
+    root of its own in the runtime directory. ``images`` adds a store
+    read-only, so ansible-test finds the images it already holds instead of
+    pulling every image again into each render.
     """
     home = Path(rendered.env["HOME"])
     config = home / ".config/containers/storage.conf"
@@ -539,7 +542,7 @@ def private_podman_store(rendered: Rendered, images: str | None = None) -> None:
         "[storage]\n"
         'driver = "overlay"\n'
         f"graphroot = {json.dumps(str(home / '.local/share/containers/storage'))}\n"
-        f"runroot = {json.dumps(str(rendered.work / 'podman-run'))}\n"
+        f"runroot = {json.dumps(str(run_root))}\n"
         + (
             f"\n[storage.options]\nadditionalimagestores = {json.dumps([images])}\n"
             if images
@@ -547,6 +550,43 @@ def private_podman_store(rendered: Rendered, images: str | None = None) -> None:
         ),
         encoding="utf-8",
     )
+
+
+def remove_render_containers(render: Path, log: TextIO | None = None) -> None:
+    """Remove containers that an interrupted ansible-test left in a render's store.
+
+    Only a store below the render qualifies; the user's own store never does.
+    Podman has not used a store whose run root is missing, or the run that
+    made it removed its containers before the run root went; calling Podman
+    then would only create the run root again.
+    """
+    home = render / "home"
+    config = home / ".config/containers/storage.conf"
+    if not config.is_file():
+        return
+    storage = tomllib.loads(config.read_text(encoding="utf-8")).get("storage", {})
+    run_root = storage.get("runroot")
+    if not isinstance(run_root, str) or not Path(run_root).is_absolute():
+        raise GateError(
+            f"The render's Podman store names no absolute run root: {render}"
+        )
+    if not Path(run_root).exists():
+        return
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if not key.startswith(("CONTAINER", "XDG_CONFIG_HOME", "XDG_DATA_HOME"))
+    }
+    env["HOME"] = str(home)
+    store = run(
+        ["podman", "info", "--format", "{{.Store.GraphRoot}}"],
+        env=env,
+        capture=True,
+        log=log,
+    ).strip()
+    if not Path(store).resolve().is_relative_to(render.resolve()):
+        raise GateError(f"Podman did not select the render's own store: {store}")
+    run(["podman", "rm", "--all", "--force", "--time", "0"], env=env, log=log)
 
 
 def module_smoke(
@@ -567,15 +607,23 @@ def module_smoke(
     indexes = range(len(IDENTITIES)) if identity is None else (identity,)
     if 0 in indexes:
         check_missing_product(output, profile)
-    for index in indexes:
-        module_identity(
-            output,
-            index,
-            utils_source=utils_source,
-            profile=profile,
-            full=full,
-            collections=collections,
-        )
+    with runtime_directory() as runtime:
+        try:
+            for index in indexes:
+                module_identity(
+                    output,
+                    index,
+                    utils_source=utils_source,
+                    profile=profile,
+                    full=full,
+                    collections=collections,
+                    runtime=runtime,
+                )
+        finally:
+            # An interrupted ansible-test leaves its containers running; their
+            # run state goes with the runtime directory.
+            for index in indexes:
+                remove_render_containers(output / IDENTITIES[index][1])
     if identity is None:
         write_json(output / "profile.json", {"profile": profile, "full": full})
 
@@ -609,6 +657,7 @@ def module_identity(
     utils_source: Path | None,
     profile: str,
     full: bool,
+    runtime: Path,
     collections: Path | None = None,
 ) -> None:
     """Render one identity and run its checks, build and installed modules."""
@@ -657,8 +706,8 @@ def module_identity(
         raise GateError(
             "Molecule inventory changed its filename or runtime expressions"
         )
-    runtime = yaml.safe_load((rendered.collection / "meta/runtime.yml").read_text())
-    if runtime["requires_ansible"] != ">=" + str(
+    meta = yaml.safe_load((rendered.collection / "meta/runtime.yml").read_text())
+    if meta["requires_ansible"] != ">=" + str(
         metadata.get("min_ansible_version", "2.19.0")
     ):
         raise GateError("Module profile changed the core floor")
@@ -682,7 +731,7 @@ def module_identity(
     check_attribution(rendered.collection, metadata)
     check_holders(rendered.collection, holder(metadata))
     install_utils(rendered, utils_source, collections)
-    private_podman_store(rendered, user_image_store())
+    private_podman_store(rendered, runtime / f"p{index}", user_image_store())
     run(["git", "init", "--quiet"], cwd=rendered.collection)
     run(["git", "add", "."], cwd=rendered.collection)
     for sessions in identity_sessions(index, full=full):
@@ -1070,10 +1119,10 @@ def check_nox_gate(rendered: Rendered) -> None:
     run(["git", "init", "--quiet"], cwd=rendered.collection)
     run(["git", "add", "."], cwd=rendered.collection)
     run(["antsibull-nox", "lint-config"], cwd=rendered.collection, env=rendered.env)
-    # Python 3.14 binds the docs-check forkserver socket below the session's tmp
-    # directory. The check runs this with TMPDIR inside its output, so a short
-    # envdir there keeps the socket within the budget of scripts.controller.
-    environment = Path(tempfile.mkdtemp(prefix=NOX_ENVDIR_PREFIX))
+    # nox, antsibull-nox and Python keep the link's short path for the
+    # docs-check forkserver socket; the environments stay in the render.
+    environment = rendered.work / "nox"
+    environment.mkdir()
     listing = run(
         ["nox", "--list"], cwd=rendered.collection, env=rendered.env, capture=True
     )
@@ -1085,44 +1134,48 @@ def check_nox_gate(rendered: Rendered) -> None:
     sessions = [name for name in default_sessions(listing) if name not in unpinned]
     if not sessions:
         raise GateError("The generated noxfile lists no default session")
-    command = [
-        "nox",
-        "--sessions",
-        *sessions,
-        "--force-python",
-        f"{sys.version_info.major}.{sys.version_info.minor}",
-        "--default-venv-backend",
-        "uv",
-        "--envdir",
-        str(environment),
-    ]
     env = {
         **rendered.env,
         "CI": "true",
         "UV_CONSTRAINT": str(constraints),
         "PIP_CONSTRAINT": str(constraints),
     }
-    output = run(
-        command,
-        cwd=rendered.collection,
-        env=env,
-        timeout=1800,
-        capture=True,
-    )
-    print(output, end="")
-    if "Verified discovery and execution of 17 foundata rules." not in output:
-        raise GateError("Nox session did not verify the adopted foundata rules")
-    run(
-        [
+    with (
+        runtime_directory() as runtime,
+        linked(runtime / NOX_LINK, environment) as link,
+    ):
+        command = [
             "nox",
             "--sessions",
-            *sorted(unpinned),
-            *command[command.index("--force-python") :],
-        ],
-        cwd=rendered.collection,
-        env={**rendered.env, "CI": "true"},
-        timeout=1800,
-    )
+            *sessions,
+            "--force-python",
+            f"{sys.version_info.major}.{sys.version_info.minor}",
+            "--default-venv-backend",
+            "uv",
+            "--envdir",
+            str(link),
+        ]
+        output = run(
+            command,
+            cwd=rendered.collection,
+            env=env,
+            timeout=1800,
+            capture=True,
+        )
+        print(output, end="")
+        if "Verified discovery and execution of 17 foundata rules." not in output:
+            raise GateError("Nox session did not verify the adopted foundata rules")
+        run(
+            [
+                "nox",
+                "--sessions",
+                *sorted(unpinned),
+                *command[command.index("--force-python") :],
+            ],
+            cwd=rendered.collection,
+            env={**rendered.env, "CI": "true"},
+            timeout=1800,
+        )
 
     stock = rendered.work / "stock-lint"
     run(["uv", "venv", "--python", sys.executable, str(stock)], env=env)

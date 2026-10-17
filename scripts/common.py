@@ -9,10 +9,10 @@ import re
 import shutil
 import subprocess
 import tomllib
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TextIO
+from typing import Any, TextIO
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -100,6 +100,49 @@ def run(
     except subprocess.TimeoutExpired as exc:
         raise GateError(f"{command[0]} exceeded its {timeout}s timeout") from exc
     return result.stdout or ""
+
+
+def remove_in_user_namespace(paths: Sequence[Path]) -> None:
+    """Remove paths as root of Podman's user namespace.
+
+    Containers write files as subordinate users; only there are they ours.
+    """
+    run(["podman", "unshare", "rm", "-rf", "--", *map(str, paths)])
+
+
+def remove_tree(
+    path: Path,
+    as_root: Callable[[Sequence[Path]], None] = remove_in_user_namespace,
+) -> None:
+    """Remove a directory tree, also where its owner withdrew write permission.
+
+    What belongs to another user, such as a container's files, goes through
+    ``as_root``.
+    """
+
+    def own(target: Path) -> None:
+        if target.lstat().st_uid != os.getuid():
+            raise PermissionError(f"{target} belongs to another user")
+        target.chmod(0o700)
+
+    def retry(_function: Callable[..., Any], name: str, error: BaseException) -> None:
+        target = Path(name)
+        if isinstance(error, FileNotFoundError):
+            return
+        if not isinstance(error, PermissionError):
+            raise error
+        if target != path:
+            own(target.parent)
+        if target.is_dir() and not target.is_symlink():
+            own(target)
+            shutil.rmtree(target, onexc=retry)
+        else:
+            target.unlink()
+
+    try:
+        shutil.rmtree(path, onexc=retry)
+    except PermissionError:
+        as_root([path])
 
 
 def require_tools(*names: str) -> None:

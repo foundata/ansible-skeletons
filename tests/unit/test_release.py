@@ -220,8 +220,9 @@ def test_subprocess_failure_leaves_no_passing_report(
     # This miniature repository has no scripts.check module. A real failing
     # child process proves that export success cannot become gate success.
     monkeypatch.delenv("SKELETONS_UTILS_SOURCE", raising=False)
-    # pytest's temporary paths exceed the socket budget, which is not under test.
-    monkeypatch.setattr("scripts.release.check_output_layout", lambda *_: None)
+    # The tests' runtime directory may be too deep for the socket budget, which
+    # is not under test here.
+    monkeypatch.setattr("scripts.release.check_socket_budget", lambda *_: None)
     output = tmp_path / "failed-check"
     with pytest.raises(GateError, match="Release checks failed"):
         check_release("1.1.0", output, repository)
@@ -229,14 +230,27 @@ def test_subprocess_failure_leaves_no_passing_report(
     assert not (output / "report.json").exists()
 
 
-def test_release_check_refuses_a_long_evidence_path_before_creating_it(
+def test_release_check_refuses_a_deep_runtime_directory_before_creating_evidence(
     repository: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.delenv("SKELETONS_UTILS_SOURCE", raising=False)
-    output = tmp_path / ("x" * 104)
-    with pytest.raises(GateError, match="shorter"):
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path / ("x" * 104)))
+    output = tmp_path / "evidence"
+    with pytest.raises(GateError, match="exceeds"):
         check_release("1.1.0", output, repository)
     assert not output.exists()
+
+
+def test_release_evidence_may_have_a_long_path(
+    repository: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("SKELETONS_UTILS_SOURCE", raising=False)
+    # A runtime directory of the usual length; its sockets are not under test.
+    monkeypatch.setattr("scripts.check.runtime_base", lambda: Path("/run/user/1000"))
+    fake_inner_check(monkeypatch, [True])
+    evidence = tmp_path / ("x" * 104) / ("y" * 104)
+    check_release("1.1.0", evidence, repository)
+    validate_report(evidence / "report.json", repository)
 
 
 def test_release_check_refuses_a_local_utils_source(
@@ -321,8 +335,9 @@ def fake_inner_check(
 @pytest.fixture
 def gate(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("SKELETONS_UTILS_SOURCE", raising=False)
-    # pytest's temporary paths exceed the socket budget, which is not under test.
-    monkeypatch.setattr("scripts.release.check_output_layout", lambda *_: None)
+    # The tests' runtime directory may be too deep for the socket budget, which
+    # is not under test here.
+    monkeypatch.setattr("scripts.release.check_socket_budget", lambda *_: None)
 
 
 @pytest.mark.usefixtures("gate")

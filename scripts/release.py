@@ -13,7 +13,7 @@ import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
-from scripts.check import check_output_layout, default_lane, required_checks
+from scripts.check import check_socket_budget, default_lane, required_checks
 from scripts.common import (
     ROOT,
     GateError,
@@ -151,7 +151,7 @@ def check_release(
     output = output.resolve()
     if output.is_relative_to(root.resolve()):
         raise GateError("Release evidence must be outside the working tree")
-    check_output_layout(output / "checks", backends)
+    check_socket_budget(backends)
     gate = {
         "version": version,
         "revision": revision,

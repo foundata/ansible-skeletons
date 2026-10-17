@@ -7,7 +7,6 @@ import importlib.metadata
 import json
 import os
 import platform
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -31,6 +30,7 @@ from scripts.common import (
     digest,
     isolated_environment,
     matrix,
+    remove_tree,
     require_tools,
     run,
     source_digest,
@@ -39,13 +39,20 @@ from scripts.common import (
 )
 from scripts.controller import (
     NOX_LAYOUT,
+    PODMAN_LAYOUT,
+    RUNTIME_PLACEHOLDER,
+    RUNTIME_VARIABLE,
     SSH_CONTROL_LAYOUT,
     STEP_SLOTS,
-    check_socket_layout,
-    controller_environment,
+    TEMPORARY_LINK,
+    check_runtime_layout,
+    new_runtime_directory,
+    private_directory,
+    runtime_base,
+    temporary_environment,
 )
 from scripts.render import MODULE_PROFILES
-from scripts.smoke import IDENTITIES
+from scripts.smoke import IDENTITIES, remove_render_containers
 
 # Source paths, and the checks a change below them needs besides the static
 # checks and the repository tests. "lanes" are the role and collection lanes.
@@ -57,6 +64,11 @@ CHANGED_SCOPES = {
     "collection_modules/": ("collection_modules",),
     "collection_modules_appliance/": ("collection_modules_appliance",),
 }
+
+
+# A check without --output writes several gigabytes here, on disk rather than
+# on a tmpfs such as /tmp, and removes them at the end.
+SCRATCH = Path("/var/tmp")
 
 
 def default_lane() -> Lane:
@@ -170,11 +182,15 @@ def required_checks(*, full: bool, backends: list[str]) -> list[str]:
     ]
 
 
-def check_output_layout(output: Path, backends: list[str]) -> None:
-    """Budget every socket a check binds below its output, before any work."""
-    check_socket_layout(output, NOX_LAYOUT)
-    for backend in backends:
-        check_socket_layout(output / f"integration-{backend}", SSH_CONTROL_LAYOUT)
+def check_socket_budget(backends: list[str], runtime: Path | None = None) -> None:
+    """Budget every socket a check binds, before any work.
+
+    Every socket binds below a step's directory in the check's runtime
+    directory; without that directory, a name of the same length stands in.
+    """
+    step = (runtime or runtime_base() / RUNTIME_PLACEHOLDER) / STEP_SLOTS[-1]
+    tiers = [PODMAN_LAYOUT, SSH_CONTROL_LAYOUT] if backends else []
+    check_runtime_layout(step, NOX_LAYOUT, *tiers)
 
 
 @dataclass(frozen=True)
@@ -213,10 +229,8 @@ def identity_step(profile: str, index: int) -> str:
     return f"{profile}-identity{index + 1}"
 
 
-def check_controllers(
-    context: Context, runtime_output: Path, *, pythons: list[str]
-) -> None:
-    """Start a controller in every admitted Python below one runtime output."""
+def check_controllers(context: Context, records: Path, *, pythons: list[str]) -> None:
+    """Start a controller in every admitted Python in the step's TMPDIR."""
     for python in pythons:
         run(
             [
@@ -230,7 +244,7 @@ def check_controllers(
                 "-m",
                 "scripts.controller",
                 "--output",
-                str(runtime_output),
+                str(records),
             ],
             env=context.env,
             log=context.log,
@@ -366,14 +380,9 @@ def integration_tier(
 ) -> None:
     """Run one infrastructure tier of the generated Molecule scenarios."""
     output = context.output / f"integration-{backend}"
-    check_controllers(context, output, pythons=pythons)
-    evidence = context.output / "controller-checks" / output.name
-    evidence.mkdir(parents=True)
-    for record in output.glob("controller-python*.json"):
-        record.rename(evidence / record.name)
-    # Keep the tier's exclusive output-directory creation check.
-    (output / "t").rmdir()
-    output.rmdir()
+    check_controllers(
+        context, context.output / "controller-checks" / output.name, pythons=pythons
+    )
     run(
         uv_command(
             default_lane(),
@@ -559,31 +568,6 @@ def duration(seconds: float) -> str:
     return f"{minutes} min {rest} s" if minutes else f"{rest} s"
 
 
-def remove_render_containers(render: Path, log: TextIO) -> None:
-    """Remove containers that an interrupted ansible-test left in a render's store.
-
-    Only a store below the render qualifies; the user's own store never does.
-    """
-    home = render / "home"
-    if not (home / ".config/containers/storage.conf").is_file():
-        return
-    env = {
-        key: value
-        for key, value in os.environ.items()
-        if not key.startswith(("CONTAINER", "XDG_CONFIG_HOME", "XDG_DATA_HOME"))
-    }
-    env["HOME"] = str(home)
-    store = run(
-        ["podman", "info", "--format", "{{.Store.GraphRoot}}"],
-        env=env,
-        capture=True,
-        log=log,
-    ).strip()
-    if not Path(store).resolve().is_relative_to(render.resolve()):
-        raise GateError(f"Podman did not select the render's own store: {store}")
-    run(["podman", "rm", "--all", "--force", "--time", "0"], env=env, log=log)
-
-
 def remove_earlier(path: Path, output: Path, log: TextIO) -> None:
     """Remove what an earlier attempt of a step left below the run's output."""
     if not path.exists() and not path.is_symlink():
@@ -596,24 +580,29 @@ def remove_earlier(path: Path, output: Path, log: TextIO) -> None:
         path.unlink()
         return
     remove_render_containers(path, log)
-    try:
-        shutil.rmtree(path)
-    except PermissionError:
-        # Podman stores below a render hold files of subordinate users.
-        run(["podman", "unshare", "rm", "-rf", "--", str(path)], log=log)
+    # Podman stores below a render hold files of subordinate users.
+    remove_tree(path)
 
 
 class Runner:
     """Run steps in dependency order, a limited number at a time.
 
     Every finished step leaves a record bound to the digest of the sources it
-    checked. A passed record with the same sources and inputs is reused.
+    checked. A passed record with the same sources and inputs is reused. Each
+    step has a directory of its own in the check's runtime directory.
     """
 
     def __init__(
-        self, output: Path, steps: Sequence[Step], *, jobs: int, source: str = ""
+        self,
+        output: Path,
+        steps: Sequence[Step],
+        *,
+        jobs: int,
+        runtime: Path,
+        source: str = "",
     ) -> None:
         self.output = output
+        self.runtime = runtime
         self.steps = list(steps)
         self.jobs = jobs
         self.source = source
@@ -648,8 +637,9 @@ class Runner:
     def run_step(self, step: Step) -> bool:
         """Run one step with its own log and TMPDIR; record its outcome."""
         log_path = self.output / "logs" / f"{step.name}.log"
-        temporary = self.output / "t" / STEP_SLOTS[self.steps.index(step)]
-        env = {**os.environ, "TMPDIR": str(temporary)}
+        slot = STEP_SLOTS[self.steps.index(step)]
+        temporary = self.output / "t" / slot
+        runtime = self.runtime / slot
         self.record(step).unlink(missing_ok=True)
         self.say(f"start  {step.name}")
         began = time.monotonic()
@@ -659,7 +649,12 @@ class Runner:
                     for path in sorted(self.output.glob(pattern)):
                         remove_earlier(path, self.output, log)
                 remove_earlier(temporary, self.output, log)
-                temporary.mkdir(mode=0o700)
+                runtime.mkdir(mode=0o700)
+                env = temporary_environment(
+                    temporary,
+                    runtime / TEMPORARY_LINK,
+                    {**os.environ, RUNTIME_VARIABLE: str(runtime)},
+                )
                 step.action(Context(self.output, log, env))
                 passed = True
             # Any exception fails this step alone; the run reports it.
@@ -779,113 +774,118 @@ def check(
     if jobs < 1:
         raise GateError("--jobs must be at least 1")
     packages = [str(foundata_wheel.resolve())] if foundata_wheel else []
-    check_output_layout(output, selected)
-    steps = plan(
-        full=full, backends=selected, packages=packages, utils_source=utils_source
-    )
-    if changed:
-        paths = changed_paths()
-        kept = changed_only(steps, paths)
-        skipped = [
-            check
-            for check in required_checks(full=full, backends=selected)
-            if check not in {step.check for step in kept}
-        ]
+    # The check's sockets bind below a short directory it removes at the end.
+    with new_runtime_directory() as runtime:
+        check_socket_budget(selected, runtime)
+        steps = plan(
+            full=full, backends=selected, packages=packages, utils_source=utils_source
+        )
+        if changed:
+            paths = changed_paths()
+            kept = changed_only(steps, paths)
+            skipped = [
+                check
+                for check in required_checks(full=full, backends=selected)
+                if check not in {step.check for step in kept}
+            ]
+            print(
+                f"{len(paths)} paths differ from HEAD. Skipped, sources unchanged: "
+                f"{', '.join(skipped) or 'nothing'}",
+                flush=True,
+            )
+            steps = kept
+        source = source_digest()
+        if resume:
+            try:
+                earlier = json.loads((output / "run.json").read_text(encoding="utf-8"))
+            except FileNotFoundError as exc:
+                raise GateError(f"No check run to resume in {output}") from exc
+            if earlier.get("source") != source:
+                raise GateError(
+                    "The sources differ from the run being resumed; "
+                    "check them into a new output"
+                )
+            (output / "checks.json").unlink(missing_ok=True)
+        else:
+            output.mkdir(parents=True, exist_ok=False)
+        private_directory(output / "t")
+        write_json(
+            output / "run.json",
+            {"source": source, "full": full, "backends": selected, "changed": changed},
+        )
+        began = time.monotonic()
         print(
-            f"{len(paths)} paths differ from HEAD. Skipped, sources unchanged: "
-            f"{', '.join(skipped) or 'nothing'}",
+            f"Running {len(steps)} steps, up to {jobs} at a time; "
+            f"logs in {output / 'logs'}",
             flush=True,
         )
-        steps = kept
-    source = source_digest()
-    if resume:
         try:
-            earlier = json.loads((output / "run.json").read_text(encoding="utf-8"))
-        except FileNotFoundError as exc:
-            raise GateError(f"No check run to resume in {output}") from exc
-        if earlier.get("source") != source:
-            raise GateError(
-                "The sources differ from the run being resumed; "
-                "check them into a new output"
-            )
-        (output / "checks.json").unlink(missing_ok=True)
-    else:
-        output.mkdir(parents=True, exist_ok=False)
-    controller_environment(output, {})
-    write_json(
-        output / "run.json",
-        {"source": source, "full": full, "backends": selected, "changed": changed},
-    )
-    began = time.monotonic()
-    print(
-        f"Running {len(steps)} steps, up to {jobs} at a time; "
-        f"logs in {output / 'logs'}",
-        flush=True,
-    )
-    try:
-        status = Runner(output, steps, jobs=jobs, source=source).execute()
-    finally:
-        if source_digest() != source:
-            # Records no longer say which sources their steps checked.
-            write_json(
-                output / "run.json",
-                {
-                    "source": None,
-                    "full": full,
-                    "backends": selected,
-                    "changed": changed,
-                },
-            )
+            status = Runner(
+                output, steps, jobs=jobs, runtime=runtime, source=source
+            ).execute()
+        finally:
+            if source_digest() != source:
+                # Records no longer say which sources their steps checked.
+                write_json(
+                    output / "run.json",
+                    {
+                        "source": None,
+                        "full": full,
+                        "backends": selected,
+                        "changed": changed,
+                    },
+                )
+                print(
+                    "warning: the sources changed during the run; it cannot be resumed",
+                    file=sys.stderr,
+                )
+        failed = [name for name, outcome in status.items() if outcome == "failed"]
+        if failed:
+            raise GateError(f"Failed: {', '.join(failed)}; logs in {output / 'logs'}")
+        checks = completed_checks(steps, status)
+        if changed:
+            # A partial run never writes a passing report.
             print(
-                "warning: the sources changed during the run; it cannot be resumed",
-                file=sys.stderr,
+                f"Changed-only checks passed in {duration(time.monotonic() - began)}. "
+                "Run the full quick check before committing."
             )
-    failed = [name for name, outcome in status.items() if outcome == "failed"]
-    if failed:
-        raise GateError(f"Failed: {', '.join(failed)}; logs in {output / 'logs'}")
-    checks = completed_checks(steps, status)
-    if changed:
-        # A partial run never writes a passing report.
-        print(
-            f"Changed-only checks passed in {duration(time.monotonic() - began)}. "
-            "Run the full quick check before committing."
+            return
+        if checks != required_checks(full=full, backends=selected):
+            raise GateError("Incomplete check run")
+        for profile in MODULE_PROFILES:
+            if (output / profile).is_dir():
+                write_json(
+                    output / profile / "profile.json",
+                    {"profile": profile, "full": full},
+                )
+        artifacts = {
+            str(path.relative_to(output)): digest(path)
+            for path in output.rglob("artifacts/*.tar.gz")
+        }
+        write_json(
+            output / "checks.json",
+            {
+                "checks": checks,
+                "artifacts": artifacts,
+                "foundata-wheel": (
+                    {"name": foundata_wheel.name, "sha256": digest(foundata_wheel)}
+                    if foundata_wheel
+                    else None
+                ),
+                "environments": {
+                    path.parent.name: json.loads(path.read_text(encoding="utf-8"))
+                    for path in output.glob("*/environment.json")
+                },
+                "python": platform.python_version(),
+                "tools": {
+                    name: importlib.metadata.version(name)
+                    for name in ("ruff", "mypy", "pytest", "reuse", "rumdl")
+                },
+            },
         )
-        return
-    if checks != required_checks(full=full, backends=selected):
-        raise GateError("Incomplete check run")
-    for profile in MODULE_PROFILES:
-        if (output / profile).is_dir():
-            write_json(
-                output / profile / "profile.json", {"profile": profile, "full": full}
-            )
-    artifacts = {
-        str(path.relative_to(output)): digest(path)
-        for path in output.rglob("artifacts/*.tar.gz")
-    }
-    write_json(
-        output / "checks.json",
-        {
-            "checks": checks,
-            "artifacts": artifacts,
-            "foundata-wheel": (
-                {"name": foundata_wheel.name, "sha256": digest(foundata_wheel)}
-                if foundata_wheel
-                else None
-            ),
-            "environments": {
-                path.parent.name: json.loads(path.read_text(encoding="utf-8"))
-                for path in output.glob("*/environment.json")
-            },
-            "python": platform.python_version(),
-            "tools": {
-                name: importlib.metadata.version(name)
-                for name in ("ruff", "mypy", "pytest", "reuse", "rumdl")
-            },
-        },
-    )
-    print(
-        f"All checks passed in {duration(time.monotonic() - began)}. Results: {output}"
-    )
+        print(
+            f"All checks passed in {duration(time.monotonic() - began)}. Results: {output}"
+        )
 
 
 def main() -> int:
@@ -948,9 +948,13 @@ def main() -> int:
         elif args.output:
             run_check(args.output.resolve())
         else:
-            # A short name keeps the temporary output within the socket budget.
-            with tempfile.TemporaryDirectory(prefix="sk-") as temporary:
-                run_check(Path(temporary).resolve() / "o")
+            temporary = Path(
+                tempfile.mkdtemp(prefix="ansible-skeletons-check-", dir=SCRATCH)
+            )
+            try:
+                run_check(temporary / "output")
+            finally:
+                remove_tree(temporary)
     except (GateError, OSError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

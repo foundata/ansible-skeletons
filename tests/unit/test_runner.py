@@ -22,7 +22,6 @@ from scripts.check import (
     Step,
     changed_only,
     changed_paths,
-    check_output_layout,
     completed_checks,
     default_lane,
     identity_step,
@@ -37,18 +36,21 @@ from scripts.render import MODULE_PROFILES
 @pytest.fixture
 def output(tmp_path: Path) -> Path:
     (tmp_path / "t").mkdir(mode=0o700)
+    (tmp_path / "runtime").mkdir(mode=0o700)
     return tmp_path
+
+
+def runner(output: Path, steps: list[Step], **options: Any) -> Runner:
+    """Run steps in a new runtime directory, as every check does."""
+    runtime = Path(tempfile.mkdtemp(dir=output / "runtime"))
+    return Runner(output, steps, runtime=runtime, **options)
 
 
 @pytest.fixture
 def unbudgeted(monkeypatch: pytest.MonkeyPatch) -> None:
-    # pytest's temporary paths exceed the socket budget, which is not under test.
-    def private_temporary(output: Path, env: dict[str, str]) -> dict[str, str]:
-        (output / "t").mkdir(mode=0o700, exist_ok=True)
-        return env
-
-    monkeypatch.setattr(check_module, "check_output_layout", lambda *_: None)
-    monkeypatch.setattr(check_module, "controller_environment", private_temporary)
+    # The tests' runtime directory may be too deep for the socket budget, which
+    # is not under test here.
+    monkeypatch.setattr(check_module, "check_socket_budget", lambda *_: None)
 
 
 def recorder(log: list[str], name: str) -> Callable[[Context], None]:
@@ -65,7 +67,7 @@ def test_one_job_keeps_the_plan_order(output: Path) -> None:
         Step("b", recorder(ran, "b"), long=True),
         Step("c", recorder(ran, "c"), ("a",)),
     ]
-    status = Runner(output, steps, jobs=1).execute()
+    status = runner(output, steps, jobs=1).execute()
     assert ran == ["a", "b", "c"]
     assert status == {"a": "passed", "b": "passed", "c": "passed"}
 
@@ -78,7 +80,7 @@ def test_independent_steps_run_at_the_same_time(output: Path) -> None:
         barrier.wait()
 
     steps = [Step("a", meet), Step("b", meet)]
-    assert set(Runner(output, steps, jobs=2).execute().values()) == {"passed"}
+    assert set(runner(output, steps, jobs=2).execute().values()) == {"passed"}
 
 
 def test_long_steps_start_first_with_several_jobs(output: Path) -> None:
@@ -88,13 +90,13 @@ def test_long_steps_start_first_with_several_jobs(output: Path) -> None:
         Step("c", recorder([], "c")),
         Step("d", recorder([], "d"), long=True),
     ]
-    assert [step.name for step in Runner(output, steps, jobs=2).order()] == [
+    assert [step.name for step in runner(output, steps, jobs=2).order()] == [
         "b",
         "d",
         "a",
         "c",
     ]
-    assert [step.name for step in Runner(output, steps, jobs=1).order()] == [
+    assert [step.name for step in runner(output, steps, jobs=1).order()] == [
         "a",
         "b",
         "c",
@@ -115,7 +117,7 @@ def test_a_failure_stops_one_job_and_spares_independent_parallel_steps(
         Step("later", recorder([], "later")),
         Step("dependent", recorder([], "dependent"), ("fail",)),
     ]
-    status = Runner(output, steps, jobs=jobs).execute()
+    status = runner(output, steps, jobs=jobs).execute()
     assert status == {
         "fail": "failed",
         "later": "not run" if jobs == 1 else "passed",
@@ -128,7 +130,7 @@ def test_dependents_of_a_failed_step_never_start(output: Path) -> None:
         raise GateError("broken")
 
     steps = [Step("a", fail), Step("b", recorder([], "b"), ("a",))]
-    assert Runner(output, steps, jobs=4).execute() == {"a": "failed", "b": "not run"}
+    assert runner(output, steps, jobs=4).execute() == {"a": "failed", "b": "not run"}
 
 
 def test_serial_steps_never_overlap(output: Path) -> None:
@@ -145,7 +147,7 @@ def test_serial_steps_never_overlap(output: Path) -> None:
 
     steps = [Step(name, tier, serial=True) for name in ("podman", "libvirt", "ee")]
     steps.append(Step("quick", recorder([], "quick")))
-    assert set(Runner(output, steps, jobs=4).execute().values()) == {"passed"}
+    assert set(runner(output, steps, jobs=4).execute().values()) == {"passed"}
     assert active[1] == 1
 
 
@@ -160,13 +162,20 @@ def test_steps_have_private_logs_and_temporary_directories(output: Path) -> None
         return action
 
     steps = [Step(name, note(name)) for name in ("a", "b", "c")]
-    Runner(output, steps, jobs=3).execute()
+    runner(output, steps, jobs=3).execute()
     assert len(set(seen.values())) == 3
     for name, temporary in seen.items():
-        path = Path(temporary)
+        # TMPDIR is a short link in the step's runtime directory to a private
+        # directory in the output.
+        link = Path(temporary)
+        assert link.is_symlink()
+        assert link.parent.parent.parent == output / "runtime"
+        assert len(link.parent.name) == 1
+        path = link.resolve()
         assert path.parent == output / "t"
         assert len(path.name) == 1
         assert not path.stat().st_mode & 0o077
+        assert not link.parent.stat().st_mode & 0o077
         log = output / "logs" / f"{name}.log"
         assert log.read_text(encoding="utf-8") == f"output of {name}\n"
 
@@ -182,7 +191,7 @@ def test_a_failed_step_prints_its_log_tail_and_path(
     def crash(_context: Context) -> None:
         raise RuntimeError("unexpected")
 
-    Runner(output, [Step("a", fail), Step("b", crash)], jobs=1).execute()
+    runner(output, [Step("a", fail), Step("b", crash)], jobs=1).execute()
     printed = capsys.readouterr().out
     assert f"FAILED a after 0 s; log: {output / 'logs/a.log'}" in printed
     assert "    line 59\n" in printed
@@ -190,7 +199,7 @@ def test_a_failed_step_prints_its_log_tail_and_path(
     assert "    error: broken" in printed
     # Steps after a failure do not start.
     assert "start  b" not in printed
-    Runner(output, [Step("b", crash)], jobs=1).execute()
+    runner(output, [Step("b", crash)], jobs=1).execute()
     log = (output / "logs/b.log").read_text(encoding="utf-8")
     assert "Traceback" in log
     assert "error: unexpected" in log
@@ -272,21 +281,31 @@ def test_invalid_jobs_are_rejected_before_any_output(tmp_path: Path) -> None:
     assert not (tmp_path / "output").exists()
 
 
-def test_temporary_output_fits_the_socket_budget(
+def test_a_check_without_output_removes_its_temporary_output(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     used: list[Path] = []
 
     def record(output: Path, **_options: object) -> None:
-        check_output_layout(output, ["podman", "libvirt", "ee"])
+        # Tools leave directories without write permission.
+        (output / "locked").mkdir(parents=True)
+        (output / "locked/file").write_text("kept by nobody\n", encoding="utf-8")
+        (output / "locked").chmod(0o500)
         used.append(output)
 
-    monkeypatch.setattr(tempfile, "tempdir", "/tmp")
+    monkeypatch.setattr(check_module, "SCRATCH", tmp_path)
     monkeypatch.setattr(check_module, "check", record)
     monkeypatch.setattr(sys, "argv", ["check"])
     assert check_module.main() == 0
     assert len(used) == 1
-    assert used[0].parent.name.startswith("sk-")
+    assert used[0].parent.parent == tmp_path
+    assert not list(tmp_path.iterdir())
+
+
+def test_a_check_without_output_works_on_disk() -> None:
+    # The output holds container storage and several gigabytes; /tmp is often
+    # a tmpfs.
+    assert check_module.SCRATCH == Path("/var/tmp")
 
 
 def test_passed_records_of_the_same_sources_are_reused(output: Path) -> None:
@@ -303,10 +322,10 @@ def test_passed_records_of_the_same_sources_are_reused(output: Path) -> None:
         Step("b", fail_once, owns=("b-output",)),
         Step("c", recorder(ran, "c"), ("b",)),
     ]
-    first = Runner(output, steps, jobs=1, source="tree").execute()
+    first = runner(output, steps, jobs=1, source="tree").execute()
     assert first == {"a": "passed", "b": "failed", "c": "not run"}
     # The rerun replaces what the failed attempt left; "a" is not run again.
-    second = Runner(output, steps, jobs=1, source="tree").execute()
+    second = runner(output, steps, jobs=1, source="tree").execute()
     assert second == {"a": "passed", "b": "passed", "c": "passed"}
     assert ran == ["a", "b", "b", "c"]
     record = json.loads((output / "records/b.json").read_text(encoding="utf-8"))
@@ -322,11 +341,11 @@ def test_records_of_other_sources_or_inputs_are_not_reused(
     output: Path, source: str, inputs: str
 ) -> None:
     ran: list[str] = []
-    Runner(
+    runner(
         output, [Step("a", recorder(ran, "a"), inputs="one")], jobs=1, source="tree"
     ).execute()
     step = Step("a", recorder(ran, "a"), inputs=inputs)
-    assert Runner(output, [step], jobs=1, source=source).execute() == {"a": "passed"}
+    assert runner(output, [step], jobs=1, source=source).execute() == {"a": "passed"}
     assert ran == ["a", "a"]
 
 
@@ -553,22 +572,24 @@ def fake_podman(
         calls.append((command, dict(options.get("env") or {})))
         return f"{store}\n" if command[:2] == ["podman", "info"] else ""
 
-    monkeypatch.setattr(check_module, "run", run)
+    monkeypatch.setattr("scripts.smoke.run", run)
     return calls
 
 
-def render_with_store(output: Path) -> Path:
+def render_with_store(output: Path, run_root: Path) -> Path:
     render = output / "collection_modules/module_fixture"
     config = render / "home/.config/containers/storage.conf"
     config.parent.mkdir(parents=True)
-    config.write_text("[storage]\n", encoding="utf-8")
+    config.write_text(f'[storage]\nrunroot = "{run_root}"\n', encoding="utf-8")
     return render
 
 
 def test_a_rerun_removes_containers_from_the_render_store(
     output: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    render = render_with_store(output)
+    run_root = output / "runtime/p0"
+    run_root.mkdir()
+    render = render_with_store(output, run_root)
     calls = fake_podman(monkeypatch, render / "home/.local/share/containers/storage")
     monkeypatch.setenv("XDG_CONFIG_HOME", "/user/config")
     monkeypatch.setenv("CONTAINERS_STORAGE_CONF", "/user/storage.conf")
@@ -584,10 +605,26 @@ def test_a_rerun_removes_containers_from_the_render_store(
     assert not render.exists()
 
 
+def test_a_rerun_leaves_a_store_alone_whose_run_root_is_gone(
+    output: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Podman would create the run root again, in a runtime directory that the
+    # earlier run removed together with its containers.
+    run_root = output / "runtime/sk-gone/0/p0"
+    render = render_with_store(output, run_root)
+    calls = fake_podman(monkeypatch, render / "home/.local/share/containers/storage")
+    remove_earlier(render, output.resolve(), io.StringIO())
+    assert calls == []
+    assert not render.exists()
+    assert not (output / "runtime/sk-gone").exists()
+
+
 def test_a_rerun_never_removes_containers_from_another_store(
     output: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    render = render_with_store(output)
+    run_root = output / "runtime/p0"
+    run_root.mkdir()
+    render = render_with_store(output, run_root)
     calls = fake_podman(monkeypatch, Path("/home/user/.local/share/containers/storage"))
     with pytest.raises(GateError, match="own store"):
         remove_earlier(render, output.resolve(), io.StringIO())

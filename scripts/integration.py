@@ -17,10 +17,14 @@ import yaml
 
 from scripts.common import ROOT, GateError, require_tools, run, write_json
 from scripts.controller import (
+    PODMAN_LAYOUT,
+    PODMAN_RUNTIME,
     SSH_CONTROL_DIRECTORY,
     SSH_CONTROL_LAYOUT,
-    check_socket_layout,
-    controller_environment,
+    TIER_TEMPORARY_LINK,
+    check_runtime_layout,
+    runtime_directory,
+    temporary_environment,
 )
 from scripts.render import Rendered, example_metadata, render
 from scripts.smoke import pinned_archives
@@ -116,22 +120,29 @@ def configure_scenario(
     fixture_tasks(project, molecule, collection=(project / "galaxy.yml").is_file())
 
 
-def podman_environment(output: Path, env: dict[str, str]) -> dict[str, str]:
-    """Keep storage, locks and the rootless pause process inside this run."""
+def podman_environment(
+    output: Path, runtime: Path, env: dict[str, str]
+) -> dict[str, str]:
+    """Keep storage, locks and the rootless pause process inside this run.
+
+    Images and containers stay in the output; run state, the temporary
+    directory and any socket go to the runtime directory. TMPDIR stays the
+    caller's, which the path check requires to be private.
+    """
     output = output.resolve()
-    env = controller_environment(output, env)
+    check_runtime_layout(runtime, PODMAN_LAYOUT)
     storage = output / "podman"
     storage.mkdir()
-    runtime = output / "r"
-    runtime.mkdir(mode=0o700)
-    (runtime / "libpod/tmp").mkdir(parents=True, mode=0o700)
+    state = runtime / PODMAN_RUNTIME
+    state.mkdir(mode=0o700)
+    (state / "libpod/tmp").mkdir(parents=True, mode=0o700)
     temporary = storage / "tmp"
     temporary.mkdir()
     config = storage / "storage.conf"
     config.write_text(
         "[storage]\n"
         'driver = "overlay"\n'
-        f"runroot = {json.dumps(str(storage / 'run'))}\n"
+        f"runroot = {json.dumps(str(state / 'run'))}\n"
         f"graphroot = {json.dumps(str(storage / 'graph'))}\n"
         f"rootless_storage_path = {json.dumps(str(storage / 'graph'))}\n",
         encoding="utf-8",
@@ -140,7 +151,7 @@ def podman_environment(output: Path, env: dict[str, str]) -> dict[str, str]:
     engine.write_text(
         '[engine]\nlock_type = "file"\n'
         f"static_dir = {json.dumps(str(storage / 'graph/libpod'))}\n"
-        f"tmp_dir = {json.dumps(str(runtime / 't'))}\n",
+        f"tmp_dir = {json.dumps(str(state / 't'))}\n",
         encoding="utf-8",
     )
     isolated = {
@@ -159,28 +170,28 @@ def podman_environment(output: Path, env: dict[str, str]) -> dict[str, str]:
         "CONTAINERS_STORAGE_CONF": str(config),
         "CONTAINERS_CONF": str(engine),
         "XDG_CONFIG_HOME": str(storage / "config"),
-        "XDG_RUNTIME_DIR": str(runtime),
+        "XDG_RUNTIME_DIR": str(state),
     }
 
 
-def check_podman_paths(output: Path, env: dict[str, str]) -> None:
+def check_podman_paths(output: Path, runtime: Path, env: dict[str, str]) -> None:
     """Refuse cleanup unless effective storage and runtime paths are private."""
-    output = output.resolve()
+    roots = (output.resolve(), runtime.resolve())
 
     def private(value: object) -> Path:
         if not isinstance(value, str) or not Path(value).is_absolute():
             raise GateError(f"Missing absolute Podman runtime path: {value!r}")
         path = Path(value).resolve()
-        if path == output or not path.is_relative_to(output):
+        if not any(path != root and path.is_relative_to(root) for root in roots):
             raise GateError(f"Podman runtime path is outside this run: {value}")
         return path
 
     storage_conf = private(env.get("CONTAINERS_STORAGE_CONF"))
     engine_conf = private(env.get("CONTAINERS_CONF"))
-    runtime = private(env.get("XDG_RUNTIME_DIR"))
+    state = private(env.get("XDG_RUNTIME_DIR"))
     private(env.get("XDG_CONFIG_HOME"))
     private(env.get("TMPDIR"))
-    if runtime.stat().st_mode & 0o077:
+    if state.stat().st_mode & 0o077:
         raise GateError("Podman runtime directory must be private to its owner")
     with engine_conf.open("rb") as stream:
         engine = tomllib.load(stream)["engine"]
@@ -256,9 +267,9 @@ def check_podman_paths(output: Path, env: dict[str, str]) -> None:
             raise GateError(f"Podman selected another {label}")
 
 
-def reset_podman(output: Path, env: dict[str, str]) -> None:
+def reset_podman(output: Path, runtime: Path, env: dict[str, str]) -> None:
     """Recheck the effective paths immediately before destructive cleanup."""
-    check_podman_paths(output, env)
+    check_podman_paths(output, runtime, env)
     run(
         ["podman", "--remote=false", "system", "reset", "--force"], env=env, timeout=180
     )
@@ -298,7 +309,6 @@ def integration(backend: str, output: Path, collections: Path | None = None) -> 
     ``collections`` names the run's downloads of the pinned Galaxy collections;
     without it, they come from Galaxy.
     """
-    check_socket_layout(output, SSH_CONTROL_LAYOUT)
     require_tools("molecule", "ansible-galaxy", "ansible-lint")
     if backend in ("podman", "ee"):
         require_tools("podman")
@@ -309,17 +319,33 @@ def integration(backend: str, output: Path, collections: Path | None = None) -> 
         run(["virsh", "--connect", "qemu:///session", "list"], timeout=30)
         if not os.access("/dev/kvm", os.R_OK | os.W_OK):
             raise GateError("libvirt integration requires access to /dev/kvm")
-    output.mkdir(parents=True, exist_ok=False)
-    rendered = render(output / "rendered", metadata=example_metadata())
-    env = controller_environment(output, rendered.env)
+    with runtime_directory() as runtime:
+        check_runtime_layout(runtime, PODMAN_LAYOUT, SSH_CONTROL_LAYOUT)
+        output.mkdir(parents=True, exist_ok=False)
+        rendered = render(output / "rendered", metadata=example_metadata())
+        env = temporary_environment(
+            output / "t", runtime / TIER_TEMPORARY_LINK, rendered.env
+        )
+        tier(backend, output, runtime, rendered, env, collections)
+
+
+def tier(
+    backend: str,
+    output: Path,
+    runtime: Path,
+    rendered: Rendered,
+    env: dict[str, str],
+    collections: Path | None,
+) -> None:
+    """Run both projects' scenarios of one tier in a prepared environment."""
     # SSH control sockets would otherwise live in ~/.ansible/cp of the rendered
     # home, too deep for the socket path limit.
-    control = output / SSH_CONTROL_DIRECTORY
+    control = runtime / SSH_CONTROL_DIRECTORY
     control.mkdir(mode=0o700)
     env["ANSIBLE_SSH_CONTROL_PATH_DIR"] = str(control)
     if backend in ("podman", "ee"):
-        env = podman_environment(output, env)
-        check_podman_paths(output, env)
+        env = podman_environment(output, runtime, env)
+        check_podman_paths(output, runtime, env)
     env["MOLECULE_GLOB"] = "{molecule,extensions/molecule}/*/molecule.yml"
     env["MOLECULE_VM_CACHE_DIR"] = str(output / "vm-images")
     run(
@@ -384,7 +410,7 @@ def integration(backend: str, output: Path, collections: Path | None = None) -> 
             )
     finally:
         if backend in ("podman", "ee"):
-            reset_podman(output, env)
+            reset_podman(output, runtime, env)
     write_json(output / "integration.json", {"backend": backend, "results": evidence})
 
 

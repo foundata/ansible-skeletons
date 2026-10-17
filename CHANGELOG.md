@@ -39,6 +39,11 @@ and the project adheres to
   generated lint, the module renders and the infrastructure tiers. The module
   renders' ansible-test containers use a Podman store of each render's own
   that reads your images read-only instead of pulling them again.
+- checks: an output may have any path; the 29-byte limit is gone. Python's
+  multiprocessing listeners, the generated collection's `docs-check` workers,
+  Podman and Molecule's SSH connections bind their Unix sockets in a short
+  directory that the check creates in `XDG_RUNTIME_DIR` and removes at the
+  end. Without `--output`, the check works below `/var/tmp` instead of `/tmp`.
 
 ### Fixed
 
