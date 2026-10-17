@@ -25,6 +25,37 @@ from ansible_collections.{{ namespace }}.\
 from ..conftest import RunModule
 
 
+@pytest.fixture(autouse=True)
+def compatible(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Record compatibility checks instead of asking a product."""
+    checks: list[str] = []
+    monkeypatch.setattr(
+        _activation.Binding,
+        "compatibility",
+        lambda self, operation: checks.append(operation),
+    )
+    return checks
+
+
+def run_main(compare: Any, apply: Any, **options: Any) -> Any:
+    def main() -> None:
+        module = AnsibleModule(
+            argument_spec=_activation.argument_spec(), supports_check_mode=True
+        )
+        _activation.run(
+            module,
+            operation_id="synthetic_apply",
+            label="synthetic state",
+            name_pattern=r"[a-z]+",
+            compare=compare,
+            apply=apply,
+            settle_seconds=0,
+            **options,
+        )
+
+    return main
+
+
 @pytest.mark.parametrize("category", ["timeout", "transport", "response"])
 @pytest.mark.parametrize(
     "before,after,activate,success",
@@ -56,49 +87,37 @@ from ..conftest import RunModule
             {"one": "drift", "two": "unverifiable"},
             {"one": "in_sync", "two": "unverifiable"},
             "auto",
-            True,
+            False,
         ),
         ({"one": "in_sync"}, {"one": "in_sync"}, "always", False),
     ],
 )
 def test_lost_reply_requires_each_triggering_object_observed_in_sync(
     run_module: RunModule,
-    monkeypatch: pytest.MonkeyPatch,
     category: str,
     before: dict[str, str],
     after: dict[str, str] | None,
     activate: str,
     success: bool,
 ) -> None:
-    monkeypatch.setattr(_activation._compat, "check", lambda *args: None)
     writes = []
+    reads: list[list[str]] = []
 
     def apply(client: Any) -> None:
         writes.append(client)
         raise errors.ApiError(category=category)
 
     def compare(client: Any, names: list[str]) -> dict[str, str]:
+        reads.append(names)
+        if len(reads) == 1:
+            return before
         if after is None:
             raise errors.ApiError(category="transport")
         return after
 
-    def main() -> None:
-        module = AnsibleModule(
-            argument_spec=_activation.argument_spec(), supports_check_mode=True
-        )
-        _activation.run(
-            module,
-            operation_id="synthetic:apply",
-            label="synthetic state",
-            name_pattern=r"[a-z]+",
-            compare=lambda *_: before,
-            apply=apply,
-            settle=lambda client, names: _activation.settle(
-                client, names, compare, limit=0
-            ),
-        )
-
-    result = run_module(main, verify=list(before), activate=activate)
+    result = run_module(
+        run_main(compare, apply), verify=list(before), activate=activate
+    )
     assert len(writes) == 1 and result["changed"]
     if success:
         assert not result.get("failed") and result["verified"] == "observed"
@@ -125,7 +144,9 @@ def test_activation_follows_the_binding_probe_policy(
     events: list[str] = []
     monkeypatch.setattr(_activation.Binding, "compatibility_always", always)
     monkeypatch.setattr(
-        _activation._compat, "check", lambda *args: events.append("compatibility")
+        _activation.Binding,
+        "compatibility",
+        lambda self, operation: events.append("compatibility"),
     )
 
     def compare(client: Any, names: list[str]) -> dict[str, str]:
@@ -133,20 +154,181 @@ def test_activation_follows_the_binding_probe_policy(
         stale = drift and "apply" not in events
         return dict.fromkeys(names, "drift" if stale else "in_sync")
 
-    def main() -> None:
-        module = AnsibleModule(
-            argument_spec=_activation.argument_spec(), supports_check_mode=True
-        )
-        _activation.run(
-            module,
-            operation_id="synthetic_apply",
-            label="synthetic state",
-            name_pattern=r"[a-z]+",
-            compare=compare,
-            apply=lambda client: events.append("apply"),
-            settle=compare,
-        )
-
-    result = run_module(main, verify=["one"])
+    result = run_module(
+        run_main(compare, lambda client: events.append("apply")), verify=["one"]
+    )
     assert result["changed"] is drift and not result.get("failed")
     assert events == expected
+
+
+class Area(_activation.Activation):
+    """An in-memory area: saved and loaded values, optional pending work."""
+
+    compatibility_id = "area_apply"
+    name_pattern = r"[a-z]+"
+    settle_seconds = 0.0
+
+    def __init__(self, module: Any, state: dict[str, Any]) -> None:
+        super().__init__(module)
+        self.state = state
+
+    def compare(self, identities: dict[str, Any]) -> dict[str, str]:
+        self.state["compared"].append(dict(identities))
+        names = set(identities) | (set(self.state["saved"]) if self.owned else set())
+        status = {}
+        for name in sorted(names):
+            saved = self.state["saved"].get(name)
+            loaded = self.state["loaded"].get(name)
+            status[name] = (
+                "unverifiable"
+                if saved == "opaque"
+                else "in_sync"
+                if saved == loaded
+                else "drift"
+            )
+        return status
+
+    def pending(self) -> dict[str, Any] | None:
+        if self.state.get("pending") is None:
+            return None
+        return dict.fromkeys(self.state["pending"])
+
+    def protect(self) -> None:
+        if self.state.get("refuse"):
+            raise _activation.ProductError(category="eligibility", code="referenced")
+
+    def activate(self) -> None:
+        self.state["applies"] += 1
+        if not self.state.get("stuck"):
+            self.state["loaded"] = dict(self.state["saved"])
+        self.state["pending"] = None if self.state.get("pending") is None else []
+        if self.state.get("lose"):
+            raise errors.ApiError(category="timeout", code="socket_timeout")
+
+
+def area_main(state: dict[str, Any], **settings: Any) -> Any:
+    def main() -> None:
+        module = AnsibleModule(
+            argument_spec=_activation.argument_spec(objects=True),
+            supports_check_mode=True,
+        )
+        activation = Area(module, state)
+        for name, value in settings.items():
+            setattr(activation, name, value)
+        activation.execute(activation.verify_activation)
+
+    return main
+
+
+def area(**values: Any) -> dict[str, Any]:
+    return {
+        "saved": {},
+        "loaded": {},
+        "compared": [],
+        "applies": 0,
+        **values,
+    }
+
+
+def test_an_owned_area_compares_every_object_without_verify(
+    run_module: RunModule,
+) -> None:
+    state = area(saved={"one": "1", "two": "2"}, loaded={"one": "1"})
+    named = run_module(area_main(state), verify=[])
+    assert named["failed"] and named["error_code"] == "validation_failed"
+    result = run_module(area_main(state, owned=True), verify=[])
+    assert result["changed"] and result["verification"] == {
+        "one": "in_sync",
+        "two": "in_sync",
+    }
+    assert state["applies"] == 1 and state["compared"][-1] == {}
+
+
+def test_object_items_carry_their_uuid_as_identity(run_module: RunModule) -> None:
+    state = area(saved={"one": "1"}, loaded={"one": "1"})
+    uuid = "0f8fad5b-d9cb-469f-a165-70867728950e"
+    result = run_module(area_main(state), verify=[{"name": "one", "uuid": uuid}])
+    assert not result["changed"] and state["compared"] == [{"one": uuid}]
+    for verify in (
+        [{"name": "one", "uuid": "not-a-uuid"}],
+        [{"name": "one", "uuid": uuid}, {"name": "one"}],
+    ):
+        refused = run_module(area_main(state), verify=verify)
+        assert refused["failed"] and refused["error_code"] == "validation_failed"
+        assert refused["fields"] == ["verify"] and not refused["changed"]
+
+
+@pytest.mark.parametrize("apply_unverifiable", [False, True])
+def test_unverifiable_objects_apply_only_when_the_area_asks(
+    run_module: RunModule, apply_unverifiable: bool
+) -> None:
+    state = area(saved={"one": "opaque"}, loaded={"one": "opaque"})
+    result = run_module(
+        area_main(state, apply_unverifiable=apply_unverifiable),
+        verify=[{"name": "one"}],
+    )
+    assert result["changed"] is apply_unverifiable
+    assert result["verified"] == "unverifiable"
+    assert state["applies"] == int(apply_unverifiable)
+
+
+def test_pending_work_drives_the_activation(run_module: RunModule) -> None:
+    state = area(
+        saved={"one": "1", "two": "2"},
+        loaded={"one": "1"},
+        pending=["two"],
+    )
+    predicted = run_module(
+        area_main(state, owned=True), verify=[], _ansible_check_mode=True
+    )
+    assert predicted["verification"] == {"one": "in_sync", "two": "drift"}
+    assert predicted["verified"] == "predicted" and not state["applies"]
+    applied = run_module(area_main(state, owned=True), verify=[])
+    assert applied["verification"] == {"two": "in_sync"}
+    assert applied["verified"] == "observed" and state["applies"] == 1
+    quiet = run_module(area_main(state, owned=True), verify=[])
+    assert not quiet["changed"] and quiet["verified"] == "observed"
+    forced = run_module(area_main(state, owned=True), verify=[], activate="always")
+    assert forced["changed"] and forced["verified"] == "unverifiable"
+
+
+def test_drift_without_pending_work_is_refused_before_applying(
+    run_module: RunModule,
+) -> None:
+    state = area(saved={"one": "1"}, loaded={"one": "0"}, pending=[])
+    result = run_module(area_main(state, owned=True), verify=[])
+    assert result["failed"] and result["error_code"] == "not_effective"
+    assert result["not_effective"] == ["one"] and result["outcome"] == "unchanged"
+    assert result["operation"] == "compare" and not state["applies"]
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_protect_refuses_before_check_mode_returns(
+    run_module: RunModule, check_mode: bool
+) -> None:
+    state = area(saved={"one": "1"}, refuse=True)
+    result = run_module(
+        area_main(state), verify=[{"name": "one"}], _ansible_check_mode=check_mode
+    )
+    assert result["failed"] and result["error_code"] == "referenced"
+    assert result["operation"] == "protect" and not state["applies"]
+
+
+def test_a_lost_reply_on_pending_work_settles_by_reading_back(
+    run_module: RunModule,
+) -> None:
+    state = area(saved={"one": "1"}, pending=["one"], lose=True)
+    result = run_module(area_main(state, owned=True), verify=[])
+    assert not result.get("failed") and result["verification"] == {"one": "in_sync"}
+    assert state["applies"] == 1
+
+
+def test_an_acknowledged_apply_that_never_converges_names_the_objects(
+    run_module: RunModule,
+) -> None:
+    state = area(saved={"one": "1", "two": "2"}, loaded={"two": "2"}, stuck=True)
+    result = run_module(area_main(state, owned=True), verify=[])
+    assert result["failed"] and result["error_code"] == "not_effective"
+    assert result["not_effective"] == ["one"] and result["operation"] == "verify"
+    assert result["changed"] and result["outcome"] == "changed"
+    assert result["msg"].startswith("Activation failed")

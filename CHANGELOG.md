@@ -64,6 +64,11 @@ and the project adheres to
   `ensure_compatible` in `lookup`), that `execute(action)` is the shape for a
   write whose read-back is expensive or impossible after a timeout, and that
   `finish()` also runs after an action and after `act_once`.
+- Both module variants: after a lost apply reply, the verifying activation
+  fails with the outcome unknown while a compared object stays unverifiable;
+  an acknowledged apply that does not converge reports `outcome: changed`.
+  Its failures carry the lifecycle base's fields, with the objects that did
+  not converge under `not_effective`.
 
 ### Fixed
 
@@ -80,6 +85,16 @@ and the project adheres to
 
 ### Added
 
+- Both module variants: `Activation` in `_activation.py` is the verifying
+  activation on the lifecycle base, with the binding's connection,
+  compatibility policy and failure contract. An apply module supplies
+  `compare` and `activate`, and where it needs them `requested` for `verify`
+  items with a `name` and an optional `uuid`, `pending` to follow the
+  product's pending work and `protect` to guard the apply. `owned` makes an
+  empty `verify` compare every owned object and `apply_unverifiable` applies
+  unless every object is in sync. The result reports `verification` per
+  object. `run()` keeps serving areas whose steps are plain functions and
+  takes `settle_seconds` instead of a `settle` function.
 - Both module variants: a `stages()` hook splits one declared change into
   several writes that `reconcile()` runs in order, such as creating an
   object disabled and enabling it, or disabling it before deleting it. Each

@@ -535,7 +535,9 @@ class Lifecycle:
         }
         named = getattr(failure, "fields", None)
         if named:
-            fields["fields"] = named
+            # Objects an activation could not converge, otherwise fields.
+            key = "not_effective" if failure.code == "not_effective" else "fields"
+            fields[key] = named
         errors.fail_from(
             self.module,
             failure,

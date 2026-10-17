@@ -9,10 +9,6 @@ from __future__ import annotations
 # fmt: off
 # isort: off
 from ansible_collections.{{ namespace }}.\
-    {{ collection_name }}.plugins.module_utils._activation import (
-        settle,
-    )
-from ansible_collections.{{ namespace }}.\
     {{ collection_name }}.plugins.module_utils._client import (
         Client,
         ProductError,
@@ -77,7 +73,3 @@ def apply_fixture(client: Client) -> None:
     response = client.write("/fixture/reconfigure")
     if not isinstance(response, dict) or response.get("status") != "ok":
         raise ProductError(code="activation_failed")
-
-
-def settle_fixture(client: Client, names: list[str]) -> dict[str, str]:
-    return settle(client, names, compare_fixture)
