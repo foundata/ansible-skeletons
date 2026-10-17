@@ -1,10 +1,29 @@
 # SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Drop one completed product response, then prove read-back without a retry.
+"""Drop completed product responses, then prove read-back without a retry.
 
-Input is a JSON object with module (FQCN), identity and params. The transport
-proxy calls the real client first. Only its first successful mutation response
-is replaced with a timeout; no synthetic product result is supplied.
+Input is one JSON object:
+
+- ``module``: the module's FQCN.
+- ``identity``: the identity options and their values, which ``params`` must
+  repeat; ``{}`` for a module without identity options, such as a settings
+  singleton.
+- ``params``: the module parameters.
+- ``expected_writes`` (default 1): how many counted writes the module makes.
+- ``drop`` (default ``first``): replace the first counted response with a
+  timeout, or ``all`` of them, as a resource that writes in stages needs.
+- ``route`` (default none): count only writes with a string argument, such
+  as the request path, that starts with this prefix.
+- ``rerun`` (default ``unchanged``): run the module again and require an
+  unchanged result without another write; ``none`` for an operation that
+  acts on every run.
+- ``target`` (default ``_client.Client.write``): the method that sends a
+  write, as ``<module_utils module>.<class>.<method>``, for a product whose
+  writes leave through another transport.
+
+The proxy calls the real method first and only then replaces the response;
+no synthetic product result is supplied. The proof names the module file
+that ran, so an acceptance run shows the installed artifact.
 """
 
 from __future__ import annotations
@@ -20,6 +39,9 @@ from typing import Any, Callable
 
 from ansible.module_utils import basic
 from ansible.plugins.loader import init_plugin_loader
+
+FQCN = re.compile(r"[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*")
+TARGET = re.compile(r"_?[a-z][a-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*\.[a-z_][a-z0-9_]*")
 
 
 def invoke(entry: Callable[[], None], params: dict[str, Any]) -> dict[str, Any]:
@@ -43,48 +65,105 @@ def invoke(entry: Callable[[], None], params: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+def options(request: dict[str, Any]) -> dict[str, Any]:
+    """Validate the request and fill in the defaults."""
+    if not isinstance(request.get("module"), str) or not FQCN.fullmatch(
+        request["module"]
+    ):
+        raise ValueError("Expected a module FQCN")
+    identity, params = request.get("identity"), request.get("params")
+    if not isinstance(identity, dict) or not isinstance(params, dict):
+        raise ValueError(
+            "Identity must be explicit; use {} for a module without identity options"
+        )
+    if any(params.get(key) != value for key, value in identity.items()):
+        raise ValueError("Identity must be repeated in the module parameters")
+    chosen = {
+        "expected_writes": request.get("expected_writes", 1),
+        "drop": request.get("drop", "first"),
+        "route": request.get("route", ""),
+        "rerun": request.get("rerun", "unchanged"),
+        "target": request.get("target", "_client.Client.write"),
+    }
+    writes = chosen["expected_writes"]
+    if isinstance(writes, bool) or not isinstance(writes, int) or writes < 1:
+        raise ValueError("expected_writes must be a positive integer")
+    if chosen["drop"] not in ("first", "all"):
+        raise ValueError("drop must be first or all")
+    if chosen["rerun"] not in ("unchanged", "none"):
+        raise ValueError("rerun must be unchanged or none")
+    if not isinstance(chosen["route"], str):
+        raise ValueError("route must be a string prefix")
+    if not isinstance(chosen["target"], str) or not TARGET.fullmatch(chosen["target"]):
+        raise ValueError("target must be <module_utils module>.<class>.<method>")
+    return chosen
+
+
 def main() -> None:
     request = json.load(sys.stdin)
-    fqcn = request["module"]
-    if not re.fullmatch(r"[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*", fqcn):
-        raise ValueError("Expected a module FQCN")
-    identity = request["identity"]
-    params = request["params"]
-    if not identity or any(params.get(key) != value for key, value in identity.items()):
-        raise ValueError("Identity must be explicit in the module parameters")
+    chosen = options(request)
+    fqcn, identity, params = request["module"], request["identity"], request["params"]
     init_plugin_loader()
     errors = importlib.import_module(
         "ansible_collections.foundata.utils.plugins.module_utils.errors"
     )
     namespace, collection, name = fqcn.split(".")
     package = f"ansible_collections.{namespace}.{collection}.plugins"
-    client = importlib.import_module(package + ".module_utils._client")
-    module = importlib.import_module(package + ".modules." + name)
-    original = client.Client.write
-    writes = 0
-    dropped = False
+    utility, owner, method = chosen["target"].split(".")
+    holder = getattr(
+        importlib.import_module(f"{package}.module_utils.{utility}"), owner
+    )
+    module = importlib.import_module(f"{package}.modules.{name}")
+    original = getattr(holder, method)
+    route = chosen["route"]
+    writes = dropped = 0
 
-    def write(instance: Any, *args: Any, **kwargs: Any) -> Any:
+    def counted(args: tuple[Any, ...], kwargs: dict[str, Any]) -> bool:
+        return not route or any(
+            isinstance(value, str) and value.startswith(route)
+            for value in (*args, *kwargs.values())
+        )
+
+    def proxy(instance: Any, *args: Any, **kwargs: Any) -> Any:
         nonlocal writes, dropped
-        writes += 1
         response = original(instance, *args, **kwargs)
-        if not dropped:
-            dropped = True
+        if not counted(args, kwargs):
+            return response
+        writes += 1
+        if chosen["drop"] == "all" or not dropped:
+            dropped += 1
             raise errors.TransportTimeout(code="socket_timeout")
         return response
 
-    client.Client.write = write
+    setattr(holder, method, proxy)
     try:
         result = invoke(module.main, params)
-        assert dropped and writes == 1, "Expected exactly one real mutation"
+        assert dropped, "Expected a real write whose response could be dropped"
+        assert writes == chosen["expected_writes"], (
+            f"Expected {chosen['expected_writes']} counted writes, saw {writes}"
+        )
         assert not result.get("failed") and result["changed"]
         assert result["verified"] == "observed"
-        observed = invoke(module.main, params)
-        assert not observed.get("failed") and not observed["changed"]
-        assert observed["verified"] == "observed" and writes == 1
+        if chosen["rerun"] == "unchanged":
+            observed = invoke(module.main, params)
+            assert not observed.get("failed") and not observed["changed"]
+            assert observed["verified"] == "observed"
+            assert writes == chosen["expected_writes"], "The rerun wrote again"
     finally:
-        client.Client.write = original
-    print(json.dumps({"verified": True, "writes": writes, "module": fqcn}))
+        setattr(holder, method, original)
+    print(
+        json.dumps(
+            {
+                "verified": True,
+                "module": fqcn,
+                "module_path": module.__file__,
+                "identity": identity,
+                "writes": writes,
+                "dropped": dropped,
+                "rerun": chosen["rerun"],
+            }
+        )
+    )
 
 
 if __name__ == "__main__":

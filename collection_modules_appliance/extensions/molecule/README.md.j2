@@ -144,10 +144,17 @@ check mode and compares the active state with the saved state. With
 {# end skeleton-variant #}
 
 
-The lost-reply checks in `side_effect` let one write reach the product and
+The lost-reply checks in `side_effect` let a write reach the product and
 replace its reply with a timeout. The module must settle the outcome by reading
 back (`verified: observed`), and a second run with the same arguments must
-report no change without writing again.
+report no change without writing again. Each case in `zz_loss.yml` names the
+module, its identity (`{}` for a module without identity options, such as a
+settings singleton) and its parameters. Its `options` fit
+`shared/files/loss.py` to the module: `expected_writes` and `drop: "all"` for a
+change written in stages, `route` to count only writes below a path prefix,
+`rerun: "none"` for an operation that acts on every run, and `target` for
+writes that leave through another method than `_client.Client.write`. The
+harness prints the module file that ran.
 
 {# skeleton-variant: recovery-sequence #}
 The last `side_effect` file, `zz_recovery.yml`, runs the

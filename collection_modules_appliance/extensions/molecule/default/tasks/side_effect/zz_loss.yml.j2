@@ -13,6 +13,7 @@
          'identity': {'name': __loss_case['name']},
          'params': product_connection | ansible.builtin.combine(
            {'name': __loss_case['name']}, __loss_case['declaration'])}
+        | ansible.builtin.combine(__loss_case['options'] | ansible.builtin.default({}))
         | ansible.builtin.to_json
       {{ '}}' }}
   environment:
@@ -42,6 +43,16 @@
       declaration:
         settings:
           port: 9090
+    # Every response below the route is lost, through the named transport.
+    - module: "{{ namespace }}.{{ collection_name }}.fixture_nested"
+      name: "molecule_fixture_nested_loss"
+      declaration:
+        settings:
+          port: 9191
+      options:
+        drop: "all"
+        route: "/nested/"
+        target: "_client.Client.write"
     - module: "{{ namespace }}.{{ collection_name }}.fixture_nested"
       name: "molecule_fixture_nested_loss"
       declaration:
