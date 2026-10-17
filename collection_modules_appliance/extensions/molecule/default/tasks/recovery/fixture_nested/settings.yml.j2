@@ -1,0 +1,12 @@
+# Settings of this area's drill. The drill parses this file as data; it never
+# runs or templates it, and any key other than these two fails the drill.
+#
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+---
+# FIXME Keep this file only where the scenario moves the management resolver
+# away from the port the lab contract names. The fixture skips the check to
+# exercise the setting; the fixture area beside it keeps it.
+fresh_dns: false
+fresh_dns_reason: "The fixture exercises the opt-out of the fresh DNS check."

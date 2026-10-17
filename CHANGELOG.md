@@ -180,9 +180,10 @@ and the project adheres to
   unknown one, naming the areas it found. Console labels derive from the area
   name in the characters the lab console accepts.
   An area may add `observe.yml`, which observes a loss that costs only
-  DNS-dependent access instead of the API probe, and `settings.yml`, whose
-  `recovery_fresh_dns: false` and `recovery_fresh_dns_reason` skip the fresh
-  DNS check for a scenario that moves the management resolver.
+  DNS-dependent access instead of the API probe, and `settings.yml`, data
+  whose `fresh_dns: false` and `fresh_dns_reason` skip the fresh DNS check for
+  a scenario that moves the management resolver; the drill parses it without
+  running it and refuses any other key.
   `shared/tasks/recovery_upload.yml` uploads a helper into the appliance
   through the console: base64 chunks within the endpoint's limits of 32
   commands of at most 200 printable bytes per request, written atomically and

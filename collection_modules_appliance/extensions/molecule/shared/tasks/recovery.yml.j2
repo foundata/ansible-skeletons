@@ -23,9 +23,10 @@
 #   when it cannot, for an area whose change costs only DNS-dependent
 #   access. It may set "recovery_observed" for the drill's record. Without
 #   it, the drill observes the loss with the API probe.
-# - settings.yml, optional, sets the area's settings: "recovery_fresh_dns:
-#   false" with "recovery_fresh_dns_reason" skips the fresh DNS check, for a
-#   scenario that moves the management resolver.
+# - settings.yml, optional, is data, never tasks: "fresh_dns: false" with a
+#   "fresh_dns_reason" skips the fresh DNS check, for a scenario that moves
+#   the management resolver. The drill parses the file without templating or
+#   running it, and refuses any other key.
 #
 # SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
@@ -46,11 +47,32 @@
     recovery_fresh_dns: true
     recovery_fresh_dns_reason: ""
 
+# A fresh fact per area: values from include_vars would rank below the
+# defaults set_fact gives above, and would outlive their area.
 - name: "Molecule | Recovery | Read the area's settings"
-  ansible.builtin.include_tasks:
-    file: "{{ recovery_hooks }}/settings.yml"
-  when:
-    - (recovery_hooks ~ '/settings.yml') is ansible.builtin.file
+  ansible.builtin.set_fact:
+    __recovery_settings: >-
+      {{ (lookup('ansible.builtin.file', recovery_hooks ~ '/settings.yml')
+          | ansible.builtin.from_yaml
+          if (recovery_hooks ~ '/settings.yml') is ansible.builtin.file
+          else {}) | ansible.builtin.default({}, true) }}
+
+- name: "Molecule | Recovery | Refuse unknown or malformed settings"
+  ansible.builtin.assert:
+    that:
+      - __recovery_settings is ansible.builtin.mapping
+      - __recovery_settings.keys() | ansible.builtin.difference(['fresh_dns', 'fresh_dns_reason']) | ansible.builtin.length == 0
+      - __recovery_settings['fresh_dns'] | ansible.builtin.default(true) is ansible.builtin.boolean
+      - __recovery_settings['fresh_dns_reason'] | ansible.builtin.default('') is ansible.builtin.string
+    fail_msg: >-
+      {{ recovery_hooks }}/settings.yml holds data with fresh_dns (true or
+      false) and fresh_dns_reason (text), nothing else.
+    quiet: true
+
+- name: "Molecule | Recovery | Apply the area's settings"
+  ansible.builtin.set_fact:
+    recovery_fresh_dns: "{{ __recovery_settings['fresh_dns'] | ansible.builtin.default(true) }}"
+    recovery_fresh_dns_reason: "{{ __recovery_settings['fresh_dns_reason'] | ansible.builtin.default('') }}"
 
 - name: "Molecule | Recovery | Require the lab contract"
   ansible.builtin.assert:
@@ -65,7 +87,7 @@
   ansible.builtin.assert:
     that:
       - recovery_fresh_dns | ansible.builtin.bool or recovery_fresh_dns_reason | ansible.builtin.length > 0
-    fail_msg: "An area that sets recovery_fresh_dns to false names why in recovery_fresh_dns_reason."
+    fail_msg: "An area whose settings.yml sets fresh_dns to false names why in fresh_dns_reason."
     quiet: true
 
 - name: "Molecule | Recovery | Require fresh access before the drill"
