@@ -10,6 +10,7 @@ import tempfile
 import threading
 import time
 from collections.abc import Callable
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -384,6 +385,103 @@ def test_resume_reruns_only_what_did_not_pass(
     assert ran == ["static", "flaky", "flaky"]
     checks = json.loads((output / "checks.json").read_text(encoding="utf-8"))
     assert checks["checks"] == ["static", "flaky"]
+
+
+def leaving(log: list[str], name: str, *, fail: int = 0) -> Callable[[Context], None]:
+    """A step that leaves a render and an archive, failing its first runs."""
+
+    def action(context: Context) -> None:
+        log.append(name)
+        render = context.output / name
+        (render / "artifacts").mkdir(parents=True, exist_ok=True)
+        (render / "collection.txt").write_text("render\n", encoding="utf-8")
+        (render / "artifacts/collection.tar.gz").write_bytes(b"archive")
+        if log.count(name) <= fail:
+            raise GateError("network")
+
+    return action
+
+
+def outcome(monkeypatch: pytest.MonkeyPatch, steps: list[Step]) -> Callable[..., None]:
+    """Run a check of these steps, all of them required."""
+    monkeypatch.setattr(check_module, "plan", plan_of(steps))
+    monkeypatch.setattr(check_module, "source_digest", lambda: "tree")
+    monkeypatch.setattr(
+        check_module, "required_checks", lambda **_: [step.name for step in steps]
+    )
+    return partial(check_module.check, jobs=1)
+
+
+@pytest.mark.usefixtures("unbudgeted")
+def test_a_passed_check_keeps_only_its_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = outcome(monkeypatch, [Step("a", leaving([], "a"), check="a")])
+    output = tmp_path / "o"
+    run(output)
+    assert sorted(
+        str(path.relative_to(output)) for path in output.rglob("*") if path.is_file()
+    ) == [
+        "a/artifacts/collection.tar.gz",
+        "checks.json",
+        "logs/a.log",
+        "records/a.json",
+        "run.json",
+    ]
+    record = json.loads((output / "run.json").read_text(encoding="utf-8"))
+    # --remove recognizes an output by exactly these fields.
+    assert set(record) == {*check_module.RUN_FIELDS, "pruned"}
+    assert record["pruned"] is True
+    with pytest.raises(GateError, match="kept only its evidence"):
+        run(output, resume=True)
+
+
+@pytest.mark.usefixtures("unbudgeted")
+def test_the_report_lists_no_archive_of_a_temporary_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fixture(context: Context) -> None:
+        # A test's fixture below the step's TMPDIR, as pytest places them.
+        archive = Path(context.env["TMPDIR"]) / "test0/o/a/artifacts/x.tar.gz"
+        archive.parent.mkdir(parents=True)
+        archive.write_bytes(b"fixture")
+
+    run = outcome(
+        monkeypatch,
+        [Step("a", leaving([], "a"), check="a"), Step("b", fixture, check="b")],
+    )
+    output = tmp_path / "o"
+    run(output)
+    checks = json.loads((output / "checks.json").read_text(encoding="utf-8"))
+    assert list(checks["artifacts"]) == ["a/artifacts/collection.tar.gz"]
+    assert not (output / "t").exists()
+
+
+@pytest.mark.usefixtures("unbudgeted")
+@pytest.mark.parametrize("keep", [False, True])
+def test_a_failed_check_and_keep_retain_everything(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, keep: bool
+) -> None:
+    log: list[str] = []
+    run = outcome(
+        monkeypatch,
+        [
+            Step("a", leaving(log, "a"), check="a"),
+            Step("b", leaving(log, "b", fail=1), check="b"),
+        ],
+    )
+    output = tmp_path / "o"
+    with pytest.raises(GateError, match="Failed: b"):
+        run(output, keep=keep)
+    assert (output / "a/collection.txt").is_file()
+    assert (output / "b/collection.txt").is_file()
+    assert (output / "t").is_dir()
+    run(output, resume=True, keep=keep)
+    # A resumed run prunes once it passes, unless told to keep everything.
+    assert (output / "a/collection.txt").is_file() == keep
+    assert (output / "b/artifacts/collection.tar.gz").is_file()
+    record = json.loads((output / "run.json").read_text(encoding="utf-8"))
+    assert record["pruned"] is not keep
 
 
 @pytest.mark.usefixtures("unbudgeted")

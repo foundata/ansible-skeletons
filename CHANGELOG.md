@@ -60,6 +60,11 @@ and the project adheres to
 - checks: `--resume <output>` reruns only the failed and missing steps of an
   earlier run of the same sources; `scripts.release check --resume` does the
   same for the evidence of the same commit.
+- checks: a passing check keeps only its evidence: `run.json`, `records/`,
+  `logs/`, the JUnit results, `checks.json` and the collection archives it
+  lists, which is all that `scripts.release tag` and `verify` read. `--keep`
+  retains everything. `--remove <output>` deletes one check output or release
+  evidence after proving it is one.
 - checks: `--changed` runs the static checks, the repository tests and only
   the lanes and module skeletons whose sources differ from `HEAD`; it never
   writes a passing report.

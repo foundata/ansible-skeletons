@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.check import required_checks
+from scripts.check import GATE_FIELDS, prune, required_checks
 from scripts.common import GateError, digest, write_json
 from scripts.release import (
     REPOSITORY,
@@ -251,6 +251,34 @@ def test_release_evidence_may_have_a_long_path(
     evidence = tmp_path / ("x" * 104) / ("y" * 104)
     check_release("1.1.0", evidence, repository)
     validate_report(evidence / "report.json", repository)
+
+
+def test_a_pruned_gate_still_validates(repository: Path, report: Path) -> None:
+    checks = report.parent / "checks"
+    write_json(
+        checks / "run.json",
+        {"source": "tree", "full": True, "backends": [], "changed": False},
+    )
+    for leftover in ("t/0/file", "galaxy/collections/x.tar.gz", "render/home/file"):
+        (checks / leftover).parent.mkdir(parents=True, exist_ok=True)
+        (checks / leftover).write_text("left by a step\n", encoding="utf-8")
+    prune(checks, lambda paths: pytest.fail(f"no namespace needed: {paths}"))
+    assert sorted(path.name for path in checks.iterdir()) == [
+        "checks.json",
+        "collection.tar.gz",
+        "run.json",
+    ]
+    validate_report(report, repository)
+
+
+@pytest.mark.usefixtures("gate")
+def test_the_gate_record_has_the_fields_remove_recognizes(
+    repository: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake_inner_check(monkeypatch, [True])
+    check_release("1.1.0", tmp_path / "evidence", repository)
+    record = json.loads((tmp_path / "evidence/gate.json").read_text(encoding="utf-8"))
+    assert set(record) == GATE_FIELDS
 
 
 def test_release_check_refuses_a_local_utils_source(

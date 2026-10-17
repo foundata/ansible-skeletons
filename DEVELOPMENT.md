@@ -236,9 +236,28 @@ output="${XDG_STATE_HOME:-${HOME}/.local/state}/ansible-skeletons/check-1"
 ./scripts/check.sh --output "${output}"
 ```
 
-Any path works, as long as it is not on a tmpfs such as `/tmp`: an output holds
-several gigabytes, container storage included. Remove obsolete outputs after
-retaining the result you need.
+Any path works, as long as it is not on a tmpfs such as `/tmp`: a check writes
+several gigabytes there, container storage included.
+
+A passing check then keeps only its evidence: `run.json`, `records/`, `logs/`,
+the JUnit results `unit-python*.xml`, and `checks.json` with the collection
+archives it lists. Generated projects, virtual environments and container
+storage go, and the check reports how much it kept. `--keep` retains
+everything, for example to inspect a render. A failed run keeps everything for
+diagnosis and `--resume`; a resumed run prunes once it passes. A pruned output
+cannot be resumed.
+
+To delete an output you no longer need:
+
+```sh
+./scripts/check.sh --remove "${output}"
+```
+
+`--remove` takes one absolute path without symbolic links and refuses the
+checkout, your home directory and their ancestors. The directory must hold the
+`run.json` of a check, or be a release gate's evidence with `gate.json` and
+`checks/run.json`. Files that containers wrote as subordinate users are removed
+inside Podman's user namespace.
 
 The check's Unix sockets bind elsewhere, in a short private directory that the
 check creates in `XDG_RUNTIME_DIR` (or `/tmp` without one) and removes at the
@@ -402,6 +421,9 @@ skeleton-specific gate (`scripts/release.py check`).
    output is in `checks/logs/<step>.log`. A successful run creates
    `report.json`; a failure retains diagnostics but creates no passing report.
    Keep the whole evidence directory, including its `checks/` subdirectory.
+   Once the gate passes, `checks/` holds only the check's evidence: records,
+   logs, JUnit results, `checks.json` and the collection archives it lists.
+   `release tag` and `release verify` read nothing else in it.
 
    When a step fails for a reason outside the sources, such as a network
    timeout, rerun the failed and missing steps into the same evidence:
@@ -453,6 +475,11 @@ skeleton-specific gate (`scripts/release.py check`).
    No container or VM starts, but the run takes several minutes. At any
    point, `uv run --locked release status "${version}"` reports where the
    release stands.
+9. Unless you archive the evidence, remove it:
+
+   ```sh
+   ./scripts/check.sh --remove "${evidence}"
+   ```
 
 Maintainers can bypass these local checks by invoking Git directly. Enforce
 protected tags or equivalent forge rules separately if server-side enforcement
@@ -482,8 +509,9 @@ validated commit and rerun publication verification when complete.
   each rerun step's earlier output and keeps the rest.
 - A lock mismatch is an error. Review dependency changes and regenerate the
   lock deliberately; release checks use `--locked`.
-- Use retained output to inspect generated YAML, the isolated `ansible.cfg`,
-  collection archives and Molecule diagnostics.
+- Use a failed run's output, or a passing one's retained with `--keep`, to
+  inspect generated YAML, the isolated `ansible.cfg`, collection archives and
+  Molecule diagnostics.
 - Infrastructure requirements are mandatory for their tier. Use quick checks
   while developing on a machine without those capabilities, then run the full
   release gate on a suitable host.

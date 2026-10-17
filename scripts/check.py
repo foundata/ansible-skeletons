@@ -14,7 +14,7 @@ import threading
 import time
 import traceback
 import xml.etree.ElementTree as ET
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -30,6 +30,7 @@ from scripts.common import (
     digest,
     isolated_environment,
     matrix,
+    remove_in_user_namespace,
     remove_tree,
     require_tools,
     run,
@@ -584,6 +585,116 @@ def remove_earlier(path: Path, output: Path, log: TextIO) -> None:
     remove_tree(path)
 
 
+# What a passed run keeps below its output: its identity, the step records and
+# logs, the JUnit results and the report. The report's collection archives stay
+# too; with the report, they are what the release helper reads.
+EVIDENCE = ("run.json", "records", "logs", "checks.json")
+JUNIT = "unit-python*.xml"
+
+
+def evidence(output: Path) -> set[Path]:
+    """List what a passed run keeps, relative to its output."""
+    kept = {Path(name) for name in EVIDENCE}
+    kept.update(path.relative_to(output) for path in output.glob(JUNIT))
+    report = output / "checks.json"
+    if report.is_file():
+        for name in json.loads(report.read_text(encoding="utf-8"))["artifacts"]:
+            archive = Path(name)
+            if archive.is_absolute() or ".." in archive.parts:
+                raise GateError(f"The report lists an archive outside {output}: {name}")
+            kept.add(archive)
+    return kept
+
+
+def prune(
+    output: Path,
+    as_root: Callable[[Sequence[Path]], None] = remove_in_user_namespace,
+) -> None:
+    """Delete everything below a passed run's output except its evidence.
+
+    Containers' files go together, as root of Podman's user namespace.
+    """
+    kept = evidence(output)
+    holding = {parent for path in kept for parent in path.parents}
+    foreign: list[Path] = []
+
+    def visit(entries: Iterable[Path]) -> None:
+        for entry in sorted(entries):
+            relative = entry.relative_to(output)
+            if relative in kept:
+                continue
+            if entry.is_symlink() or not entry.is_dir():
+                entry.unlink()
+            elif relative in holding:
+                visit(entry.iterdir())
+            else:
+                remove_tree(entry, as_root=foreign.extend)
+
+    visit(output.iterdir())
+    if foreign:
+        as_root(foreign)
+
+
+# The fields of a check's run.json, which a pruned run's adds to, and of a
+# release gate's gate.json.
+RUN_FIELDS = frozenset({"source", "full", "backends", "changed"})
+GATE_FIELDS = frozenset(
+    {"version", "revision", "base", "backends", "source", "source_sha256"}
+)
+
+
+def written_here(path: Path, fields: frozenset[str], optional: frozenset[str]) -> bool:
+    """Whether a path is a regular JSON file with the fields this tool writes."""
+    if path.is_symlink() or not path.is_file():
+        return False
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return False
+    return isinstance(data, dict) and fields <= set(data) <= fields | optional
+
+
+def remove_output(
+    path: Path,
+    as_root: Callable[[Sequence[Path]], None] = remove_in_user_namespace,
+) -> None:
+    """Delete one check output or release evidence after proving it is one.
+
+    The path must be absolute and free of symbolic links, must be neither the
+    checkout, the home nor an ancestor of either, and must hold the run.json
+    of a check, directly or in the checks/ of a release gate's evidence.
+    """
+    if not path.is_absolute():
+        raise GateError(f"--remove needs an absolute path: {path}")
+    if path.resolve() != path:
+        raise GateError(f"--remove refuses a symbolic link or '..' in {path}")
+    for protected in (ROOT.resolve(), Path.home().resolve()):
+        if protected.is_relative_to(path):
+            raise GateError(f"--remove refuses {path}, which is or holds {protected}")
+    run_record = partial(
+        written_here, fields=RUN_FIELDS, optional=frozenset({"pruned"})
+    )
+    if not (
+        run_record(path / "run.json")
+        or (
+            written_here(path / "gate.json", GATE_FIELDS, frozenset())
+            and run_record(path / "checks/run.json")
+        )
+    ):
+        raise GateError(f"{path} holds no run.json of a check or release gate")
+    remove_tree(path, as_root)
+    print(f"Removed {path}")
+
+
+def size(output: Path) -> int:
+    """Count the bytes of the regular files below an output."""
+    return sum(
+        path.lstat().st_size
+        for path in output.rglob("*")
+        if path.is_file() and not path.is_symlink()
+    )
+
+
 class Runner:
     """Run steps in dependency order, a limited number at a time.
 
@@ -756,12 +867,14 @@ def check(
     jobs: int | None = None,
     resume: bool = False,
     changed: bool = False,
+    keep: bool = False,
 ) -> None:
     """Run required stages and emit a complete report only after all succeed.
 
     With ``resume``, the existing output's passed records of the same sources
     are reused and every other step runs. With ``changed``, only the steps
     that the sources changed since HEAD need run, and no report is written.
+    A passed run keeps only its evidence, or everything with ``keep``.
     """
     if changed and (resume or backends):
         raise GateError("--changed combines with neither --resume nor --integration")
@@ -805,14 +918,24 @@ def check(
                     "The sources differ from the run being resumed; "
                     "check them into a new output"
                 )
+            if earlier.get("pruned"):
+                # Its passed records name outputs that are gone.
+                raise GateError(
+                    f"The run in {output} passed and kept only its evidence; "
+                    "check into a new output"
+                )
             (output / "checks.json").unlink(missing_ok=True)
         else:
             output.mkdir(parents=True, exist_ok=False)
         private_directory(output / "t")
-        write_json(
-            output / "run.json",
-            {"source": source, "full": full, "backends": selected, "changed": changed},
-        )
+        record = {
+            "source": source,
+            "full": full,
+            "backends": selected,
+            "changed": changed,
+            "pruned": False,
+        }
+        write_json(output / "run.json", record)
         began = time.monotonic()
         print(
             f"Running {len(steps)} steps, up to {jobs} at a time; "
@@ -826,15 +949,8 @@ def check(
         finally:
             if source_digest() != source:
                 # Records no longer say which sources their steps checked.
-                write_json(
-                    output / "run.json",
-                    {
-                        "source": None,
-                        "full": full,
-                        "backends": selected,
-                        "changed": changed,
-                    },
-                )
+                record["source"] = None
+                write_json(output / "run.json", record)
                 print(
                     "warning: the sources changed during the run; it cannot be resumed",
                     file=sys.stderr,
@@ -849,6 +965,8 @@ def check(
                 f"Changed-only checks passed in {duration(time.monotonic() - began)}. "
                 "Run the full quick check before committing."
             )
+            if not keep:
+                keep_evidence(output, record)
             return
         if checks != required_checks(full=full, backends=selected):
             raise GateError("Incomplete check run")
@@ -861,6 +979,8 @@ def check(
         artifacts = {
             str(path.relative_to(output)): digest(path)
             for path in output.rglob("artifacts/*.tar.gz")
+            # The steps' temporary directories hold their tests' fixtures.
+            if path.relative_to(output).parts[0] != "t"
         }
         write_json(
             output / "checks.json",
@@ -886,6 +1006,20 @@ def check(
         print(
             f"All checks passed in {duration(time.monotonic() - began)}. Results: {output}"
         )
+        if not keep:
+            keep_evidence(output, record)
+
+
+def keep_evidence(output: Path, record: dict[str, object]) -> None:
+    """Prune a passed run's output to its evidence and say so in run.json."""
+    prune(output)
+    record["pruned"] = True
+    write_json(output / "run.json", record)
+    print(
+        f"Kept {size(output) / 1e6:.1f} MB of evidence: run.json, records/, logs/, "
+        "the JUnit results, checks.json and the archives it lists. "
+        "--keep retains everything."
+    )
 
 
 def main() -> int:
@@ -910,10 +1044,21 @@ def main() -> int:
         metavar="OUTPUT",
         help="Rerun the failed and missing steps of a retained output",
     )
+    destination.add_argument(
+        "--remove",
+        type=Path,
+        metavar="OUTPUT",
+        help="Delete a retained output or release evidence after proving it is one",
+    )
     parser.add_argument(
         "--changed",
         action="store_true",
         help="Check only what the changes since HEAD affect; writes no report",
+    )
+    parser.add_argument(
+        "--keep",
+        action="store_true",
+        help="Retain everything a passing run wrote, not only its evidence",
     )
     parser.add_argument(
         "--jobs",
@@ -941,9 +1086,12 @@ def main() -> int:
         utils_source=args.utils_source,
         jobs=args.jobs,
         changed=args.changed,
+        keep=args.keep,
     )
     try:
-        if args.resume:
+        if args.remove:
+            remove_output(args.remove)
+        elif args.resume:
             run_check(args.resume.resolve(), resume=True)
         elif args.output:
             run_check(args.output.resolve())
@@ -952,7 +1100,8 @@ def main() -> int:
                 tempfile.mkdtemp(prefix="ansible-skeletons-check-", dir=SCRATCH)
             )
             try:
-                run_check(temporary / "output")
+                # All of it goes at the end; nothing to prune first.
+                run_check(temporary / "output", keep=True)
             finally:
                 remove_tree(temporary)
     except (GateError, OSError, ValueError) as exc:
