@@ -36,7 +36,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
   against the actual listener, ingress, aliases, translations and activation
   scope. Test refusal in normal and check mode. Do not infer ingress from a
   default route or advertise the guard as a complete lockout guarantee.
-- Replace the recovery induce and absence stubs, one directory per area in
+- Replace the fixture's recovery hooks, one directory per area in
   `default/tasks/recovery/<area>/` (flat for a scenario with one area), and the
   inventory's FIXME commands with qualified native backup, restore and discard
   operations. Keep the generic drill files unchanged, and run `zz_recovery.yml`

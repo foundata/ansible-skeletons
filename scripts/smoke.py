@@ -3,6 +3,7 @@
 """Check real Galaxy rendering, collection packaging and role execution."""
 
 import argparse
+import contextlib
 import importlib.metadata
 import json
 import os
@@ -15,6 +16,7 @@ import tarfile
 import time
 import tomllib
 import xml.etree.ElementTree as ET
+from collections.abc import Iterator
 from pathlib import Path
 from typing import TextIO
 
@@ -297,17 +299,22 @@ def build_collection(rendered: Rendered) -> Path:
     return archive
 
 
-def molecule_with_fake(rendered: Rendered) -> None:
-    """Run the module Molecule scenario against the render's own fake product."""
-    state = rendered.work / "molecule-fake"
+# The management name the appliance fixture's drill withdraws from the fake
+# product's resolver: its first label names the fixture record.
+RECOVERY_NAME = "molecule_fixture_dns.fixture.invalid"
+
+
+@contextlib.contextmanager
+def fake_product(rendered: Rendered, state: Path) -> Iterator[dict[str, str]]:
+    """Run the render's fake product and yield its scenario environment.
+
+    The appliance's credentials file also carries the lab contract of the
+    fake console, resolver and management address, so its scenario drills.
+    """
     state.mkdir()
     credentials = state / "credentials"
     credentials.write_text("SYNTHETIC-KEY:SYNTHETIC-SECRET", encoding="utf-8")
     credentials.chmod(0o600)
-    scenario_credentials = state / "credentials.json"
-    write_json(
-        scenario_credentials, {"key": "SYNTHETIC-KEY", "secret": "SYNTHETIC-SECRET"}
-    )
     fake = (
         rendered.collection
         / "tests/integration/targets/setup_fixture_fake/files/fake_product.py"
@@ -327,20 +334,113 @@ def molecule_with_fake(rendered: Rendered) -> None:
             if not (state / "port").is_file():
                 raise GateError("The fake product did not report its port")
             port = (state / "port").read_text(encoding="utf-8").strip()
-            run(
-                ["uv", "run", "--python", "3.13", "noxfile.py", "-s", "molecule"],
-                cwd=rendered.collection,
-                env={
-                    **rendered.env,
-                    "CI": "true",
-                    "MOLECULE_PRODUCT_URL": f"http://127.0.0.1:{port}/api",
-                    "MOLECULE_PRODUCT_CREDENTIALS": str(scenario_credentials),
-                },
-                timeout=1800,
-            )
+            contract: dict[str, object] = {
+                "key": "SYNTHETIC-KEY",
+                "secret": "SYNTHETIC-SECRET",
+            }
+            if rendered.profile == "collection_modules_appliance":
+                dns_port = (state / "dns-port").read_text(encoding="utf-8").strip()
+                contract.update(
+                    console={
+                        "argv": [sys.executable, str(fake), "console", str(state)]
+                    },
+                    dns={
+                        "host": "127.0.0.1",
+                        "port": int(dns_port),
+                        "name": RECOVERY_NAME,
+                    },
+                    management={"address": "127.0.0.1", "client": "127.0.0.1"},
+                )
+            scenario_credentials = state / "credentials.json"
+            write_json(scenario_credentials, contract)
+            yield {
+                "MOLECULE_PRODUCT_URL": f"http://127.0.0.1:{port}/api",
+                "MOLECULE_PRODUCT_CREDENTIALS": str(scenario_credentials),
+            }
         finally:
             server.terminate()
             server.wait(timeout=30)
+
+
+def molecule_with_fake(rendered: Rendered) -> None:
+    """Run the module Molecule scenario against the render's own fake product."""
+    with fake_product(rendered, rendered.work / "molecule-fake") as product:
+        run(
+            ["uv", "run", "--python", "3.13", "noxfile.py", "-s", "molecule"],
+            cwd=rendered.collection,
+            env={**rendered.env, "CI": "true", **product},
+            timeout=1800,
+        )
+
+
+def drill_alone(rendered: Rendered) -> None:
+    """Prove the drill's skip, then drill one area of the installed artifact alone.
+
+    The standalone playbook must refuse an unknown area and name the ones it
+    found, then drill the nested area, upload included, against a fresh fake.
+    """
+    molecule = rendered.collection / "extensions/molecule"
+    play = rendered.work / "recovery-skip.yml"
+    write_json(
+        play,
+        [
+            {
+                "name": "Skip the drill without a console contract",
+                "hosts": "localhost",
+                "connection": "local",
+                "gather_facts": False,
+                "vars": {"__product_credentials": {"key": "k", "secret": "s"}},
+                "tasks": [
+                    {
+                        "ansible.builtin.include_tasks": {
+                            "file": str(
+                                molecule / "default/tasks/side_effect/zz_recovery.yml"
+                            )
+                        }
+                    }
+                ],
+            }
+        ],
+    )
+    skipped = run(
+        ["ansible-playbook", "-i", "localhost,", str(play)],
+        cwd=rendered.work,
+        env=rendered.env,
+        capture=True,
+    )
+    if "Recovery drill skipped" not in skipped:
+        raise GateError("The drill stage did not skip without a console contract")
+    command = [
+        "ansible-playbook",
+        "-i",
+        str(molecule / "default/inventory/hosts.yml"),
+        str(molecule / "shared/playbooks/recovery.yml"),
+    ]
+    with fake_product(rendered, rendered.work / "recovery-fake") as product:
+        env = {
+            **rendered.env,
+            **product,
+            "MOLECULE_SCENARIO_DIRECTORY": str(molecule / "default"),
+            "MOLECULE_RECOVERY_SCENARIO": "default",
+        }
+        refused = run(
+            command,
+            cwd=rendered.work,
+            env={**env, "MOLECULE_RECOVERY_AREA": "unknown"},
+            capture=True,
+            allowed_exit_codes=(2,),
+        )
+        if "areas of default: fixture, fixture_nested" not in refused:
+            raise GateError("The standalone drill did not name the scenario's areas")
+        drilled = run(
+            command,
+            cwd=rendered.work,
+            env={**env, "MOLECULE_RECOVERY_AREA": "fixture_nested"},
+            capture=True,
+        )
+        print(drilled, flush=True)
+        if '\\"area\\": \\"fixture_nested\\"' not in drilled:
+            raise GateError("The standalone drill recorded no drill of the area")
 
 
 def pinned_utils_version(root: Path = ROOT) -> str:
@@ -752,6 +852,8 @@ def module_identity(
         molecule_with_fake(rendered)
     build_collection(rendered)
     exercise_modules(rendered)
+    if full and index == 0 and profile == "collection_modules_appliance":
+        drill_alone(rendered)
 
 
 def exercise_role(rendered: Rendered, *, collection: bool) -> None:

@@ -1,0 +1,24 @@
+# Nested fixture area drill: after the restore the drill record is gone.
+# FIXME Replace with the area's researched absence proof.
+#
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+{% raw %}
+---
+- name: "Molecule | Recovery | Nested | Read the drill record"
+  ansible.builtin.uri:
+    url: "{{ product_connection['url'] }}/nested/get_item/molecule_fixture_lockout"
+    force_basic_auth: true
+    url_password: "{{ product_connection['api_secret'] }}"
+    url_username: "{{ product_connection['api_key'] }}"
+    validate_certs: "{{ product_connection['validate_certs'] }}"
+  register: __recovery_lockout
+  no_log: true
+
+- name: "Molecule | Recovery | Nested | Require the drill record gone"
+  ansible.builtin.assert:
+    that:
+      - __recovery_lockout['json']['nested'] is ansible.builtin.none
+    quiet: true
+{% endraw %}

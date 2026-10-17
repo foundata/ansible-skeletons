@@ -248,9 +248,9 @@ grid-style fake API: UUID identifiers, paginated `search_item` listings with a
 declared total, `add_item`, `set_item` and `del_item` actions, string-encoded
 values and fixed response envelopes. A dependent record blocks deletion.
 The second fixture has nested values that a flat definition cannot express.
-The external-endpoint Molecule scenario runs both fixtures and skips the
-recovery stage with a reason when no console contract is supplied. It
-contains no deployment role.
+The external-endpoint Molecule scenario runs both fixtures and drills two
+areas against the fake product's console, or skips the drill with a reason
+when no console contract is supplied. It contains no deployment role.
 
 Render with the metadata from the usage example and the product's display name:
 

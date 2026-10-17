@@ -182,12 +182,13 @@ drills each of its areas in turn, in the order of their names.
 
 Before the drill can run:
 
-1. Give each area of the scenario its hooks in
-   `default/tasks/recovery/<area>/`: `induce.yml` makes the change that loses
-   access, `absent.yml` proves it is gone. A scenario with one area may keep
-   them directly in `default/tasks/recovery/`; that area then carries the
-   scenario's name. The stubs there fail until you replace them. Two files are
-   optional:
+1. Give each area of the scenario its hooks in `default/tasks/recovery/<area>/`:
+   `induce.yml` makes the change that loses access, `absent.yml` proves it is
+   gone. A scenario with one area may keep them directly in
+   `default/tasks/recovery/`; that area then carries the scenario's name. The
+   fixture's hooks drill two areas of the fake product, one that loses API
+   access and one that loses only DNS; replace them with the product's. Two
+   files are optional:
    - `observe.yml` observes the loss on fresh connections, for an area whose
      change costs only access that depends on DNS; without it the drill
      watches the API probe fail.
@@ -195,12 +196,13 @@ Before the drill can run:
      false` with a `recovery_fresh_dns_reason` skips the fresh DNS check, for
      a scenario that moves the management resolver.
 2. Replace the `backup`, `restore` and `discard` commands under
-   `recovery_defaults` in `default/inventory/hosts.yml`. They run `false`
-   until you replace them. A drill that needs a helper inside the appliance
-   includes `shared/tasks/recovery_upload.yml`, which sends a file through the
-   console in base64 chunks, checks its SHA-256 digest in the appliance and
-   renames it into place; name the appliance's `decode` and `digest` commands
-   under `upload` for it.
+   `recovery_defaults` in `default/inventory/hosts.yml`. The fixture's commands
+   work only in the fake product's console; anywhere else the backup fails
+   before the drill changes anything. A drill that needs a helper inside the
+   appliance includes `shared/tasks/recovery_upload.yml`, which sends a file
+   through the console in base64 chunks, checks its SHA-256 digest in the
+   appliance and renames it into place; name the appliance's `decode` and
+   `digest` commands under `upload` for it.
 3. Add three entries to the credentials file:
    - `console`: `argv`, a command that runs commands in the appliance's root
      shell. The drill writes `{"label": "...", "commands": ["..."]}` to its

@@ -131,8 +131,12 @@ def test_recovery_stage_is_appliance_only() -> None:
         "shared/playbooks/recovery.yml.j2",
         "shared/files/recovery_dns.py.j2",
         "shared/files/recovery_upload.py.j2",
-        "default/tasks/recovery/induce.yml.j2",
-        "default/tasks/recovery/absent.yml.j2",
+        "default/tasks/recovery/fixture/induce.yml.j2",
+        "default/tasks/recovery/fixture/observe.yml.j2",
+        "default/tasks/recovery/fixture/absent.yml.j2",
+        "default/tasks/recovery/fixture_nested/induce.yml.j2",
+        "default/tasks/recovery/fixture_nested/absent.yml.j2",
+        "default/tasks/recovery/fixture_nested/files/antilockout.py.j2",
         "default/tasks/side_effect/zz_recovery.yml.j2",
     )
     for profile in ("collection_modules", "collection_modules_appliance"):

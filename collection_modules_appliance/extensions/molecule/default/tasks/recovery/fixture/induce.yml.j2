@@ -1,0 +1,27 @@
+# Fixture area drill: an active fixture record named like the first label
+# of the management name withdraws that name from the fake product's
+# resolver. The change costs only access that depends on DNS; observe.yml
+# sees the loss.
+# FIXME Replace with the area's researched management-loss change.
+#
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+---
+- name: "Molecule | Recovery | Fixture | Withdraw the management name"
+  module_defaults:
+    group/{{ namespace }}.{{ collection_name }}.api: >-
+      {{ '{{ product_connection }}' }}
+  vars:
+    __recovery_record: >-
+      {{ '{{' }} recovery_defaults['lab']['dns']['name'] | ansible.builtin.split('.') | ansible.builtin.first {{ '}}' }}
+  block:
+    - name: "Molecule | Recovery | Fixture | Save a record named like the management name"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        name: "{{ '{{' }} __recovery_record {{ '}}' }}"
+        value: "192.0.2.1"
+
+    - name: "Molecule | Recovery | Fixture | Activate the record"
+      {{ namespace }}.{{ collection_name }}.fixture_apply:
+        verify:
+          - "{{ '{{' }} __recovery_record {{ '}}' }}"

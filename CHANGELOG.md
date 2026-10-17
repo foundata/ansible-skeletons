@@ -165,6 +165,15 @@ and the project adheres to
   restore undoes, that the drill and lost-reply stages need the scenario's
   dependencies in place rather than running last, and that none of this
   changes the lab contract.
+  The fixture's default scenario drills two areas against the fake product,
+  which serves a console and a resolver under the lab contract: `fixture`
+  loses only DNS and observes it through `observe.yml`, `fixture_nested`
+  loses API access after an uploaded helper turns its anti-lockout fixture
+  off. The fixture's hooks and recovery commands work only against that fake
+  and fail at the backup elsewhere.
+- checks: the full matrix drills the appliance render's two areas against its
+  fake console, drills one area through the standalone playbook after it
+  refused an unknown one, and proves the skip without a console contract.
 - Rendered Boundaries documentation names the base, engine, activation,
   harnesses and shared tests as skeleton-owned invariants, plus the
   appliance-only activation and drill files.

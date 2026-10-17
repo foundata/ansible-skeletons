@@ -1,0 +1,65 @@
+# Nested fixture area drill: a nested record covering the API listener's
+# address and port cuts off the fake product's API once its anti-lockout
+# setting is off. fixture_nested refuses that record first. The drill then
+# turns anti-lockout off with a helper it uploads into the appliance, a
+# fixture the restore undoes, and saves the record through the endpoint
+# behind the module.
+# FIXME Replace with the area's researched management-loss change.
+#
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+---
+- name: "Molecule | Recovery | Nested | Require fixture_nested to refuse the drill record"
+  {{ namespace }}.{{ collection_name }}.fixture_nested:
+    name: "molecule_fixture_lockout"
+    settings:
+      network: "{{ '{{' }} recovery_defaults['lab']['management']['address'] {{ '}}' }}/32"
+      port: "{{ '{{' }} product_connection['url'] | ansible.builtin.urlsplit('port') {{ '}}' }}"
+  module_defaults:
+    group/{{ namespace }}.{{ collection_name }}.api: >-
+      {{ '{{ product_connection }}' }}
+  failed_when:
+    - "__recovery_refusal['error_code'] | ansible.builtin.default('') != 'management_path' or __recovery_refusal['changed']"
+  register: __recovery_refusal
+{% raw %}
+
+- name: "Molecule | Recovery | Nested | Upload the anti-lockout helper"
+  ansible.builtin.include_tasks:
+    file: "{{ __recovery_shared }}/tasks/recovery_upload.yml"
+  vars:
+    recovery_upload_src: "{{ recovery_hooks }}/files/antilockout.py"
+    recovery_upload_dest: "fixture-antilockout.py"
+
+- name: "Molecule | Recovery | Nested | Turn anti-lockout off as a fixture"
+  ansible.builtin.command:
+    argv: "{{ recovery_defaults['lab']['console']['argv'] }}"
+    stdin: "{{ {'label': __recovery_label ~ '-fixture', 'commands': ['python3 fixture-antilockout.py off']} | ansible.builtin.to_json }}"
+  changed_when:
+    - true
+
+- name: "Molecule | Recovery | Nested | Remove the helper after the restore"
+  ansible.builtin.set_fact:
+    recovery_reload:
+      - "rm -f fixture-antilockout.py"
+
+- name: "Molecule | Recovery | Nested | Save the drill record through the endpoint"
+  # The reply may be lost with the access it just cut off.
+  ansible.builtin.uri:
+    url: "{{ product_connection['url'] }}/nested/add_item/molecule_fixture_lockout"
+    method: "POST"
+    body:
+      nested:
+        settings:
+          network: "{{ recovery_defaults['lab']['management']['address'] }}/32"
+          port: "{{ product_connection['url'] | ansible.builtin.urlsplit('port') | ansible.builtin.int }}"
+    body_format: "json"
+    force_basic_auth: true
+    timeout: 5
+    url_password: "{{ product_connection['api_secret'] }}"
+    url_username: "{{ product_connection['api_key'] }}"
+    validate_certs: "{{ product_connection['validate_certs'] }}"
+  failed_when:
+    - false
+  no_log: true
+{% endraw %}

@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Turn the fake product's anti-lockout setting on or off: antilockout.py on|off.
+
+The nested area's drill uploads this helper into the fake appliance and runs
+it through the console as a fixture; restoring the configuration undoes it.
+FIXME Replace with the helper the area's drill needs inside the appliance,
+or delete it.
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+
+def main() -> int:
+    if sys.argv[1:] not in (["on"], ["off"]):
+        print("usage: antilockout.py on|off", file=sys.stderr)
+        return 2
+    path = Path("fixture-config.json")
+    config = json.loads(path.read_text(encoding="utf-8"))
+    config["antilockout"] = sys.argv[1] == "on"
+    staged = path.with_suffix(".tmp")
+    staged.write_text(json.dumps(config, indent=2, sort_keys=True) + "\n")
+    staged.replace(path)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,34 @@
+# Fixture area drill: after the restore the record is gone from the saved
+# and from the loaded state.
+# FIXME Replace with the area's researched absence proof.
+#
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+---
+- name: "Molecule | Recovery | Fixture | Prove the record is gone"
+  module_defaults:
+    group/{{ namespace }}.{{ collection_name }}.api: >-
+      {{ '{{ product_connection }}' }}
+  vars:
+    __recovery_record: >-
+      {{ '{{' }} recovery_defaults['lab']['dns']['name'] | ansible.builtin.split('.') | ansible.builtin.first {{ '}}' }}
+  block:
+    - name: "Molecule | Recovery | Fixture | Read the saved record"
+      {{ namespace }}.{{ collection_name }}.fixture_info:
+        name: "{{ '{{' }} __recovery_record {{ '}}' }}"
+      register: __recovery_saved
+
+    - name: "Molecule | Recovery | Fixture | Compare the loaded record"
+      {{ namespace }}.{{ collection_name }}.fixture_apply:
+        verify:
+          - "{{ '{{' }} __recovery_record {{ '}}' }}"
+      check_mode: true
+      register: __recovery_loaded
+
+    - name: "Molecule | Recovery | Fixture | Require the record gone"
+      ansible.builtin.assert:
+        that:
+          - __recovery_saved['fixture'] is ansible.builtin.none
+          - __recovery_loaded is not ansible.builtin.changed
+        quiet: true

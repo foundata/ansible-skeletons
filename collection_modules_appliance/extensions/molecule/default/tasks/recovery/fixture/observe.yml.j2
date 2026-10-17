@@ -1,0 +1,40 @@
+# Fixture area drill: on a fresh query the management name no longer
+# resolves to the management address, while the API stays reachable.
+# FIXME Replace with the area's researched observation, or delete this file
+# when the area's change costs API access.
+#
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+{% raw %}
+---
+- name: "Molecule | Recovery | Fixture | Observe the withdrawn management name"
+  ansible.builtin.command:
+    argv:
+      - "{{ ansible_playbook_python }}"
+      - "{{ __recovery_shared }}/files/recovery_dns.py"
+      - "{{ recovery_defaults['lab']['dns']['host'] }}"
+      - "{{ recovery_defaults['lab']['dns']['port'] }}"
+      - "{{ recovery_defaults['lab']['dns']['name'] }}"
+  changed_when:
+    - false
+  failed_when:
+    - false
+  until:
+    - recovery_defaults['lab']['management']['address'] not in __recovery_dns_loss['stdout_lines'] | ansible.builtin.default([])
+  retries: 15
+  delay: 1
+  register: __recovery_dns_loss
+
+- name: "Molecule | Recovery | Fixture | Require the withdrawn name"
+  ansible.builtin.assert:
+    that:
+      - recovery_defaults['lab']['management']['address'] not in __recovery_dns_loss['stdout_lines'] | ansible.builtin.default([])
+    fail_msg: "The fixture's change did not withdraw the management name; the drill proves nothing."
+    quiet: true
+
+- name: "Molecule | Recovery | Fixture | Keep what the resolver answered"
+  ansible.builtin.set_fact:
+    recovery_observed:
+      dns_answers: "{{ __recovery_dns_loss['stdout_lines'] | ansible.builtin.default([]) }}"
+{% endraw %}

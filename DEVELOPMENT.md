@@ -128,8 +128,9 @@ that utility for each hook-based resource and edit hooks, not the sequence.
 The shared loss harness proves lost create, update and delete settlement for
 both fixtures. Only the appliance variant carries act-once activation, the
 management-path guard scaffold and recovery machinery. Its default scenario
-skips the last recovery stage with a reason when credentials have no console
-contract, so the fake-product gate needs no lab.
+drills two areas against the fake product's console and skips the drill with
+a reason when the credentials have no console contract, so the fake-product
+gate needs no lab.
 
 `tests/unit/test_checks.py` lists the files that skeletons share. Copies of a
 shared file are identical except inside variant regions, which wrap the few
@@ -194,13 +195,16 @@ limited to):
   a build, and the installed definition-driven and hook-based modules.
 
 The full matrix also executes both module scenarios against their own fake
-products, including the six lost-response cases and the appliance's explicit
-no-console recovery skip. The appliance variant's default scenario ends with
-its recovery drill, which skips without a console contract. The fake product
-has no console, so the checks exercise only the skip; they do not qualify a
-live drill. Unit tests cover management-listener refusal in normal and check
-mode. They do not qualify a product's console recovery; that drill belongs to
-the collection's authorized lab before an area's first management-path write.
+products, including the lost-response cases. The appliance's fake product
+also serves a console and a resolver under the lab contract, so its default
+scenario ends with a real drill of two areas: one loses API access, one loses
+only DNS and observes that through its `observe.yml`, one uploads a helper
+through the console, and both restore. The matrix then drills one area alone
+through the standalone playbook, after it refused an unknown one, and proves
+the skip without a console contract. Unit tests cover management-listener
+refusal in normal and check mode. None of this qualifies a product's console
+recovery; that drill belongs to the collection's authorized lab before an
+area's first management-path write.
 
 The check runs independent steps at the same time: the repository test runs,
 the lanes, `generated-lint`, and each identity of both module skeletons.

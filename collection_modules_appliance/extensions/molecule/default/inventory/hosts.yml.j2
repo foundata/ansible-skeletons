@@ -20,7 +20,10 @@ all:
 {% endraw %}
 {# skeleton-variant: recovery-defaults #}
 {% raw %}
-          # FIXME Qualify the product probe and native recovery commands.
+          # FIXME Qualify the product probe and native recovery commands. The
+          # fixture's commands work only in the fake product's console, which
+          # runs them next to its configuration file; anywhere else the backup
+          # fails before the drill changes anything.
           recovery_defaults:
             lab:
               console: "{{ __product_credentials['console'] | ansible.builtin.default({}) }}"
@@ -32,14 +35,14 @@ all:
               password: "{{ product_connection['api_secret'] }}"
               validate_certs: "{{ product_connection['validate_certs'] }}"
             backup:
-              - "false" # FIXME Save the good configuration with native semantics.
+              - "cp fixture-config.json fixture-config.good" # FIXME Save the good configuration with native semantics.
             restore:
-              - "false" # FIXME Restore it, including the product's history.
+              - "cp fixture-config.good fixture-config.json" # FIXME Restore it, including the product's history.
             discard:
-              - "false" # FIXME Remove only the drill's saved configuration.
+              - "rm fixture-config.good" # FIXME Remove only the drill's saved configuration.
             upload:
-              decode: "false" # FIXME The appliance's base64 decoder, reading stdin.
-              digest: "false" # FIXME A SHA-256 tool that prints the digest first.
+              decode: "base64 -d" # FIXME The appliance's base64 decoder, reading stdin.
+              digest: "sha256sum" # FIXME A SHA-256 tool that prints the digest first.
 {% endraw %}
 {# end skeleton-variant #}
 {% raw %}

@@ -1,29 +1,71 @@
 # SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Loopback-only invented product API. Usage: fake_product.py STATE_DIR LIFETIME."""
+"""Loopback-only invented appliance with an API, a resolver and a console.
+
+Usage: fake_product.py STATE_DIR LIFETIME serves the API and the resolver;
+fake_product.py console STATE_DIR answers one console request.
+
+The appliance keeps its configuration in STATE_DIR/guest/fixture-config.json
+and reads it on every request, so a console restore takes effect at once. A
+nested record covering the API listener's address and port cuts off the API
+(every request fails with 503) unless the anti-lockout setting is on, as it
+is by default. The resolver answers the management name with the listener
+address, except while an active fixture record is named like the first label
+of the query; then it answers with that record's value.
+
+The console runs a request's commands in /bin/sh from the guest directory, in
+order, under the limits of the lab contract: a label, at most 32 printable
+commands of at most 200 bytes each, one JSON status line as the answer.
+"""
 # FIXME Replace fixture routes, validation and activation with qualified behavior.
 
 from __future__ import annotations
 
 import base64
 import copy
+import fcntl
+import ipaddress
 import json
 import re
+import socket
+import socketserver
+import struct
+import subprocess
 import sys
 import threading
+import time
 import uuid
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any
+
+EMPTY = {"records": {}, "active": {}, "nested_rows": {}, "antilockout": True}
+
+
+class Appliance:
+    """The saved configuration, read and written whole."""
+
+    def __init__(self, state: Path) -> None:
+        self.guest = state / "guest"
+        self.path = self.guest / "fixture-config.json"
+
+    def load(self) -> dict[str, Any]:
+        if not self.path.is_file():
+            self.save(copy.deepcopy(EMPTY))
+        loaded: dict[str, Any] = json.loads(self.path.read_text(encoding="utf-8"))
+        return loaded
+
+    def save(self, config: dict[str, Any]) -> None:
+        self.guest.mkdir(parents=True, exist_ok=True)
+        staged = self.path.with_suffix(".tmp")
+        staged.write_text(json.dumps(config, indent=2, sort_keys=True) + "\n")
+        staged.replace(self.path)
 
 
 class Handler(BaseHTTPRequestHandler):
     server: HTTPServer
     credentials = ""
-    nested_rows: ClassVar[dict[str, dict[str, Any]]] = {}
-    # Shared by all requests: the server creates one handler per request.
-    records: ClassVar[dict[str, dict[str, str]]] = {}
-    active: ClassVar[dict[str, dict[str, str]]] = {}
+    appliance: Appliance
 
     def log_message(self, format: str, *args: Any) -> None:
         pass
@@ -36,15 +78,28 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def nested_request(self, action: str, name: str, data: dict[str, Any]) -> None:
+    def locked_out(self, config: dict[str, Any]) -> bool:
+        if config["antilockout"]:
+            return False
+        listener = ipaddress.ip_address("127.0.0.1")
+        return any(
+            listener in ipaddress.ip_network(row["settings"]["network"])
+            and row["settings"]["port"] == self.server.server_port
+            for row in config["nested_rows"].values()
+        )
+
+    def nested_request(
+        self, config: dict[str, Any], action: str, name: str, data: dict[str, Any]
+    ) -> None:
+        rows = config["nested_rows"]
         if action == "get_item":
-            self.send_json(200, {"nested": self.nested_rows.get(name)})
+            self.send_json(200, {"nested": rows.get(name)})
             return
         if action == "del_item":
-            self.nested_rows.pop(name, None)
+            rows.pop(name, None)
         else:
             record = copy.deepcopy(
-                self.nested_rows.get(
+                rows.get(
                     name,
                     {
                         "name": name,
@@ -58,7 +113,8 @@ class Handler(BaseHTTPRequestHandler):
                 )
             )
             record["settings"].update(data.get("settings", {}))
-            self.nested_rows[name] = record
+            rows[name] = record
+        self.appliance.save(config)
         self.send_json(200, {"status": "ok"})
 
     def dispatch(self) -> None:
@@ -72,16 +128,22 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(200, {"status": "ok"})
             threading.Thread(target=self.server.shutdown, daemon=True).start()
             return
+        config = self.appliance.load()
+        if self.locked_out(config):
+            self.send_json(503, {"status": "unreachable"})
+            return
+        records, active = config["records"], config["active"]
         if self.path == "/api/system/version":
             self.send_json(200, {"version": "1.0.0"})
             return
         if self.path == "/api/fixture/reconfigure":
-            type(self).active = copy.deepcopy(self.records)
+            config["active"] = copy.deepcopy(records)
+            self.appliance.save(config)
             self.send_json(200, {"status": "ok"})
             return
         if self.path in ("/api/fixture/search_item", "/api/fixture/active/search_item"):
-            records = self.active if "/active/" in self.path else self.records
-            rows = [{"uuid": key, **row} for key, row in records.items()]
+            source = active if "/active/" in self.path else records
+            rows = [{"uuid": key, **row} for key, row in source.items()]
             page, page_size = data["current"], min(2, data["rowCount"])
             self.send_json(
                 200,
@@ -106,7 +168,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.path.startswith("/api/nested/"):
             _prefix, _api, _route, action, name = self.path.split("/")
-            self.nested_request(action, name, data.get("nested", {}))
+            self.nested_request(config, action, name, data.get("nested", {}))
             return
         match = re.fullmatch(
             r"/api/fixture/(get_item|add_item|set_item|del_item)(?:/([^/]+))?",
@@ -117,14 +179,15 @@ class Handler(BaseHTTPRequestHandler):
             return
         action, key = match.groups()
         if action == "get_item":
-            self.send_json(200, {"fixture": self.records.get(key, {})})
+            self.send_json(200, {"fixture": records.get(key, {})})
         elif action == "del_item":
-            removed = self.records.pop(key, None)
+            removed = records.pop(key, None)
+            self.appliance.save(config)
             self.send_json(200, {"result": "deleted" if removed else "not found"})
         else:
             row = (
-                dict(self.records[key])
-                if key in self.records
+                dict(records[key])
+                if key in records
                 else {
                     "name": "",
                     "value": "",
@@ -137,7 +200,7 @@ class Handler(BaseHTTPRequestHandler):
             row.update(data["fixture"])
             if row["value"] == "INVALID" or any(
                 other["name"] == row["name"]
-                for identity, other in self.records.items()
+                for identity, other in records.items()
                 if identity != key
             ):
                 self.send_json(
@@ -145,19 +208,123 @@ class Handler(BaseHTTPRequestHandler):
                 )
                 return
             key = key or str(uuid.uuid4())
-            self.records[key] = row
+            records[key] = row
+            self.appliance.save(config)
             self.send_json(200, {"result": "saved", "uuid": key})
 
     do_GET = dispatch
     do_POST = dispatch
 
 
+class Resolver(socketserver.BaseRequestHandler):
+    """One DNS query over TCP: an A record for every name, or a fixture's value."""
+
+    appliance: Appliance
+
+    def handle(self) -> None:
+        header = self.request.recv(2)
+        if len(header) < 2:
+            return
+        size = struct.unpack("!H", header)[0]
+        query = b""
+        while len(query) < size:
+            chunk = self.request.recv(size - len(query))
+            if not chunk:
+                return
+            query += chunk
+        identity, labels, offset = struct.unpack("!H", query[:2])[0], [], 12
+        while query[offset]:
+            length = query[offset]
+            labels.append(query[offset + 1 : offset + 1 + length].decode("ascii"))
+            offset += 1 + length
+        question = query[12 : offset + 5]
+        address = "127.0.0.1"
+        for row in self.appliance.load()["active"].values():
+            if labels and row.get("name") == labels[0]:
+                address = row.get("value", "")
+        answers = b""
+        try:
+            packed = socket.inet_aton(address)
+        except OSError:
+            packed = b""
+        if len(packed) == 4:
+            answers = struct.pack("!HHHIH", 0xC00C, 1, 1, 60, 4) + packed
+        reply = (
+            struct.pack("!6H", identity, 0x8180, 1, 1 if answers else 0, 0, 0)
+            + question
+            + answers
+        )
+        self.request.sendall(struct.pack("!H", len(reply)) + reply)
+
+
+def console(state: Path) -> int:
+    """Answer one console request read from stdin with one status line."""
+    started = time.monotonic()
+    try:
+        request = json.loads(sys.stdin.read())
+    except ValueError:
+        request = None
+    label = request.get("label") if isinstance(request, dict) else None
+    commands = request.get("commands") if isinstance(request, dict) else None
+    if (
+        not isinstance(label, str)
+        or not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,47}", label)
+        or not isinstance(commands, list)
+        or not 0 < len(commands) <= 32
+        or not all(
+            isinstance(command, str)
+            and 0 < len(command.encode()) <= 200
+            and command.isprintable()
+            for command in commands
+        )
+    ):
+        print(json.dumps({"status": "invalid"}))
+        return 2
+    appliance = Appliance(state)
+    appliance.load()
+    answer: dict[str, Any] = {"label": label, "commands": len(commands)}
+    with (state / "console.lock").open("w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        status = "ok"
+        with (state / "console.log").open("a", encoding="utf-8") as log:
+            log.write(f"# console request {label}\n")
+            for command in commands:
+                completed = subprocess.run(
+                    ["/bin/sh", "-c", command],
+                    cwd=appliance.guest,
+                    stdin=subprocess.DEVNULL,
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                    timeout=60,
+                    check=False,
+                )
+                if completed.returncode:
+                    status = "failed"
+                    break
+    answer["status"] = status
+    answer["seconds"] = round(time.monotonic() - started, 3)
+    print(json.dumps(answer))
+    return 0 if status == "ok" else 1
+
+
 def main() -> None:
+    if sys.argv[1] == "console":
+        raise SystemExit(console(Path(sys.argv[2])))
     state = Path(sys.argv[1])
+    appliance = Appliance(state)
+    appliance.load()
     Handler.credentials = (state / "credentials").read_text().strip()
+    Handler.appliance = Resolver.appliance = appliance
     server = HTTPServer(("127.0.0.1", 0), Handler)
-    (state / "port.tmp").write_text(str(server.server_port))
-    (state / "port.tmp").replace(state / "port")
+    resolver = socketserver.ThreadingTCPServer(("127.0.0.1", 0), Resolver)
+    resolver.daemon_threads = True
+    threading.Thread(target=resolver.serve_forever, daemon=True).start()
+    for name, port in (
+        ("dns-port", resolver.server_address[1]),
+        ("port", server.server_port),
+    ):
+        (state / f"{name}.tmp").write_text(str(port))
+        (state / f"{name}.tmp").replace(state / name)
     timer = threading.Timer(float(sys.argv[2]), server.shutdown)
     timer.daemon = True
     timer.start()
@@ -165,6 +332,8 @@ def main() -> None:
         server.serve_forever()
     finally:
         timer.cancel()
+        resolver.shutdown()
+        resolver.server_close()
         server.server_close()
 
 
