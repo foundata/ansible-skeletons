@@ -153,6 +153,10 @@ and the project adheres to
   `MOLECULE_RECOVERY_SCENARIO` and `MOLECULE_RECOVERY_AREA` and refuses an
   unknown one, naming the areas it found. Console labels derive from the area
   name in the characters the lab console accepts.
+  An area may add `observe.yml`, which observes a loss that costs only
+  DNS-dependent access instead of the API probe, and `settings.yml`, whose
+  `recovery_fresh_dns: false` and `recovery_fresh_dns_reason` skip the fresh
+  DNS check for a scenario that moves the management resolver.
 - Rendered Boundaries documentation names the base, engine, activation,
   harnesses and shared tests as skeleton-owned invariants, plus the
   appliance-only activation and drill files.

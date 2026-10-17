@@ -8,14 +8,23 @@
 # console only backs up and restores; every assertion goes through the API
 # and DNS.
 #
-# Set "recovery_area" (a label) and "recovery_hooks" (a directory) when
-# including this file. "recovery_defaults" comes from the inventory: the lab
-# contract ("lab"), the fresh authenticated read ("probe") and the guest
-# commands that save ("backup"), restore ("restore") and remove ("discard")
-# the good configuration. The hooks directory holds the area's part:
-# induce.yml makes the change and may set "recovery_reload", guest commands
-# that run after the restore; absent.yml proves the fixture is gone from
-# saved and loaded state.
+# Set "recovery_area" (the area's name) and "recovery_hooks" (its hooks
+# directory) when including this file. "recovery_defaults" comes from the
+# inventory: the lab contract ("lab"), the fresh authenticated read
+# ("probe") and the guest commands that save ("backup"), restore
+# ("restore") and remove ("discard") the good configuration. The hooks
+# directory holds the area's part:
+#
+# - induce.yml makes the change and may set "recovery_reload", guest
+#   commands that run after the restore.
+# - absent.yml proves the fixture is gone from saved and loaded state.
+# - observe.yml, optional, observes the loss on fresh connections and fails
+#   when it cannot, for an area whose change costs only DNS-dependent
+#   access. It may set "recovery_observed" for the drill's record. Without
+#   it, the drill observes the loss with the API probe.
+# - settings.yml, optional, sets the area's settings: "recovery_fresh_dns:
+#   false" with "recovery_fresh_dns_reason" skips the fresh DNS check, for a
+#   scenario that moves the management resolver.
 #
 # SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
@@ -30,7 +39,17 @@
       {{ (recovery_area | ansible.builtin.lower
           | ansible.builtin.regex_replace('[^a-z0-9]+', '-')
           | ansible.builtin.regex_replace('^-+|-+$', ''))[:32] }}
+    __recovery_observer: "{{ recovery_hooks }}/observe.yml"
     recovery_reload: []
+    recovery_observed: {}
+    recovery_fresh_dns: true
+    recovery_fresh_dns_reason: ""
+
+- name: "Molecule | Recovery | Read the area's settings"
+  ansible.builtin.include_tasks:
+    file: "{{ recovery_hooks }}/settings.yml"
+  when:
+    - (recovery_hooks ~ '/settings.yml') is ansible.builtin.file
 
 - name: "Molecule | Recovery | Require the lab contract"
   ansible.builtin.assert:
@@ -39,6 +58,13 @@
       - recovery_defaults['lab']['dns']['name'] | ansible.builtin.default('') | ansible.builtin.length > 0
       - recovery_defaults['lab']['management']['address'] | ansible.builtin.default('') | ansible.builtin.length > 0
     fail_msg: "The lab contract needs console, dns and management entries; see extensions/molecule/README.md."
+    quiet: true
+
+- name: "Molecule | Recovery | Require a reason to skip the fresh DNS check"
+  ansible.builtin.assert:
+    that:
+      - recovery_fresh_dns | ansible.builtin.bool or recovery_fresh_dns_reason | ansible.builtin.length > 0
+    fail_msg: "An area that sets recovery_fresh_dns to false names why in recovery_fresh_dns_reason."
     quiet: true
 
 - name: "Molecule | Recovery | Require fresh access before the drill"
@@ -60,7 +86,13 @@
       ansible.builtin.include_tasks:
         file: "{{ recovery_hooks }}/induce.yml"
 
-    - name: "Molecule | Recovery | Observe the loss on fresh connections"
+    - name: "Molecule | Recovery | Observe the loss through the area's hook"
+      ansible.builtin.include_tasks:
+        file: "{{ __recovery_observer }}"
+      when:
+        - __recovery_observer is ansible.builtin.file
+
+    - name: "Molecule | Recovery | Observe the loss on fresh API connections"
       ansible.builtin.uri:
         url: "{{ recovery_defaults['probe']['url'] }}"
         force_basic_auth: true
@@ -68,12 +100,14 @@
         url_password: "{{ recovery_defaults['probe']['password'] }}"
         url_username: "{{ recovery_defaults['probe']['username'] }}"
         validate_certs: "{{ recovery_defaults['probe']['validate_certs'] }}"
-      failed_when:
-        - false
+      when:
+        - __recovery_observer is not ansible.builtin.file
       until:
         - __recovery_loss['status'] | ansible.builtin.default(-1) != 200
       retries: 15
       delay: 1
+      failed_when:
+        - false
       register: __recovery_loss
       no_log: true
 
@@ -109,6 +143,8 @@
       - __recovery_loss['status'] | ansible.builtin.default(-1) != 200
     fail_msg: "The area's change did not cost fresh API access; the drill proves nothing."
     quiet: true
+  when:
+    - __recovery_observer is not ansible.builtin.file
 
 - name: "Molecule | Recovery | Prove the fixture is gone"
   ansible.builtin.include_tasks:
@@ -118,9 +154,12 @@
   ansible.builtin.debug:
     msg: >-
       {{ {'area': recovery_area,
+          'observation': 'observe.yml' if __recovery_observer is ansible.builtin.file else 'api',
+          'observed': recovery_observed,
           'lost_api_status': __recovery_loss['status'] | ansible.builtin.default(-1),
           'loss_reads': __recovery_loss['attempts'] | ansible.builtin.default(1),
-          'restored_api_and_dns': true,
+          'restored_api': true,
+          'fresh_dns': true if recovery_fresh_dns | ansible.builtin.bool else recovery_fresh_dns_reason,
           'fixture_absent': true,
           'recovery_seconds': __recovery_seconds,
           'console': __recovery_console['stdout'] | ansible.builtin.from_json} | ansible.builtin.to_json }}
