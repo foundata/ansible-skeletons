@@ -170,13 +170,16 @@ its management access. It backs up the configuration through the appliance's
 console, makes the area's change that breaks API access, and restores the
 backup through the console. Then it requires a fresh API login, a fresh DNS
 answer for the management name, and the change to be gone. The console only
-backs up and restores; every check goes through the API and DNS.
+backs up and restores; every check goes through the API and DNS. A scenario
+drills each of its areas in turn, in the order of their names.
 
 Before the drill can run:
 
-1. Replace the stubs in `default/tasks/recovery/`: `induce.yml` makes the
-   change that loses access, `absent.yml` proves it is gone. Both fail until
-   you replace them.
+1. Give each area of the scenario its hooks in
+   `default/tasks/recovery/<area>/`: `induce.yml` makes the change that loses
+   access, `absent.yml` proves it is gone. A scenario with one area may keep
+   them directly in `default/tasks/recovery/`; that area then carries the
+   scenario's name. The stubs there fail until you replace them.
 2. Replace the `backup`, `restore` and `discard` commands under
    `recovery_defaults` in `default/inventory/hosts.yml`. They run `false`
    until you replace them.
@@ -199,15 +202,18 @@ endpoint.
 {# skeleton-variant: recovery-tool #}
 ### Drill one area on its own<a id="usage-area-drill"></a>
 
-`shared/playbooks/recovery.yml` runs one scenario's recovery hooks without the
-rest of the test sequence, for example to rehearse a new area before it
-writes anything that affects the management path. It needs the same
-`MOLECULE_PRODUCT_*` variables as the scenario. Run it from the collection root
-against a lab you can afford to lose:
+`shared/playbooks/recovery.yml` drills one area without the rest of the test
+sequence, for example to rehearse a new area before it writes anything that
+affects the management path. `MOLECULE_RECOVERY_SCENARIO` names the scenario
+and `MOLECULE_RECOVERY_AREA` one of its areas; the playbook refuses an unknown
+one and names those it found. It needs the same `MOLECULE_PRODUCT_*` variables
+as the scenario. Run it from the collection root against a lab you can afford
+to lose:
 
 ```sh
 export MOLECULE_SCENARIO_DIRECTORY="$PWD/extensions/molecule/default"
 export MOLECULE_RECOVERY_SCENARIO="default"
+export MOLECULE_RECOVERY_AREA="default"
 ansible-playbook \
   -i extensions/molecule/default/inventory/hosts.yml \
   extensions/molecule/shared/playbooks/recovery.yml

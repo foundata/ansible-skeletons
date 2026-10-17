@@ -147,6 +147,12 @@ and the project adheres to
 - Appliance variant: a conditional last-stage recovery drill, generic fresh
   API and DNS probes, fail-closed area hooks, the console lab contract and
   a standalone drill playbook for one area. No recovery scenario is added.
+  Each area keeps its hooks in `<scenario>/tasks/recovery/<area>/`, a
+  scenario with one area may keep them in `tasks/recovery/`, and the stage
+  drills a scenario's areas one after another. The standalone playbook takes
+  `MOLECULE_RECOVERY_SCENARIO` and `MOLECULE_RECOVERY_AREA` and refuses an
+  unknown one, naming the areas it found. Console labels derive from the area
+  name in the characters the lab console accepts.
 - Rendered Boundaries documentation names the base, engine, activation,
   harnesses and shared tests as skeleton-owned invariants, plus the
   appliance-only activation and drill files.

@@ -22,9 +22,14 @@
 
 {% raw %}
 ---
-- name: "Molecule | Recovery | Locate the shared files"
+- name: "Molecule | Recovery | Start the area's drill"
   ansible.builtin.set_fact:
     __recovery_shared: "{{ lookup('ansible.builtin.env', 'MOLECULE_SCENARIO_DIRECTORY') }}/../shared"
+    # The console accepts labels of lowercase letters, digits and dashes.
+    __recovery_label: >-
+      {{ (recovery_area | ansible.builtin.lower
+          | ansible.builtin.regex_replace('[^a-z0-9]+', '-')
+          | ansible.builtin.regex_replace('^-+|-+$', ''))[:32] }}
     recovery_reload: []
 
 - name: "Molecule | Recovery | Require the lab contract"
@@ -45,7 +50,7 @@
 - name: "Molecule | Recovery | Back the good configuration up through the console"
   ansible.builtin.command:
     argv: "{{ recovery_defaults['lab']['console']['argv'] }}"
-    stdin: "{{ {'label': recovery_area ~ '-backup', 'commands': recovery_defaults['backup']} | ansible.builtin.to_json }}"
+    stdin: "{{ {'label': __recovery_label ~ '-backup', 'commands': recovery_defaults['backup']} | ansible.builtin.to_json }}"
   changed_when:
     - true
 
@@ -81,7 +86,7 @@
       ansible.builtin.command:
         argv: "{{ recovery_defaults['lab']['console']['argv'] }}"
         stdin: >-
-          {{ {'label': recovery_area ~ '-restore',
+          {{ {'label': __recovery_label ~ '-restore',
               'commands': recovery_defaults['restore'] + recovery_reload + recovery_defaults['discard']}
              | ansible.builtin.to_json }}
       changed_when:

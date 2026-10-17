@@ -1,7 +1,7 @@
-# Run one scenario's recovery drill without the rest of its test sequence.
-# MOLECULE_RECOVERY_SCENARIO names the scenario whose tasks/recovery/ hooks
-# to use; MOLECULE_SCENARIO_DIRECTORY points at any scenario of this
-# collection.
+# Run one area's recovery drill without the rest of its scenario.
+# MOLECULE_RECOVERY_SCENARIO names the scenario and MOLECULE_RECOVERY_AREA
+# one of its areas, as shared/tasks/recovery_areas.yml finds them;
+# MOLECULE_SCENARIO_DIRECTORY points at any scenario of this collection.
 #
 # SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
@@ -17,7 +17,7 @@
       delegate_to: "localhost"
       ansible.builtin.find:
         paths: "{{ lookup('ansible.builtin.env', 'MOLECULE_SCENARIO_DIRECTORY') | ansible.builtin.dirname }}"
-        depth: 4
+        depth: 5
         patterns: "induce.yml"
         recurse: true
       register: __recovery_found
@@ -27,11 +27,11 @@
         __recovery_molecule: "{{ lookup('ansible.builtin.env', 'MOLECULE_SCENARIO_DIRECTORY') | ansible.builtin.dirname }}"
         __recovery_registered: >-
           {{ __recovery_found['files'] | ansible.builtin.map(attribute='path')
-             | ansible.builtin.select('ansible.builtin.match', '.*/tasks/recovery/induce\.yml$')
-             | ansible.builtin.map('ansible.builtin.dirname') | ansible.builtin.map('ansible.builtin.dirname')
-             | ansible.builtin.map('ansible.builtin.dirname') | ansible.builtin.map('ansible.builtin.basename')
+             | ansible.builtin.select('ansible.builtin.match', '.*/tasks/recovery/([^/]+/)?induce\.yml$')
+             | ansible.builtin.map('ansible.builtin.regex_replace', '^.*/([^/]+)/tasks/recovery/([^/]+/)?induce\.yml$', '\1')
              | ansible.builtin.unique | ansible.builtin.sort }}
         __recovery_scenario: "{{ lookup('ansible.builtin.env', 'MOLECULE_RECOVERY_SCENARIO') | ansible.builtin.trim }}"
+        __recovery_area: "{{ lookup('ansible.builtin.env', 'MOLECULE_RECOVERY_AREA') | ansible.builtin.trim }}"
 
     - name: "Molecule | Recovery | Require a scenario with recovery hooks"
       ansible.builtin.assert:
@@ -42,10 +42,27 @@
           {{ __recovery_registered | ansible.builtin.join(', ') }}
         quiet: true
 
-    - name: "Molecule | Recovery | Drill the scenario's area"
+    - name: "Molecule | Recovery | Find the scenario's areas"
+      ansible.builtin.include_tasks:
+        file: "{{ __recovery_molecule }}/shared/tasks/recovery_areas.yml"
+      vars:
+        __recovery_scenario_directory: "{{ __recovery_molecule }}/{{ __recovery_scenario }}"
+
+    - name: "Molecule | Recovery | Require one of the scenario's areas"
+      ansible.builtin.assert:
+        that:
+          - __recovery_area in recovery_areas
+        fail_msg: >-
+          Set MOLECULE_RECOVERY_AREA to one of the areas of {{ __recovery_scenario }}:
+          {{ recovery_areas | ansible.builtin.join(', ') }}
+        quiet: true
+
+    - name: "Molecule | Recovery | Drill the area"
       ansible.builtin.include_tasks:
         file: "{{ __recovery_molecule }}/shared/tasks/recovery.yml"
       vars:
-        recovery_area: "{{ __recovery_scenario }}"
-        recovery_hooks: "{{ __recovery_molecule }}/{{ __recovery_scenario }}/tasks/recovery"
+        recovery_area: "{{ __recovery_area }}"
+        recovery_hooks: >-
+          {{ __recovery_molecule ~ '/' ~ __recovery_scenario ~ '/tasks/recovery'
+             ~ ('' if __recovery_flat else '/' ~ __recovery_area) }}
 {% endraw %}

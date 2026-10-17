@@ -84,14 +84,17 @@ would conflict with the next update from the skeleton.
 The same holds for what the appliance variant adds: the act-once activation
 (`plugins/module_utils/_act_once.py` with
 `tests/unit/plugins/modules/test_act_once.py`) and the recovery drill
-(`recovery.yml` and `recovery_fresh.yml` in `extensions/molecule/shared/tasks/`,
-`recovery_dns.py` in `extensions/molecule/shared/files/`, and
+(`recovery.yml`, `recovery_areas.yml` and `recovery_fresh.yml` in
+`extensions/molecule/shared/tasks/`, `recovery_dns.py` in
+`extensions/molecule/shared/files/`, and
 `extensions/molecule/shared/playbooks/recovery.yml`, which runs one area's
 drill on its own).
 
 The product supplies what the drill does:
-`default/tasks/side_effect/zz_recovery.yml`, the hooks in
-`default/tasks/recovery/` and the backup and restore commands in the inventory.
+`default/tasks/side_effect/zz_recovery.yml`, each area's hooks in
+`default/tasks/recovery/<area>/` (or directly in `default/tasks/recovery/` for
+a scenario with one area) and the backup and restore commands in the
+inventory.
 Keep `zz_recovery.yml` the last side-effect file. It skips the drill when the
 credentials file names no console, and it always runs the drill when one is
 named. Run an area's drill on its own before that area first writes anything

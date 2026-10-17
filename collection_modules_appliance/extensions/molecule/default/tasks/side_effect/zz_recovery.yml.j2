@@ -10,12 +10,25 @@
   when:
     - "'console' not in __product_credentials"
 
-- name: "Molecule | Side effect | Run the area's recovery drill last"
+- name: "Molecule | Side effect | Find the scenario's recovery areas"
+  ansible.builtin.include_tasks:
+    file: "{{ lookup('ansible.builtin.env', 'MOLECULE_SCENARIO_DIRECTORY') }}/../shared/tasks/recovery_areas.yml"
+  vars:
+    __recovery_scenario_directory: "{{ lookup('ansible.builtin.env', 'MOLECULE_SCENARIO_DIRECTORY') }}"
+  when:
+    - "'console' in __product_credentials"
+
+- name: "Molecule | Side effect | Drill each area one after another"
   ansible.builtin.include_tasks:
     file: "{{ lookup('ansible.builtin.env', 'MOLECULE_SCENARIO_DIRECTORY') }}/../shared/tasks/recovery.yml"
   vars:
-    recovery_area: "fixture"
-    recovery_hooks: "{{ lookup('ansible.builtin.env', 'MOLECULE_SCENARIO_DIRECTORY') }}/tasks/recovery"
+    recovery_area: "{{ __recovery_area_name }}"
+    recovery_hooks: >-
+      {{ lookup('ansible.builtin.env', 'MOLECULE_SCENARIO_DIRECTORY') ~ '/tasks/recovery'
+         ~ ('' if __recovery_flat else '/' ~ __recovery_area_name) }}
   when:
     - "'console' in __product_credentials"
+  loop: "{{ recovery_areas | ansible.builtin.default([]) }}"
+  loop_control:
+    loop_var: "__recovery_area_name"
 {% endraw %}
