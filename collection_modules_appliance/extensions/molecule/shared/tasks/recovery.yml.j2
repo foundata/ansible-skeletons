@@ -4,8 +4,9 @@
 #
 # The console endpoint comes from the lab contract. It reads a label and a
 # list of guest commands as JSON on stdin and prints one status line, so the
-# serial protocol and the root credential stay in the lab's tooling. The
-# console only backs up and restores; every assertion goes through the API
+# serial protocol and the root credential stay in the lab's tooling.
+# Besides the backup and the restore, an area's hooks may use the console
+# for fixtures that the restore undoes; every assertion goes through the API
 # and DNS.
 #
 # Set "recovery_area" (the area's name) and "recovery_hooks" (its hooks

@@ -96,11 +96,13 @@ The product supplies what the drill does:
 `default/tasks/recovery/<area>/` (or directly in `default/tasks/recovery/` for
 a scenario with one area) and the backup and restore commands in the
 inventory.
-Keep `zz_recovery.yml` the last side-effect file. It skips the drill when the
-credentials file names no console, and it always runs the drill when one is
-named. Run an area's drill on its own before that area first writes anything
-that affects the management path. The management-path guard belongs to the
-product; check it against the product's real listeners and ingress.
+`zz_recovery.yml` needs the scenario's dependencies in place, such as the
+management resolver the drill checks, more than it needs to run last. It skips
+the drill when the credentials file names no console, and it always runs the
+drill when one is named. Run an area's drill on its own before that area first
+writes anything that affects the management path. The management-path guard
+belongs to the product; check it against the product's real listeners and
+ingress.
 
 {# end skeleton-variant #}
 The shared Molecule playbooks in `extensions/molecule/shared/playbooks/` come

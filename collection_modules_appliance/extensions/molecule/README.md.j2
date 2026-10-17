@@ -154,12 +154,17 @@ settings singleton) and its parameters. Its `options` fit
 change written in stages, `route` to count only writes below a path prefix,
 `rerun: "none"` for an operation that acts on every run, and `target` for
 writes that leave through another method than `_client.Client.write`. The
-harness prints the module file that ran.
+harness prints the module file that ran. The cases need the objects and
+services they use more than they need to run last; when a later side effect
+releases them, name `zz_loss.yml` so that it runs first.
 
 {# skeleton-variant: recovery-sequence #}
-The last `side_effect` file, `zz_recovery.yml`, runs the
-[recovery drill](#usage-recovery) when the credentials file names a console
-endpoint, and otherwise prints why it skipped.
+`zz_recovery.yml` runs the [recovery drill](#usage-recovery) when the
+credentials file names a console endpoint, and otherwise prints why it
+skipped. Its name puts it last here, but what it needs is the scenario's
+dependencies in place: the management resolver on the contract's DNS port and
+whatever the areas' hooks use. When a later side effect removes one of them,
+name the file so that it runs before that one.
 
 {# end skeleton-variant #}
 {# skeleton-variant: recovery-contract #}
@@ -169,8 +174,10 @@ The drill proves that you can get the appliance back after a change cuts off
 its management access. It backs up the configuration through the appliance's
 console, makes the area's change that breaks API access, and restores the
 backup through the console. Then it requires a fresh API login, a fresh DNS
-answer for the management name, and the change to be gone. The console only
-backs up and restores; every check goes through the API and DNS. A scenario
+answer for the management name, and the change to be gone. Every check goes
+through the API and DNS. Besides the backup and the restore, an area's hooks
+may use the console for fixtures that the restore undoes, such as turning off
+a setting that would keep the change from cutting off access. A scenario
 drills each of its areas in turn, in the order of their names.
 
 Before the drill can run:
@@ -207,7 +214,8 @@ Before the drill can run:
 
 Without `console` the drill is skipped; with an incomplete entry it fails. The
 drill never needs the appliance's root credential, so keep that in the console
-endpoint.
+endpoint. Areas, their optional files and uploads need nothing beyond these
+three entries; the lab contract stays as it is.
 
 {# end skeleton-variant #}
 {# skeleton-variant: recovery-tool #}
