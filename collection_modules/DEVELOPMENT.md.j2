@@ -62,27 +62,32 @@ utility, one activation scope and usually one Molecule scenario, such as the
 modules for routes, gateways and their activation.
 
 Replace the [fixture](plugins/modules/fixture.py), its definition and tests
-together. Bind the shared contract tests in
+together, and point the shared contract tests at a product resource in
 `tests/unit/plugins/modules/contract_subject.py`. For a hook-based resource,
-copy `_fixture_nested.py`, its module and its tests. Edit hooks, never the
-lifecycle sequence. The synthetic base and engine tests remain independent
-of the product's fixtures.
+copy `_fixture_nested.py`, its module and its tests, and change the hook
+methods; the order of the lifecycle steps belongs to the base. The shared base
+and engine tests bring their own synthetic resource and fake product, so
+replacing the fixture does not touch them.
 
-The following files are skeleton-owned invariants. Keep them byte-identical
-to the selected render; a required change goes through the skeleton:
-
-- `plugins/module_utils/_lifecycle.py`, `_engine.py` and `_activation.py`.
-- `extensions/molecule/shared/files/loss.py`, the one-response loss harness.
-- `tests/unit/plugins/conftest.py`, the generic module runner.
-- `test_contract.py`, `test_engine.py`, `test_activation.py` and
-  `test_lifecycle.py` under `tests/unit/plugins/modules/`.
+Some files are the same in every collection rendered from foundata's module
+skeleton and are updated from it rather than edited here: the lifecycle base,
+the definition engine and the activation helper (`_lifecycle.py`, `_engine.py`
+and `_activation.py` in `plugins/module_utils/`), the unit-test runner
+`tests/unit/plugins/conftest.py`, the shared tests `test_contract.py`,
+`test_engine.py`, `test_activation.py` and `test_lifecycle.py` in
+`tests/unit/plugins/modules/`, and the lost-reply helper
+`extensions/molecule/shared/files/loss.py`. When one of them needs a change,
+make it in the skeleton so that every collection receives it; a local edit
+would conflict with the next update from the skeleton.
 
 {# skeleton-variant: appliance-invariants #}
 {# end skeleton-variant #}
-The shared Molecule playbooks dispatch scenario hooks and retain their
-skeleton-owned structure. `contract_subject.py` binds the contract tests to
-the product; `_binding.py` binds the lifecycle to its client, error schema and
-compatibility policy. Bring those bindings forward with product values kept.
+The shared Molecule playbooks in `extensions/molecule/shared/playbooks/` come
+from the skeleton as well; they run each scenario's task files. Two files
+connect the shared code to this product and keep the product's values when
+the skeleton changes: `contract_subject.py` points the shared contract tests
+at a product resource, and `plugins/module_utils/_binding.py` gives the
+lifecycle base this collection's client, error schema and compatibility check.
 
 `foundata.utils` owns byte transport, deadlines, JSON decoding and safe error
 translation. The client, definitions, copied resource utilities, guard rules,
