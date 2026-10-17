@@ -259,6 +259,11 @@ class Lifecycle:
     # Binding: one implementation per collection.
 
     def connect(self) -> Any:
+        """Build the client without a request or a command.
+
+        ``prepare`` calls it before ``reconcile`` reads and before a supplied
+        action validates its input, so building it must have no effect.
+        """
         raise NotImplementedError
 
     def compatibility(self, operation: str) -> None:
@@ -556,11 +561,16 @@ class Lifecycle:
         A supplied action starts connected: ``prepare`` builds ``self.client``
         and applies the compatibility policy for ``compatibility_operation``
         (default ``operation_id()``) first, so the action never connects itself.
+        A resource whose transport is not the binding's client, such as a
+        command runner, overrides ``connect`` to return it. The operation the
+        instance had before preparing, ``validate`` or what ``__init__`` set,
+        is restored afterwards.
         """
         try:
             if action is not None:
+                operation = self.operation
                 self.prepare(compatibility_operation or self.operation_id())
-                self.step("validate")
+                self.operation = operation
             sequence = action if action is not None else self.reconcile
             result = self.finish(sequence())
         except errors.ApiError as failure:

@@ -588,6 +588,23 @@ def test_custom_operation_probes_before_action(
     assert not store.writes
 
 
+def test_custom_operation_keeps_its_preset_operation_after_preparing(
+    run_module: RunModule,
+) -> None:
+    def entrypoint() -> None:
+        module = AnsibleModule(argument_spec=spec(), supports_check_mode=True)
+        subject = Synthetic(module)
+        subject.operation = "job"
+
+        def action() -> dict[str, Any]:
+            raise Failure(category="product", code="rejected")
+
+        subject.execute(action=action)
+
+    result = run_module(entrypoint, name="a")
+    assert result["failed"] and result["operation"] == "job"
+
+
 def test_custom_operation_never_runs_without_a_connection(
     store: Store, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
 ) -> None:

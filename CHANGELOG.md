@@ -56,7 +56,9 @@ and the project adheres to
 - Both module variants: `execute(action)` always runs `prepare()` before the
   action: it connects once and applies the binding's compatibility policy, so
   an action uses `self.client` and never connects itself. `prepare()` keeps
-  an existing client instead of building a second one.
+  an existing client instead of building a second one. The action starts
+  with the operation the instance had before, and a resource with another
+  transport, such as a command runner, overrides `connect`.
 - Both module variants: the base's docstrings say how a resource that learns
   the product version from its first read checks compatibility (call
   `ensure_compatible` in `lookup`), that `execute(action)` is the shape for a
