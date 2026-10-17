@@ -278,6 +278,24 @@ def test_guard_and_identity_on_failure(store: Store, run_module: RunModule) -> N
     assert not store.writes
 
 
+@pytest.mark.parametrize(
+    "arguments,changed",
+    [({"value": "1"}, False), ({"value": "2"}, True), ({"state": "absent"}, True)],
+)
+def test_guards_see_whether_the_declaration_changes_anything(
+    store: Store,
+    run_module: RunModule,
+    monkeypatch: pytest.MonkeyPatch,
+    arguments: dict[str, Any],
+    changed: bool,
+) -> None:
+    store.rows["a"] = {"name": "a", "value": "1"}
+    seen: list[bool] = []
+    monkeypatch.setattr(Synthetic, "protect", lambda self: seen.append(self.changed))
+    result = run_module(main, name="a", _ansible_check_mode=True, **arguments)
+    assert seen == [changed] and result["changed"] is changed
+
+
 def test_secret_is_unverifiable_and_rotates_only_when_asked(
     store: Store, run_module: RunModule
 ) -> None:

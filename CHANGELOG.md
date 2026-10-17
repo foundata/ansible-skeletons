@@ -50,6 +50,9 @@ and the project adheres to
 - Both module variants: a definitive refusal reports the step of the write it
   refused, such as `update`, instead of `reconcile`, the step of its
   read-back.
+- Both module variants: the base sets `self.changed` before `protect`, so
+  guards and later hooks read whether the declaration changes anything
+  instead of computing it again.
 
 ### Fixed
 
