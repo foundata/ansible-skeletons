@@ -232,6 +232,25 @@ def test_lost_reply_without_effect_is_unknown(
     assert result["operation"] == "reconcile" and result["name"] == "a"
 
 
+@pytest.mark.parametrize("lost_reply", [False, True])
+def test_moved_read_back_that_misses_the_declaration_is_changed(
+    store: Store, run_module: RunModule, lost_reply: bool
+) -> None:
+    store.rows["a"] = {"name": "a", "value": "1"}
+
+    def elsewhere() -> None:
+        store.rows["a"]["value"] = "other"
+        if lost_reply:
+            lose()
+
+    store.drop, store.after = True, elsewhere
+    result = run_module(main, name="a", value="2")
+    assert result["failed"] and result["error_code"] == "not_persisted"
+    assert result["changed"] and result["outcome"] == "changed"
+    assert result["operation"] == ("reconcile" if lost_reply else "verify")
+    assert store.writes == ["update"]
+
+
 @pytest.mark.parametrize("drop,outcome", [(False, "changed"), (True, "unchanged")])
 def test_refusal_reports_what_the_read_back_shows(
     store: Store, run_module: RunModule, drop: bool, outcome: str

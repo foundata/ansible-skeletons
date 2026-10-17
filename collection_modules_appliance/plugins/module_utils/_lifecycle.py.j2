@@ -18,8 +18,9 @@ before the single ``write``. Afterwards the object is read again by the
 same lookup and checked (``verify``); a write never repeats.
 
 A reply lost after sending (category ``transport``, ``timeout`` or
-``response``) proves nothing: the read-back alone decides, and a
-declaration it cannot confirm fails with the outcome unknown. A definitive
+``response``) proves nothing: the read-back alone decides. A read-back that
+moved (``moved``) but misses the declaration fails with the outcome
+changed; one that did not move fails with the outcome unknown. A definitive
 refusal is reported as refused; the read-back only tells whether something
 changed anyway. A write that the client reports as never started
 (``started``) is unchanged. A field the product never returns (``secret``)
@@ -265,8 +266,8 @@ class Lifecycle:
             self.step("reconcile")
             self.settling = True
             observed = self.lookup()
+            self.confirmed = self.confirmed or self.moved(observed)
             if not self.lost(failure):
-                self.confirmed = self.confirmed or self.moved(observed)
                 self.attempted = self.confirmed or self.write_only()
                 raise
             self.verify(observed, self.want, self.absent)
@@ -276,6 +277,7 @@ class Lifecycle:
             self.step("verify")
             self.settling = True
             observed = self.lookup()
+            self.confirmed = self.confirmed or self.moved(observed)
             self.verify(observed, self.want, self.absent)
         self.confirmed = True
         return observed

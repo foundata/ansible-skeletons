@@ -367,7 +367,8 @@ def test_failure_after_a_write_keeps_changed_and_outcome(
 
     monkeypatch.setattr(Engine, "verify", mismatch)
     result = run_module(entry(), label="example", text="new")
-    assert result["failed"] and result["changed"] and result["outcome"] == "unknown"
+    # The update moved the record, so the failed verification reports changed.
+    assert result["failed"] and result["changed"] and result["outcome"] == "changed"
     assert result["operation"] == "verify" and synthetic.writes == ["update"]
     assert (result["error_category"], result["error_code"]) == (
         "verification",
