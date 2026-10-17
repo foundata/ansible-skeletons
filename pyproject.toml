@@ -28,7 +28,7 @@ lint = [
   "ansible-docsmith>=2.4.0",
   "ansible-lint-foundata>=1.1.0",
   "antsibull-changelog",
-  "antsibull-docs",
+  "antsibull-docs>=2.28.0",
   "antsibull-nox",
   "nox>=2025.02.09",
 ]

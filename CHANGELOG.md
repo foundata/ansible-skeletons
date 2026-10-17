@@ -92,6 +92,9 @@ and the project adheres to
   `XDG_RUNTIME_DIR` (or `/tmp`), removed when nox ends. Python's
   multiprocessing, which `reuse lint` and `docs-check` use, binds its sockets
   there, so the default sessions also pass in a deeply nested checkout.
+- collection_default, collection_modules, collection_modules_appliance:
+  `docs-check` installs antsibull-docs 2.28.0 or later, the first release that
+  accepts `no_log` in role argument specs.
 
 ### Fixed
 
