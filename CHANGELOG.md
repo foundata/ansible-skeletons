@@ -157,6 +157,10 @@ and the project adheres to
   DNS-dependent access instead of the API probe, and `settings.yml`, whose
   `recovery_fresh_dns: false` and `recovery_fresh_dns_reason` skip the fresh
   DNS check for a scenario that moves the management resolver.
+  `shared/tasks/recovery_upload.yml` uploads a helper into the appliance
+  through the console: base64 chunks within the endpoint's limits of 32
+  commands of at most 200 printable bytes per request, written atomically and
+  checked by SHA-256 in the appliance.
 - Rendered Boundaries documentation names the base, engine, activation,
   harnesses and shared tests as skeleton-owned invariants, plus the
   appliance-only activation and drill files.

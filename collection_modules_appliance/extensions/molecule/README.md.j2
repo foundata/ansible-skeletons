@@ -189,7 +189,11 @@ Before the drill can run:
      a scenario that moves the management resolver.
 2. Replace the `backup`, `restore` and `discard` commands under
    `recovery_defaults` in `default/inventory/hosts.yml`. They run `false`
-   until you replace them.
+   until you replace them. A drill that needs a helper inside the appliance
+   includes `shared/tasks/recovery_upload.yml`, which sends a file through the
+   console in base64 chunks, checks its SHA-256 digest in the appliance and
+   renames it into place; name the appliance's `decode` and `digest` commands
+   under `upload` for it.
 3. Add three entries to the credentials file:
    - `console`: `argv`, a command that runs commands in the appliance's root
      shell. The drill writes `{"label": "...", "commands": ["..."]}` to its

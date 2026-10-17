@@ -1,0 +1,61 @@
+# Upload one file from the controller into the appliance through the
+# console endpoint, for a drill that needs a helper inside the appliance.
+# The file travels as base64 chunks within the endpoint's limits, is decoded
+# next to its destination, checked by SHA-256 in the appliance and renamed
+# over the destination; see shared/files/recovery_upload.py.
+#
+# Include it from an area's hooks with "recovery_upload_src" (a controller
+# path), "recovery_upload_dest" (a path in the appliance of letters, digits
+# and "._/-") and optionally "recovery_upload_mode" (default "0700").
+# recovery_defaults["upload"] in the inventory names the appliance's base64
+# decoder ("decode") and SHA-256 tool ("digest"); both read standard input.
+#
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+{% raw %}
+---
+- name: "Molecule | Recovery | Require the upload commands"
+  ansible.builtin.assert:
+    that:
+      - recovery_defaults['upload']['decode'] | ansible.builtin.default('') | ansible.builtin.length > 0
+      - recovery_defaults['upload']['digest'] | ansible.builtin.default('') | ansible.builtin.length > 0
+    fail_msg: "Name the appliance's decode and digest commands under recovery_defaults['upload']; see extensions/molecule/README.md."
+    quiet: true
+
+- name: "Molecule | Recovery | Plan the upload"
+  delegate_to: "localhost"
+  ansible.builtin.command:
+    argv:
+      - "{{ ansible_playbook_python }}"
+      - "{{ lookup('ansible.builtin.env', 'MOLECULE_SCENARIO_DIRECTORY') }}/../shared/files/recovery_upload.py"
+      - "{{ recovery_upload_src }}"
+      - "{{ recovery_upload_dest }}"
+      - "{{ __recovery_label }}"
+      - "{{ recovery_defaults['upload']['decode'] }}"
+      - "{{ recovery_defaults['upload']['digest'] }}"
+      - "{{ recovery_upload_mode | ansible.builtin.default('0700') }}"
+  changed_when:
+    - false
+  register: __recovery_upload_plan
+
+- name: "Molecule | Recovery | Send the file through the console"
+  ansible.builtin.command:
+    argv: "{{ recovery_defaults['lab']['console']['argv'] }}"
+    stdin: "{{ __recovery_upload_request | ansible.builtin.to_json }}"
+  changed_when:
+    - true
+  loop: "{{ (__recovery_upload_plan['stdout'] | ansible.builtin.from_json)['requests'] }}"
+  loop_control:
+    label: "{{ __recovery_upload_request['label'] }}"
+    loop_var: "__recovery_upload_request"
+
+- name: "Molecule | Recovery | Record the upload"
+  ansible.builtin.debug:
+    msg: >-
+      {{ {'uploaded': recovery_upload_dest,
+          'sha256': (__recovery_upload_plan['stdout'] | ansible.builtin.from_json)['sha256'],
+          'bytes': (__recovery_upload_plan['stdout'] | ansible.builtin.from_json)['bytes']}
+         | ansible.builtin.to_json }}
+    verbosity: 0
+{% endraw %}

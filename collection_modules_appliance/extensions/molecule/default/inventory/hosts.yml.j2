@@ -37,6 +37,9 @@ all:
               - "false" # FIXME Restore it, including the product's history.
             discard:
               - "false" # FIXME Remove only the drill's saved configuration.
+            upload:
+              decode: "false" # FIXME The appliance's base64 decoder, reading stdin.
+              digest: "false" # FIXME A SHA-256 tool that prints the digest first.
 {% endraw %}
 {# end skeleton-variant #}
 {% raw %}

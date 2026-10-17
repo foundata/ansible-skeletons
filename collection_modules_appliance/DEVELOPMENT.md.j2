@@ -84,8 +84,9 @@ would conflict with the next update from the skeleton.
 The same holds for what the appliance variant adds: the act-once activation
 (`plugins/module_utils/_act_once.py` with
 `tests/unit/plugins/modules/test_act_once.py`) and the recovery drill
-(`recovery.yml`, `recovery_areas.yml` and `recovery_fresh.yml` in
-`extensions/molecule/shared/tasks/`, `recovery_dns.py` in
+(`recovery.yml`, `recovery_areas.yml`, `recovery_fresh.yml` and
+`recovery_upload.yml` in `extensions/molecule/shared/tasks/`,
+`recovery_dns.py` and `recovery_upload.py` in
 `extensions/molecule/shared/files/`, and
 `extensions/molecule/shared/playbooks/recovery.yml`, which runs one area's
 drill on its own).

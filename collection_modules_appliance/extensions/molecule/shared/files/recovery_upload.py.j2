@@ -1,0 +1,83 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Plan the console requests that upload one file into the appliance.
+
+Usage: recovery_upload.py SOURCE DESTINATION LABEL DECODE DIGEST MODE
+
+Prints one JSON object with the file's ``sha256``, its ``bytes`` and the
+``requests`` to send to the console endpoint in order. Each request has at
+most 32 commands of at most 200 printable bytes, the endpoint's limits. The
+commands append the file's base64 text to ``DESTINATION.b64`` in chunks,
+decode it with DECODE into ``DESTINATION.part``, compare the SHA-256 digest
+that DIGEST prints first, set MODE and rename the part over DESTINATION, so
+the destination never holds a partial file. DECODE and DIGEST read standard
+input.
+"""
+
+from __future__ import annotations
+
+import base64
+import hashlib
+import json
+import re
+import sys
+from pathlib import Path
+
+LIMIT = 200
+"""Longest command the console endpoint accepts, in bytes."""
+PER_REQUEST = 32
+"""Most commands the console endpoint accepts in one request."""
+PATH = re.compile(r"[A-Za-z0-9._/-]{1,120}")
+LABEL = re.compile(r"[a-z0-9][a-z0-9-]{0,32}")
+MODE = re.compile(r"[0-7]{3,4}")
+
+
+def plan(
+    data: bytes, destination: str, label: str, decode: str, digest: str, mode: str
+) -> dict[str, object]:
+    """Return the requests that upload ``data`` to ``destination``."""
+    if not PATH.fullmatch(destination) or ".." in destination.split("/"):
+        raise ValueError(
+            "The destination must be a plain path of letters, digits and ._/-"
+        )
+    if not LABEL.fullmatch(label) or not MODE.fullmatch(mode):
+        raise ValueError("The label or the mode is malformed")
+    part, text = f"{destination}.part", f"{destination}.b64"
+    prefix, suffix = "printf '%s' '", f"' >> '{text}'"
+    size = LIMIT - len(prefix) - len(suffix)
+    encoded = base64.b64encode(data).decode("ascii")
+    hexdigest = hashlib.sha256(data).hexdigest()
+    commands = [f"rm -f '{text}' '{part}'", f": > '{text}'"]
+    commands += [
+        prefix + encoded[start : start + size] + suffix
+        for start in range(0, len(encoded), size)
+    ]
+    commands += [
+        f"{decode} < '{text}' > '{part}'",
+        f"test \"$({digest} < '{part}' | cut -c 1-64)\" = '{hexdigest}'",
+        f"chmod {mode} '{part}'",
+        f"mv -f '{part}' '{destination}'",
+        f"rm -f '{text}'",
+    ]
+    for command in commands:
+        if len(command.encode()) > LIMIT or not command.isprintable():
+            raise ValueError("A command exceeds the console endpoint's limits")
+    requests = [
+        {
+            "label": f"{label}-upload-{number}",
+            "commands": commands[start : start + PER_REQUEST],
+        }
+        for number, start in enumerate(range(0, len(commands), PER_REQUEST), 1)
+    ]
+    return {"sha256": hexdigest, "bytes": len(data), "requests": requests}
+
+
+def main() -> int:
+    source, destination, label, decode, digest, mode = sys.argv[1:7]
+    result = plan(Path(source).read_bytes(), destination, label, decode, digest, mode)
+    print(json.dumps(result))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
