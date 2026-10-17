@@ -76,6 +76,9 @@ and the project adheres to
   prerequisites in a Requirements section, where product READMEs keep them,
   and its "Management path and recovery" contract points there instead of
   repeating them.
+- collection_default, collection_modules, collection_modules_appliance: the
+  rendered `DEVELOPMENT.md` says to run the sessions of one ansible-core
+  release while editing and the default sessions before a commit.
 
 ### Fixed
 

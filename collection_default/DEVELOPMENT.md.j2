@@ -48,7 +48,10 @@ It runs by default; add it to CI configurations that list sessions explicitly.
 
 Session definitions: [noxfile.py](noxfile.py).
 Built-in session settings: [antsibull-nox.toml](antsibull-nox.toml).
-Run container-backed sessions sequentially.
+Run container-backed sessions sequentially. While editing, run the sessions of
+one ansible-core release, such as
+`uv run noxfile.py -s ansible-test-sanity-2.21` (`-l` lists them), and the
+sessions above before a commit.
 
 ## Releases<a id="releases"></a>
 
