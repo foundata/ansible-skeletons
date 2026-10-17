@@ -47,6 +47,9 @@ and the project adheres to
 - Both module variants: a failed write whose read-back moved reports
   `outcome: changed`, after a lost reply and after an acknowledged write
   alike. A read-back that did not move stays `unknown`.
+- Both module variants: a definitive refusal reports the step of the write it
+  refused, such as `update`, instead of `reconcile`, the step of its
+  read-back.
 
 ### Fixed
 

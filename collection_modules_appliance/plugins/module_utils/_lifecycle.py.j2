@@ -21,12 +21,12 @@ A reply lost after sending (category ``transport``, ``timeout`` or
 ``response``) proves nothing: the read-back alone decides. A read-back that
 moved (``moved``) but misses the declaration fails with the outcome
 changed; one that did not move fails with the outcome unknown. A definitive
-refusal is reported as refused; the read-back only tells whether something
-changed anyway. A write that the client reports as never started
-(``started``) is unchanged. A field the product never returns (``secret``)
-is always written, to an existing object only with ``update_password:
-always``; it makes a successful write ``unverifiable`` and a lost one
-unknown.
+refusal is reported as refused, under the step of the write it refused; the
+read-back only tells whether something changed anyway. A write that the
+client reports as never started (``started``) is unchanged. A field the
+product never returns (``secret``) is always written, to an existing object
+only with ``update_password: always``; it makes a successful write
+``unverifiable`` and a lost one unknown.
 
 Failures go through the binding's error schema with ``operation``,
 ``outcome`` (``unchanged``, ``unknown`` or ``changed``), the identity
@@ -257,6 +257,7 @@ class Lifecycle:
         a later refusal, uncertain response or request that never started.
         """
         self.attempted = True
+        operation = self.operation
         try:
             request()
         except errors.ApiError as failure:
@@ -268,7 +269,9 @@ class Lifecycle:
             observed = self.lookup()
             self.confirmed = self.confirmed or self.moved(observed)
             if not self.lost(failure):
+                # The refusal belongs to the write, not to its read-back.
                 self.attempted = self.confirmed or self.write_only()
+                self.operation = operation
                 raise
             self.verify(observed, self.want, self.absent)
             if self.write_only():

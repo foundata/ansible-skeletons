@@ -260,6 +260,7 @@ def test_refusal_reports_what_the_read_back_shows(
     result = run_module(main, name="a", value="2")
     assert result["failed"] and result["error_code"] == "rejected"
     assert result["outcome"] == outcome and result["changed"] == (not drop)
+    assert result["operation"] == "update" and store.writes == ["update"]
 
 
 def test_write_that_never_started_is_unchanged(
