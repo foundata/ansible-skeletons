@@ -57,6 +57,11 @@ and the project adheres to
   action: it connects once and applies the binding's compatibility policy, so
   an action uses `self.client` and never connects itself. `prepare()` keeps
   an existing client instead of building a second one.
+- Both module variants: the base's docstrings say how a resource that learns
+  the product version from its first read checks compatibility (call
+  `ensure_compatible` in `lookup`), that `execute(action)` is the shape for a
+  write whose read-back is expensive or impossible after a timeout, and that
+  `finish()` also runs after an action and after `act_once`.
 
 ### Fixed
 

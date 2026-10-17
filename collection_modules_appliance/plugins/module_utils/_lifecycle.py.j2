@@ -11,11 +11,28 @@ resource implements them again:
 ``declared``), connects, reads the object completely (``lookup``) and
 projects it (``managed``), computes the minimal difference, runs the
 resource's guards (``protect``) and predicts the result. Unless
-``compatibility_always`` is set, an unchanged run
-returns without discovering the product version; check mode returns
-after the eligibility check. Otherwise ``recheck`` repeats a guard right
-before the single ``write``. Afterwards the object is read again by the
-same lookup and checked (``verify``); a write never repeats.
+``compatibility_always`` is set, an unchanged run returns without
+discovering the product version; check mode returns after the eligibility
+check. Otherwise ``recheck`` repeats a guard right before the single
+``write``. Afterwards the object is read again by the same lookup and
+checked (``verify``); a write never repeats.
+
+``compatibility_always`` decides when the version is checked: before the
+first read when it is set, otherwise only before a write or a changed
+prediction. A resource that learns the version from its first read, such as
+a command runner that reports it with the data, checks right after that
+read instead: it leaves the setting off and calls
+``ensure_compatible(self.operation_id())`` at the end of ``lookup``. The
+verdict is cached per operation, so the later check before a write repeats
+nothing.
+
+An operation that fits no resource sequence runs under ``execute(action)``.
+It keeps the base's connection, probe policy and failure boundary and
+supplies its own steps, settling each write through ``stage`` where a
+read-back can prove it. ``execute(action)`` is also the shape for a write
+whose read-back is expensive, or impossible after a timeout because the
+write may have spent the deadline: the action reports the outcome its own
+evidence supports instead of reading back.
 
 A reply lost after sending (category ``transport``, ``timeout`` or
 ``response``) proves nothing: the read-back alone decides. A read-back that
@@ -322,7 +339,12 @@ class Lifecycle:
         return sorted(self.delta) if self.record is not None and not self.absent else []
 
     def finish(self, result: dict[str, Any]) -> dict[str, Any]:
-        """Complete every successful result before execute passes it to exit_json."""
+        """Complete every successful result before execute passes it to exit_json.
+
+        It runs after whatever ``execute`` ran: ``reconcile``, a supplied action
+        and, in the appliance variant, ``act_once``. A class that offers several
+        of them branches on its own state.
+        """
         return result
 
     def verify(self, record: Any, desired: dict[str, Any], absent: bool) -> None:

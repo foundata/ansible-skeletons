@@ -7,7 +7,8 @@ precedes preflight when the binding requires a probe before every product read.
 Normal mode activates once and reports verified: unverifiable. A lost reply
 leaves the outcome unknown. Effective may check bounded readiness without
 claiming a loaded-state receipt. An area's apply module supplies the product
-hooks and binding.
+hooks and binding. The base's ``finish`` hook runs after ``act_once`` too: an
+area class that also reconciles resources branches there on its own state.
 """
 
 from __future__ import annotations
