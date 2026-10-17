@@ -182,7 +182,9 @@ and the project adheres to
   refused an unknown one, and proves the skip without a console contract.
 - Rendered Boundaries documentation names the base, engine, activation,
   harnesses and shared tests as skeleton-owned invariants, plus the
-  appliance-only activation and drill files.
+  appliance-only activation and drill files. It describes the contract
+  subject and the copied scaffold so that it reads right in a fresh render
+  and in a collection whose resources replaced the fixture.
 - collection_default, collection_modules, collection_modules_grid: a default
   `runtime-check` Nox session checks a built artifact with only `meta/`,
   `plugins/`, `roles/` and `playbooks/` retained. It checks imports,

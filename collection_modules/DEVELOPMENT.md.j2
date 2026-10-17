@@ -61,13 +61,14 @@ lifecycle's hooks. An area is a group of modules that share one module
 utility, one activation scope and usually one Molecule scenario, such as the
 modules for routes, gateways and their activation.
 
-Replace the [fixture](plugins/modules/fixture.py), its definition and tests
-together, and point the shared contract tests at a product resource in
-`tests/unit/plugins/modules/contract_subject.py`. For a hook-based resource,
-copy `_fixture_nested.py`, its module and its tests, and change the hook
-methods; the order of the lifecycle steps belongs to the base. The shared base
-and engine tests bring their own synthetic resource and fake product, so
-replacing the fixture does not touch them.
+`tests/unit/plugins/modules/contract_subject.py` names the product resource
+the shared contract tests run against. A fresh render names the fixture there,
+`plugins/modules/fixture.py`, which the first product resource replaces
+together with its definition and tests. A new hook-based resource starts as a
+copy of the skeleton's `_fixture_nested.py` with its module and tests and
+changes only the hook methods; the order of the lifecycle steps belongs to the
+base. The shared base and engine tests bring their own synthetic resource and
+fake product, so the product's resources never touch them.
 
 Some files are the same in every collection rendered from foundata's module
 skeleton and are updated from it rather than edited here: the lifecycle base,
