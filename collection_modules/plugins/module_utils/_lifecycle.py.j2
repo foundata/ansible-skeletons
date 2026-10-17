@@ -239,8 +239,9 @@ class Lifecycle:
             self.compatible.add(operation)
 
     def prepare(self, operation: str) -> None:
+        """Connect once and check compatibility when the binding's policy asks."""
         self.step("connect")
-        if self.client is None or not self.compatibility_always:
+        if self.client is None:
             self.client = self.connect()
         if self.compatibility_always:
             self.step("compatibility")
@@ -373,10 +374,16 @@ class Lifecycle:
         *,
         compatibility_operation: str | None = None,
     ) -> None:
-        """Run a resource or supplied operation under the failure boundary."""
+        """Run a resource or supplied operation under the failure boundary.
+
+        A supplied action starts connected: ``prepare`` builds ``self.client``
+        and applies the compatibility policy for ``compatibility_operation``
+        (default ``operation_id()``) first, so the action never connects itself.
+        """
         try:
-            if action is not None and self.compatibility_always:
+            if action is not None:
                 self.prepare(compatibility_operation or self.operation_id())
+                self.step("validate")
             sequence = action if action is not None else self.reconcile
             result = self.finish(sequence())
         except errors.ApiError as failure:

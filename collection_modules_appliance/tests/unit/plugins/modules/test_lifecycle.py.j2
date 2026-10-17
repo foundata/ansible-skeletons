@@ -531,17 +531,30 @@ def test_custom_operation_probes_before_action(
     monkeypatch.setattr(Synthetic, "compatibility_always", always)
 
     def action(subject: Synthetic) -> dict[str, Any]:
-        assert store.versions == int(always)
+        assert store.versions == int(always) and subject.client is store
+        assert subject.operation == "validate"
         if always:
-            assert subject.client is store
             subject.ensure_compatible(subject.operation_id())
-        else:
-            assert subject.client is None
         return {"changed": False}
 
     result = run_module(action_main(action), name="a", _ansible_check_mode=check_mode)
     assert not result["changed"] and store.versions == int(always)
     assert not store.writes
+
+
+def test_custom_operation_never_runs_without_a_connection(
+    store: Store, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def refuse_connection(self: Synthetic) -> Store:
+        raise Failure(category="product", code="rejected")
+
+    def action(subject: Synthetic) -> dict[str, Any]:
+        raise AssertionError("An action without a client must not run")
+
+    monkeypatch.setattr(Synthetic, "connect", refuse_connection)
+    result = run_module(action_main(action), name="a")
+    assert result["failed"] and result["operation"] == "connect"
+    assert result["outcome"] == "unchanged" and not store.writes
 
 
 def test_custom_operation_refuses_before_action(

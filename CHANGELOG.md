@@ -53,6 +53,10 @@ and the project adheres to
 - Both module variants: the base sets `self.changed` before `protect`, so
   guards and later hooks read whether the declaration changes anything
   instead of computing it again.
+- Both module variants: `execute(action)` always runs `prepare()` before the
+  action: it connects once and applies the binding's compatibility policy, so
+  an action uses `self.client` and never connects itself. `prepare()` keeps
+  an existing client instead of building a second one.
 
 ### Fixed
 
