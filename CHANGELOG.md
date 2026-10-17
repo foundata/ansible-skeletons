@@ -79,6 +79,10 @@ and the project adheres to
   in a subclass's bases and says why in its docstring: listed after the
   binding or a resource class, any member of the same name there would
   replace the activation's silently. Declare `class Apply(ActOnce, Binding)`.
+- Both module variants: the base's failure boundary maps an `OSError` from a
+  local file or process operation to category `local`, code
+  `operation_failed`, without the error's message; the rendered error schema
+  declares the pair.
 - checks: `--resume <output>` reruns only the failed and missing steps of an
   earlier run of the same sources; `scripts.release check --resume` does the
   same for the evidence of the same commit.

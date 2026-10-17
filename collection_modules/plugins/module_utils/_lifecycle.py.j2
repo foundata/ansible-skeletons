@@ -30,11 +30,13 @@ only with ``update_password: always``; it makes a successful write
 
 Failures go through the binding's error schema with ``operation``,
 ``outcome`` (``unchanged``, ``unknown`` or ``changed``), the identity
-options the schema accepts and the fields the failure names. Hooks keep
-their state on the instance; a hook may refine ``operation`` within its
-step and may set ``confirmed`` when its own evidence proves an effect.
-``changed`` tells ``protect`` and every later hook whether the declaration
-changes anything.
+options the schema accepts and the fields the failure names. A local
+operation that raises ``OSError``, such as writing a file on the controller,
+fails with category ``local`` and code ``operation_failed``, never with the
+error's message, which may name private paths. Hooks keep their state on the
+instance; a hook may refine ``operation`` within its step and may set
+``confirmed`` when its own evidence proves an effect. ``changed`` tells
+``protect`` and every later hook whether the declaration changes anything.
 
 A subclass overrides hooks and settings and may add names of its own; it
 never redefines the sequence, its helpers or the instance state, and a class
@@ -507,5 +509,7 @@ class Lifecycle:
             result = self.finish(sequence())
         except errors.ApiError as failure:
             self.fail(failure)
+        except OSError:
+            self.fail(Failure(category="local", code="operation_failed"))
         else:
             self.module.exit_json(**result)

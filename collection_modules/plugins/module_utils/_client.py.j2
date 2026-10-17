@@ -71,6 +71,8 @@ ERROR_CODES: dict[str, frozenset[str | None]] = {
         }
     ),
     "compatibility": frozenset({"version_unknown", "ineligible"}),
+    # The lifecycle base reports a failed local file or process operation.
+    "local": frozenset({"operation_failed"}),
 }
 """Categories and codes this collection raises besides the shared ones."""
 

@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 from types import SimpleNamespace
 from typing import Any, Callable
@@ -56,6 +57,7 @@ SCHEMA = errors.ErrorSchema(
         "product": {"rejected"},
         "eligibility": {"referenced", "stale"},
         "compatibility": {"ineligible"},
+        "local": {"operation_failed"},
         "verification": {
             "still_present",
             "missing_after_write",
@@ -530,6 +532,22 @@ def test_custom_operation_uses_the_same_failure_boundary(
     result = run_module(action_main(action), name="a")
     assert result["failed"] and result["outcome"] == outcome
     assert result["operation"] == "job" and result["name"] == "a"
+
+
+def test_local_os_error_fails_without_its_message(run_module: RunModule) -> None:
+    def action(subject: Synthetic) -> dict[str, Any]:
+        subject.operation = "deliver"
+        subject.attempted = subject.confirmed = True
+        raise PermissionError(13, "Permission denied", "/private/SYNTHETIC-path")
+
+    result = run_module(action_main(action), name="a")
+    assert (result["error_category"], result["error_code"]) == (
+        "local",
+        "operation_failed",
+    )
+    assert result["operation"] == "deliver" and result["outcome"] == "changed"
+    assert "SYNTHETIC-path" not in json.dumps(result)
+    assert Binding.schema.allows("local", "operation_failed")
 
 
 def test_custom_operation_finishes_its_result(
