@@ -69,6 +69,9 @@ and the project adheres to
   an acknowledged apply that does not converge reports `outcome: changed`.
   Its failures carry the lifecycle base's fields, with the objects that did
   not converge under `not_effective`.
+- All skeletons: `requirements.txt` says to list additional Python packages
+  or, when there are none, to keep the file with a comment saying so, which
+  is what every `FIXME.md` now says.
 
 ### Fixed
 
