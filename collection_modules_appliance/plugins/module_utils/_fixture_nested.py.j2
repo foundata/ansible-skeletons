@@ -5,6 +5,13 @@
 The fixture has nested settings with partial declarations. A definition's flat
 field mapping cannot preserve their unmanaged members. The inherited base owns
 validation order, guards, prediction, write settlement and public failures.
+
+Overrides marked "Delete when unchanged" only call the base; they are here for
+their contracts. A copy deletes each one it does not change. An override keeps
+the base's parameter names: only ansible-test sanity's pylint
+(``arguments-renamed``) reports a renamed one, so Ruff and mypy pass it. Keep
+per-instance state in ``__init__`` after the base's, never in mutable class
+attributes.
 """
 
 from __future__ import annotations
@@ -66,10 +73,17 @@ class FixtureNested(Binding):
     whole_diff = True
     recheck_code = "stale"
 
+    # Delete when unchanged.
+    def __init__(self, module: Any) -> None:
+        """Set per-instance state here, after the base's own."""
+        super().__init__(module)
+
+    # Delete when unchanged.
     def connect(self) -> Any:
         """Construct the bound client after request-free declaration validation."""
         return super().connect()
 
+    # Delete when unchanged.
     def compatibility(self, operation: str) -> None:
         """Refuse excluded operations; do not write or change declared state."""
         super().compatibility(operation)
@@ -154,6 +168,7 @@ class FixtureNested(Binding):
             )
         return super().same(name, current, desired)
 
+    # Delete when unchanged.
     def difference(self) -> dict[str, Any]:
         """Calculate the minimum declared difference from the initial snapshot."""
         return super().difference()
@@ -166,6 +181,7 @@ class FixtureNested(Binding):
             protect_listener(self.client, self.predict(), self.absent)
 {# end skeleton-variant #}
 
+    # Delete when unchanged.
     def secret(self, name: str) -> bool:
         """Identify write-only fields; this public fixture has none."""
         return False
@@ -178,10 +194,12 @@ class FixtureNested(Binding):
             predicted["settings"] = {**predicted.get("settings", {}), **settings}
         return predicted
 
+    # Delete when unchanged.
     def public(self, record: Any) -> Any:
         """Project observed output without private or unmanaged wire members."""
         return self.managed(record)
 
+    # Delete when unchanged.
     def diff(self) -> dict[str, Any] | None:
         """Publish complete public before and after objects, never wire secrets."""
         return super().diff()
@@ -208,10 +226,12 @@ class FixtureNested(Binding):
         if not isinstance(reply, dict) or reply.get("status") != "ok":
             raise ProductError(category="product", code="rejected")
 
+    # Delete when unchanged.
     def started(self) -> bool:
         """Tell the base whether a failed request may have reached the product."""
         return super().started()
 
+    # Delete when unchanged.
     def lost(self, failure: errors.ApiError) -> bool:
         """Classify an uncertain reply that read-back may settle without retry."""
         return super().lost(failure)
@@ -220,6 +240,7 @@ class FixtureNested(Binding):
         """Compare the full snapshot because a write carries unmanaged members."""
         return bool(observed != self.record)
 
+    # Delete when unchanged.
     def verify(self, record: Any, desired: dict[str, Any], absent: bool) -> None:
         """Prove declared state or raise a shared verification verdict."""
         super().verify(record, desired, absent)
@@ -235,14 +256,17 @@ class FixtureNested(Binding):
             if current.get(name) != value
         )
 
+    # Delete when unchanged.
     def finish(self, result: dict[str, Any]) -> dict[str, Any]:
         """Complete successful output once; never hide an uncertain outcome."""
         return super().finish(result)
 
+    # Delete when unchanged.
     def operation_id(self) -> str:
         """Name the operation used by the collection compatibility policy."""
         return super().operation_id()
 
+    # Delete when unchanged.
     def identity_fields(self) -> dict[str, Any]:
         """Return only identity fields allowed by the collection error schema."""
         return super().identity_fields()

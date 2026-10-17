@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import inspect
 import json
 
 import pytest
@@ -11,6 +12,14 @@ import pytest
 # Preserve wrapping for maximum-length Galaxy identities.
 # fmt: off
 # isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._fixture_nested import (
+        FixtureNested,
+    )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._lifecycle import (
+        Lifecycle,
+    )
 from ansible_collections.{{ namespace }}.\
     {{ collection_name }}.plugins.modules import (
         fixture_nested,
@@ -20,6 +29,17 @@ from ansible_collections.{{ namespace }}.\
 
 from ..conftest import RunModule
 from ..fake_product import OLD_SECRET, FakeProduct, lost_response
+
+
+def test_overrides_keep_the_base_parameter_names() -> None:
+    # Only ansible-test sanity's pylint (arguments-renamed) reports a renamed one.
+    for name, method in vars(FixtureNested).items():
+        base = getattr(Lifecycle, name, None)
+        if name.startswith("__") or not callable(method) or not callable(base):
+            continue
+        assert list(inspect.signature(method).parameters) == list(
+            inspect.signature(base).parameters
+        ), name
 
 
 def test_nested_create_and_partial_update(
