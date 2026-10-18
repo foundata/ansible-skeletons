@@ -46,7 +46,7 @@ The skeletons follow these style guides:
 - [Features](#features)
 - [Examples](#examples)
 - [Usage](#usage)
-- [Description of provided skeletons](#content)
+- [Provided skeletons](#content)
   - [`collection_default`](#collection_default)
   - [`collection_modules`](#collection_modules)
   - [`collection_modules_appliance`](#collection_modules_appliance)
@@ -123,7 +123,7 @@ Some collections built using these skeletons:
       "namespace.new_collection"
 
    # Create a new stand-alone role called "new_role" based on the "role_default" skeleton
-   # Syntax: ansible-galaxy role init --collection-skeleton <path> <extra variables> <name of the new role>
+   # Syntax: ansible-galaxy role init --role-skeleton <path> <extra variables> <name of the new role>
    ansible-galaxy role init \
       --role-skeleton "./role_default" \
       --extra-var "author='FIXME User <user@example.com>'" \
@@ -183,76 +183,36 @@ a `run` role in an Ansible collection. It includes:
   [foundata Ansible playbook guideline](https://foundata.com/en/guidelines/ansible-playbooks/#linting).
 - [`antsibull-changelog`](https://docs.ansible.com/projects/antsibull-changelog/changelogs/)
   support.
-- [`antsibull-nox`](https://docs.ansible.com/projects/antsibull-nox/) checks:
-  `nox` rewrites and checks, `CI=true nox` only checks,
-  `nox -s ansible-test-sanity` runs `ansible-test` sanity per `ansible-core`
-  version, `nox -s molecule` runs Molecule. `DEVELOPMENT.md` in the collection
-  explains them.
+- [`antsibull-nox`](https://docs.ansible.com/projects/antsibull-nox/) checks,
+  including ansible-lint with foundata's rules, `ansible-test` sanity per
+  `ansible-core` version and Molecule. The rendered `DEVELOPMENT.md` explains
+  them.
 - [Molecule](https://docs.ansible.com/projects/molecule/) support with a default
   scenario using [Podman](https://podman.io/docs/installation) and several
   [integration test targets](https://github.com/orgs/foundata/repositories?q=oci-*-itt).
 
-Nox installs and verifies `ansible-lint-foundata` in its lint environment.
-With `nox --no-venv`, a missing extension produces a warning and only stock
-rules run.
-
 
 ### `collection_modules`<a id="collection_modules"></a>
 
-A module-first skeleton with one skeleton-owned lifecycle base for both
-definition-driven and hook-based resources. The engine supplies hooks to
-that base; a second, nested fixture shows how to copy a hook-based
-resource's utility and edit its hooks without changing the sequence. Both
-fixtures use one lost-response harness for create, update and delete.
+A module-first skeleton for REST products whose writes take effect
+immediately. For an appliance whose configuration carries its own management
+path or whose activation is global, use
+[`collection_modules_appliance`](#collection_modules_appliance) instead. It
+includes:
 
-Its REST fixture uses server-assigned integer identifiers, case-insensitive
-names, by-key 404 absence, empty-page pagination, native JSON and
-POST/PUT-or-PATCH/DELETE writes that take effect immediately. It includes a
-replaceable resource and info module, references, a write-only password and
-a deletion guard; no apply module. The verifying activation helper remains
-available, but act-once activation and appliance recovery machinery do not
-ship in this variant. Shared base and harness files are byte-identical to
-the appliance variant outside declared variant regions, enforced by tests.
+- A shared lifecycle base that runs every resource module, and a definition
+  engine for resources that a declaration can describe.
+- A resource module and an info module against a fake REST product, with
+  references, a write-only password and a deletion guard. The product's own
+  resources replace them.
+- A second, hook-based fixture with nested values, the starting point for
+  resources that a definition cannot express.
+- A Molecule scenario, and a harness that proves each module handles a lost
+  reply to a create, update or delete.
+- A verifying activation helper for products that activate changes in a
+  separate step; the fixture does not use it.
 
-```sh
-ansible-galaxy collection init \
-  --collection-skeleton ./collection_modules \
-  --extra-vars @metadata.json \
-  --extra-vars "skeleton_revision=$(git describe --tags --always)" \
-  --extra-vars '{"product": "Example REST Product"}' namespace.product
-```
-
-The `metadata.json`, the defaults and the `foundata.utils` prerequisite are the
-same as above.
-Follow the rendered `FIXME.md` to replace the fixture with product evidence.
-
-
-
-### `collection_modules_appliance`<a id="collection_modules_appliance"></a>
-
-A module-first skeleton for appliances whose managed configuration carries
-the management path, whose activation is global, and whose console recovery
-is rehearsed per area. Choose it by those traits, not by the API's endpoint
-shape.
-
-It ships the same skeleton-owned lifecycle base, definition engine, copyable
-hook-based resource scaffold and loss harness as `collection_modules`. It
-adds act-once activation for scopes without an authoritative loaded-state
-receipt, a management-path guard scaffold, and a recovery drill with a lab
-contract. Independent recovery and a single writer are prerequisites.
-Act-once reports `verified: unverifiable`, not proof that the requested state
-became active.
-
-Its replaceable resource, info and verifying activation modules exercise a
-grid-style fake API: UUID identifiers, paginated `search_item` listings with a
-declared total, `add_item`, `set_item` and `del_item` actions, string-encoded
-values and fixed response envelopes. A dependent record blocks deletion.
-The second fixture has nested values that a flat definition cannot express.
-The external-endpoint Molecule scenario runs both fixtures and drills two
-areas against the fake product's console, or skips the drill with a reason
-when no console contract is supplied. It contains no deployment role.
-
-Render with the metadata from the usage example and the product's display name:
+Render it with a `metadata.json` and the product's display name:
 
 ```sh
 cat > metadata.json <<'EOF'
@@ -267,17 +227,53 @@ cat > metadata.json <<'EOF'
 }
 EOF
 ansible-galaxy collection init \
+  --collection-skeleton ./collection_modules \
+  --extra-vars @metadata.json \
+  --extra-vars "skeleton_revision=$(git describe --tags --always)" \
+  --extra-vars '{"product": "Example REST Product"}' namespace.product
+```
+
+`version` defaults to `1.0.0`; the core floor defaults to `2.19.0`. The
+rendered collection requires `foundata.utils >=1.0.0`. Follow the rendered
+`FIXME.md` to replace the fixtures with the product's resources.
+
+
+### `collection_modules_appliance`<a id="collection_modules_appliance"></a>
+
+A module-first skeleton for appliances with these traits:
+
+- The managed configuration carries the management path, so a change can cut
+  off the API the modules use.
+- Activation is global: one apply step activates every pending change.
+- Recovery through the console is rehearsed for each area before the area's
+  first change that can affect the management path.
+
+Choose it by those traits, not by the shape of the API. It requires a single
+writer and a recovery path that does not depend on the API, such as a
+console. On top of `collection_modules`, it adds:
+
+- Act-once activation, for scopes where the product cannot confirm what it
+  loaded. It reports `verified: unverifiable`, which does not prove that the
+  requested state became active.
+- A scaffold for a guard that keeps writes away from the management path.
+- A recovery drill that backs up the configuration through the console, cuts
+  off API access and restores the backup. Without console access, the drill
+  skips with a reason.
+
+Its fixtures run against a fake product with a grid-style API: UUID
+identifiers, paginated searches, and add, set and delete actions. It contains
+no deployment role. Render it with the same `metadata.json`:
+
+```sh
+ansible-galaxy collection init \
   --collection-skeleton ./collection_modules_appliance \
   --extra-vars @metadata.json \
   --extra-vars "skeleton_revision=$(git describe --tags --always)" \
   --extra-vars '{"product": "Example Grid"}' namespace.product
 ```
 
-`version` defaults to `1.0.0`; the core floor defaults to `2.19.0`.
-The fixture imports `foundata.utils >=1.0.0`.
-Follow the rendered `FIXME.md` to adapt the fixture. The shared contract tests
-reach the fixture only through `tests/unit/plugins/modules/contract_subject.py`;
-a product binds its own resource there and keeps `test_contract.py` unchanged.
+Follow the rendered `FIXME.md` to replace the fixtures with the product's
+resources.
 
 
 ### `role_default`<a id="role_default"></a>
@@ -313,22 +309,13 @@ combinations, using the exact dependency versions recorded in `uv.lock`:
 | 2.20         | 3.12, 3.13, 3.14  |
 | 2.21         | 3.12, 3.13, 3.14  |
 
-The matrix is defined in `pyproject.toml`; see
-[Development: Testing](./DEVELOPMENT.md#testing) for repeatable commands and
-infrastructure coverage. It is reviewed against the
-[upstream support matrix](https://docs.ansible.com/ansible/latest/reference_appendices/release_and_maintenance.html#ansible-core-support-matrix).
-Module skeleton checks run on the default lane; their rendered collections carry
-their own lanes.
+[Development: Testing](./DEVELOPMENT.md#testing) describes the checks and
+their infrastructure coverage.
 
 **ansible-core before 2.19 cannot run the rendered content:** the templates
 write Jinja's own filters and tests as `ansible.builtin.<name>`, which
-ansible-core resolves from 2.19. The development helpers require Python 3.12 or
-newer; consumers only need Ansible and its supported Python runtime.
-
-The following versions are known to be problematic:
-
-- `ansible-galaxy [core 2.16.4]` ("ERROR! Invalid collection name" when passing
-  `authors` as extra-var)
+ansible-core resolves from 2.19. Projects rendered from the skeletons need only
+Ansible and its supported Python runtime.
 
 
 
