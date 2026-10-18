@@ -635,6 +635,83 @@ def test_custom_operation_refuses_before_action(
 
 
 @pytest.mark.parametrize("always", [False, True])
+def test_custom_operation_validates_before_it_connects(
+    store: Store,
+    run_module: RunModule,
+    monkeypatch: pytest.MonkeyPatch,
+    always: bool,
+) -> None:
+    monkeypatch.setattr(Synthetic, "compatibility_always", always)
+    events: list[str] = []
+
+    def connect(self: Synthetic) -> Store:
+        events.append("connect")
+        return store
+
+    def entrypoint() -> None:
+        module = AnsibleModule(argument_spec=spec(), supports_check_mode=True)
+        subject = Synthetic(module)
+
+        def validate() -> None:
+            assert subject.client is None and not store.versions
+            events.append("validate")
+
+        def action() -> dict[str, Any]:
+            assert subject.client is store
+            events.append("action")
+            return {"changed": False}
+
+        subject.execute(action=action, validate=validate)
+
+    monkeypatch.setattr(Synthetic, "connect", connect)
+    result = run_module(entrypoint, name="a")
+    assert not result["changed"] and events == ["validate", "connect", "action"]
+    assert store.versions == int(always) and not store.writes
+
+
+@pytest.mark.parametrize("always", [False, True])
+def test_custom_operation_refuses_its_input_before_any_connection(
+    store: Store,
+    run_module: RunModule,
+    monkeypatch: pytest.MonkeyPatch,
+    always: bool,
+) -> None:
+    monkeypatch.setattr(Synthetic, "compatibility_always", always)
+    events: list[str] = []
+
+    def unreachable(self: Synthetic) -> Store:
+        events.append("connect")
+        raise Failure(category="product", code="rejected")
+
+    def entrypoint() -> None:
+        module = AnsibleModule(argument_spec=spec(), supports_check_mode=True)
+        subject = Synthetic(module)
+        subject.operation = "job"
+
+        def validate() -> None:
+            events.append("validate")
+            raise Failure(category="eligibility", code="stale", fields=["value"])
+
+        def action() -> dict[str, Any]:
+            raise AssertionError("Refused input must not reach the action")
+
+        subject.execute(action=action, validate=validate)
+
+    monkeypatch.setattr(Synthetic, "connect", unreachable)
+    result = run_module(entrypoint, name="a")
+    assert result["failed"] and result["error_code"] == "stale"
+    assert result["operation"] == "job" and result["fields"] == ["value"]
+    assert result["outcome"] == "unchanged" and events == ["validate"]
+    assert not store.versions and not store.writes
+
+
+def test_validate_belongs_to_a_supplied_action() -> None:
+    module = SimpleNamespace(params={"name": "a", "state": "present"})
+    with pytest.raises(ValueError, match="supplied action"):
+        Synthetic(module).execute(validate=lambda: None)
+
+
+@pytest.mark.parametrize("always", [False, True])
 @pytest.mark.parametrize("refused", [False, True])
 def test_engine_info_probes_before_product_reads(
     monkeypatch: pytest.MonkeyPatch, always: bool, refused: bool

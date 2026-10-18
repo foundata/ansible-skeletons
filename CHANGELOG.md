@@ -146,6 +146,10 @@ and the project adheres to
   local file or process operation to category `local`, code
   `operation_failed`, without the error's message; the rendered error schema
   declares the pair.
+- Both module variants: `execute(action, validate=check)` runs `check`, a
+  request-free test of the action's input, before the base connects, so
+  invalid input is refused under the action's operation before a locator or
+  connection error can be. `ActOnce.execute` passes it on.
 - checks: `--resume <output>` reruns only the failed and missing steps of an
   earlier run of the same sources; `scripts.release check --resume` does the
   same for the evidence of the same commit.

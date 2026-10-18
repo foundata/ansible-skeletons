@@ -37,7 +37,10 @@ nothing.
 An operation that fits no resource sequence runs under ``execute(action)``.
 It keeps the base's connection, probe policy and failure boundary and
 supplies its own steps, settling each write through ``stage`` where a
-read-back can prove it. ``execute(action)`` is also the shape for a write
+read-back can prove it. Its input check goes into ``execute``'s
+``validate``, which runs before the base connects, as ``identify`` and
+``declared`` do for a resource, so invalid input is refused before a
+locator or connection error can be. ``execute(action)`` is also the shape for a write
 whose read-back is expensive, or impossible after a timeout because the
 write may have spent the deadline: the action reports the outcome its own
 evidence supports instead of reading back.
@@ -560,20 +563,28 @@ class Lifecycle:
         action: Callable[[], dict[str, Any]] | None = None,
         *,
         compatibility_operation: str | None = None,
+        validate: Callable[[], None] | None = None,
     ) -> None:
         """Run a resource or supplied operation under the failure boundary.
 
-        A supplied action starts connected: ``prepare`` builds ``self.client``
-        and applies the compatibility policy for ``compatibility_operation``
-        (default ``operation_id()``) first, so the action never connects itself.
-        A resource whose transport is not the binding's client, such as a
-        command runner, overrides ``connect`` to return it. The operation the
-        instance had before preparing, ``validate`` or what ``__init__`` set,
-        is restored afterwards.
+        A supplied action runs in this order. ``validate``, when given, checks
+        the action's input without a request or a command and raises to
+        refuse it, so invalid input fails before anything connects. Then
+        ``prepare`` builds ``self.client`` and applies the compatibility
+        policy for ``compatibility_operation`` (default ``operation_id()``),
+        so the action starts connected and never connects itself. A resource
+        whose transport is not the binding's client, such as a command
+        runner, overrides ``connect`` to return it. A refusal by ``validate``
+        reports the operation the instance had, ``validate`` or what
+        ``__init__`` set, and that operation is restored after preparing.
         """
+        if validate is not None and action is None:
+            raise ValueError("validate checks a supplied action's input")
         try:
             if action is not None:
                 operation = self.operation
+                if validate is not None:
+                    validate()
                 self.prepare(compatibility_operation or self.operation_id())
                 self.operation = operation
             sequence = action if action is not None else self.reconcile

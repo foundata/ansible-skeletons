@@ -92,10 +92,13 @@ class ActOnce(Lifecycle, sequence=("act_once", "execute")):
         *,
         activation: bool = False,
         compatibility_operation: str | None = None,
+        validate: Callable[[], None] | None = None,
     ) -> None:
         """Select act-once when requested, then use the base's result boundary."""
         if action is None and activation:
             action = self.act_once
         if action == self.act_once:
             compatibility_operation = self.activation_id()
-        super().execute(action, compatibility_operation=compatibility_operation)
+        super().execute(
+            action, compatibility_operation=compatibility_operation, validate=validate
+        )
