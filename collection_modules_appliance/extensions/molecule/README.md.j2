@@ -215,7 +215,12 @@ Before the drill can run:
    - `console`: `argv`, a command that runs commands in the appliance's root
      shell. The drill writes `{"label": "...", "commands": ["..."]}` to its
      standard input, fails unless it exits with status 0, and records its
-     output, which must be one JSON line.
+     output, which must be one JSON line. The commands need a POSIX shell,
+     for example for the `$(...)` that `recovery_upload.yml` sends: where the
+     root shell is another one, such as csh, the endpoint runs them in
+     `/bin/sh`. A request holds at most 32 commands of at most 200 printable
+     bytes each; a step that needs a longer command goes into a helper that
+     `shared/tasks/recovery_upload.yml` uploads first.
    - `dns`: `host` and `port` of a TCP DNS server that reaches the
      appliance's resolver over the management path, and the management
      `name`.

@@ -206,7 +206,9 @@ and the project adheres to
   `shared/tasks/recovery_upload.yml` uploads a helper into the appliance
   through the console: base64 chunks within the endpoint's limits of 32
   commands of at most 200 printable bytes per request, written atomically and
-  checked by SHA-256 in the appliance.
+  checked by SHA-256 in the appliance. The Molecule README says that the
+  console runs its commands in a POSIX shell, names its limits and sends a
+  step that needs a longer command through an uploaded helper.
   The documents say that an area's hooks may use the console for fixtures the
   restore undoes, that the drill and lost-reply stages need the scenario's
   dependencies in place rather than running last, and that none of this
