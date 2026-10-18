@@ -134,6 +134,7 @@ def test_recovery_stage_is_appliance_only() -> None:
         "default/tasks/recovery/fixture/induce.yml.j2",
         "default/tasks/recovery/fixture/observe.yml.j2",
         "default/tasks/recovery/fixture/absent.yml.j2",
+        "default/tasks/recovery/fixture/settings.yml.j2",
         "default/tasks/recovery/fixture_nested/induce.yml.j2",
         "default/tasks/recovery/fixture_nested/absent.yml.j2",
         "default/tasks/recovery/fixture_nested/files/antilockout.py.j2",

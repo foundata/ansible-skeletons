@@ -1,0 +1,13 @@
+# Settings of this area's drill. The drill parses this file as data; it never
+# runs or templates it, and any key other than fresh_dns and fresh_dns_reason
+# fails the drill.
+#
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+---
+# FIXME Keep this file only for an area that drills both in a scenario that
+# moves the management resolver and on its own. The drill asks for the
+# management name before the induce and checks it after the restore only
+# when that answer came; the fake product always answers.
+fresh_dns: auto

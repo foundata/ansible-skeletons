@@ -198,8 +198,11 @@ Before the drill can run:
      watches the API probe fail.
    - `settings.yml` is data, not tasks: `fresh_dns: false` with a
      `fresh_dns_reason` skips the fresh DNS check, for a scenario that moves
-     the management resolver. Any other key fails the drill;
-     `default/tasks/recovery/fixture_nested/settings.yml` shows the form.
+     the management resolver. `fresh_dns: auto` asks for the management name
+     once before the drill and requires a fresh answer after the restore only
+     when that one came, for an area that drills in such a scenario and on
+     its own. Any other key fails the drill; the settings of both fixture
+     areas show the forms.
 2. Replace the `backup`, `restore` and `discard` commands under
    `recovery_defaults` in `default/inventory/hosts.yml`. The fixture's commands
    work only in the fake product's console; anywhere else the backup fails

@@ -25,8 +25,11 @@
 #   it, the drill observes the loss with the API probe.
 # - settings.yml, optional, is data, never tasks: "fresh_dns: false" with a
 #   "fresh_dns_reason" skips the fresh DNS check, for a scenario that moves
-#   the management resolver. The drill parses the file without templating or
-#   running it, and refuses any other key.
+#   the management resolver; "fresh_dns: auto" asks for the management name
+#   once before the drill and requires a fresh answer after the restore only
+#   when that one came, for an area that drills both in such a scenario and
+#   alone. The drill parses the file without templating or running it, and
+#   refuses any other key.
 #
 # SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
@@ -62,11 +65,13 @@
     that:
       - __recovery_settings is ansible.builtin.mapping
       - __recovery_settings.keys() | ansible.builtin.difference(['fresh_dns', 'fresh_dns_reason']) | ansible.builtin.length == 0
-      - __recovery_settings['fresh_dns'] | ansible.builtin.default(true) is ansible.builtin.boolean
+      - >-
+        __recovery_settings['fresh_dns'] | ansible.builtin.default(true) is ansible.builtin.boolean
+        or __recovery_settings['fresh_dns'] | ansible.builtin.default(true) == 'auto'
       - __recovery_settings['fresh_dns_reason'] | ansible.builtin.default('') is ansible.builtin.string
     fail_msg: >-
-      {{ recovery_hooks }}/settings.yml holds data with fresh_dns (true or
-      false) and fresh_dns_reason (text), nothing else.
+      {{ recovery_hooks }}/settings.yml holds data with fresh_dns (true, false
+      or auto) and fresh_dns_reason (text), nothing else.
     quiet: true
 
 - name: "Molecule | Recovery | Apply the area's settings"
@@ -86,7 +91,7 @@
 - name: "Molecule | Recovery | Require a reason to skip the fresh DNS check"
   ansible.builtin.assert:
     that:
-      - recovery_fresh_dns | ansible.builtin.bool or recovery_fresh_dns_reason | ansible.builtin.length > 0
+      - recovery_fresh_dns == 'auto' or recovery_fresh_dns | ansible.builtin.bool or recovery_fresh_dns_reason | ansible.builtin.length > 0
     fail_msg: "An area whose settings.yml sets fresh_dns to false names why in fresh_dns_reason."
     quiet: true
 
@@ -95,6 +100,38 @@
     file: "{{ __recovery_shared }}/tasks/recovery_fresh.yml"
   vars:
     __recovery_retries: 30
+
+# With "auto", the answer now decides whether the restore must bring the
+# name back; until then the fresh access check above leaves DNS out.
+- name: "Molecule | Recovery | Ask once whether the management name answers"
+  ansible.builtin.command:
+    argv:
+      - "{{ ansible_playbook_python }}"
+      - "{{ __recovery_shared }}/files/recovery_dns.py"
+      - "{{ recovery_defaults['lab']['dns']['host'] }}"
+      - "{{ recovery_defaults['lab']['dns']['port'] }}"
+      - "{{ recovery_defaults['lab']['dns']['name'] }}"
+  when:
+    - recovery_fresh_dns == 'auto'
+  changed_when:
+    - false
+  failed_when:
+    - false
+  register: __recovery_dns_before
+
+- name: "Molecule | Recovery | Require fresh DNS after the restore only if it answered"
+  ansible.builtin.set_fact:
+    recovery_fresh_dns: "{{ __recovery_answered | ansible.builtin.bool }}"
+    recovery_fresh_dns_reason: >-
+      {{ recovery_fresh_dns_reason if __recovery_answered | ansible.builtin.bool
+         else (['auto: the management name did not answer before the drill', recovery_fresh_dns_reason]
+               | ansible.builtin.select | ansible.builtin.join('; ')) }}
+  vars:
+    __recovery_answered: >-
+      {{ recovery_defaults['lab']['management']['address']
+         in __recovery_dns_before['stdout_lines'] | ansible.builtin.default([]) }}
+  when:
+    - recovery_fresh_dns == 'auto'
 
 - name: "Molecule | Recovery | Back the good configuration up through the console"
   ansible.builtin.command:

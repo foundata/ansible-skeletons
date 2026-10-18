@@ -198,7 +198,10 @@ and the project adheres to
   An area may add `observe.yml`, which observes a loss that costs only
   DNS-dependent access instead of the API probe, and `settings.yml`, data
   whose `fresh_dns: false` and `fresh_dns_reason` skip the fresh DNS check for
-  a scenario that moves the management resolver; the drill parses it without
+  a scenario that moves the management resolver, while `fresh_dns: auto`
+  asks for the management name once before the drill and requires a fresh
+  answer after the restore only when that one came, for an area that drills
+  in such a scenario and on its own; the drill parses the file without
   running it and refuses any other key.
   `shared/tasks/recovery_upload.yml` uploads a helper into the appliance
   through the console: base64 chunks within the endpoint's limits of 32
