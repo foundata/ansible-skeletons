@@ -114,6 +114,14 @@ and the project adheres to
   sequentially, as ansible-test sessions can run in parallel. They say
   instead that two Molecule runs at once collide, because Molecule names each
   container after its platform.
+- role_default, collection_default: the README opens with the project's
+  `description`. The role READMEs say that the `always` init tasks run with
+  any `--tags` selection, and Compatibility names the ansible-core floor and
+  asks for the supported platforms in a FIXME. The `_state` and
+  `_autoupgrade` descriptions in `argument_specs.yml`, and their copies in the
+  README and `defaults/main.yml`, read as plain sentences.
+- collection_modules, collection_modules_appliance: a FIXME asks to replace
+  the README's fixture compatibility row with the tested product series.
 
 ### Fixed
 

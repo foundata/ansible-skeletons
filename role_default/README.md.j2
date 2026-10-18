@@ -6,7 +6,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
 {% filter wordwrap(width=78, break_long_words=False, break_on_hyphens=False) %}
-This repository contains the `{{ role_name }}` Ansible role.
+{{ description }}
 {% endfilter %}{{ '' }}
 
 
@@ -69,7 +69,7 @@ Uninstall:
 
 ## Supported tags<a id="tags"></a>
 
-It might be useful and faster to only call parts of the role by using tags:
+Run parts of the role with `--tags`:
 
 - {% filter wordwrap(width=76, break_long_words=False, break_on_hyphens=False) | indent(2) %}
 `{{ role_name }}_setup`: Manage basic resources, such as packages or service users.
@@ -81,11 +81,8 @@ It might be useful and faster to only call parts of the role by using tags:
 `{{ role_name }}_service`: Manage services and daemons, such as running states and service boot configurations.
 {% endfilter %}{{ '' }}
 
-There are also tags that are generally not intended to be called directly but
-are included for completeness and to cover edge cases:
-
-- {% filter wordwrap(width=76, break_long_words=False, break_on_hyphens=False) | indent(2) %}
-`{{ role_name }}_always`, `always`: Tasks needed by the role itself for internal role setup and the Ansible environment.
+{% filter wordwrap(width=78, break_long_words=False, break_on_hyphens=False) %}
+The init tasks check the environment and prepare the role. They carry the tags `{{ role_name }}_always` and `always`, so they run with any `--tags` selection; do not skip them.
 {% endfilter %}{{ '' }}
 
 
@@ -94,7 +91,7 @@ are included for completeness and to cover edge cases:
 ## Role variables<a id="variables"></a>
 
 {% filter wordwrap(width=72, break_long_words=False, break_on_hyphens=False) %}
-Main entry point for the {{ role_name }} role
+Main entry point for the {{ role_name }} role.
 {% endfilter %}{{ '' }}
 
 FIXME Describe what this entry point manages.
@@ -105,7 +102,7 @@ The following variables can be configured for this role:
 | {{ ' ' *((__docsmith_width - 8) // 2) }}Variable{{ ' '* (__docsmith_width - 8 - (__docsmith_width - 8) // 2) }} |  Type  | Required |   Default   | Description (abstract) |
 | {{ '-' * __docsmith_width }} | ------ | -------- | ----------- | ---------------------- |
 | {{ ('`' ~ role_name ~ '_state`').ljust(__docsmith_width) }} | `str`  | No       | `"present"` | Determines whether the managed resources should be `present` or `absent`.<br><br>`present` ensures that required components, such as software packages, are installed and configured.<br><br>`absent` reverts changes as much as possible, such as […](#variable-{{ role_name }}_state) |
-| {{ ('`' ~ role_name ~ '_autoupgrade`').ljust(__docsmith_width) }} | `bool` | No       | `false`     | If set to `true`, all managed packages will be upgraded during each Ansible run (e.g., when the package provider detects a newer version than the currently installed one). |
+| {{ ('`' ~ role_name ~ '_autoupgrade`').ljust(__docsmith_width) }} | `bool` | No       | `false`     | If set to `true`, each Ansible run upgrades the managed packages to the newest version the package provider offers. |
 | {{ ('`' ~ role_name ~ '_service_state`').ljust(__docsmith_width) }} | `str`  | No       | `"enabled"` | Defines the status of the service(s). Possible values:<br><br>- `enabled`: Service is running and will start automatically at boot. - `disabled`: Service is stopped and will not start automatically at boot. - `running`: Service is running but will […](#variable-{{ role_name }}_service_state) |
 
 {% if ('variable-' ~ role_name ~ '_state') | length > 60 %}
@@ -124,7 +121,7 @@ Determines whether the managed resources should be `present` or `absent`.
 installed and configured.
 
 `absent` reverts changes as much as possible, such as removing packages,
-deleting created users, stopping services, restoring modified settings, ...
+deleting created users, stopping services and restoring modified settings.
 
 - **Type**: `str`
 - **Required**: No
@@ -143,9 +140,8 @@ deleting created users, stopping services, restoring modified settings, ...
 
 [*⇑ Back to ToC ⇑*](#toc)
 
-If set to `true`, all managed packages will be upgraded during each Ansible
-run (e.g., when the package provider detects a newer version than the
-currently installed one).
+If set to `true`, each Ansible run upgrades the managed packages to the
+newest version the package provider offers.
 
 - **Type**: `bool`
 - **Required**: No
@@ -194,9 +190,14 @@ See `dependencies` in [`meta/main.yml`](./meta/main.yml).
 
 ## Compatibility<a id="compatibility"></a>
 
-See `min_ansible_version` in [`meta/main.yml`](./meta/main.yml) and
+The role needs at least the ansible-core version set as `min_ansible_version`
+in [`meta/main.yml`](./meta/main.yml).
+
+FIXME List the supported platforms. Keep the list in line with
 `__{{ role_name }}_supported_platforms`
 in [`vars/main.yml`](./vars/main.yml).
+
+The role stops on a platform that a non-empty list does not name.
 
 
 

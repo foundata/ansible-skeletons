@@ -11,7 +11,7 @@ argument_specs:
 
   # Main entry point: roles/run/tasks/main.yml
   main:
-    short_description: "Main entry point for the run role"
+    short_description: "Main entry point for the run role."
     description: |
       FIXME Describe what this entry point manages.
     options:
@@ -23,7 +23,7 @@ argument_specs:
           installed and configured.
 
           `absent` reverts changes as much as possible, such as removing packages,
-          deleting created users, stopping services, restoring modified settings, ...
+          deleting created users, stopping services and restoring modified settings.
         type: "str"
         default: "present"
         choices:
@@ -32,9 +32,8 @@ argument_specs:
 
       run_{{ collection_name }}_autoupgrade:
         description: |
-          If set to `true`, all managed packages will be upgraded during each Ansible
-          run (e.g., when the package provider detects a newer version than the
-          currently installed one).
+          If set to `true`, each Ansible run upgrades the managed packages to the
+          newest version the package provider offers.
         type: "bool"
         default: false
 
