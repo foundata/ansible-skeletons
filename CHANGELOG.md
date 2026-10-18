@@ -65,7 +65,10 @@ and the project adheres to
   an action uses `self.client` and never connects itself. `prepare()` keeps
   an existing client instead of building a second one. The action starts
   with the operation the instance had before, and a resource with another
-  transport, such as a command runner, overrides `connect`.
+  transport, such as a command runner, overrides `connect`. `connect()` and
+  the `fixture_nested` scaffold's `__init__` say where a transport that must
+  check its target before use does so: where it builds its first command,
+  not in a method that receives a command already built.
 - Both module variants: the base's docstrings say how a resource that learns
   the product version from its first read checks compatibility (call
   `ensure_compatible` in `lookup`), that `execute(action)` is the shape for a

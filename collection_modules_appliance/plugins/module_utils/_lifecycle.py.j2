@@ -262,7 +262,10 @@ class Lifecycle:
         """Build the client without a request or a command.
 
         ``prepare`` calls it before ``reconcile`` reads and before a supplied
-        action validates its input, so building it must have no effect.
+        action validates its input, so building it must have no effect. A
+        transport that must check its target before use does so where it
+        builds its first command, not in a method that receives a command
+        already built.
         """
         raise NotImplementedError
 

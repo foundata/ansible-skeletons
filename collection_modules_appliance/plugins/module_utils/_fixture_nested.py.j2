@@ -75,7 +75,12 @@ class FixtureNested(Binding):
 
     # Delete when unchanged.
     def __init__(self, module: Any) -> None:
-        """Set per-instance state here, after the base's own."""
+        """Set per-instance state here, after the base's own.
+
+        Construction sends no request and runs no command. A transport that
+        must check its target before use does so where it builds its first
+        command, not in a method that receives a command already built.
+        """
         super().__init__(module)
 
     # Delete when unchanged.
