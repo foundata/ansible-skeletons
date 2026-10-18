@@ -88,7 +88,8 @@ and the project adheres to
   repeating them.
 - collection_default, collection_modules, collection_modules_appliance: the
   rendered `DEVELOPMENT.md` says to run the sessions of one ansible-core
-  release while editing and the default sessions before a commit.
+  release while editing and the default sessions before a commit, not every
+  session its list shows, which includes `molecule`.
 - collection_default, collection_modules, collection_modules_appliance: the
   rendered noxfile gives a session whose `TMPDIR` is too long for a Unix
   socket path a short link to it in a private directory below
