@@ -11,9 +11,6 @@ and install the generated collections.
 
 Both module skeletons also render two identities and exercise installed fixture
 modules against the `foundata.utils` release pinned in `tests/requirements.yml`.
-To test a skeleton change against an unreleased `foundata.utils` commit, pass
-`--utils-source /path/to/utils` to `scripts/check.sh` or set
-`SKELETONS_UTILS_SOURCE`. Release checks always use the pinned release.
 
 
 ## Table of contents<a id="toc"></a>
@@ -46,10 +43,7 @@ uv sync --locked
 
 uv installs the Python tools in isolated environments, foundata's
 [`releasing`](https://foundata.com/en/projects/releasing/) among them.
-`pyproject.toml` contains development dependencies and configuration; its
-`0.0.0` version belongs to the development setup. Skeleton releases use the
-version in the dated changelog section and the corresponding `vX.Y.Z` Git tag,
-which is what `.releasing.toml` declares.
+`pyproject.toml` contains the development dependencies and configuration.
 
 
 ## Getting started<a id="getting-started"></a>
@@ -60,14 +54,12 @@ While editing templates or tooling, check what your changes affect:
 ./scripts/check.sh --changed
 ```
 
-This runs the static checks, the repository tests, and the lanes and module
-skeletons whose sources differ from `HEAD` in the index or working tree. A
-change in `role_default/` or `collection_default/` selects the role and
-collection lanes and `generated-lint`; a change in a module skeleton selects
-that skeleton. A change anywhere else, such as `scripts/`, `tests/`,
-`pyproject.toml` or `uv.lock`, selects everything. The run prints the checks it
-skipped and never writes a passing `checks.json`. Before each commit, run the
-full quick check:
+This runs the static checks, the repository tests and only the lanes and
+module skeletons that your uncommitted changes affect. A change outside the
+skeleton directories, such as in `scripts/` or `uv.lock`, selects everything.
+The run prints the checks it skipped and never writes a passing
+`checks.json`. It cannot be combined with `--resume` or `--integration`.
+Before each commit, run the full quick check:
 
 ```sh
 ./scripts/check.sh
@@ -78,7 +70,7 @@ already exist:
 
 ```sh
 uv run --locked --group core221 python -m scripts.render \
-  --output /tmp/skeleton-examples
+  --output "${XDG_STATE_HOME:-${HOME}/.local/state}/ansible-skeletons/render-1"
 ```
 
 The output contains a standalone role, a collection, and an isolated Ansible
@@ -110,27 +102,11 @@ instructions and `.yml.example` files are intentional parts of the product.
 Do not reject all remaining Jinja expressions or placeholders as render errors.
 
 Edit each skeleton directly in its own directory.
-`scripts.render --profile collection_modules_appliance` or
-`--profile collection_modules` selects a module skeleton. Both variants run
-through the render and release gates; the unit tests enforce their shared-file
-list without a composition layer. Quick checks run their default nox sessions
-in check-only mode. Full matrix checks add the first identity's sanity, unit
-and integration sessions on every core and the Molecule scenario against its
-own fake product. The second identity tests the render with maximum-length
-names and a quoted product; of the ansible-test lanes only sanity reads those
-names, so it runs once, on the newest released core of the matrix.
-
-Both module variants own one `_lifecycle.py` sequence and result boundary.
-The product binding `_binding.py` supplies its client, error schema and
-compatibility policy. `_engine.py` implements definition-driven hooks;
-`_fixture_nested.py` demonstrates nested values through the same base. Copy
-that utility for each hook-based resource and edit hooks, not the sequence.
-The shared loss harness proves lost create, update and delete settlement for
-both fixtures. Only the appliance variant carries act-once activation, the
-management-path guard scaffold and recovery machinery. Its default scenario
-drills two areas against the fake product's console and skips the drill with
-a reason when the credentials have no console contract, so the fake-product
-gate needs no lab.
+`scripts.render --profile collection_modules` or
+`--profile collection_modules_appliance` renders a module skeleton. Their
+rendered `DEVELOPMENT.md` explains the lifecycle base, the binding, the engine
+and the two fixtures. Only the appliance variant carries act-once activation,
+the management-path guard scaffold and the recovery drill.
 
 `tests/unit/test_checks.py` lists the files that skeletons share. Copies of a
 shared file are identical except inside variant regions, which wrap the few
@@ -178,78 +154,98 @@ trailers. Review the diff and stage only changes intended for the commit.
 
 ### Quick checks<a id="quick-checks"></a>
 
-`scripts/check.sh` accepts uncommitted changes and checks the working tree. It
-runs Python and shell checks, Markdown linting, REUSE validation, helper tests,
-and the default Ansible lane. Generated-resource checks cover (including but not
-limited to):
+Run `./scripts/check.sh` before each commit. It checks the working tree,
+uncommitted changes included: Python and shell checks, Markdown linting, REUSE
+validation, the helper tests and the default Ansible lane. The checks of
+generated projects include:
 
-- Initialization with defaults, explicit metadata, and quoted metadata.
-- Collection build contents and installation into an isolated collection path.
-- Strict production-profile Ansible linting of both renders, and a second
-  autofix pass that must not change anything.
+- Initialization with default, explicit and quoted metadata.
+- Collection builds, their contents and installation into an isolated
+  collection path.
+- Strict production-profile Ansible linting of both renders, then an autofix
+  pass that must change nothing.
 - The rendered collection's default Nox sessions in check-only mode, with tool
   versions pinned to the check environment, plus a stock-only `--no-venv` run.
   Repository checks require successful foundata rule verification.
 - Both module skeletons under two identities: their default Nox sessions in
-  check-only mode (Ruff and mypy including the integration targets' Python),
-  a build, and the installed definition-driven and hook-based modules.
+  check-only mode (Ruff and mypy include the integration targets' Python), a
+  build, and runs of the installed definition-driven and hook-based fixture
+  modules.
 
-The full matrix also executes both module scenarios against their own fake
-products, including the lost-response cases. The appliance's fake product
-also serves a console and a resolver under the lab contract, so its default
-scenario ends with a real drill of two areas: one loses API access, one loses
-only DNS and observes that through its `observe.yml`, one uploads a helper
-through the console, and both restore. The matrix then drills one area alone
-through the standalone playbook, after it refused an unknown one, and proves
-the skip without a console contract. Unit tests cover management-listener
-refusal in normal and check mode. None of this qualifies a product's console
-recovery; that drill belongs to the collection's authorized lab before an
-area's first management-path write.
-
-The check runs independent steps at the same time: the repository test runs,
-the lanes, `generated-lint`, and each identity of both module skeletons.
-`--jobs N` sets how many run at once, by default half the CPUs; `--jobs 1` runs
-them one after another in a fixed order. Each step writes its output to
+The check runs independent steps at the same time: the repository tests, the
+lanes, `generated-lint` and each identity of both module skeletons. `--jobs N`
+sets how many run at once, by default half the CPUs. Each step writes
 `logs/<step>.log` below the check's output and prints one line when it starts
 and one when it ends, with its duration. A failing step prints the end of its
-log and the log's path. With one job, the first failure ends the run, as the
-order is fixed. With several, every step whose prerequisites passed still runs,
-so a resumed run, described below, repeats only what failed. Without
-`--output`, the check works in a temporary directory below `/var/tmp` and
-removes it, logs included, at the end.
+log and the log's path. With `--jobs 1`, the steps run one after another in a
+fixed order and the first failure ends the run. With more jobs, every step
+whose prerequisites passed still runs, so a [resumed run](#check-results)
+repeats only what failed.
 
-On a 16-core workstation with the default eight jobs, a quick check took about
-5.5 minutes in October 2026, `--matrix` about 13, a quick check with all three
-infrastructure tiers about 11, and `--matrix` with all three tiers about 15.
-The longest chain of steps sets the time: `generated-lint` in a quick check,
-the first module identity in the matrix, and the tiers, one after another,
-once they run.
+Durations on a 16-core workstation with the default eight jobs, October 2026:
 
-To test a future release candidate, build its wheel and override the released
-package. Example:
+|                       Run                       |     Duration      | Longest chain of steps |
+| ----------------------------------------------- | ----------------- | ---------------------- |
+| Quick check                                     | about 5.5 minutes | `generated-lint`       |
+| `--matrix`                                      | about 13 minutes  | the first module identity |
+| Quick check with all three infrastructure tiers | about 11 minutes  | the tiers, one after another |
+| `--matrix` with all three tiers                 | about 15 minutes  | the tiers, one after another |
+
+To test a release candidate of foundata's ansible-lint rules, build its wheel
+and pass it to override the released package:
 
 ```sh
 ./scripts/check.sh --foundata-wheel /absolute/path/to/ansible_lint_foundata-1.1.0rc1-py3-none-any.whl
 ```
 
-To retain results, including generated projects and collection archives, name
-a new directory:
+To test against an unreleased `foundata.utils` commit, pass its source
+directory with `--utils-source /path/to/utils` or set `SKELETONS_UTILS_SOURCE`.
+Release checks always use the pinned release.
+
+To run only the helper regression suite:
+
+```sh
+uv run --locked python -m pytest -q
+```
+
+Use `python -m pytest` so repository-local modules are importable without an
+installation or test-specific `sys.path` changes. Warnings are errors and pytest
+configuration is strict. Required suites must execute without failures or skips.
+
+#### Keep, resume and remove results<a id="check-results"></a>
+
+Without `--output`, the check works in a temporary directory below `/var/tmp`
+and deletes it at the end, logs included. To keep the results, name a new
+directory. It must not be on a tmpfs such as `/tmp`, because a check writes
+several gigabytes there, container storage included:
 
 ```sh
 output="${XDG_STATE_HOME:-${HOME}/.local/state}/ansible-skeletons/check-1"
 ./scripts/check.sh --output "${output}"
 ```
 
-Any path works, as long as it is not on a tmpfs such as `/tmp`: a check writes
-several gigabytes there, container storage included.
+A passing check keeps only its evidence: `run.json`, `records/`, `logs/`, the
+JUnit results `unit-python*.xml`, and `checks.json` with the collection
+archives it lists. It deletes generated projects, virtual environments and
+container storage, and reports how much it kept. `--keep` retains everything,
+for example to inspect a render. A failed run keeps everything for diagnosis.
 
-A passing check then keeps only its evidence: `run.json`, `records/`, `logs/`,
-the JUnit results `unit-python*.xml`, and `checks.json` with the collection
-archives it lists. Generated projects, virtual environments and container
-storage go, and the check reports how much it kept. `--keep` retains
-everything, for example to inspect a render. A failed run keeps everything for
-diagnosis and `--resume`; a resumed run prunes once it passes. A pruned output
-cannot be resumed.
+To continue a failed or interrupted run, for example after a network timeout,
+pass its output to `--resume` with the same options as before:
+
+```sh
+./scripts/check.sh --resume "${output}"
+```
+
+The resumed run reuses every step that passed and reruns the failed and
+missing ones, replacing what their earlier attempt left. It refuses when the
+sources changed: each finished step leaves a record in `records/` with the
+digest of the path, mode and content of the tracked files and of the
+untracked files Git does not ignore. A step whose options changed, such as a
+module identity resumed with `--matrix`, runs again. Containers an
+interrupted ansible-test left in a module render's own Podman store are
+removed first. A resumed run that passes prunes its output like any passing
+run, and a pruned output cannot be resumed.
 
 To delete an output you no longer need:
 
@@ -263,43 +259,6 @@ checkout, your home directory and their ancestors. The directory must hold the
 `checks/run.json`. Files that containers wrote as subordinate users are removed
 inside Podman's user namespace.
 
-The check's Unix sockets bind elsewhere, in a short private directory that the
-check creates in `XDG_RUNTIME_DIR` (or `/tmp` without one) and removes at the
-end, also after a failure or an interrupt. Each step has a subdirectory there.
-The step's `TMPDIR` is a link from that subdirectory to `t/<slot>` in the
-output, so Python's multiprocessing listeners get short socket paths and
-temporary files stay on disk. The generated collection's Nox environments stay
-in its render; Nox reaches them through a second link in the subdirectory,
-where the `docs-check` workers bind. Podman keeps its run state there, and
-Molecule its SSH control sockets. The check refuses to start when one of these
-socket paths would be longer than 103 bytes; Linux allows 108.
-
-Each finished step leaves a record in `records/` below the output. The record
-names the digest of the sources it checked: path, mode and content of the
-tracked files and of the untracked files Git does not ignore. To continue an
-interrupted or failed run, for example after a network timeout:
-
-```sh
-./scripts/check.sh --resume "${output}"
-```
-
-The resumed run reuses every passed record and reruns the failed and missing
-steps, replacing what their earlier attempt left. An interrupted ansible-test
-can leave containers running in a module render's own Podman store; the rerun
-removes them first. The resume refuses when the sources changed since. Pass
-the same options as before; a step whose options changed, such as a module
-identity resumed with `--matrix`, runs again.
-
-Run only the helper regression suite with:
-
-```sh
-uv run --locked python -m pytest -q
-```
-
-Use `python -m pytest` so repository-local modules are importable without an
-installation or test-specific `sys.path` changes. Warnings are errors and pytest
-configuration is strict. Required suites must execute without failures or skips.
-
 
 ### Compatibility matrix<a id="compatibility-matrix"></a>
 
@@ -309,6 +268,27 @@ configuration is strict. Required suites must execute without failures or skips.
 
 The matrix is defined in `[tool.skeletons]` in `pyproject.toml`. Each lane uses
 a separate locked environment; no lane upgrades dependencies during a run.
+
+For the module skeletons, the matrix adds:
+
+- The first identity's sanity, unit and integration sessions on every core,
+  and its Molecule scenario against the skeleton's own fake product,
+  including the lost replies.
+- The second identity's sanity session, once, on the newest released core.
+  This identity renders maximum-length names and a quoted product, and sanity
+  is the only ansible-test lane that reads those names.
+- In the appliance scenario, a real drill of two areas against the fake
+  product's console and resolver: `fixture` loses only DNS and observes the
+  loss through its `observe.yml`; `fixture_nested` loses API access and
+  uploads a helper through the console. Both restore.
+- A drill of one area alone through the standalone playbook, after checking
+  that the playbook refuses an unknown area, and proof that the drill skips
+  without a console contract.
+
+Unit tests cover the management-listener refusal in normal and check mode.
+None of this qualifies a product's console recovery: that drill runs on the
+collection's authorized lab before an area's first write that can affect the
+management path.
 
 The module renders' ansible-test lanes run their containers in a Podman store
 of each render's own. It reads the images of your own Podman store read-only,
@@ -348,13 +328,11 @@ uv run --locked --group core221 --group lint --group integration \
   --output "${XDG_STATE_HOME:-${HOME}/.local/state}/ansible-skeletons/podman-1"
 ```
 
-Tests need network access for pinned Galaxy collections, container images, and,
-for libvirt, the cloud image. A check downloads the pinned Galaxy collections
-once, into `galaxy/` below its output, and every later step installs them from
-there. The module renders install their Molecule scenario's collections from
-there too, so no render calls Galaxy; the scenario therefore runs with the
-versions pinned in `tests/requirements.yml`, which must list every collection
-it requires. `SKELETONS_VM_IMAGE` can name an absolute path to an existing
+Tests need network access for the pinned Galaxy collections, container images
+and, for libvirt, the cloud image. A check downloads the Galaxy collections
+once, into `galaxy/` below its output, and every later step, including the
+module renders' Molecule scenarios, installs them from there.
+`SKELETONS_VM_IMAGE` can name an absolute path to an existing
 Debian-compatible cloud-init image. Each run uses unique VM and container
 names. Podman tests use a separate disposable storage configuration, including
 the execution-environment build and its image cleanup.
@@ -371,6 +349,8 @@ uv lock --upgrade
 
 Review lock changes before committing. Galaxy pins live in
 `tests/requirements.yml`; update them together with infrastructure validation.
+The module renders' Molecule scenarios install only from these pins, so the
+file must list every collection those scenarios require.
 
 
 ## Releases<a id="releases"></a>
@@ -426,11 +406,9 @@ skeleton-specific gate (`scripts/release.py check`).
 
    `check.log` shows one line per step as it starts and ends; each step's
    output is in `checks/logs/<step>.log`. A successful run creates
-   `report.json`; a failure retains diagnostics but creates no passing report.
-   Keep the whole evidence directory, including its `checks/` subdirectory.
-   Once the gate passes, `checks/` holds only the check's evidence: records,
-   logs, JUnit results, `checks.json` and the collection archives it lists.
-   `release tag` and `release verify` read nothing else in it.
+   `report.json`; a failure keeps its diagnostics but creates no passing
+   report. Keep the whole evidence directory until step 9; the later steps
+   read it.
 
    When a step fails for a reason outside the sources, such as a network
    timeout, rerun the failed and missing steps into the same evidence:
@@ -449,11 +427,9 @@ skeleton-specific gate (`scripts/release.py check`).
    git show "v${version}"
    ```
 
-   The helper checks that the report belongs to `HEAD` and that its checks,
-   source archive and artifact digests are intact, and refuses when an equal or
-   newer release tag exists locally or on the remote or when the remote cannot
-   be asked. `release tag create` then refuses a dirty tree or a tag that
-   already exists, and writes the annotated tag. Nothing is pushed.
+   The helper refuses unless the report belongs to `HEAD` with intact digests,
+   the tree is clean, the remote answers, and no equal or newer release tag
+   exists locally or on the remote. Nothing is pushed.
 6. Push the branch, then the tag:
 
    ```sh
@@ -475,13 +451,11 @@ skeleton-specific gate (`scripts/release.py check`).
    uv run --locked python -m scripts.release verify "${evidence}/report.json"
    ```
 
-   `release verify` checks that the remote holds the tag and that the forge
-   reports it as latest. The helper then clones the tag anonymously and runs
-   rendering, build, installation and role smoke tests on that clone,
-   including the module skeletons' Molecule scenario against the fake product.
-   No container or VM starts, but the run takes several minutes. At any
-   point, `uv run --locked release status "${version}"` reports where the
-   release stands.
+   The helper checks that the remote holds the tag and that the forge reports
+   it as latest, then clones the tag anonymously and runs the render, build,
+   installation and smoke tests on that clone, including the module
+   skeletons' Molecule scenarios against their fake products. It starts no
+   container or VM but takes several minutes.
 9. Unless you archive the evidence, remove it:
 
    ```sh
@@ -504,6 +478,7 @@ While no GitHub release exists, `uv run --locked release tag delete
 release exists. Do not move, replace or reuse a tag that consumers may have
 checked out. Correct a defective release with a new patch version.
 
+`uv run --locked release status "${version}"` reports where a release stands.
 After an interrupted push or release creation, inspect the existing remote tag
 and release entry and finish the missing publication step. Preserve the
 validated commit and rerun publication verification when complete.
@@ -511,17 +486,19 @@ validated commit and rerun publication verification when complete.
 
 ## Troubleshooting<a id="troubleshooting"></a>
 
-- An existing output path is an error. Choose a new path; helpers never merge
-  a new result into an older run. `--resume` is the exception: it replaces
-  each rerun step's earlier output and keeps the rest.
-- A lock mismatch is an error. Review dependency changes and regenerate the
-  lock deliberately; release checks use `--locked`.
-- Use a failed run's output, or a passing one's retained with `--keep`, to
-  inspect generated YAML, the isolated `ansible.cfg`, collection archives and
-  Molecule diagnostics.
-- Infrastructure requirements are mandatory for their tier. Use quick checks
-  while developing on a machine without those capabilities, then run the full
-  release gate on a suitable host.
-- A release check takes longer because it provisions targets and builds
-  execution environments. Each step's log in `checks/logs/` holds its command
-  output, including the failing command's diagnostics.
+- **The output path exists:** choose a new path; the helpers never merge a
+  new result into an older run. To continue a failed run, use `--resume`.
+- **The lock does not match:** review the dependency changes and regenerate
+  the lock deliberately, as [Updating dependencies](#updating-dependencies)
+  shows; release checks use `--locked`.
+- **A socket path is too long:** the check binds its Unix sockets in a short
+  private directory in `XDG_RUNTIME_DIR`, or `/tmp` without one, and refuses
+  to start when a socket path there would exceed 103 bytes (Linux allows
+  108). Shorten `XDG_RUNTIME_DIR`.
+- **A tier's infrastructure is missing:** each tier's requirements are
+  mandatory. Use quick checks on that machine, then run the release gate on a
+  suitable host.
+- **A step failed:** its log is `logs/<step>.log` below the output, or
+  `checks/logs/<step>.log` in release evidence. A failed run also keeps the
+  generated YAML, the isolated `ansible.cfg`, collection archives and
+  Molecule diagnostics; `--keep` keeps them after a passing run.
