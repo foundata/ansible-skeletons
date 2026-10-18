@@ -8,10 +8,11 @@ validation order, guards, prediction, write settlement and public failures.
 
 Overrides marked "Delete when unchanged" only call the base; they are here for
 their contracts. A copy deletes each one it does not change. An override keeps
-the base's parameter names: only ansible-test sanity's pylint
-(``arguments-renamed``) reports a renamed one, so Ruff and mypy pass it. Keep
-per-instance state in ``__init__`` after the base's, never in mutable class
-attributes.
+the base's parameter names: Ruff and mypy pass a renamed one, and only
+ansible-test sanity's pylint (``arguments-renamed``) and ``test_lifecycle.py``,
+which checks every lifecycle class below ``plugins/module_utils/``, report it.
+Keep per-instance state in ``__init__`` after the base's, never in mutable
+class attributes.
 """
 
 from __future__ import annotations

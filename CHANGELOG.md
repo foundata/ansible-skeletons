@@ -168,9 +168,11 @@ and the project adheres to
   hook contracts, module documentation, unit and file-only integration tests,
   default scenario tasks, a verifier slot, a Usage placeholder and a copy
   checklist. Its pass-through overrides say to delete them when unchanged,
-  its `__init__` shows where per-instance state goes, and its docstring and a
-  unit test keep each override's parameter names equal to the base's, which
-  only ansible-test sanity's pylint would otherwise report.
+  its `__init__` shows where per-instance state goes, and its docstring says
+  that an override keeps the base's parameter names. `test_lifecycle.py`
+  checks that for every lifecycle class below `plugins/module_utils/`, the
+  scaffold's copies included, which only ansible-test sanity's pylint would
+  otherwise report, so a collection needs no test of its own for it.
 - Both module variants: one parameterized response-loss harness, exercised
   for create, update and delete by both fixtures. A case declares an empty
   identity for a module without identity options, `expected_writes` and

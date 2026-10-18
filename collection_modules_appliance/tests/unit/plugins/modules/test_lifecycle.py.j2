@@ -4,7 +4,10 @@
 
 from __future__ import annotations
 
+import importlib
+import inspect
 import json
+import pkgutil
 import sys
 from types import SimpleNamespace
 from typing import Any, Callable
@@ -18,6 +21,10 @@ from ansible_collections.foundata.utils.plugins.module_utils import errors
 # Preserve wrapping for maximum-length Galaxy identities.
 # fmt: off
 # isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins import (
+        module_utils,
+    )
 {# skeleton-variant: activation-import #}
 from ansible_collections.{{ namespace }}.\
     {{ collection_name }}.plugins.module_utils._act_once import (
@@ -172,6 +179,45 @@ def test_the_base_docstring_names_every_hook_setting_and_reserved_name() -> None
     documentation = sys.modules[Lifecycle.__module__].__doc__ or ""
     for name in sequence | HOOKS | SETTINGS | STATE:
         assert f"``{name}``" in documentation, name
+
+
+def lifecycle_classes() -> list[type[Lifecycle]]:
+    """Every lifecycle class defined below the collection's module_utils."""
+    found: list[type[Lifecycle]] = []
+    for info in pkgutil.walk_packages(
+        module_utils.__path__, module_utils.__name__ + "."
+    ):
+        module = importlib.import_module(info.name)
+        found.extend(
+            cls
+            for cls in vars(module).values()
+            if inspect.isclass(cls)
+            and issubclass(cls, Lifecycle)
+            and cls.__module__ == module.__name__
+        )
+    return found
+
+
+def test_overrides_keep_the_parameter_names_of_what_they_override() -> None:
+    # Only ansible-test sanity's pylint (arguments-renamed) reports a renamed
+    # one; this covers the product's copies of the scaffold as well.
+    classes = lifecycle_classes()
+    assert Binding in classes
+    for cls in classes:
+        for name, method in vars(cls).items():
+            base = next(
+                (vars(b)[name] for b in cls.__mro__[1:] if name in vars(b)), None
+            )
+            if (
+                name.startswith("__")
+                or name in cls._sequence
+                or not inspect.isfunction(method)
+                or not inspect.isfunction(base)
+            ):
+                continue
+            assert list(inspect.signature(method).parameters) == list(
+                inspect.signature(base).parameters
+            ), f"{cls.__qualname__}.{name}"
 
 
 def spec() -> dict[str, Any]:
