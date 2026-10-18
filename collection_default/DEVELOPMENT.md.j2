@@ -17,20 +17,8 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 ## Checks<a id="checks"></a>
 
-`runtime-check` runs by default. It installs a built archive in isolation and
-retains only `meta/`, `plugins/`, `roles/` and `playbooks/`. It checks Python
-imports, module documentation and role loading/syntax, then runs available
-unit tests from a separate fixture directory against that installation.
-Role deployment behavior remains covered by Molecule.
-
-To check the exact archive retained for a release:
-
-```sh
-uv run noxfile.py -s runtime-check -- --artifact /path/to/collection.tar.gz
-```
-
-Run from the collection's Git root. If Nox is installed, use `nox`
-instead of `uv run noxfile.py`.
+Run the checks from the collection's Git root. With nox installed, `nox`
+replaces `uv run noxfile.py`.
 
 ```bash
 uv run noxfile.py                 # fix, then run default checks
@@ -42,9 +30,26 @@ uv run noxfile.py -s molecule
 uv run noxfile.py -s molecule -- test --platform-name molecule-debian13
 ```
 
-`helper-lint` covers Python in `extensions/molecule/`, `roles/*/files/`,
-`tools/`, `scripts/` and `tests/runtime_check.py`, using [ruff.toml](ruff.toml).
-It runs by default; add it to CI configurations that list sessions explicitly.
+Among the default sessions:
+
+- `runtime-check` installs the built collection in isolation and keeps only
+  what ships: `meta/`, `plugins/`, `roles/` and `playbooks/`. It checks Python
+  imports, module documentation, and role loading and syntax, then runs the
+  unit tests against that installation. Molecule covers how the roles deploy.
+  To check the exact archive of a release:
+
+  ```sh
+  uv run noxfile.py -s runtime-check -- --artifact /path/to/collection.tar.gz
+  ```
+
+- `ansible-lint` runs with foundata's rules from `ansible-lint-foundata`,
+  after checking that the rules the configuration enables are active. With
+  `nox --no-venv` and the extension missing, it warns and runs only the stock
+  rules.
+- `helper-lint` checks the Python outside `plugins/` with
+  [ruff.toml](ruff.toml): `extensions/molecule/`, the roles' `files/`,
+  `tools/`, `scripts/` and `tests/runtime_check.py`. Add it to CI
+  configurations that list sessions explicitly.
 
 Session definitions: [noxfile.py](noxfile.py).
 Built-in session settings: [antsibull-nox.toml](antsibull-nox.toml).
@@ -63,9 +68,8 @@ python -m pip install -r requirements-dev.txt
 ```
 
 `release build` runs the committed revision's Ansible sanity tests before
-building the archive.
+building the archive. Set `repository` in `.releasing.toml` before the first
+release.
 
 FIXME Describe what a release of this collection consists of and the steps to
-make one. The release runs through foundata's `release` command, declared in
-`.releasing.toml` (kept out of the archive by `build_ignore`); set its
-`repository` before the first release.
+make one.

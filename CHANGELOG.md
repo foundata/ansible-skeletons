@@ -105,6 +105,10 @@ and the project adheres to
   describes the loss cases, the recovery drill and its lab contract in steps
   and lists, and the appliance README turns act-once activation into a FIXME,
   as no fixture module uses it.
+- role_default, collection_default: the Molecule README lists the `create`
+  and `destroy` task directories and its FAQ covers direct Molecule runs.
+  collection_default's `DEVELOPMENT.md` starts its checks with the commands
+  and explains `runtime-check`, `ansible-lint` and `helper-lint`.
 
 ### Fixed
 

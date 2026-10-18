@@ -75,7 +75,7 @@ Virtual machine platforms need:
    ```
 
    The scenario uses the libvirt user session (`qemu:///session`), which needs
-   no root privileges and no membership in the `libvirt` group.
+   no root privileges, no membership in the `libvirt` group and no polkit rules.
 2. Access to `/dev/kvm`. Users logged in locally on Fedora, Debian and Ubuntu
    have it by default. Headless sessions on Debian and Ubuntu, such as SSH
    sessions or CI runners, also need membership in the `kvm` group
@@ -109,10 +109,9 @@ uv pip install "ansible-builder"
 
 ## Usage<a id="usage"></a>
 
-Run Molecule from the project's root directory, with `MOLECULE_GLOB` matching
-both the role layout (`molecule/`) and the collection layout
-(`extensions/molecule/`). The examples below assume these two commands. The
-[FAQ](#faq-role-path-detection) explains why the variable is set.
+Run Molecule from the project's root directory with `MOLECULE_GLOB` set; the
+[FAQ](#faq-role-path-detection) explains why. The examples below assume these
+two commands:
 
 ```bash
 cd "/path/to/project"
@@ -133,9 +132,9 @@ contains a virtual machine: then each platform runs on its own, one after the
 other. `MOLECULE_SERIAL=true` or `MOLECULE_SERIAL=false` overrides that choice.
 
 Arguments after `--` go to Molecule, so the commands in the following sections
-also work as `nox -s molecule -- <command>`. Molecule takes one platform name
-per run, on `test` only. See [`DEVELOPMENT.md`](../../DEVELOPMENT.md) for the
-other checks.
+also work as `nox -s molecule -- <command>`. `--platform-name` takes one
+platform and works only with `molecule test`. See
+[`DEVELOPMENT.md`](../../DEVELOPMENT.md) for the other checks.
 
 {# end skeleton-variant #}
 #### Scenario `default`<a id="usage-testing-default"></a>
@@ -164,9 +163,7 @@ backend. One run can mix containers and virtual machines.
 
 Use virtual machines for tests that containers cannot cover, such as kernel
 settings, nested virtualization or Podman inside the test target. They boot
-vendor cloud images in the libvirt user session with passt user networking,
-which needs no root privileges, no `libvirt` group membership and no polkit
-rules.
+vendor cloud images in the libvirt user session with passt user networking.
 
 Virtual machines need far more resources than containers. On smaller machines,
 test one platform at a time with `--platform-name`. A resource guard stops the
@@ -223,16 +220,18 @@ molecule login --host "<name>"
 ### Write tests<a id="usage-add-tests"></a>
 
 The playbooks in `shared/playbooks/` run each Molecule phase. Every phase also
-includes the task files of a directory under `<scenario>/tasks/`, in
+includes the task files of its directory under `<scenario>/tasks/`, `*.yml` in
 alphabetical order:
 
 |      Directory       |            Task files            | Use |
 | -------------------- | -------------------------------- | --- |
+| `tasks/create/`      | `*.yml`                          | Add steps to `create`, such as building an image to test. |
 | `tasks/converge/`    | `*.yml`                          | Apply the project. Failing tasks already fail the test. |
 | `tasks/verify/`      | `*.yml`                          | Check the resulting state and behavior, usually with `ansible.builtin.assert`. |
 | `tasks/prepare/`     | `all.yml`, `<instance name>.yml` | Configure all instances, or one, before converge. |
 | `tasks/side_effect/` | `*.yml`                          | Change the instances between two test steps. |
 | `tasks/cleanup/`     | `*.yml`                          | Remove what the tests left behind. |
+| `tasks/destroy/`     | `*.yml`                          | Add steps to `destroy`, such as removing what `tasks/create/` built. |
 
 The `*.yml.example` files in `default/tasks/` show how to apply the project.
 Rename one to `*.yml` to use it.
@@ -248,23 +247,19 @@ without losing them.
 
 ### Molecule does not find the scenarios<a id="faq-role-path-detection"></a>
 
-If Molecule does not find the roles or does not install the current version of
-the project on each run, set `MOLECULE_GLOB` and run `molecule` from the
-project's root directory instead of the `extensions` subdirectory:
+When you run Molecule directly and it finds no scenario, or does not install
+the current version of the project on each run, set `MOLECULE_GLOB` and run
+`molecule` from the project's root directory, as [Usage](#usage) shows. For
+one command only:
 
 ```bash
-cd "/path/to/project"
-export MOLECULE_GLOB="./{extensions/molecule,molecule}/*/molecule.yml"
-molecule list
-
-# or for one command only
 MOLECULE_GLOB="./{extensions/molecule,molecule}/*/molecule.yml" molecule list
 ```
 
 Without the variable, Molecule looks for `molecule/*/molecule.yml` in the
 working directory. Recent releases use `extensions/molecule/*/molecule.yml`
-instead when the working directory contains a valid `galaxy.yml`. Further
-reading:
+instead when the working directory contains a valid `galaxy.yml`. The pattern
+above matches both layouts. Further reading:
 
 - Source:
   [`molecule/command/base.py`](https://github.com/ansible/molecule/blob/main/src/molecule/command/base.py)
@@ -314,8 +309,8 @@ repositories. If your network provides mirrors:
 
 ### Container: `inotify_init1(): Too many open files`<a id="faq-inotify"></a>
 
-If not all platform instances start in parallel, start fewer containers at once
-with `--platform-name`, or raise the inotify limits:
+Starting many containers at once can exceed the inotify limits. Start fewer
+at once with `--platform-name`, or raise the limits:
 
 ```bash
 # Inspect
@@ -332,7 +327,7 @@ sudo sysctl -p
 ```
 
 To debug, keep the instances, find the stopped container and start it with
-debug logging. Keep the complete output of the failing command:
+debug logging:
 
 ```bash
 # Reproduce the resource limit
@@ -351,19 +346,11 @@ podman --log-level debug start <container-id>
 Virtual machine instances cannot reach each other. [passt](https://passt.top/)
 gives every instance its own isolated user-space network stack, and the host
 reaches the instances through SSH port forwards. The shared playbooks do not
-implement or support traffic between instances.
+support traffic between instances.
 
-A scenario that needs it would have to use bridged networking through the
-setuid `qemu-bridge-helper`
-(`<interface type='bridge'><source bridge='virbr0'/>`). That confines the
-privilege to one narrow, audited helper binary instead of making the whole user
-session equivalent to root:
-
-- **Fedora** ships everything needed (`/etc/qemu/bridge.conf` containing
-  `allow virbr0`, setuid helper). One-time setup:
-  `sudo virsh --connect 'qemu:///system' net-start default && sudo virsh --connect 'qemu:///system' net-autostart default`.
-- **Debian and Ubuntu** deliberately ship the helper without setuid and without
-  a `bridge.conf`. You would need
-  `sudo dpkg-statoverride --update --add root root 4755 /usr/lib/qemu/qemu-bridge-helper`
-  and to create `/etc/qemu/bridge.conf` with the content `allow virbr0`
-  yourself. This changes the system's security posture; consider it carefully.
+A scenario that needs it would have to change the domain template to bridged
+networking through the setuid `qemu-bridge-helper`, which keeps the privilege
+in one small helper binary. Fedora ships the helper setuid with a
+`/etc/qemu/bridge.conf` that allows `virbr0`. Debian and Ubuntu ship it without
+setuid and without that file on purpose; enabling it changes the system's
+security posture.
