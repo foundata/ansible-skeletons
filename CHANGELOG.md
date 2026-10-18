@@ -116,15 +116,16 @@ and the project adheres to
 ### Added
 
 - Both module variants: `Activation` in `_activation.py` is the verifying
-  activation on the lifecycle base, with the binding's connection,
-  compatibility policy and failure contract. An apply module supplies
-  `compare` and `activate`, and where it needs them `requested` for `verify`
-  items with a `name` and an optional `uuid`, `pending` to follow the
+  activation on the lifecycle base, with the binding's connection, compatibility
+  policy and failure contract. An apply module supplies `compare` and
+  `activate`, and where it needs them `requested` for `verify` items with a
+  `name` and an optional `uuid`, `survey` to read once, before the first
+  comparison, what the comparison and `pending` share, `pending` to follow the
   product's pending work and `protect` to guard the apply. `owned` makes an
   empty `verify` compare every owned object and `apply_unverifiable` applies
-  unless every object is in sync. The result reports `verification` per
-  object. `run()` keeps serving areas whose steps are plain functions and
-  takes `settle_seconds` instead of a `settle` function.
+  unless every object is in sync. The result reports `verification` per object.
+  `run()` keeps serving areas whose steps are plain functions and takes
+  `settle_seconds` instead of a `settle` function.
 - Both module variants: a `stages()` hook splits one declared change into
   several writes that `reconcile()` runs in order, such as creating an
   object disabled and enabling it, or disabling it before deleting it. Each

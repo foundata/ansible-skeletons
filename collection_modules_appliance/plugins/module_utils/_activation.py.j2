@@ -18,7 +18,9 @@ applies when a compared object drifts, also when one cannot be verified if
 An area whose product tracks pending work follows it (``pending``): it
 applies when work is pending, reports pending objects as drifting, and
 refuses drift without pending work before applying, because the apply would
-not repair it. After the apply only the pending objects are verified.
+not repair it. After the apply only the pending objects are verified. An
+area whose comparison and pending work read the same state first reads it
+once in ``survey``, which runs before the first comparison.
 
 A reply lost after the apply request was sent (a timeout, a dropped
 connection or an undecodable body) proves nothing by itself. The module goes
@@ -127,9 +129,9 @@ class Activation(Binding, sequence=("verify_activation", "verdict", "converged")
     """Verifying activation of one area; an apply module supplies the hooks.
 
     ``compare`` reports ``in_sync``, ``drift`` or ``unverifiable`` per
-    object and ``activate`` sends the apply. ``requested``, ``pending`` and
-    the base's ``protect`` and ``finish`` are optional. Run it with
-    ``execute(activation.verify_activation)``.
+    object and ``activate`` sends the apply. ``requested``, ``survey``,
+    ``pending`` and the base's ``protect`` and ``finish`` are optional. Run it
+    with ``execute(activation.verify_activation)``.
     """
 
     message = "Activation failed; see operation, error_category and error_code"
@@ -175,6 +177,14 @@ class Activation(Binding, sequence=("verify_activation", "verdict", "converged")
             raise ProductError(code="validation_failed", fields=["verify"])
         return identities
 
+    def survey(self) -> None:
+        """Read what the first comparison and ``pending`` share; no write.
+
+        It runs once, connected and under the step ``compare``, before the
+        first comparison, for example to read a protection state that both
+        need. The default reads nothing.
+        """
+
     def compare(self, identities: dict[str, Any]) -> dict[str, str]:
         """Compare saved with loaded state for these objects, and every owned one."""
         raise NotImplementedError
@@ -212,6 +222,7 @@ class Activation(Binding, sequence=("verify_activation", "verdict", "converged")
         self.identities = self.requested()
         self.prepare(self.operation_id())
         self.step("compare")
+        self.survey()
         before = self.compare(self.identities)
         self.waiting = self.pending()
         if self.waiting is not None:

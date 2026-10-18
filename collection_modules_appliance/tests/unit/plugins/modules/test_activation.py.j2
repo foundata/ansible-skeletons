@@ -230,6 +230,45 @@ def area(**values: Any) -> dict[str, Any]:
     }
 
 
+@pytest.mark.parametrize("refused", [False, True])
+def test_survey_runs_once_connected_before_the_first_comparison(
+    run_module: RunModule, refused: bool
+) -> None:
+    events: list[str] = []
+
+    class Surveyed(Area):
+        def survey(self) -> None:
+            assert self.client is not None
+            events.append("survey " + self.operation)
+            if refused:
+                raise _activation.ProductError(
+                    category="eligibility", code="referenced"
+                )
+
+        def compare(self, identities: dict[str, Any]) -> dict[str, str]:
+            events.append("compare")
+            return super().compare(identities)
+
+    def main() -> None:
+        module = AnsibleModule(
+            argument_spec=_activation.argument_spec(objects=True),
+            supports_check_mode=True,
+        )
+        activation = Surveyed(module, state)
+        activation.execute(activation.verify_activation)
+
+    state = area(saved={"one": "1"}, loaded={"one": "0"})
+    result = run_module(main, verify=[{"name": "one"}])
+    if refused:
+        assert result["failed"] and result["error_code"] == "referenced"
+        assert result["operation"] == "compare" and events == ["survey compare"]
+        assert not state["applies"]
+    else:
+        assert result["changed"] and result["verification"] == {"one": "in_sync"}
+        assert events[:2] == ["survey compare", "compare"]
+        assert events.count("survey compare") == 1 and state["applies"] == 1
+
+
 def test_an_owned_area_compares_every_object_without_verify(
     run_module: RunModule,
 ) -> None:
