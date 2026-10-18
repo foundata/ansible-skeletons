@@ -109,6 +109,11 @@ and the project adheres to
   and `destroy` task directories and its FAQ covers direct Molecule runs.
   collection_default's `DEVELOPMENT.md` starts its checks with the commands
   and explains `runtime-check`, `ansible-lint` and `helper-lint`.
+- collection_default, collection_modules, collection_modules_appliance,
+  role_default: the docs no longer ask to run every container-backed session
+  sequentially, as ansible-test sessions can run in parallel. They say
+  instead that two Molecule runs at once collide, because Molecule names each
+  container after its platform.
 
 ### Fixed
 

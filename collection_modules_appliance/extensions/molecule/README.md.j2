@@ -330,6 +330,8 @@ molecule destroy
 
 Container platforms need [Podman](https://podman.io/docs/installation). Set
 `MOLECULE_PODMAN_EXECUTABLE` to use another Podman binary than `podman`.
+Molecule names each container after its platform, so two runs of a scenario
+at the same time collide.
 
 
 

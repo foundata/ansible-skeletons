@@ -53,8 +53,8 @@ Among the default sessions:
 
 Session definitions: [noxfile.py](noxfile.py).
 Built-in session settings: [antsibull-nox.toml](antsibull-nox.toml).
-Run container-backed sessions sequentially. While editing, run the sessions of
-one ansible-core release, such as
+Run one `molecule` session at a time; two runs at once collide on container
+names. While editing, run the sessions of one ansible-core release, such as
 `uv run noxfile.py -s ansible-test-sanity-2.21` (`-l` lists them), and the
 default sessions before a commit.
 

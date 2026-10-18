@@ -11,9 +11,11 @@ project:
 
 - `default` tests the project on several Linux distributions, in Podman
   containers or QEMU/KVM virtual machines.
-- `ee` builds an Ansible execution environment (EE) with
-  [`ansible-builder`](https://docs.ansible.com/projects/builder/en/latest/)
-  and checks that the project is included.
+- `ee` builds the project artifact and an Ansible
+  [execution environment](https://docs.ansible.com/projects/ansible/latest/getting_started_ee/index.html)
+  (EE) image with
+  [`ansible-builder`](https://docs.ansible.com/projects/builder/en/latest/),
+  and checks that the image contains the project.
 
 Paths are relative to this directory unless stated otherwise.
 
@@ -55,11 +57,14 @@ installs the collections a scenario needs from `<scenario>/requirements.yml`.
 
 Each platform in `default/molecule.yml` selects its backend with the `type` key:
 `"podman"` for a container, which is also the default without a `type` key, or
-`"libvirt"` for a QEMU/KVM virtual machine. Install what the listed platforms
-need.
+`"libvirt"` for a QEMU/KVM virtual machine. One run can mix both. To switch a
+platform, swap its active entry in `default/molecule.yml`; its comments list
+the keys of each backend. Install what the listed platforms need.
 
 Container platforms need [Podman](https://podman.io/docs/installation). Set
 `MOLECULE_PODMAN_EXECUTABLE` to use another Podman binary than `podman`.
+Molecule names each container after its platform, so two runs of a scenario
+at the same time collide.
 
 Virtual machine platforms need:
 
@@ -153,10 +158,6 @@ molecule list
 molecule destroy
 ```
 
-To switch a platform between container and virtual machine, swap its active
-entry in `default/molecule.yml`. The comments there list the keys of each
-backend. One run can mix containers and virtual machines.
-
 
 
 #### VM platforms (`type: "libvirt"`)<a id="usage-testing-vm"></a>
@@ -194,10 +195,6 @@ If an instance does not come up:
 
 
 #### Scenario `ee`<a id="usage-testing-ee"></a>
-
-The scenario builds the project artifact and an
-[execution environment](https://docs.ansible.com/projects/ansible/latest/getting_started_ee/index.html)
-image, then checks that the project is included in the EE:
 
 ```bash
 molecule test --scenario-name "ee"
