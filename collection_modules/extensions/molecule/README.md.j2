@@ -133,23 +133,24 @@ or destroy:
 {# end skeleton-variant #}
 
 
-The lost-reply checks in `side_effect` let a write reach the product and
-replace its reply with a timeout. The module must settle the outcome by reading
-back (`verified: observed`), and a second run with the same arguments must
-report no change without writing again. Each case in `zz_loss.yml` names the
-module, its identity (`{}` for a module without identity options, such as a
-settings singleton) and its parameters. Its `options` fit
-`shared/files/loss.py` to the module: `expected_writes` and `drop: "all"` for a
-change written in stages, `route` to count only writes below a path prefix,
-`when` to count only calls with these keyword arguments, such as
-`{"write": true}` for a method that both reads and writes, `rerun: "none"` for
-an operation that acts on every run, and `target` for writes that leave
-through another method than `_client.Client.write`. The cases run hidden,
-because their parameters carry the credentials; `zz_loss.yml` then shows each
-case's proof, which holds none and names the module file that settled the
-reply. The cases need the objects and services they use more than they need
-to run last; when a later side effect releases them, name `zz_loss.yml` so
-that it runs first.
+`zz_loss.yml` checks what a module does when a write reaches the product but
+its reply is lost. For each case, `shared/files/loss.py` lets the write
+through, replaces the reply with a timeout and then requires:
+
+- The module reads the result back, reports the change and returns
+  `verified: observed`.
+- A second run with the same arguments reports no change and writes nothing.
+
+Each case names a module, a record and the parameters to declare. Its
+`options` adapt the check to modules that write in stages, send writes through
+another method than `_client.Client.write` or act on every run; the docstring
+of `loss.py` describes each option. The cases run hidden because their
+parameters contain the credentials. `zz_loss.yml` then shows each case's
+proof, which contains no credentials and names the module file that ran.
+
+The cases need the records and services they use. The `zz_` prefix runs the
+file after the other side-effect files; if one of those removes something the
+cases need, rename `zz_loss.yml` so that it runs before that file.
 
 {# skeleton-variant: recovery-sequence #}
 {# end skeleton-variant #}
@@ -169,13 +170,15 @@ task files of a directory under `default/tasks/`, in alphabetical order:
 | `tasks/side_effect/` | Change the fixtures and assert the reported change. |
 | `tasks/cleanup/`     | Remove the fixture records. It also runs first, so absence is not an error. |
 
-The `fixture.yml` files exercise a definition-driven resource;
-`fixture_nested.yml` exercises the copyable hook-based resource. Copy that
-utility, module and its task files per hook-based resource, edit hooks rather
-than the lifecycle sequence, and replace the verifier slot with independent
-product evidence. Parameterize `zz_loss.yml` for the copied module and its
-identity; keep `shared/files/loss.py` unchanged. Set the connection once per
-block with `module_defaults` for the
+The `fixture.yml` files exercise the definition-driven resource and
+`fixture_nested.yml` the hook-based one. For each new hook-based resource,
+copy the nested fixture's task files along with its utility and module, as
+[`DEVELOPMENT.md`](../../DEVELOPMENT.md#boundaries) describes. Replace the
+FIXME in the copy of `tasks/verify/fixture_nested.yml` with an independent
+check of the product, and add the module to `zz_loss.yml`; keep
+`shared/files/loss.py` unchanged.
+
+Set the connection once per block with `module_defaults` for the
 `{{ namespace }}.{{ collection_name }}.api`
 action group and the `product_connection` inventory variable. When adding tests:
 
@@ -243,7 +246,7 @@ Virtual machine platforms need:
    ```
 
    The scenario uses the libvirt user session (`qemu:///session`), which needs
-   no root privileges and no membership in the `libvirt` group.
+   no root privileges, no membership in the `libvirt` group and no polkit rules.
 2. Access to `/dev/kvm`. Users logged in locally on Fedora, Debian and Ubuntu
    have it by default. Headless sessions on Debian and Ubuntu, such as SSH
    sessions or CI runners, also need membership in the `kvm` group
@@ -260,8 +263,7 @@ Virtual machine platforms need:
    ```
 
 Virtual machines boot vendor cloud images in the libvirt user session with
-passt user networking, which needs no root privileges, no `libvirt` group
-membership and no polkit rules.
+passt user networking.
 
 Virtual machines need far more resources than containers. On smaller machines,
 test one platform at a time with `--platform-name`. A resource guard stops the
@@ -347,8 +349,8 @@ network you control: the credentials then travel to an unverified peer.
 
 ### Container: `inotify_init1(): Too many open files`<a id="faq-inotify"></a>
 
-If not all platform instances start in parallel, start fewer containers at once
-with `--platform-name`, or raise the inotify limits:
+Starting many containers at once can exceed the inotify limits. Start fewer
+at once with `--platform-name`, or raise the limits:
 
 ```bash
 # Inspect
@@ -365,7 +367,7 @@ sudo sysctl -p
 ```
 
 To debug, keep the instances, find the stopped container and start it with
-debug logging. Keep the complete output of the failing command:
+debug logging:
 
 ```bash
 # Reproduce the resource limit
@@ -384,19 +386,11 @@ podman --log-level debug start <container-id>
 Virtual machine instances cannot reach each other. [passt](https://passt.top/)
 gives every instance its own isolated user-space network stack, and the host
 reaches the instances through SSH port forwards. The shared playbooks do not
-implement or support traffic between instances.
+support traffic between instances.
 
-A scenario that needs it would have to use bridged networking through the
-setuid `qemu-bridge-helper`
-(`<interface type='bridge'><source bridge='virbr0'/>`). That confines the
-privilege to one narrow, audited helper binary instead of making the whole user
-session equivalent to root:
-
-- **Fedora** ships everything needed (`/etc/qemu/bridge.conf` containing
-  `allow virbr0`, setuid helper). One-time setup:
-  `sudo virsh --connect 'qemu:///system' net-start default && sudo virsh --connect 'qemu:///system' net-autostart default`.
-- **Debian and Ubuntu** deliberately ship the helper without setuid and without
-  a `bridge.conf`. You would need
-  `sudo dpkg-statoverride --update --add root root 4755 /usr/lib/qemu/qemu-bridge-helper`
-  and to create `/etc/qemu/bridge.conf` with the content `allow virbr0`
-  yourself. This changes the system's security posture; consider it carefully.
+A scenario that needs it would have to change the domain template to bridged
+networking through the setuid `qemu-bridge-helper`, which keeps the privilege
+in one small helper binary. Fedora ships the helper setuid with a
+`/etc/qemu/bridge.conf` that allows `virbr0`. Debian and Ubuntu ship it without
+setuid and without that file on purpose; enabling it changes the system's
+security posture.

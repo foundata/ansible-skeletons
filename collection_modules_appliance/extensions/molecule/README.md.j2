@@ -144,93 +144,95 @@ check mode and compares the active state with the saved state. With
 {# end skeleton-variant #}
 
 
-The lost-reply checks in `side_effect` let a write reach the product and
-replace its reply with a timeout. The module must settle the outcome by reading
-back (`verified: observed`), and a second run with the same arguments must
-report no change without writing again. Each case in `zz_loss.yml` names the
-module, its identity (`{}` for a module without identity options, such as a
-settings singleton) and its parameters. Its `options` fit
-`shared/files/loss.py` to the module: `expected_writes` and `drop: "all"` for a
-change written in stages, `route` to count only writes below a path prefix,
-`when` to count only calls with these keyword arguments, such as
-`{"write": true}` for a method that both reads and writes, `rerun: "none"` for
-an operation that acts on every run, and `target` for writes that leave
-through another method than `_client.Client.write`. The cases run hidden,
-because their parameters carry the credentials; `zz_loss.yml` then shows each
-case's proof, which holds none and names the module file that settled the
-reply. The cases need the objects and services they use more than they need
-to run last; when a later side effect releases them, name `zz_loss.yml` so
-that it runs first.
+`zz_loss.yml` checks what a module does when a write reaches the product but
+its reply is lost. For each case, `shared/files/loss.py` lets the write
+through, replaces the reply with a timeout and then requires:
+
+- The module reads the result back, reports the change and returns
+  `verified: observed`.
+- A second run with the same arguments reports no change and writes nothing.
+
+Each case names a module, a record and the parameters to declare. Its
+`options` adapt the check to modules that write in stages, send writes through
+another method than `_client.Client.write` or act on every run; the docstring
+of `loss.py` describes each option. The cases run hidden because their
+parameters contain the credentials. `zz_loss.yml` then shows each case's
+proof, which contains no credentials and names the module file that ran.
+
+The cases need the records and services they use. The `zz_` prefix runs the
+file after the other side-effect files; if one of those removes something the
+cases need, rename `zz_loss.yml` so that it runs before that file.
 
 {# skeleton-variant: recovery-sequence #}
 `zz_recovery.yml` runs the [recovery drill](#usage-recovery) when the
-credentials file names a console endpoint, and otherwise prints why it
-skipped. Its name puts it last here, but what it needs is the scenario's
-dependencies in place: the management resolver on the contract's DNS port and
-whatever the areas' hooks use. When a later side effect removes one of them,
-name the file so that it runs before that one.
+credentials file names a console, and otherwise prints why it skipped. It
+needs the management resolver behind the credentials file's `dns` entry and
+whatever the areas' hooks use. If a later side-effect file removes one of
+them, rename `zz_recovery.yml` so that it runs before that file.
 
 {# end skeleton-variant #}
 {# skeleton-variant: recovery-contract #}
 ### Recovery drill<a id="usage-recovery"></a>
 
 The drill proves that you can get the appliance back after a change cuts off
-its management access. It backs up the configuration through the appliance's
-console, makes the area's change that breaks API access, and restores the
-backup through the console. Then it requires a fresh API login, a fresh DNS
-answer for the management name, and the change to be gone. Every check goes
-through the API and DNS. Besides the backup and the restore, an area's hooks
-may use the console for fixtures that the restore undoes, such as turning off
-a setting that would keep the change from cutting off access. A scenario
-drills each of its areas in turn, in the order of their names.
+its management access. It drills each area of the scenario in turn, in the
+order of their names:
+
+1. Back up the configuration through the appliance's console.
+2. Make the area's change that cuts off access, and observe the loss.
+3. Restore the backup through the console.
+4. Require a fresh API login, a fresh DNS answer for the management name and
+   the change to be gone. These checks go through the API and DNS only.
 
 Before the drill can run:
 
-1. Give each area of the scenario its hooks in `default/tasks/recovery/<area>/`:
-   `induce.yml` makes the change that loses access, `absent.yml` proves it is
-   gone. A scenario with one area may keep them directly in
-   `default/tasks/recovery/`; that area then carries the scenario's name. The
-   fixture's hooks drill two areas of the fake product, one that loses API
-   access and one that loses only DNS; replace them with the product's. Two
-   files are optional:
-   - `observe.yml` observes the loss on fresh connections, for an area whose
-     change costs only access that depends on DNS; without it the drill
-     watches the API probe fail.
-   - `settings.yml` is data, not tasks: `fresh_dns: false` with a
-     `fresh_dns_reason` skips the fresh DNS check, for a scenario that moves
-     the management resolver. `fresh_dns: auto` asks for the management name
-     once before the drill and requires a fresh answer after the restore only
-     when that one came, for an area that drills in such a scenario and on
-     its own. Any other key fails the drill; the settings of both fixture
-     areas show the forms.
+1. Give each area its hooks in `default/tasks/recovery/<area>/`. A scenario
+   with one area may keep them directly in `default/tasks/recovery/`; the
+   area then carries the scenario's name. The fixture's hooks drill two areas
+   of the fake product, `fixture`, which loses only DNS, and
+   `fixture_nested`, which loses API access; replace them with the product's.
+   - `induce.yml` makes the change that cuts off access. Besides the backup
+     and the restore, hooks may use the console for fixtures that the
+     restore undoes, such as turning off a setting that would keep the change
+     from cutting off access.
+   - `absent.yml` proves that the change is gone.
+   - `observe.yml`, optional, observes the loss on fresh connections, for an
+     area whose change costs only access that depends on DNS. Without it, the
+     drill watches the API fail.
+   - `settings.yml`, optional, holds data, not tasks. `fresh_dns: false` with
+     a `fresh_dns_reason` skips the fresh DNS check, for a scenario that moves
+     the management resolver. `fresh_dns: auto` checks DNS after the restore
+     only if the management name resolved to the `management` address before
+     the drill; use it for an area that drills both in such a scenario and on
+     its own. Any other key fails the drill.
+   - A hook that needs a helper inside the appliance includes
+     `shared/tasks/recovery_upload.yml`, whose header lists its variables.
+     Name the appliance's base64 decoder and SHA-256 tool as `decode` and
+     `digest` under `upload` in `recovery_defaults`.
 2. Replace the `backup`, `restore` and `discard` commands under
    `recovery_defaults` in `default/inventory/hosts.yml`. The fixture's commands
    work only in the fake product's console; anywhere else the backup fails
-   before the drill changes anything. A drill that needs a helper inside the
-   appliance includes `shared/tasks/recovery_upload.yml`, which sends a file
-   through the console in base64 chunks, checks its SHA-256 digest in the
-   appliance and renames it into place; name the appliance's `decode` and
-   `digest` commands under `upload` for it.
-3. Add three entries to the credentials file:
+   before the drill changes anything.
+3. Add the three entries of the lab contract, which the drill's messages
+   refer to, to the credentials file:
    - `console`: `argv`, a command that runs commands in the appliance's root
      shell. The drill writes `{"label": "...", "commands": ["..."]}` to its
-     standard input, fails unless it exits with status 0, and records its
-     output, which must be one JSON line. The commands need a POSIX shell,
-     for example for the `$(...)` that `recovery_upload.yml` sends: where the
-     root shell is another one, such as csh, the endpoint runs them in
-     `/bin/sh`. A request holds at most 32 commands of at most 200 printable
-     bytes each; a step that needs a longer command goes into a helper that
-     `shared/tasks/recovery_upload.yml` uploads first.
+     standard input, records its output, which must be one JSON line, and
+     fails unless it exits with status 0. The endpoint must run the commands
+     in a POSIX shell; where the root shell is another one, such as csh, it
+     runs them through `/bin/sh`. It must accept up to 32 commands of up to
+     200 printable bytes per request. Keep your commands within these limits;
+     a step that needs more goes into a helper that you upload first.
    - `dns`: `host` and `port` of a TCP DNS server that reaches the
      appliance's resolver over the management path, and the management
      `name`.
    - `management`: the `address` that name must resolve to, and the `client`
-     address the appliance sees management traffic come from.
+     address the appliance sees management traffic come from. The shared
+     drill does not read `client`; it is there for hooks that need it.
 
-Without `console` the drill is skipped; with an incomplete entry it fails. The
-drill never needs the appliance's root credential, so keep that in the console
-endpoint. Areas, their optional files and uploads need nothing beyond these
-three entries; the lab contract stays as it is.
+Without `console`, the drill is skipped; an incomplete entry fails it. The
+drill never needs the appliance's root credential, so keep that inside the
+console endpoint.
 
 {# end skeleton-variant #}
 {# skeleton-variant: recovery-tool #}
@@ -238,20 +240,25 @@ three entries; the lab contract stays as it is.
 
 `shared/playbooks/recovery.yml` drills one area without the rest of the test
 sequence, for example to rehearse a new area before it writes anything that
-affects the management path. `MOLECULE_RECOVERY_SCENARIO` names the scenario
-and `MOLECULE_RECOVERY_AREA` one of its areas; the playbook refuses an unknown
-one and names those it found. It needs the same `MOLECULE_PRODUCT_*` variables
-as the scenario. Run it from the collection root against a lab you can afford
-to lose:
+can affect the management path. Run it from the collection root against a lab
+you can afford to lose. It needs the same `MOLECULE_PRODUCT_*` variables as
+the scenario, and this collection and `foundata.utils` installed where Ansible
+finds them:
 
 ```sh
 export MOLECULE_SCENARIO_DIRECTORY="$PWD/extensions/molecule/default"
 export MOLECULE_RECOVERY_SCENARIO="default"
-export MOLECULE_RECOVERY_AREA="default"
+export MOLECULE_RECOVERY_AREA="fixture"
 ansible-playbook \
   -i extensions/molecule/default/inventory/hosts.yml \
   extensions/molecule/shared/playbooks/recovery.yml
 ```
+
+- `MOLECULE_SCENARIO_DIRECTORY` points at any scenario of this collection;
+  the playbook finds `shared/` and the other scenarios through it.
+- `MOLECULE_RECOVERY_SCENARIO` names the scenario and
+  `MOLECULE_RECOVERY_AREA` one of its areas. An unknown scenario or area fails
+  and lists the valid names.
 
 {# end skeleton-variant #}
 ### Write tests<a id="usage-add-tests"></a>
@@ -266,13 +273,15 @@ task files of a directory under `default/tasks/`, in alphabetical order:
 | `tasks/side_effect/` | Change the fixtures and assert the reported change. |
 | `tasks/cleanup/`     | Remove the fixture records. It also runs first, so absence is not an error. |
 
-The `fixture.yml` files exercise a definition-driven resource;
-`fixture_nested.yml` exercises the copyable hook-based resource. Copy that
-utility, module and its task files per hook-based resource, edit hooks rather
-than the lifecycle sequence, and replace the verifier slot with independent
-product evidence. Parameterize `zz_loss.yml` for the copied module and its
-identity; keep `shared/files/loss.py` unchanged. Set the connection once per
-block with `module_defaults` for the
+The `fixture.yml` files exercise the definition-driven resource and
+`fixture_nested.yml` the hook-based one. For each new hook-based resource,
+copy the nested fixture's task files along with its utility and module, as
+[`DEVELOPMENT.md`](../../DEVELOPMENT.md#boundaries) describes. Replace the
+FIXME in the copy of `tasks/verify/fixture_nested.yml` with an independent
+check of the product, and add the module to `zz_loss.yml`; keep
+`shared/files/loss.py` unchanged.
+
+Set the connection once per block with `module_defaults` for the
 `{{ namespace }}.{{ collection_name }}.api`
 action group and the `product_connection` inventory variable. When adding tests:
 
@@ -340,7 +349,7 @@ Virtual machine platforms need:
    ```
 
    The scenario uses the libvirt user session (`qemu:///session`), which needs
-   no root privileges and no membership in the `libvirt` group.
+   no root privileges, no membership in the `libvirt` group and no polkit rules.
 2. Access to `/dev/kvm`. Users logged in locally on Fedora, Debian and Ubuntu
    have it by default. Headless sessions on Debian and Ubuntu, such as SSH
    sessions or CI runners, also need membership in the `kvm` group
@@ -357,8 +366,7 @@ Virtual machine platforms need:
    ```
 
 Virtual machines boot vendor cloud images in the libvirt user session with
-passt user networking, which needs no root privileges, no `libvirt` group
-membership and no polkit rules.
+passt user networking.
 
 Virtual machines need far more resources than containers. On smaller machines,
 test one platform at a time with `--platform-name`. A resource guard stops the
@@ -444,8 +452,8 @@ network you control: the credentials then travel to an unverified peer.
 
 ### Container: `inotify_init1(): Too many open files`<a id="faq-inotify"></a>
 
-If not all platform instances start in parallel, start fewer containers at once
-with `--platform-name`, or raise the inotify limits:
+Starting many containers at once can exceed the inotify limits. Start fewer
+at once with `--platform-name`, or raise the limits:
 
 ```bash
 # Inspect
@@ -462,7 +470,7 @@ sudo sysctl -p
 ```
 
 To debug, keep the instances, find the stopped container and start it with
-debug logging. Keep the complete output of the failing command:
+debug logging:
 
 ```bash
 # Reproduce the resource limit
@@ -481,19 +489,11 @@ podman --log-level debug start <container-id>
 Virtual machine instances cannot reach each other. [passt](https://passt.top/)
 gives every instance its own isolated user-space network stack, and the host
 reaches the instances through SSH port forwards. The shared playbooks do not
-implement or support traffic between instances.
+support traffic between instances.
 
-A scenario that needs it would have to use bridged networking through the
-setuid `qemu-bridge-helper`
-(`<interface type='bridge'><source bridge='virbr0'/>`). That confines the
-privilege to one narrow, audited helper binary instead of making the whole user
-session equivalent to root:
-
-- **Fedora** ships everything needed (`/etc/qemu/bridge.conf` containing
-  `allow virbr0`, setuid helper). One-time setup:
-  `sudo virsh --connect 'qemu:///system' net-start default && sudo virsh --connect 'qemu:///system' net-autostart default`.
-- **Debian and Ubuntu** deliberately ship the helper without setuid and without
-  a `bridge.conf`. You would need
-  `sudo dpkg-statoverride --update --add root root 4755 /usr/lib/qemu/qemu-bridge-helper`
-  and to create `/etc/qemu/bridge.conf` with the content `allow virbr0`
-  yourself. This changes the system's security posture; consider it carefully.
+A scenario that needs it would have to change the domain template to bridged
+networking through the setuid `qemu-bridge-helper`, which keeps the privilege
+in one small helper binary. Fedora ships the helper setuid with a
+`/etc/qemu/bridge.conf` that allows `virbr0`. Debian and Ubuntu ship it without
+setuid and without that file on purpose; enabling it changes the system's
+security posture.

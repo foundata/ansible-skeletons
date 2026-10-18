@@ -44,9 +44,9 @@ This table is maintained by hand. Module documentation is authoritative:
 
 See `dependencies` in [`galaxy.yml`](./galaxy.yml).
 
-The fixture uses `foundata.utils >=1.0.0`.
-Additional Python packages belong in [`requirements.txt`](./requirements.txt);
-the fixture requires none.
+The fixture uses `foundata.utils >=1.0.0`. Python packages that the execution
+host needs are listed in [`requirements.txt`](./requirements.txt); the fixture
+needs none.
 
 
 
@@ -60,11 +60,11 @@ credentials and TLS trust are caller prerequisites.
 
 ### Management path and recovery
 
-The managed configuration carries the management path. Activation is global
-within its subsystem, and console recovery is rehearsed for each area before
-that area makes its first management-path write. A grid-shaped API alone does
-not establish these properties. What they ask of the caller is listed under
-[Requirements](#requirements).
+The managed configuration carries the management path, so a change can cut
+off the API that the modules use. Activation applies every pending change in
+its subsystem. Console recovery is rehearsed for each area before the area's
+first write that can affect the management path. [Requirements](#requirements)
+lists what this asks of you.
 
 ### Identity
 
@@ -82,15 +82,18 @@ writers, including inventory aliases that address the same endpoint.
 Resource writes save state. Run `fixture_apply` with `activate: auto` and a
 `verify` list on every workflow execution. It consumes all pending changes in
 the area, compares only the named objects, and waits for observed convergence.
-`always` forces activation.
+`always` forces activation. If the activation reply is lost, `fixture_apply`
+reads the active state again. When it matches the saved state, the run
+succeeds; otherwise it reports `outcome: unknown`.
 
-An area without an authoritative effective-state probe uses act-once
-activation: preflight, at most one activation request per explicit invocation,
-and optional bounded readiness checks. Normal mode reports
-`verified: unverifiable`; readiness is not a loaded-state receipt. Check mode
-reports `verified: predicted`. A lost activation response leaves the outcome
-unknown and is never retried. FIXME State the area's activation scope,
-probe limits and recovery prerequisites.
+FIXME Describe each area without a probe of its active state, which uses
+act-once activation from `_act_once.py`: a preflight, at most one activation
+request per run and optional bounded readiness checks. Normal mode reports
+`verified: unverifiable`, because readiness does not prove what the product
+loaded; check mode reports `verified: predicted`. A lost activation reply
+leaves the outcome unknown and is never retried. State the area's activation
+scope, probe limits and recovery prerequisites. Delete this paragraph if
+every area has a probe.
 
 ### Check and diff mode
 
@@ -101,13 +104,16 @@ have no identifier. Diffs contain public managed fields only, on request.
 
 ### Failures
 
-Failures report `error_category`, `error_code`, `http_status`, `operation`, the
-identity under its option names, `changed` and `outcome` (`unchanged`, `changed`
-or `unknown`). Lost responses are reconciled by identity; creations are never
-blindly retried. After a lost activation reply the apply module reads the loaded
-state again: the observed resolution of the drift is success, anything else
-`outcome: unknown`. Results and errors exclude secrets, including secrets
-returned in listings.
+A failure reports:
+
+- `error_category` and `error_code`.
+- `http_status` and the `operation`.
+- The identity under its option names.
+- `changed`, and `outcome`: `unchanged`, `changed` or `unknown`.
+
+After a lost response, a module reads the record back by its identity; it
+never retries a creation blindly. Results and errors exclude secrets,
+including secrets returned in listings.
 
 ### Version check
 
@@ -116,20 +122,20 @@ A read-only probe precedes writes.
 Every module checks the product version before its first request, including
 unchanged and read-only runs.
 
-Untested series warn once and proceed; evidence-backed operation exclusions
-fail before writing.
+An untested product series produces one warning and the module proceeds.
+Operations known to fail on a particular product build fail before they write.
 
 
 
 ## Usage<a id="usage"></a>
 
 Each section below covers one administration task: what its modules manage and
-refuse, what you prepare and when to activate. It ends with the tasks of that
-task's play and the names of its modules;
+refuse, what you prepare and when to activate. It ends with an example task list
+and the names of its modules;
 `ansible-doc {{ namespace }}.{{ collection_name }}.<module>`
-shows a module's options, return values and own rules. Every example is the task
-list of this play, run on the control node against an inventory host that
-carries the endpoint's variables:
+shows a module's options, return values and own rules. The examples are tasks of
+this play, run on the control node against an inventory host that defines the
+endpoint's variables:
 
 ```yaml
 ---
@@ -151,7 +157,7 @@ carries the endpoint's variables:
 FIXME Two to four sentences: what the task's modules manage, what they refuse
 and why, what the caller prepares, and when to run the apply module. A rule
 a single module enforces belongs in that module's documentation, not here.
-One section per administration task of the plan, in its order.
+Write one section per administration task.
 
 ```yaml
 - name: "Save the record"

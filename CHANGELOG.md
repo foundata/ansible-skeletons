@@ -99,6 +99,12 @@ and the project adheres to
 - collection_default, collection_modules, collection_modules_appliance:
   `docs-check` installs antsibull-docs 2.28.0 or later, the first release that
   accepts `no_log` in role argument specs.
+- Both module variants: the rendered `DEVELOPMENT.md` lists the files that
+  come from the skeleton by directory and sends changes to them to the
+  skeleton, and its checks start with the commands. The Molecule README
+  describes the loss cases, the recovery drill and its lab contract in steps
+  and lists, and the appliance README turns act-once activation into a FIXME,
+  as no fixture module uses it.
 
 ### Fixed
 
@@ -112,6 +118,9 @@ and the project adheres to
   runtime check's `subprocess.run` call passes `check=False`, which pylint's
   `subprocess-run-check` demanded in every ansible-test sanity lane of a
   rendered collection.
+- Appliance variant: the Molecule README's example for drilling one area on
+  its own names the area `fixture`; `default` is not an area of the rendered
+  scenario, so the playbook refused it.
 
 ### Added
 

@@ -16,20 +16,8 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 ## Checks<a id="checks"></a>
 
-`runtime-check` runs by default. It installs a built archive in isolation and
-retains only `meta/`, `plugins/`, `roles/` and `playbooks/`. It checks Python
-imports, module documentation and role loading/syntax, then runs available
-unit tests from a separate fixture directory against that installation.
-Role deployment behavior remains covered by Molecule.
-
-To check the exact archive retained for a release:
-
-```sh
-uv run noxfile.py -s runtime-check -- --artifact /path/to/collection.tar.gz
-```
-
-Run from the collection's Git root. If Nox is installed, use `nox`
-instead of `uv run noxfile.py`.
+Run the checks from the collection's Git root. With nox installed, `nox`
+replaces `uv run noxfile.py`.
 
 ```bash
 uv run noxfile.py                 # fix, then run default checks
@@ -43,9 +31,22 @@ uv run noxfile.py -s ansible-test-integration
 uv run noxfile.py -s molecule
 ```
 
-`helper-lint` covers Python in `extensions/molecule/`, `roles/*/files/`,
-`tools/`, `scripts/` and `tests/runtime_check.py`, using [ruff.toml](ruff.toml).
-It runs by default; add it to CI configurations that list sessions explicitly.
+Among the default sessions:
+
+- `runtime-check` installs the built collection in isolation and keeps only
+  what ships: `meta/`, `plugins/`, `roles/` and `playbooks/`. It checks Python
+  imports, module documentation and the syntax of any roles, then runs the
+  unit tests against that installation. To check the exact archive of a
+  release:
+
+  ```sh
+  uv run noxfile.py -s runtime-check -- --artifact /path/to/collection.tar.gz
+  ```
+
+- `helper-lint` checks the Python outside `plugins/` with
+  [ruff.toml](ruff.toml): `extensions/molecule/`, any role's `files/`,
+  `tools/`, `scripts/` and `tests/runtime_check.py`. Add it to CI
+  configurations that list sessions explicitly.
 
 Session definitions: [noxfile.py](noxfile.py).
 Built-in session settings: [antsibull-nox.toml](antsibull-nox.toml).
@@ -70,34 +71,39 @@ together with its definition and tests. A new hook-based resource starts as a
 copy of the skeleton's `_fixture_nested.py` with its module and tests and
 changes only the hook methods; the order of the lifecycle steps belongs to the
 base. The shared base and engine tests bring their own synthetic resource and
-fake product, so the product's resources never touch them.
+fake product, so replacing the fixture needs no change to them.
 
-Some files are the same in every collection rendered from foundata's module
-skeleton and are updated from it rather than edited here: the lifecycle base,
-the definition engine and the activation helper (`_lifecycle.py`, `_engine.py`
-and `_activation.py` in `plugins/module_utils/`), the unit-test runner
-`tests/unit/plugins/conftest.py`, the shared tests `test_contract.py`,
-`test_engine.py`, `test_activation.py` and `test_lifecycle.py` in
-`tests/unit/plugins/modules/`, and the lost-reply helper
-`extensions/molecule/shared/files/loss.py`. When one of them needs a change,
-make it in the skeleton so that every collection receives it; a local edit
-would conflict with the next update from the skeleton.
+Some files come from foundata's module skeleton and are the same in every
+collection rendered from it:
+
+- `plugins/module_utils/`: `_lifecycle.py`, `_engine.py` and `_activation.py`.
+- `tests/unit/plugins/`: `conftest.py`, and `test_contract.py`,
+  `test_engine.py`, `test_activation.py` and `test_lifecycle.py` in
+  `modules/`.
+- `extensions/molecule/shared/`: everything.
+
+Leave them unchanged, so that you can update them from a newer render of
+[foundata/ansible-skeletons](https://github.com/foundata/ansible-skeletons);
+a local edit would conflict with that update. When one of them needs a
+change, make it in the skeleton so that every collection receives it.
+[CONTRIBUTING.md](https://github.com/foundata/ansible-skeletons/blob/main/CONTRIBUTING.md)
+explains how to propose one.
 
 {# skeleton-variant: appliance-invariants #}
 {# end skeleton-variant #}
-The shared Molecule playbooks in `extensions/molecule/shared/playbooks/` come
-from the skeleton as well; they run each scenario's task files. Two files
-connect the shared code to this product and keep the product's values when
-the skeleton changes: `contract_subject.py` points the shared contract tests
-at a product resource, and `plugins/module_utils/_binding.py` gives the
-lifecycle base this collection's client, error schema and compatibility check.
+Two files connect the shared code to this product and keep the product's
+values when the skeleton changes: `contract_subject.py` points the shared
+contract tests at a product resource, and `plugins/module_utils/_binding.py`
+gives the lifecycle base this collection's client, error schema and
+compatibility check.
 
 `foundata.utils` owns byte transport, deadlines, JSON decoding and safe error
-translation. The client, definitions, copied resource utilities, guard rules,
-modules, documentation fragments, fake product, scenario hooks and inventory
-extractor are product-owned. The extractor writes
-`tools/inventory/<series>.yml` beside itself. That inventory is development
-evidence: it never ships and nothing reads it at runtime.
+translation. Everything else is product-owned, including the client, the
+definitions, the fake product and the scenario hooks.
+
+The inventory extractor writes `tools/inventory/<series>.yml` beside itself.
+That inventory is development evidence: it never ships and nothing reads it
+at runtime.
 
 FIXME State which resources use hooks rather than definitions and why, and
 which writers and prerequisites the caller supplies. Each enforced rule and
@@ -113,9 +119,8 @@ python -m pip install -r requirements-dev.txt
 ```
 
 `release build` runs the committed revision's Ansible sanity tests before
-building the archive.
+building the archive. Set `repository` in `.releasing.toml` before the first
+release.
 
 FIXME Describe what a release of this collection consists of, its product
-qualification and the steps to make one. The release runs through foundata's
-`release` command, declared in `.releasing.toml` (kept out of the archive by
-`build_ignore`); set its `repository` before the first release.
+qualification and the steps to make one.
