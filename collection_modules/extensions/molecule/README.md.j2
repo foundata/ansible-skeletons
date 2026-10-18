@@ -141,11 +141,13 @@ module, its identity (`{}` for a module without identity options, such as a
 settings singleton) and its parameters. Its `options` fit
 `shared/files/loss.py` to the module: `expected_writes` and `drop: "all"` for a
 change written in stages, `route` to count only writes below a path prefix,
-`rerun: "none"` for an operation that acts on every run, and `target` for
-writes that leave through another method than `_client.Client.write`. The
-harness prints the module file that ran. The cases need the objects and
-services they use more than they need to run last; when a later side effect
-releases them, name `zz_loss.yml` so that it runs first.
+`when` to count only calls with these keyword arguments, such as
+`{"write": true}` for a method that both reads and writes, `rerun: "none"` for
+an operation that acts on every run, and `target` for writes that leave
+through another method than `_client.Client.write`. The harness prints the
+module file that ran. The cases need the objects and services they use more
+than they need to run last; when a later side effect releases them, name
+`zz_loss.yml` so that it runs first.
 
 {# skeleton-variant: recovery-sequence #}
 {# end skeleton-variant #}

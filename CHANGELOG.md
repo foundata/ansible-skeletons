@@ -174,10 +174,11 @@ and the project adheres to
 - Both module variants: one parameterized response-loss harness, exercised
   for create, update and delete by both fixtures. A case declares an empty
   identity for a module without identity options, `expected_writes` and
-  `drop: all` for a change written in stages, a `route` prefix that selects
-  the counted writes, `rerun: none` for an operation that acts on every run
-  and a `target` other than `_client.Client.write`; the proof names the
-  module file that ran.
+  `drop: all` for a change written in stages, a `route` prefix and `when`
+  keyword arguments, such as `{"write": true}`, that select the counted
+  writes, `rerun: none` for an operation that acts on every run and a
+  `target` other than `_client.Client.write`; the proof names the module
+  file that ran and the selector.
 - Appliance variant: `_act_once.py` with preflight and bounded readiness
   hooks, its shared tests, a management-path guard scaffold, recovery and
   single-writer prerequisites, and `verified: unverifiable` semantics.

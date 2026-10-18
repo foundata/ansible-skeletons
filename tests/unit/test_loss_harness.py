@@ -41,9 +41,15 @@ STUBS = {
         "    def send(self, command, value=None):\n"
         "        if value is not None:\n"
         "            STORE[command] = value\n"
+        "\n"
+        "    def call(self, command, value=None, write=False):\n"
+        "        if write:\n"
+        "            STORE[command] = value\n"
+        "        return STORE.get(command)\n"
     ),
     # Writes "value" in "stages" requests, one path each; "always" acts on
-    # every run; "audit" sends an extra request outside the /items/ route.
+    # every run; "audit" sends an extra request outside the /items/ route;
+    # "keyword" reads and writes through one method told apart by "write".
     "ansible_collections/acme/demo/plugins/modules/thing.py": """
 import json
 import sys
@@ -63,15 +69,19 @@ def main():
     params = json.loads(basic._ANSIBLE_ARGS)["ANSIBLE_MODULE_ARGS"]
     name = params.get("name", "settings")
     runner = params.get("runner", False)
+    keyword = params.get("keyword", False)
     changed = False
     for stage in range(params.get("stages", 1)):
         path = f"/items/{name}/{stage}"
-        if STORE.get(path) == params["value"] and not params.get("always"):
+        current = Runner().call(path) if keyword else STORE.get(path)
+        if current == params["value"] and not params.get("always"):
             continue
         changed = True
         try:
             if runner:
                 Runner().send(path, params["value"])
+            elif keyword:
+                Runner().call(path, params["value"], write=True)
             else:
                 Client().write(path, params["value"])
         except TransportTimeout:
@@ -138,6 +148,7 @@ def test_one_lost_write_settles_and_names_the_module_file(harness: Path) -> None
     assert result["verified"] and result["writes"] == 1 and result["dropped"] == 1
     assert result["module_path"].endswith("acme/demo/plugins/modules/thing.py")
     assert result["identity"] == {"name": "a"} and result["rerun"] == "unchanged"
+    assert result["route"] == "" and result["when"] == {}
 
 
 def test_a_module_without_identity_options_declares_an_empty_identity(
@@ -223,6 +234,28 @@ def test_another_transport_is_patched_by_its_target(harness: Path) -> None:
     assert result["writes"] == 1 and result["dropped"] == 1
 
 
+def test_a_keyword_selects_the_writes_of_a_method_that_also_reads(
+    harness: Path,
+) -> None:
+    params = {"name": "a", "value": "1", "keyword": True}
+    unselected = lose(
+        harness, identity={"name": "a"}, params=params, target="_client.Runner.call"
+    )
+    assert unselected.returncode != 0
+    result = proof(
+        lose(
+            harness,
+            identity={"name": "b"},
+            params={**params, "name": "b"},
+            target="_client.Runner.call",
+            route="/items/",
+            when={"write": True},
+        )
+    )
+    assert result["writes"] == 1 and result["dropped"] == 1
+    assert result["route"] == "/items/" and result["when"] == {"write": True}
+
+
 @pytest.mark.parametrize(
     "option,value",
     [
@@ -231,6 +264,8 @@ def test_another_transport_is_patched_by_its_target(harness: Path) -> None:
         ("drop", "some"),
         ("rerun", "twice"),
         ("route", 5),
+        ("when", "write"),
+        ("when", {"write": [True]}),
         ("target", "os.system"),
         ("module", "not a module"),
     ],

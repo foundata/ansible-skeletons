@@ -14,6 +14,10 @@ Input is one JSON object:
   timeout, or ``all`` of them, as a resource that writes in stages needs.
 - ``route`` (default none): count only writes with a string argument, such
   as the request path, that starts with this prefix.
+- ``when`` (default none): count only writes whose keyword arguments carry
+  each of these names with this value, such as ``{"write": true}`` for a
+  method that reads and writes and tells the two apart by a keyword.
+  ``route`` and ``when`` together count a write that matches both.
 - ``rerun`` (default ``unchanged``): run the module again and require an
   unchanged result without another write; ``none`` for an operation that
   acts on every run.
@@ -82,6 +86,7 @@ def options(request: dict[str, Any]) -> dict[str, Any]:
         "expected_writes": request.get("expected_writes", 1),
         "drop": request.get("drop", "first"),
         "route": request.get("route", ""),
+        "when": request.get("when", {}),
         "rerun": request.get("rerun", "unchanged"),
         "target": request.get("target", "_client.Client.write"),
     }
@@ -94,6 +99,12 @@ def options(request: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("rerun must be unchanged or none")
     if not isinstance(chosen["route"], str):
         raise ValueError("route must be a string prefix")
+    when = chosen["when"]
+    if not isinstance(when, dict) or not all(
+        value is None or isinstance(value, (bool, int, float, str))
+        for value in when.values()
+    ):
+        raise ValueError("when must map keyword names to JSON scalars")
     if not isinstance(chosen["target"], str) or not TARGET.fullmatch(chosen["target"]):
         raise ValueError("target must be <module_utils module>.<class>.<method>")
     return chosen
@@ -115,10 +126,14 @@ def main() -> None:
     )
     module = importlib.import_module(f"{package}.modules.{name}")
     original = getattr(holder, method)
-    route = chosen["route"]
+    route, when = chosen["route"], chosen["when"]
     writes = dropped = 0
 
     def counted(args: tuple[Any, ...], kwargs: dict[str, Any]) -> bool:
+        if any(
+            name not in kwargs or kwargs[name] != value for name, value in when.items()
+        ):
+            return False
         return not route or any(
             isinstance(value, str) and value.startswith(route)
             for value in (*args, *kwargs.values())
@@ -158,6 +173,8 @@ def main() -> None:
                 "module": fqcn,
                 "module_path": module.__file__,
                 "identity": identity,
+                "route": route,
+                "when": when,
                 "writes": writes,
                 "dropped": dropped,
                 "rerun": chosen["rerun"],
