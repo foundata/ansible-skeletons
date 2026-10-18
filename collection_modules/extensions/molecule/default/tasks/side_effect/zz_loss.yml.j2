@@ -60,7 +60,19 @@
   loop_control:
     loop_var: "__loss_case"
     label: "{{ '{{' }} __loss_case['module'] {{ '}}' }}"
+  register: __loss_proofs
   no_log: true
+
+# The parameters above carry the credentials, so the runs stay hidden; each
+# proof holds none and names the module file that settled the reply.
+- name: "Show the proof of each lost reply"
+  ansible.builtin.debug:
+    msg: "{{ '{{' }} __loss_run['stdout'] | ansible.builtin.from_json {{ '}}' }}"
+    verbosity: 0
+  loop: "{{ '{{' }} __loss_proofs['results'] {{ '}}' }}"
+  loop_control:
+    loop_var: "__loss_run"
+    label: "{{ '{{' }} __loss_run['__loss_case']['module'] {{ '}}' }}"
 
 - name: "Report lost-response coverage"
   ansible.builtin.debug:

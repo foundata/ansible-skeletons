@@ -180,7 +180,9 @@ and the project adheres to
   keyword arguments, such as `{"write": true}`, that select the counted
   writes, `rerun: none` for an operation that acts on every run and a
   `target` other than `_client.Client.write`; the proof names the module
-  file that ran and the selector.
+  file that ran and the selector. The scenario runs the cases hidden, since
+  their parameters carry the credentials, and then shows each proof, which
+  holds none.
 - Appliance variant: `_act_once.py` with preflight and bounded readiness
   hooks, its shared tests, a management-path guard scaffold, recovery and
   single-writer prerequisites, and `verified: unverifiable` semantics.
