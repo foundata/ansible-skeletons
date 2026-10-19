@@ -172,7 +172,8 @@ STATE = frozenset(
 MISSING = object()
 
 Stage = tuple[str, dict[str, Any], bool, Callable[[], None], bool]
-"""One write of a change: step, wanted state, whether absent, request."""
+"""One write of a change: step, wanted state, whether absent, request, and
+whether that request sends a field ``secret`` names."""
 
 
 class Failure(errors.ApiError):
