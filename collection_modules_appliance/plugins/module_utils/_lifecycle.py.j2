@@ -327,7 +327,20 @@ class Lifecycle:
         return False
 
     def predict(self) -> Any:
-        return {**(self.current or {}), **self.visible()}
+        """The public object after the change, with the visible changes applied.
+
+        Without a stored object, the identity starts it: ``key`` when that is
+        a mapping, otherwise ``key`` under the only identity option.
+        """
+        if self.current is not None:
+            start = self.current
+        elif isinstance(self.key, dict):
+            start = self.key
+        elif len(self.identity_options) == 1 and self.key is not None:
+            start = {self.identity_options[0]: self.key}
+        else:
+            start = {}
+        return {**start, **self.visible()}
 
     def public(self, record: Any) -> Any:
         return self.managed(record)

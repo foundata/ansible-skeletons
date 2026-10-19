@@ -20,6 +20,11 @@ and the project adheres to
   keeps a refused write `unknown` when it may change state no read-back
   shows.
 
+### Changed
+
+- Both module variants: the default `predict()` includes the identity when
+  creating.
+
 
 ## [3.0.0] - 2026-10-19
 

@@ -563,9 +563,6 @@ class Engine(Binding):
         if not self.absent:
             self.payload(desired)
 
-    def predict(self) -> dict[str, Any]:
-        return {**self.key, **(self.current or {}), **self.visible()}
-
     def write(self) -> None:
         resource, found = self.resource, self.record
         target = found[resource.identifier.name] if found else None

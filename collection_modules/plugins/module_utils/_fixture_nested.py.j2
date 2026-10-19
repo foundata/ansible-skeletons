@@ -187,11 +187,16 @@ class FixtureNested(Binding):
         return False
 
     def predict(self) -> Any:
-        """Merge public nested state for check mode without inventing defaults."""
-        predicted = copy.deepcopy(self.current or {"name": self.key})
+        """Merge declared nested members over the stored ones; invent no defaults.
+
+        The base starts from the stored object, or from the identity when
+        there is none.
+        """
+        predicted = super().predict()
         settings = self.delta.get("settings")
         if settings:
-            predicted["settings"] = {**predicted.get("settings", {}), **settings}
+            stored = (self.current or {}).get("settings", {})
+            predicted["settings"] = {**stored, **settings}
         return predicted
 
     # Delete when unchanged.

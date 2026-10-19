@@ -143,9 +143,6 @@ class Synthetic(Lifecycle):
         if self.absent and self.record and self.record.get("referenced"):
             raise Failure(category="eligibility", code="referenced")
 
-    def predict(self) -> dict[str, Any]:
-        return {"name": self.key, **super().predict()}
-
     def write(self) -> None:
         rows, key, delta = self.client.rows, self.key, dict(self.delta)
         if self.absent:
