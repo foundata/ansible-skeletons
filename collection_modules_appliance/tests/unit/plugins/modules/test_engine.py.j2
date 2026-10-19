@@ -261,6 +261,59 @@ def test_identity_normalizer_applies_to_declared_and_stored_values(
     assert synthetic.writes == ["create"]
 
 
+def test_a_value_the_product_forces_on_creation_follows_as_an_update(
+    synthetic: SyntheticClient, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    enabled = Field("enabled", "bool", "Enabled", created=True)
+    resource = replace(SYNTHETIC, fields=(*SYNTHETIC.fields, enabled))
+    bodies: list[dict[str, Any]] = []
+    create = synthetic.create
+
+    def forcing(definition: Resource, values: dict[str, Any]) -> None:
+        bodies.append(dict(values))
+        create(definition, {**values, "enabled": True})
+
+    monkeypatch.setattr(synthetic, "create", forcing)
+    disabled = run_module(entry(resource), label="off", enabled=False)
+    assert disabled["changed"] and disabled["synthetic"]["enabled"] is False
+    assert synthetic.writes == ["create", "update"]
+    run_module(entry(resource), label="on", enabled=True)
+    assert synthetic.writes == ["create", "update", "create"]
+    assert bodies == [{"label": "off"}, {"label": "on"}]
+
+
+def test_an_implied_field_is_no_option_and_its_step_writes_it_alone(
+    synthetic: SyntheticClient, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    managed = Field(
+        "managed", "bool", "Managed", created=True, implied=True, step="adopt"
+    )
+    resource = replace(SYNTHETIC, fields=(*SYNTHETIC.fields, managed))
+    assert "managed" not in build_spec(resource)
+    bodies: list[dict[str, Any]] = []
+    update = synthetic.update
+
+    def recording(definition: Resource, identity: int, values: dict[str, Any]) -> None:
+        bodies.append(dict(values))
+        update(definition, identity, values)
+
+    monkeypatch.setattr(synthetic, "update", recording)
+    synthetic.add(managed=False, text="old")
+    adopted = run_module(entry(resource), label="example", text="new")
+    assert adopted["changed_fields"] == ["managed", "text"]
+    assert bodies == [{"managed": True}, {"text": "new"}]
+    assert not run_module(entry(resource), label="example", text="new")["changed"]
+
+    def refusing(definition: Resource, identity: int, values: dict[str, Any]) -> None:
+        raise ProductError(code="rejected")
+
+    synthetic.add(label="other", managed=False)
+    monkeypatch.setattr(synthetic, "update", refusing)
+    refused = run_module(entry(resource), label="other")
+    assert refused["failed"] and refused["error_code"] == "rejected"
+    assert refused["operation"] == "adopt" and refused["outcome"] == "unchanged"
+
+
 def test_identity_keys_are_strings() -> None:
     resource = replace(SYNTHETIC, keys=(Key("tag", "Tag", kind="int"),))
     with pytest.raises(ValueError, match="identity keys are strings"):

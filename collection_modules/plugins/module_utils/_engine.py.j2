@@ -12,7 +12,8 @@ Client contract (exercised by tests/unit/plugins/modules/test_contract.py):
 keys)`` permits absence only under that definition's documented by-key rule.
 ``get(definition, identifier)`` reads one object, never infers absence from a
 write response. ``create``, ``update`` and ``delete`` perform at most one write;
-update preserves unmanaged fields. Their responses remain private. ``encode``
+update preserves unmanaged fields, and receives a field with a ``step`` alone,
+to send by that field's own request. Their responses remain private. ``encode``
 and ``decode`` translate individual field values, not lifecycle decisions.
 ``probe`` is read-only. ``version`` discovers once per client and caches.
 
@@ -50,6 +51,7 @@ from ansible_collections.{{ namespace }}.\
 from ansible_collections.{{ namespace }}.\
     {{ collection_name }}.plugins.module_utils._lifecycle import (
         MISSING,
+        Stage,
     )
 # isort: on
 # fmt: on
@@ -101,7 +103,15 @@ class Reference:
 
 @dataclass(frozen=True)
 class Field:
-    """A public field or write-only secret; wire translation belongs to the client."""
+    """A public field or write-only secret; wire translation belongs to the client.
+
+    ``created`` is the value the product stores on creation whatever the
+    request says: the creation leaves the field out, and a declared value
+    that differs follows as an update. ``implied`` is the value every
+    declaration implies, such as a flag that marks an object as managed; the
+    field is then no option. A field with a ``step`` is written by its own
+    request under that step, alone and before the other changes.
+    """
 
     name: str
     kind: str
@@ -116,6 +126,9 @@ class Field:
     minimum_items: int = 0
     maximum_items: int | None = 256
     item_limit: int | None = 150
+    created: Any = None
+    implied: Any = None
+    step: str = ""
 
 
 @dataclass(frozen=True)
@@ -177,6 +190,8 @@ def build_spec(resource: Resource) -> dict[str, Any]:
         if key.choices:
             spec[key.name]["choices"] = list(key.choices)
     for field in resource.fields:
+        if field.implied is not None:
+            continue
         kind = {
             "set": "list",
             "names": "list",
@@ -516,11 +531,14 @@ class Engine(Binding):
         return ident
 
     def declared(self) -> dict[str, Any]:
-        return {
+        fields = self.resource.fields
+        want = {
             field.name: normalize(field, self.params[field.name], input_value=True)
-            for field in self.resource.fields
-            if self.params.get(field.name) is not None
+            for field in fields
+            if field.implied is None and self.params.get(field.name) is not None
         }
+        implied = {f.name: f.implied for f in fields if f.implied is not None}
+        return want if self.absent else {**want, **implied}
 
     def lookup(self) -> dict[str, Any] | None:
         return self.find(self.key)
@@ -579,6 +597,61 @@ class Engine(Binding):
         self.operation = "references"
         if not self.absent:
             self.payload(desired)
+
+    def stages(self) -> list[Stage]:
+        """One write, or a creation followed by the writes it cannot carry.
+
+        The creation leaves out every field with ``created`` or a ``step``.
+        Then each changed field with a ``step`` is written alone, in the
+        definition's order, and one ``update`` writes the rest, including a
+        declared value that differs from ``created``.
+        """
+        resource, identity = self.resource, self.resource.identifier.name
+        fields = [field for field in resource.fields if field.name in self.delta]
+        creating = self.record is None
+        held = [
+            field
+            for field in fields
+            if field.step or (creating and field.created is not None)
+        ]
+        if self.absent or not held:
+            return super().stages()
+        follow = (
+            [f for f in held if f.created is None or self.delta[f.name] != f.created]
+            if creating
+            else fields
+        )
+        waiting = {field.name for field in follow}
+
+        def wanted() -> dict[str, Any]:
+            return {k: v for k, v in self.want.items() if k not in waiting}
+
+        def sends(values: dict[str, Any]) -> bool:
+            return any(self.secret(name) for name in values)
+
+        def create(values: dict[str, Any]) -> Callable[[], None]:
+            return lambda: self.client.create(resource, self.payload(values, self.key))
+
+        def update(values: dict[str, Any]) -> Callable[[], None]:
+            return lambda: self.client.update(
+                resource, self.record[identity], self.payload(values)
+            )
+
+        plan: list[Stage] = []
+        if creating:
+            names = {field.name for field in held}
+            body = {k: v for k, v in self.delta.items() if k not in names}
+            plan.append(("create", wanted(), False, create(body), sends(body)))
+        for field in follow:
+            if field.step:
+                waiting.discard(field.name)
+                alone = {field.name: self.delta[field.name]}
+                plan.append((field.step, wanted(), False, update(alone), sends(alone)))
+        rest = {f.name: self.delta[f.name] for f in follow if not f.step}
+        if rest:
+            waiting.difference_update(rest)
+            plan.append(("update", wanted(), False, update(rest), sends(rest)))
+        return plan
 
     def write(self) -> None:
         resource, found = self.resource, self.record

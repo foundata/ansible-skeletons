@@ -23,6 +23,9 @@ and the project adheres to
   with a hook-based resource.
 - Both module variants: `Key(normalizer=...)` brings a declared or stored
   identity into the form its pattern describes.
+- Both module variants: the engine's `Field` takes `created`, a value the
+  product forces on creation; `implied`, a value every declaration implies;
+  and `step`, for a field written by its own request.
 
 ### Changed
 
