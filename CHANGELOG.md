@@ -34,6 +34,11 @@ and the project adheres to
 - Both module variants: the error code `create_unknown` is now
   `secret_unknown`, for any lost reply to a request that sends a secret.
 
+### Fixed
+
+- collection_default, collection_modules, collection_modules_appliance: the
+  next nox run removes the short `TMPDIR` links of a nox that was killed.
+
 
 ## [3.0.0] - 2026-10-19
 

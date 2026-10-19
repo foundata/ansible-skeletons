@@ -4,6 +4,7 @@
 
 import io
 import json
+import os
 import runpy
 import sys
 import tarfile
@@ -117,6 +118,40 @@ def test_a_deep_temporary_directory_gets_a_short_path(
         assert short_path(str(deep)) == str(deep)
     finally:
         link.parent.chmod(0o700)
+
+
+@pytest.mark.parametrize(
+    "noxfile",
+    ["collection_default", "collection_modules", "collection_modules_appliance"],
+    indirect=True,
+)
+def test_the_short_links_of_a_killed_nox_go_with_the_next_run(
+    noxfile: dict[str, object], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runtime = tmp_path / "run"
+    runtime.mkdir()
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(runtime))
+    monkeypatch.setattr("atexit.register", lambda *arguments: None)
+    target = tmp_path / ("d" * 70)
+    target.mkdir()
+    # No process has an ID above pid_max; this process has not made its own yet.
+    gone = int(Path("/proc/sys/kernel/pid_max").read_text(encoding="utf-8")) + 1
+    stale, mine = runtime / f"nox.{gone}", runtime / f"nox.{os.getpid()}"
+    for left in (stale, mine):
+        left.mkdir()
+        (left / "0").symlink_to(target, target_is_directory=True)
+    kept = [
+        runtime / f"nox.{os.getppid()}",
+        runtime / "nox-45wu6fhp",
+        runtime / f"nox.{2**64}",
+    ]
+    for directory in kept:
+        directory.mkdir()
+    short_path = cast(Callable[[str], str], noxfile["_short_path"])
+    link = Path(short_path(str(target)))
+    assert link.parent == mine and link.resolve() == target.resolve()
+    assert not stale.exists() and all(directory.is_dir() for directory in kept)
+    assert target.is_dir()
 
 
 @pytest.fixture

@@ -24,7 +24,6 @@ import os
 import shutil
 import sys
 import tarfile
-import tempfile
 from pathlib import Path
 
 import nox
@@ -53,10 +52,33 @@ nox.options.default_venv_backend = "uv|virtualenv"
 # path. Below a deep checkout the sessions' TMPDIR is too long for that, so the
 # sessions see a short link to the same directory instead, in a private
 # directory below XDG_RUNTIME_DIR (or /tmp). Files stay on disk; the links go
-# when nox ends.
+# when nox ends, or with the next nox run when nox was killed.
 TMPDIR_LIMIT = 64
 """Longest TMPDIR that leaves room for the socket names below it."""
 _SHORT: list[Path] = []
+
+
+def _sweep(parent: Path) -> None:
+    """Remove the short-link directories of nox processes that are gone.
+
+    Each is named after its process ID. One named after this process is a
+    dead one's too, because this process has not created its own yet.
+    """
+    for entry in parent.glob("nox.*"):
+        pid = entry.name.removeprefix("nox.")
+        if not pid.isdigit() or entry.is_symlink() or not entry.is_dir():
+            continue
+        try:
+            if entry.lstat().st_uid != os.getuid():
+                continue
+            if int(pid) != os.getpid():
+                os.kill(int(pid), 0)
+                continue
+        except ProcessLookupError:
+            pass
+        except (OSError, OverflowError):
+            continue
+        shutil.rmtree(entry, ignore_errors=True)
 
 
 def _short_path(directory: str) -> str:
@@ -69,8 +91,11 @@ def _short_path(directory: str) -> str:
             runtime = Path(os.environ.get("XDG_RUNTIME_DIR", ""))
             usable = runtime.is_absolute() and runtime.is_dir()
             parent = runtime if usable else Path("/tmp")
-            _SHORT.append(Path(tempfile.mkdtemp(prefix="nox-", dir=parent)))
-            atexit.register(shutil.rmtree, _SHORT[0], True)
+            _sweep(parent)
+            short = parent / f"nox.{os.getpid()}"
+            short.mkdir(mode=0o700)
+            _SHORT.append(short)
+            atexit.register(shutil.rmtree, short, True)
         link = _SHORT[0] / str(len(list(_SHORT[0].iterdir())))
         link.symlink_to(target, target_is_directory=True)
     except OSError:
