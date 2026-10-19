@@ -203,6 +203,7 @@ def build_collection(rendered: Rendered) -> Path:
             else (
                 "plugins/modules/fixture.py",
                 "plugins/modules/fixture_nested.py",
+                "plugins/modules/fixture_nested_info.py",
                 "plugins/modules/fixture_info.py",
                 *(
                     ("plugins/modules/fixture_apply.py",)
@@ -574,7 +575,7 @@ def exercise_modules(rendered: Rendered) -> None:
         / namespace
         / name
     )
-    modules = ("fixture", "fixture_nested", "fixture_info") + (
+    modules = ("fixture", "fixture_nested", "fixture_nested_info", "fixture_info") + (
         ("fixture_apply",) if rendered.profile == "collection_modules_appliance" else ()
     )
     for module in modules:

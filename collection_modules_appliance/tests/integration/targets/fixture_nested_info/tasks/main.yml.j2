@@ -1,0 +1,60 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+---
+- name: "Exercise the nested fixture's information read"
+  module_defaults:
+    group/{{ namespace }}.{{ collection_name }}.api: >-
+      {{ '{{ fixture_fake_connection }}' }}
+  block:
+    - name: "Read an absent nested fixture in check mode"
+      {{ namespace }}.{{ collection_name }}.fixture_nested_info:
+        name: "integration_nested_info"
+      check_mode: true
+      register: __nested_info_absent
+
+    - name: "Create a readable nested fixture"
+      {{ namespace }}.{{ collection_name }}.fixture_nested:
+        name: "integration_nested_info"
+        settings:
+          network: "198.51.100.9/24"
+          port: 8080
+
+    - name: "Read the nested fixture by another case"
+      {{ namespace }}.{{ collection_name }}.fixture_nested_info:
+        name: "INTEGRATION_NESTED_INFO"
+      register: __nested_info_read
+
+    - name: "Reject an invalid read identity"
+      {{ namespace }}.{{ collection_name }}.fixture_nested_info:
+        name: "invalid/name"
+      ignore_errors: true
+      register: __nested_info_invalid
+
+    - name: "Delete the nested fixture"
+      {{ namespace }}.{{ collection_name }}.fixture_nested:
+        name: "integration_nested_info"
+        state: "absent"
+
+    - name: "Read the deleted nested fixture"
+      {{ namespace }}.{{ collection_name }}.fixture_nested_info:
+        name: "integration_nested_info"
+      register: __nested_info_final
+
+    - name: "Verify the information read"
+      ansible.builtin.assert:
+        that:
+          - __nested_info_absent['fixture_nested'] is ansible.builtin.none
+          - __nested_info_absent is not ansible.builtin.changed
+          - __nested_info_read is not ansible.builtin.changed
+          - __nested_info_read['verified'] == 'observed'
+          - __nested_info_read['fixture_nested']['name'] == 'integration_nested_info'
+          - __nested_info_read['fixture_nested']['settings']['network'] == '198.51.100.0/24'
+          - __nested_info_invalid is ansible.builtin.failed
+          - __nested_info_invalid['outcome'] == 'unchanged'
+          - __nested_info_final['fixture_nested'] is ansible.builtin.none
+  always:
+    - name: "Stop the nested fixture endpoint"
+      ansible.builtin.include_role:
+        name: "setup_fixture_fake"
+        tasks_from: "stop"

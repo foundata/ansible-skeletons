@@ -27,12 +27,13 @@ invented fixture contract below after qualifying the first product resource.
 ## Included content<a id="content"></a>
 
 <!-- BEGIN MODULE TABLE -->
-|      Module      | Purpose |
-| ---------------- | ------- |
-| `fixture`        | Converge one saved record |
-| `fixture_nested` | Manage a nested resource through lifecycle hooks |
-| `fixture_info`   | Read its public saved state |
-| `fixture_apply`  | Activate the fixture subsystem and verify named records |
+|        Module         | Purpose |
+| --------------------- | ------- |
+| `fixture`             | Converge one saved record |
+| `fixture_info`        | Read its public saved state |
+| `fixture_nested`      | Manage a nested resource through lifecycle hooks |
+| `fixture_nested_info` | Read its public state |
+| `fixture_apply`       | Activate the fixture subsystem and verify named records |
 <!-- END MODULE TABLE -->
 
 This table is maintained by hand. Module documentation is authoritative:
@@ -189,7 +190,7 @@ resource utility and edit hooks, never the shared lifecycle sequence.
       port: 8080
 ```
 
-Modules: `fixture_nested`.
+Modules: `fixture_nested`, `fixture_nested_info`.
 
 
 

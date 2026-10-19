@@ -49,10 +49,11 @@ SPDX-License-Identifier: GPL-3.0-or-later
   lifecycle sequence. Keep `_lifecycle.py` and the shared tests unchanged.
   Bind the client, schema and compatibility policy once in `_binding.py`.
   Copy the `fixture_nested` module, unit test, file-only integration target
-  and default scenario tasks together. Replace the module's notes FIXME,
-  verifier slot and Usage subsection with researched product evidence.
-  Preserve unmanaged nested values and prove lost create, update and delete
-  responses with the shared loss harness.
+  and default scenario tasks together, and `fixture_nested_info` with its
+  target where the resource needs an information read. Replace the module's
+  notes FIXME, verifier slot and Usage subsection with researched product
+  evidence. Preserve unmanaged nested values and prove lost create, update
+  and delete responses with the shared loss harness.
 - Replace `!UNKNOWN` author handles in module documentation.
 - Adapt connection options, authentication, version probe, supported series and
   evidence-backed exclusions.

@@ -1,0 +1,98 @@
+#!/usr/bin/python
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+from __future__ import annotations
+
+DOCUMENTATION = r"""
+---
+module: fixture_nested_info
+short_description: Read one nested fixture resource on the lifecycle base
+description:
+  - "Reads the object named by O(name), without any write, including in check mode."
+  - >-
+    Uses the identity check, lookup and projection of
+    M({{ namespace }}.{{ collection_name }}.fixture_nested).
+version_added: "{{ version | default('1.0.0') }}"
+author:
+{% for author in authors %}
+  - {{ (author if '(@' in author or '!UNKNOWN' in author else author ~ ' !UNKNOWN') | to_json }}
+{% endfor %}
+extends_documentation_fragment:
+  - {{ namespace }}.{{ collection_name }}.api
+  - foundata.utils.http_client
+attributes:
+  check_mode:
+    description: Performs the same read without any write.
+    support: full
+  diff_mode:
+    description: Does not change state or produce a diff.
+    support: none
+options:
+  name:
+    description: Immutable case-insensitive name, starting with a letter and containing letters, digits and underscores; at most 64 characters.
+    type: str
+    required: true
+"""
+
+EXAMPLES = r"""
+---
+- name: "Read a nested fixture"
+  {{ namespace }}.{{ collection_name }}.fixture_nested_info:
+    url: "https://example.invalid/api"
+    api_key: "{% raw %}{{ fixture_api_key }}{% endraw %}"
+    api_secret: "{% raw %}{{ fixture_api_secret }}{% endraw %}"
+    name: "example"
+"""
+
+RETURN = r"""
+---
+fixture_nested:
+  description: Public observed state, or null when the object does not exist.
+  returned: success
+  type: dict
+  contains:
+    name:
+      description: Canonical immutable name.
+      type: str
+    settings:
+      description: Public nested settings, without unmanaged or private wire members.
+      type: dict
+      contains:
+        network:
+          description: Canonical network.
+          type: str
+        port:
+          description: Port number.
+          type: int
+verified:
+  description: Always V(observed), including in check mode.
+  returned: success
+  type: str
+"""
+
+from ansible.module_utils.basic import AnsibleModule
+
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._fixture_nested import (
+        FixtureNestedInfo,
+        argument_spec,
+    )
+# isort: on
+# fmt: on
+
+
+def main() -> None:
+    module = AnsibleModule(
+        argument_spec=argument_spec(info=True), supports_check_mode=True
+    )
+    info = FixtureNestedInfo(module)
+    info.execute(info.read, validate=info.check_identity)
+
+
+if __name__ == "__main__":
+    main()

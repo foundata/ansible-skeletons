@@ -14,6 +14,7 @@ import pytest
 from ansible_collections.{{ namespace }}.\
     {{ collection_name }}.plugins.modules import (
         fixture_nested,
+        fixture_nested_info,
     )
 # isort: on
 # fmt: on
@@ -86,6 +87,40 @@ def test_omitted_members_and_delete(fake: FakeProduct, run_module: RunModule) ->
     assert removed["changed"] and removed["fixture_nested"] is None
     assert removed["changed_fields"] == []
     assert not run_module(fixture_nested.main, name="nested", state="absent")["changed"]
+
+
+@pytest.mark.parametrize("check", [False, True])
+def test_info_reads_the_resource_and_never_writes(
+    fake: FakeProduct, run_module: RunModule, check: bool
+) -> None:
+    absent = run_module(fixture_nested_info.main, name="nested")
+    assert absent["fixture_nested"] is None and not absent["changed"]
+    run_module(
+        fixture_nested.main,
+        name="nested",
+        settings={"network": "198.51.100.9/24", "port": 8080},
+    )
+    before = len(fake.writes())
+    result = run_module(
+        fixture_nested_info.main, name="NESTED", _ansible_check_mode=check
+    )
+    assert result["fixture_nested"] == {
+        "name": "nested",
+        "settings": {"network": "198.51.100.0/24", "port": 8080},
+    }
+    assert not result["changed"] and result["verified"] == "observed"
+    assert len(fake.writes()) == before
+    assert OLD_SECRET not in json.dumps(result)
+    assert "unmanaged" not in json.dumps(result)
+
+
+def test_info_refuses_an_invalid_identity_without_a_request(
+    fake: FakeProduct, run_module: RunModule
+) -> None:
+    result = run_module(fixture_nested_info.main, name="bad/name")
+    assert result["failed"] and result["outcome"] == "unchanged"
+    assert result["operation"] == "validate" and result["fields"] == ["name"]
+    assert not fake.requests
 
 
 @pytest.mark.parametrize("operation", ["create", "update", "delete"])

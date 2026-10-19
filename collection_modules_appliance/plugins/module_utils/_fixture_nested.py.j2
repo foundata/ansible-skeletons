@@ -12,7 +12,8 @@ the base's parameter names: Ruff and mypy pass a renamed one, and only
 ansible-test sanity's pylint (``arguments-renamed``) and ``test_lifecycle.py``,
 which checks every lifecycle class below ``plugins/module_utils/``, report it.
 Keep per-instance state in ``__init__`` after the base's, never in mutable
-class attributes.
+class attributes. ``FixtureNestedInfo`` is the information read that goes
+with the resource; copy it along when the resource needs one.
 """
 
 from __future__ import annotations
@@ -46,10 +47,15 @@ from ansible_collections.{{ namespace }}.\
 # fmt: on
 
 
-def argument_spec() -> dict[str, Any]:
-    return {
+def argument_spec(*, info: bool = False) -> dict[str, Any]:
+    spec: dict[str, Any] = {
         **api_argument_spec(),
         "name": {"type": "str", "required": True},
+    }
+    if info:
+        return spec
+    return {
+        **spec,
         "settings": {
             "type": "dict",
             "options": {
@@ -286,3 +292,29 @@ class FixtureNested(Binding):
     def identity_fields(self) -> dict[str, Any]:
         """Return only identity fields allowed by the collection error schema."""
         return super().identity_fields()
+
+
+class FixtureNestedInfo(FixtureNested):
+    """Read one object of the resource; never writes.
+
+    The identity check, lookup and projection are the resource's own. The
+    read runs under ``execute(action)``, so an invalid identity is refused
+    before anything connects.
+    """
+
+    state_option = ""
+    compatibility_id = "fixture_nested_info"
+
+    def check_identity(self) -> None:
+        """Validate the identity without a request."""
+        self.key = self.identify()
+
+    def read(self) -> dict[str, Any]:
+        """Return the public object, or None when the lookup finds none."""
+        self.step("lookup")
+        record = self.lookup()
+        return {
+            "changed": False,
+            "verified": "observed",
+            self.result_key: None if record is None else self.public(record),
+        }

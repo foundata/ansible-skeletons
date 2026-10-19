@@ -19,6 +19,8 @@ and the project adheres to
 - Both module variants: the lifecycle hook `refusal_may_change(failure)`
   keeps a refused write `unknown` when it may change state no read-back
   shows.
+- Both module variants: `fixture_nested_info`, the information read to copy
+  with a hook-based resource.
 
 ### Changed
 
