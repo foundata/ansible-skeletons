@@ -14,7 +14,11 @@ and the project adheres to
 
 ## [Unreleased]
 
-- Nothing worth mentioning right now.
+### Added
+
+- Both module variants: the lifecycle hook `refusal_may_change(failure)`
+  keeps a refused write `unknown` when it may change state no read-back
+  shows.
 
 
 ## [3.0.0] - 2026-10-19

@@ -335,6 +335,22 @@ def test_refusal_reports_what_the_read_back_shows(
     assert result["operation"] == "update" and store.writes == ["update"]
 
 
+def test_a_refusal_that_may_change_unseen_state_stays_unknown(
+    store: Store, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        Synthetic,
+        "refusal_may_change",
+        lambda self, failure: failure.code == "rejected",
+    )
+    store.rows["a"] = {"name": "a", "value": "1"}
+    store.drop, store.after = True, refuse
+    result = run_module(main, name="a", value="2")
+    assert result["failed"] and result["error_code"] == "rejected"
+    assert result["changed"] and result["outcome"] == "unknown"
+    assert result["operation"] == "update" and store.writes == ["update"]
+
+
 def test_write_that_never_started_is_unchanged(
     store: Store, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
 ) -> None:

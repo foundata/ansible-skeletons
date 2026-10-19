@@ -50,13 +50,15 @@ A reply lost after sending (category ``transport``, ``timeout`` or
 moved (``moved``) but misses the declaration fails with the outcome
 changed; one that did not move fails with the outcome unknown. A definitive
 refusal is reported as refused, under the step of the write it refused; the
-read-back only tells whether something changed anyway. A write that the
-client reports as never started (``started``) is unchanged. A field the
-product never returns (``secret``) is always written, to an existing object
-only with ``update_password: always``; it makes a successful write
-``unverifiable`` and a lost one unknown. In a staged change, each stage
-says whether its write sends such a field, so a lost reply to a stage that
-sends none settles by its read-back alone.
+read-back only tells whether something changed anyway, unless the refused
+write may change what no read-back shows (``refusal_may_change``), which
+keeps the outcome unknown. A write that the client reports as never started
+(``started``) is unchanged. A field the product never returns (``secret``)
+is always written, to an existing object only with ``update_password:
+always``; it makes a successful write ``unverifiable`` and a lost one
+unknown. In a staged change, each stage says whether its write sends such a
+field, so a lost reply to a stage that sends none settles by its read-back
+alone.
 
 Failures go through the binding's error schema with ``operation``,
 ``outcome`` (``unchanged``, ``unknown`` or ``changed``), the identity
@@ -76,9 +78,9 @@ that does fails when it is created, at import:
   binding), ``identify``, ``declared``, ``lookup``, ``managed``, ``same``,
   ``difference``, ``protect``, ``secret``, ``predict``, ``public``,
   ``diff``, ``recheck``, ``write``, ``stages``, ``started``, ``lost``,
-  ``moved``, ``verify``, ``changed_fields``, ``finish``, ``operation_id``
-  and ``identity_fields``; ``__init__`` for per-instance state, calling the
-  base first.
+  ``refusal_may_change``, ``moved``, ``verify``, ``changed_fields``,
+  ``finish``, ``operation_id`` and ``identity_fields``; ``__init__`` for
+  per-instance state, calling the base first.
 - Settings, class attributes to set: ``schema``, ``result_key``,
   ``compatibility_id``, ``message``, ``state_option``,
   ``compatibility_always``, ``whole_diff``, ``recheck_code``,
@@ -121,6 +123,7 @@ HOOKS = frozenset(
         "stages",
         "started",
         "lost",
+        "refusal_may_change",
         "moved",
         "verify",
         "changed_fields",
@@ -375,6 +378,10 @@ class Lifecycle:
         """Whether read-back alone may settle this uncertain write response."""
         return failure.category in LOSS
 
+    def refusal_may_change(self, failure: errors.ApiError) -> bool:
+        """Whether a refused write may change state its read-back cannot show."""
+        return False
+
     def moved(self, observed: Any) -> bool:
         """Whether read-back proves an effect relative to this stage's snapshot."""
         return (None if observed is None else self.managed(observed)) != self.current
@@ -465,7 +472,9 @@ class Lifecycle:
             self.confirmed = self.confirmed or self.moved(observed)
             if not self.lost(failure):
                 # The refusal belongs to the write, not to its read-back.
-                self.attempted = self.confirmed or sends
+                self.attempted = (
+                    self.confirmed or sends or self.refusal_may_change(failure)
+                )
                 self.operation = operation
                 raise
             self.verify(observed, self.want, self.absent)

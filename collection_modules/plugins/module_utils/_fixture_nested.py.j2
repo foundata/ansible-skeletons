@@ -231,6 +231,11 @@ class FixtureNested(Binding):
         """Classify an uncertain reply that read-back may settle without retry."""
         return super().lost(failure)
 
+    # Delete when unchanged.
+    def refusal_may_change(self, failure: errors.ApiError) -> bool:
+        """Keep a refusal unknown when it may change state no read-back shows."""
+        return super().refusal_may_change(failure)
+
     def moved(self, observed: Any) -> bool:
         """Compare the full snapshot because a write carries unmanaged members."""
         return bool(observed != self.record)
