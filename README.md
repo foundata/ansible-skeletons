@@ -205,8 +205,8 @@ includes:
 - A resource module and an info module against a fake REST product, with
   references, a write-only password and a deletion guard. The product's own
   resources replace them.
-- A second, hook-based fixture with nested values, the starting point for
-  resources that a definition cannot express.
+- A second, hook-based fixture with nested values and its info module, the
+  starting point for resources that a definition cannot express.
 - A Molecule scenario, and a harness that proves each module handles a lost
   reply to a create, update or delete.
 - A verifying activation helper for products that activate changes in a
