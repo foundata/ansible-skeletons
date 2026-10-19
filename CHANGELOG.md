@@ -122,6 +122,11 @@ and the project adheres to
   README and `defaults/main.yml`, read as plain sentences.
 - collection_modules, collection_modules_appliance: a FIXME asks to replace
   the README's fixture compatibility row with the tested product series.
+- Both module variants: `FIXME.md` and the binding's comment say that
+  building the client sends nothing, no login and no version probe, because
+  `compatibility_always` and the contract tests depend on it. `connect()`'s
+  docstring says that `prepare` builds the client after a supplied action's
+  `validate`.
 
 ### Fixed
 

@@ -39,7 +39,10 @@ SPDX-License-Identifier: GPL-3.0-or-later
 - Set `Binding.compatibility_always` in `plugins/module_utils/_binding.py`:
   keep `False` to probe before writes, or use `True` to probe before every
   module's first request, including unchanged and read-only runs. Keep the
-  matching README version-check sentence.
+  matching README version-check sentence. Either way, the client sends
+  nothing when it is built, no login and no version probe; it logs in with
+  its first request, or neither setting holds and the contract tests that
+  check it fail.
 - Update the README contract, module table, compatibility evidence and the
   Usage section: one subsection per administration task with the tasks of
   one runnable example.

@@ -34,7 +34,9 @@ class Binding(Lifecycle):
     schema = SCHEMA
 
     # When true, every module checks the product version before its first
-    # request, including unchanged and read-only runs.
+    # request, including unchanged and read-only runs. Either way, building
+    # the client in connect() sends nothing, so the policy decides when the
+    # first request happens.
     compatibility_always = False
 
     def connect(self) -> Any:
