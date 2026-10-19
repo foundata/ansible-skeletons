@@ -54,7 +54,9 @@ read-back only tells whether something changed anyway. A write that the
 client reports as never started (``started``) is unchanged. A field the
 product never returns (``secret``) is always written, to an existing object
 only with ``update_password: always``; it makes a successful write
-``unverifiable`` and a lost one unknown.
+``unverifiable`` and a lost one unknown. In a staged change, each stage
+says whether its write sends such a field, so a lost reply to a stage that
+sends none settles by its read-back alone.
 
 Failures go through the binding's error schema with ``operation``,
 ``outcome`` (``unchanged``, ``unknown`` or ``changed``), the identity
@@ -169,7 +171,7 @@ STATE = frozenset(
 
 MISSING = object()
 
-Stage = tuple[str, dict[str, Any], bool, Callable[[], None]]
+Stage = tuple[str, dict[str, Any], bool, Callable[[], None], bool]
 """One write of a change: step, wanted state, whether absent, request."""
 
 
@@ -264,8 +266,9 @@ class Lifecycle:
     def connect(self) -> Any:
         """Build the client without a request or a command.
 
-        ``prepare`` calls it before ``reconcile`` reads and before a supplied
-        action validates its input, so building it must have no effect. A
+        ``prepare`` calls it before ``reconcile`` reads, and after a supplied
+        action's ``validate`` but before the action, so building it must have
+        no effect. A
         transport that must check its target before use does so where it
         builds its first command, not in a method that receives a command
         already built.
@@ -348,15 +351,20 @@ class Lifecycle:
     def stages(self) -> list[Stage]:
         """The writes of the declared change, in order; never empty.
 
-        The default is the single ``write`` under the step ``create``,
-        ``update`` or ``delete`` with the declared ``want`` and ``absent``. A
-        request reads ``record`` and ``current`` when it runs, so a later stage
-        sees the read-back of the stage before it.
+        Each stage is ``(step, want, absent, request, secret)``: the step it
+        runs under, the state its read-back must show, its request, and
+        whether that request sends a field ``secret`` names. A lost reply to
+        such a request leaves the secret unknown even when the read-back
+        matches. The default is the single ``write`` under the step
+        ``create``, ``update`` or ``delete`` with the declared ``want`` and
+        ``absent``, sending every declared secret. A request reads ``record``
+        and ``current`` when it runs, so a later stage sees the read-back of
+        the stage before it.
         """
         step = (
             "delete" if self.absent else "create" if self.record is None else "update"
         )
-        return [(step, self.want, self.absent, self.write)]
+        return [(step, self.want, self.absent, self.write, self.write_only())]
 
     def started(self) -> bool:
         """Whether a failed write may have reached the product."""
@@ -432,15 +440,18 @@ class Lifecycle:
     def write_only(self) -> bool:
         return any(self.secret(key) for key in self.delta)
 
-    def stage(self, request: Callable[[], None]) -> Any:
+    def stage(self, request: Callable[[], None], secret: bool | None = None) -> Any:
         """Write once and settle against the current stage's declared state.
 
         Set record, current, want, delta and absent for this stage before calling.
+        ``secret`` tells whether the request sends a field ``secret`` names;
+        without it, the request counts as sending every declared secret.
         The returned read-back can seed the next stage. Confirmed progress survives
         a later refusal, uncertain response or request that never started.
         """
         self.attempted = True
         operation = self.operation
+        sends = self.write_only() if secret is None else secret
         try:
             request()
         except errors.ApiError as failure:
@@ -453,11 +464,11 @@ class Lifecycle:
             self.confirmed = self.confirmed or self.moved(observed)
             if not self.lost(failure):
                 # The refusal belongs to the write, not to its read-back.
-                self.attempted = self.confirmed or self.write_only()
+                self.attempted = self.confirmed or sends
                 self.operation = operation
                 raise
             self.verify(observed, self.want, self.absent)
-            if self.write_only():
+            if sends:
                 raise Failure(category="verification", code="create_unknown") from None
         else:
             self.step("verify")
@@ -509,13 +520,13 @@ class Lifecycle:
             raise ValueError("stages() returned no write for a change")
         declared, absent = self.want, self.absent
         observed: Any = None
-        for index, (step, want, gone, request) in enumerate(plan):
+        for index, (step, want, gone, request, secret) in enumerate(plan):
             if index:
                 self.record = observed
                 self.current = None if observed is None else self.managed(observed)
             self.want, self.absent = want, gone
             self.step(step)
-            observed = self.stage(request)
+            observed = self.stage(request, secret)
         self.want, self.absent = declared, absent
         if self.result_key:
             result[self.result_key] = (

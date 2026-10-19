@@ -949,7 +949,10 @@ def test_stages_keep_confirmed_progress_and_never_repeat_a_write(
 
 
 class Staged(Synthetic):
-    """Created inactive and enabled in a second write; disabled before deletion."""
+    """Created inactive and enabled in a second write; disabled before deletion.
+
+    The secret goes out with the create request only.
+    """
 
     def declared(self) -> dict[str, Any]:
         return {**super().declared(), "active": True}
@@ -975,10 +978,17 @@ class Staged(Synthetic):
                         self.request(
                             "disable", lambda rows: rows[key].update(active=False)
                         ),
+                        False,
                     )
                 )
             plan.append(
-                ("delete", {}, True, self.request("delete", lambda rows: rows.pop(key)))
+                (
+                    "delete",
+                    {},
+                    True,
+                    self.request("delete", lambda rows: rows.pop(key)),
+                    False,
+                )
             )
             return plan
         if self.record is None:
@@ -994,12 +1004,14 @@ class Staged(Synthetic):
                             {key: {"name": key, "value": value, "active": False}}
                         ),
                     ),
+                    self.write_only(),
                 ),
                 (
                     "enable",
                     self.want,
                     False,
                     self.request("enable", lambda rows: rows[key].update(active=True)),
+                    False,
                 ),
             ]
         return super().stages()
@@ -1058,3 +1070,26 @@ def test_a_failing_stage_keeps_the_progress_of_earlier_ones(
         "not_started": ("socket_timeout", "enable"),
     }[second]
     assert (result["error_code"], result["operation"]) == expected
+
+
+@pytest.mark.parametrize("lost", ["create", "enable"])
+def test_a_lost_stage_settles_by_read_back_unless_it_sends_the_secret(
+    store: Store,
+    run_module: RunModule,
+    monkeypatch: pytest.MonkeyPatch,
+    lost: str,
+) -> None:
+    monkeypatch.setattr(Staged, "connect", lambda self: store)
+
+    def after_first() -> None:
+        store.after = lose
+
+    store.after = lose if lost == "create" else after_first
+    result = run_module(staged_main, name="a", value="1", secret="s1")
+    if lost == "enable":
+        assert store.writes == ["create", "enable"] and store.rows["a"]["active"]
+        assert not result.get("failed") and result["verified"] == "unverifiable"
+    else:
+        assert store.writes == ["create"]
+        assert result["error_code"] == "create_unknown"
+        assert result["outcome"] == "changed"
