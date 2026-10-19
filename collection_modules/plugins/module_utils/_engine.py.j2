@@ -57,7 +57,12 @@ from ansible_collections.{{ namespace }}.\
 
 @dataclass(frozen=True)
 class Key:
-    """Immutable identity or server identifier with a reviewed type and case rule."""
+    """Immutable identity or server identifier with a reviewed type and case rule.
+
+    ``normalizer`` turns an identity value, declared or stored, into the form
+    ``pattern`` describes, such as a MAC address with hyphens into one with
+    colons; it never raises.
+    """
 
     name: str
     description: str
@@ -68,6 +73,7 @@ class Key:
     default: str | None = None
     follows_field: str = ""
     minimum: int | None = None
+    normalizer: Callable[[str], str] | None = None
 
 
 @dataclass(frozen=True)
@@ -207,6 +213,11 @@ def canonical(value: str, mode: str) -> str:
     if mode == "casefold":
         return value.casefold()
     return value
+
+
+def key_value(key: Key, value: str) -> str:
+    """An identity value in the form its key's pattern describes."""
+    return key.normalizer(value) if key.normalizer else value
 
 
 def identifier(key: Key, value: Any) -> str | int:
@@ -379,7 +390,7 @@ class Engine(Binding):
             value = record.get(key.name)
             if not isinstance(value, str):
                 raise ProductError(category="response", code="schema")
-            if canonical(value, key.canonical) != canonical(
+            if canonical(key_value(key, value), key.canonical) != canonical(
                 ident[key.name], key.canonical
             ):
                 return False
@@ -394,7 +405,10 @@ class Engine(Binding):
         }
         for key in resource.keys:
             value = record.get(key.name)
-            if not isinstance(value, str) or not re.fullmatch(key.pattern, value):
+            if not isinstance(value, str):
+                raise ProductError(category="response", code="schema")
+            value = key_value(key, value)
+            if not re.fullmatch(key.pattern, value):
                 raise ProductError(category="response", code="schema")
             public[key.name] = value
         for field in resource.fields:
@@ -487,9 +501,12 @@ class Engine(Binding):
     def identify(self) -> dict[str, str]:
         params, resource = self.params, self.resource
         ident = {
-            key.name: canonical(params[key.name], "lower")
-            if key.canonical == "lower"
-            else params[key.name]
+            key.name: key_value(
+                key,
+                canonical(params[key.name], "lower")
+                if key.canonical == "lower"
+                else params[key.name],
+            )
             for key in resource.keys
         }
         if any(not re.fullmatch(k.pattern, ident[k.name]) for k in resource.keys):

@@ -21,6 +21,8 @@ and the project adheres to
   shows.
 - Both module variants: `fixture_nested_info`, the information read to copy
   with a hook-based resource.
+- Both module variants: `Key(normalizer=...)` brings a declared or stored
+  identity into the form its pattern describes.
 
 ### Changed
 

@@ -242,6 +242,25 @@ def test_definition_can_allow_an_empty_identity_component(
     assert not synthetic.writes
 
 
+def test_identity_normalizer_applies_to_declared_and_stored_values(
+    synthetic: SyntheticClient, run_module: RunModule
+) -> None:
+    key = Key(
+        "label",
+        "MAC address",
+        r"[0-9a-f]{2}(?::[0-9a-f]{2}){5}",
+        normalizer=lambda value: value.lower().replace("-", ":"),
+    )
+    resource = replace(SYNTHETIC, keys=(key,))
+    synthetic.add(label="AA-BB-CC-DD-EE-FF", text="kept")
+    result = run_module(entry(resource), label="aa:bb:cc:dd:ee:ff", text="kept")
+    assert not result.get("failed") and not result["changed"]
+    assert result["synthetic"]["label"] == "aa:bb:cc:dd:ee:ff"
+    created = run_module(entry(resource), label="00-11-22-33-44-55", text="new")
+    assert created["changed"] and synthetic.rows[2]["label"] == "00:11:22:33:44:55"
+    assert synthetic.writes == ["create"]
+
+
 def test_identity_keys_are_strings() -> None:
     resource = replace(SYNTHETIC, keys=(Key("tag", "Tag", kind="int"),))
     with pytest.raises(ValueError, match="identity keys are strings"):
