@@ -20,14 +20,14 @@ SPDX-License-Identifier: GPL-3.0-or-later
   synthetic definition and fake; do not add fields or guards to the product.
   The fixture's grid protocol is replaceable. This variant is for managed
   configuration that carries the management path, global activation and
-  console recovery rehearsed per area; choose it by those traits, not by
-  endpoint shape.
+  console recovery rehearsed per subsystem; choose it by those traits, not
+  by endpoint shape.
 - Keep a scope-named apply module only where saved and active state differ. Use
   the shared verifying `_activation.py` workflow when a product probe proves the
   loaded state: `run()` with compare and apply functions, or a subclass of
-  `Activation` for an area that resolves `verify` items itself, compares every
-  object it owns, follows pending work or guards the apply. Otherwise compose
-  `ActOnce` from `_act_once.py` with the product binding, ActOnce first
+  `Activation` for a subsystem that resolves `verify` items itself, compares
+  every object it owns, follows pending work or guards the apply. Otherwise
+  compose `ActOnce` from `_act_once.py` with the product binding, ActOnce first
   (`class Apply(ActOnce, Binding)`), and implement its preflight, activate,
   effective and activation_id hooks on that class. It reports
   `verified: unverifiable`, never a loaded-state receipt; readiness is not that
@@ -36,13 +36,14 @@ SPDX-License-Identifier: GPL-3.0-or-later
   against the actual listener, ingress, aliases, translations and activation
   scope. Test refusal in normal and check mode. Do not infer ingress from a
   default route or advertise the guard as a complete lockout guarantee.
-- Replace the fixture's recovery hooks, one directory per area in
-  `default/tasks/recovery/<area>/` (flat for a scenario with one area), and the
-  inventory's FIXME commands with qualified native backup, restore and discard
-  operations. Keep the generic drill files unchanged, and run `zz_recovery.yml`
-  while the scenario's dependencies are still in place; see "Recovery drill" in
-  `extensions/molecule/README.md`. Document independent recovery and one writer,
-  including pending changes from other clients, as caller prerequisites.
+- Replace the fixture's recovery hooks, one directory per subsystem in
+  `default/tasks/recovery/<subsystem>/` (flat for a scenario with one
+  subsystem), and the inventory's FIXME commands with qualified native backup,
+  restore and discard operations. Keep the generic drill files unchanged, and
+  run `zz_recovery.yml` while the scenario's dependencies are still in place;
+  see "Recovery drill" in `extensions/molecule/README.md`. Document independent
+  recovery and one writer, including pending changes from other clients, as
+  caller prerequisites.
 - Copy `plugins/module_utils/_fixture_nested.py` for each resource that a
   flat definition cannot express. Edit its hooks and their contracts, never the
   lifecycle sequence. Keep `_lifecycle.py` and the shared tests unchanged.

@@ -28,7 +28,7 @@ Paths are relative to this directory unless stated otherwise.
   - [Recovery drill](#usage-recovery)
 {# end skeleton-variant #}
 {# skeleton-variant: recovery-tool-toc #}
-  - [Drill one area on its own](#usage-area-drill)
+  - [Drill one subsystem on its own](#usage-subsystem-drill)
 {# end skeleton-variant #}
   - [Write tests](#usage-add-tests)
   - [Provision your own target](#usage-owned-target)
@@ -167,44 +167,45 @@ cases need, rename `zz_loss.yml` so that it runs before that file.
 `zz_recovery.yml` runs the [recovery drill](#usage-recovery) when the
 credentials file names a console, and otherwise prints why it skipped. It
 needs the management resolver behind the credentials file's `dns` entry and
-whatever the areas' hooks use. If a later side-effect file removes one of
-them, rename `zz_recovery.yml` so that it runs before that file.
+whatever the subsystems' hooks use. If a later side-effect file removes one
+of them, rename `zz_recovery.yml` so that it runs before that file.
 
 {# end skeleton-variant #}
 {# skeleton-variant: recovery-contract #}
 ### Recovery drill<a id="usage-recovery"></a>
 
 The drill proves that you can get the appliance back after a change cuts off
-its management access. It drills each area of the scenario in turn, in the
-order of their names:
+its management access. It drills each subsystem of the scenario in turn, in
+the order of their names:
 
 1. Back up the configuration through the appliance's console.
-2. Make the area's change that cuts off access, and observe the loss.
+2. Make the subsystem's change that cuts off access, and observe the loss.
 3. Restore the backup through the console.
 4. Require a fresh API login, a fresh DNS answer for the management name and
    the change to be gone. These checks go through the API and DNS only.
 
 Before the drill can run:
 
-1. Give each area its hooks in `default/tasks/recovery/<area>/`. A scenario
-   with one area may keep them directly in `default/tasks/recovery/`; the
-   area then carries the scenario's name. The fixture's hooks drill two areas
-   of the fake product, `fixture`, which loses only DNS, and
-   `fixture_nested`, which loses API access; replace them with the product's.
+1. Give each subsystem its hooks in `default/tasks/recovery/<subsystem>/`. A
+   scenario with one subsystem may keep them directly in
+   `default/tasks/recovery/`; the subsystem then carries the scenario's name.
+   The fixture's hooks drill two subsystems of the fake product, `fixture`,
+   which loses only DNS, and `fixture_nested`, which loses API access;
+   replace them with the product's.
    - `induce.yml` makes the change that cuts off access. Besides the backup
      and the restore, hooks may use the console for fixtures that the
      restore undoes, such as turning off a setting that would keep the change
      from cutting off access.
    - `absent.yml` proves that the change is gone.
-   - `observe.yml`, optional, observes the loss on fresh connections, for an
-     area whose change costs only access that depends on DNS. Without it, the
-     drill watches the API fail.
+   - `observe.yml`, optional, observes the loss on fresh connections, for a
+     subsystem whose change costs only access that depends on DNS. Without
+     it, the drill watches the API fail.
    - `settings.yml`, optional, holds data, not tasks. `fresh_dns: false` with
      a `fresh_dns_reason` skips the fresh DNS check, for a scenario that moves
      the management resolver. `fresh_dns: auto` checks DNS after the restore
      only if the management name resolved to the `management` address before
-     the drill; use it for an area that drills both in such a scenario and on
-     its own. Any other key fails the drill.
+     the drill; use it for a subsystem that drills both in such a scenario
+     and on its own. Any other key fails the drill.
    - A hook that needs a helper inside the appliance includes
      `shared/tasks/recovery_upload.yml`, whose header lists its variables.
      Name the appliance's base64 decoder and SHA-256 tool as `decode` and
@@ -236,19 +237,19 @@ console endpoint.
 
 {# end skeleton-variant #}
 {# skeleton-variant: recovery-tool #}
-### Drill one area on its own<a id="usage-area-drill"></a>
+### Drill one subsystem on its own<a id="usage-subsystem-drill"></a>
 
-`shared/playbooks/recovery.yml` drills one area without the rest of the test
-sequence, for example to rehearse a new area before it writes anything that
-can affect the management path. Run it from the collection root against a lab
-you can afford to lose. It needs the same `MOLECULE_PRODUCT_*` variables as
-the scenario, and this collection and `foundata.utils` installed where Ansible
-finds them:
+`shared/playbooks/recovery.yml` drills one subsystem without the rest of the
+test sequence, for example to rehearse a new subsystem before it writes
+anything that can affect the management path. Run it from the collection root
+against a lab you can afford to lose. It needs the same `MOLECULE_PRODUCT_*`
+variables as the scenario, and this collection and `foundata.utils` installed
+where Ansible finds them:
 
 ```sh
 export MOLECULE_SCENARIO_DIRECTORY="$PWD/extensions/molecule/default"
 export MOLECULE_RECOVERY_SCENARIO="default"
-export MOLECULE_RECOVERY_AREA="fixture"
+export MOLECULE_RECOVERY_SUBSYSTEM="fixture"
 ansible-playbook \
   -i extensions/molecule/default/inventory/hosts.yml \
   extensions/molecule/shared/playbooks/recovery.yml
@@ -257,8 +258,8 @@ ansible-playbook \
 - `MOLECULE_SCENARIO_DIRECTORY` points at any scenario of this collection;
   the playbook finds `shared/` and the other scenarios through it.
 - `MOLECULE_RECOVERY_SCENARIO` names the scenario and
-  `MOLECULE_RECOVERY_AREA` one of its areas. An unknown scenario or area fails
-  and lists the valid names.
+  `MOLECULE_RECOVERY_SUBSYSTEM` one of its subsystems. An unknown scenario or
+  subsystem fails and lists the valid names.
 
 {# end skeleton-variant #}
 ### Write tests<a id="usage-add-tests"></a>

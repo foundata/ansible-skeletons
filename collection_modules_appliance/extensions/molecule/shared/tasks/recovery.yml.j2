@@ -1,47 +1,47 @@
-# Recovery drill of one area: lose the management path through the
-# area's own change, restore it through the lab's console endpoint and
+# Recovery drill of one subsystem: lose the management path through the
+# subsystem's own change, restore it through the lab's console endpoint and
 # prove fresh API and DNS access through the automation account.
 #
 # The console endpoint comes from the lab contract. It reads a label and a
 # list of guest commands as JSON on stdin and prints one status line, so the
 # serial protocol and the root credential stay in the lab's tooling.
-# Besides the backup and the restore, an area's hooks may use the console
-# for fixtures that the restore undoes; every assertion goes through the API
-# and DNS.
+# Besides the backup and the restore, a subsystem's hooks may use the
+# console for fixtures that the restore undoes; every assertion goes through
+# the API and DNS.
 #
-# Set "recovery_area" (the area's name) and "recovery_hooks" (its hooks
-# directory) when including this file. "recovery_defaults" comes from the
-# inventory: the lab contract ("lab"), the fresh authenticated read
+# Set "recovery_subsystem" (the subsystem's name) and "recovery_hooks" (its
+# hooks directory) when including this file. "recovery_defaults" comes from
+# the inventory: the lab contract ("lab"), the fresh authenticated read
 # ("probe") and the guest commands that save ("backup"), restore
 # ("restore") and remove ("discard") the good configuration. The hooks
-# directory holds the area's part:
+# directory holds the subsystem's part:
 #
 # - induce.yml makes the change and may set "recovery_reload", guest
 #   commands that run after the restore.
 # - absent.yml proves the fixture is gone from saved and loaded state.
 # - observe.yml, optional, observes the loss on fresh connections and fails
-#   when it cannot, for an area whose change costs only DNS-dependent
+#   when it cannot, for a subsystem whose change costs only DNS-dependent
 #   access. It may set "recovery_observed" for the drill's record. Without
 #   it, the drill observes the loss with the API probe.
 # - settings.yml, optional, is data, never tasks: "fresh_dns: false" with a
 #   "fresh_dns_reason" skips the fresh DNS check, for a scenario that moves
 #   the management resolver; "fresh_dns: auto" asks for the management name
 #   once before the drill and requires a fresh answer after the restore only
-#   when that one came, for an area that drills both in such a scenario and
-#   alone. The drill parses the file without templating or running it, and
-#   refuses any other key.
+#   when that one came, for a subsystem that drills both in such a scenario
+#   and alone. The drill parses the file without templating or running it,
+#   and refuses any other key.
 #
 # SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 {% raw %}
 ---
-- name: "Molecule | Recovery | Start the area's drill"
+- name: "Molecule | Recovery | Start the subsystem's drill"
   ansible.builtin.set_fact:
     __recovery_shared: "{{ lookup('ansible.builtin.env', 'MOLECULE_SCENARIO_DIRECTORY') }}/../shared"
     # The console accepts labels of lowercase letters, digits and dashes.
     __recovery_label: >-
-      {{ (recovery_area | ansible.builtin.lower
+      {{ (recovery_subsystem | ansible.builtin.lower
           | ansible.builtin.regex_replace('[^a-z0-9]+', '-')
           | ansible.builtin.regex_replace('^-+|-+$', ''))[:32] }}
     __recovery_observer: "{{ recovery_hooks }}/observe.yml"
@@ -50,9 +50,9 @@
     recovery_fresh_dns: true
     recovery_fresh_dns_reason: ""
 
-# A fresh fact per area: values from include_vars would rank below the
-# defaults set_fact gives above, and would outlive their area.
-- name: "Molecule | Recovery | Read the area's settings"
+# A fresh fact per subsystem: values from include_vars would rank below the
+# defaults set_fact gives above, and would outlive their subsystem.
+- name: "Molecule | Recovery | Read the subsystem's settings"
   ansible.builtin.set_fact:
     __recovery_settings: >-
       {{ (lookup('ansible.builtin.file', recovery_hooks ~ '/settings.yml')
@@ -74,7 +74,7 @@
       or auto) and fresh_dns_reason (text), nothing else.
     quiet: true
 
-- name: "Molecule | Recovery | Apply the area's settings"
+- name: "Molecule | Recovery | Apply the subsystem's settings"
   ansible.builtin.set_fact:
     recovery_fresh_dns: "{{ __recovery_settings['fresh_dns'] | ansible.builtin.default(true) }}"
     recovery_fresh_dns_reason: "{{ __recovery_settings['fresh_dns_reason'] | ansible.builtin.default('') }}"
@@ -92,7 +92,7 @@
   ansible.builtin.assert:
     that:
       - recovery_fresh_dns == 'auto' or recovery_fresh_dns | ansible.builtin.bool or recovery_fresh_dns_reason | ansible.builtin.length > 0
-    fail_msg: "An area whose settings.yml sets fresh_dns to false names why in fresh_dns_reason."
+    fail_msg: "A subsystem whose settings.yml sets fresh_dns to false names why in fresh_dns_reason."
     quiet: true
 
 - name: "Molecule | Recovery | Require fresh access before the drill"
@@ -142,11 +142,11 @@
 
 - name: "Molecule | Recovery | Lose the management path and restore it"
   block:
-    - name: "Molecule | Recovery | Induce the loss through the area"
+    - name: "Molecule | Recovery | Induce the loss through the subsystem"
       ansible.builtin.include_tasks:
         file: "{{ recovery_hooks }}/induce.yml"
 
-    - name: "Molecule | Recovery | Observe the loss through the area's hook"
+    - name: "Molecule | Recovery | Observe the loss through the subsystem's hook"
       ansible.builtin.include_tasks:
         file: "{{ __recovery_observer }}"
       when:
@@ -201,7 +201,7 @@
   ansible.builtin.assert:
     that:
       - __recovery_loss['status'] | ansible.builtin.default(-1) != 200
-    fail_msg: "The area's change did not cost fresh API access; the drill proves nothing."
+    fail_msg: "The subsystem's change did not cost fresh API access; the drill proves nothing."
     quiet: true
   when:
     - __recovery_observer is not ansible.builtin.file
@@ -213,7 +213,7 @@
 - name: "Molecule | Recovery | Record the drill"
   ansible.builtin.debug:
     msg: >-
-      {{ {'area': recovery_area,
+      {{ {'subsystem': recovery_subsystem,
           'observation': 'observe.yml' if __recovery_observer is ansible.builtin.file else 'api',
           'observed': recovery_observed,
           'lost_api_status': __recovery_loss['status'] | ansible.builtin.default(-1),

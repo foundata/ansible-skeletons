@@ -277,18 +277,18 @@ For the module skeletons, the matrix adds:
 - The second identity's sanity session, once, on the newest released core.
   This identity renders maximum-length names and a quoted product, and sanity
   is the only ansible-test lane that reads those names.
-- In the appliance scenario, a real drill of two areas against the fake
+- In the appliance scenario, a real drill of two subsystems against the fake
   product's console and resolver: `fixture` loses only DNS and observes the
   loss through its `observe.yml`; `fixture_nested` loses API access and
   uploads a helper through the console. Both restore.
-- A drill of one area alone through the standalone playbook, after checking
-  that the playbook refuses an unknown area, and proof that the drill skips
-  without a console contract.
+- A drill of one subsystem alone through the standalone playbook, after
+  checking that the playbook refuses an unknown subsystem, and proof that the
+  drill skips without a console contract.
 
 Unit tests cover the management-listener refusal in normal and check mode.
 None of this qualifies a product's console recovery: that drill runs on the
-collection's authorized lab before an area's first write that can affect the
-management path.
+collection's authorized lab before a subsystem's first write that can affect
+the management path.
 
 The module renders' ansible-test lanes run their containers in a Podman store
 of each render's own. It reads the images of your own Podman store read-only,

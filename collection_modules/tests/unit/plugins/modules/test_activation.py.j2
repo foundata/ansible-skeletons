@@ -161,10 +161,10 @@ def test_activation_follows_the_binding_probe_policy(
     assert events == expected
 
 
-class Area(_activation.Activation):
-    """An in-memory area: saved and loaded values, optional pending work."""
+class Subsystem(_activation.Activation):
+    """An in-memory subsystem: saved and loaded values, optional pending work."""
 
-    compatibility_id = "area_apply"
+    compatibility_id = "subsystem_apply"
     name_pattern = r"[a-z]+"
     settle_seconds = 0.0
 
@@ -206,13 +206,13 @@ class Area(_activation.Activation):
             raise errors.ApiError(category="timeout", code="socket_timeout")
 
 
-def area_main(state: dict[str, Any], **settings: Any) -> Any:
+def subsystem_main(state: dict[str, Any], **settings: Any) -> Any:
     def main() -> None:
         module = AnsibleModule(
             argument_spec=_activation.argument_spec(objects=True),
             supports_check_mode=True,
         )
-        activation = Area(module, state)
+        activation = Subsystem(module, state)
         for name, value in settings.items():
             setattr(activation, name, value)
         activation.execute(activation.verify_activation)
@@ -220,7 +220,7 @@ def area_main(state: dict[str, Any], **settings: Any) -> Any:
     return main
 
 
-def area(**values: Any) -> dict[str, Any]:
+def subsystem(**values: Any) -> dict[str, Any]:
     return {
         "saved": {},
         "loaded": {},
@@ -236,7 +236,7 @@ def test_survey_runs_once_connected_before_the_first_comparison(
 ) -> None:
     events: list[str] = []
 
-    class Surveyed(Area):
+    class Surveyed(Subsystem):
         def survey(self) -> None:
             assert self.client is not None
             events.append("survey " + self.operation)
@@ -257,7 +257,7 @@ def test_survey_runs_once_connected_before_the_first_comparison(
         activation = Surveyed(module, state)
         activation.execute(activation.verify_activation)
 
-    state = area(saved={"one": "1"}, loaded={"one": "0"})
+    state = subsystem(saved={"one": "1"}, loaded={"one": "0"})
     result = run_module(main, verify=[{"name": "one"}])
     if refused:
         assert result["failed"] and result["error_code"] == "referenced"
@@ -269,13 +269,13 @@ def test_survey_runs_once_connected_before_the_first_comparison(
         assert events.count("survey compare") == 1 and state["applies"] == 1
 
 
-def test_an_owned_area_compares_every_object_without_verify(
+def test_an_owned_subsystem_compares_every_object_without_verify(
     run_module: RunModule,
 ) -> None:
-    state = area(saved={"one": "1", "two": "2"}, loaded={"one": "1"})
-    named = run_module(area_main(state), verify=[])
+    state = subsystem(saved={"one": "1", "two": "2"}, loaded={"one": "1"})
+    named = run_module(subsystem_main(state), verify=[])
     assert named["failed"] and named["error_code"] == "validation_failed"
-    result = run_module(area_main(state, owned=True), verify=[])
+    result = run_module(subsystem_main(state, owned=True), verify=[])
     assert result["changed"] and result["verification"] == {
         "one": "in_sync",
         "two": "in_sync",
@@ -284,26 +284,26 @@ def test_an_owned_area_compares_every_object_without_verify(
 
 
 def test_object_items_carry_their_uuid_as_identity(run_module: RunModule) -> None:
-    state = area(saved={"one": "1"}, loaded={"one": "1"})
+    state = subsystem(saved={"one": "1"}, loaded={"one": "1"})
     uuid = "0f8fad5b-d9cb-469f-a165-70867728950e"
-    result = run_module(area_main(state), verify=[{"name": "one", "uuid": uuid}])
+    result = run_module(subsystem_main(state), verify=[{"name": "one", "uuid": uuid}])
     assert not result["changed"] and state["compared"] == [{"one": uuid}]
     for verify in (
         [{"name": "one", "uuid": "not-a-uuid"}],
         [{"name": "one", "uuid": uuid}, {"name": "one"}],
     ):
-        refused = run_module(area_main(state), verify=verify)
+        refused = run_module(subsystem_main(state), verify=verify)
         assert refused["failed"] and refused["error_code"] == "validation_failed"
         assert refused["fields"] == ["verify"] and not refused["changed"]
 
 
 @pytest.mark.parametrize("apply_unverifiable", [False, True])
-def test_unverifiable_objects_apply_only_when_the_area_asks(
+def test_unverifiable_objects_apply_only_when_the_subsystem_asks(
     run_module: RunModule, apply_unverifiable: bool
 ) -> None:
-    state = area(saved={"one": "opaque"}, loaded={"one": "opaque"})
+    state = subsystem(saved={"one": "opaque"}, loaded={"one": "opaque"})
     result = run_module(
-        area_main(state, apply_unverifiable=apply_unverifiable),
+        subsystem_main(state, apply_unverifiable=apply_unverifiable),
         verify=[{"name": "one"}],
     )
     assert result["changed"] is apply_unverifiable
@@ -312,30 +312,30 @@ def test_unverifiable_objects_apply_only_when_the_area_asks(
 
 
 def test_pending_work_drives_the_activation(run_module: RunModule) -> None:
-    state = area(
+    state = subsystem(
         saved={"one": "1", "two": "2"},
         loaded={"one": "1"},
         pending=["two"],
     )
     predicted = run_module(
-        area_main(state, owned=True), verify=[], _ansible_check_mode=True
+        subsystem_main(state, owned=True), verify=[], _ansible_check_mode=True
     )
     assert predicted["verification"] == {"one": "in_sync", "two": "drift"}
     assert predicted["verified"] == "predicted" and not state["applies"]
-    applied = run_module(area_main(state, owned=True), verify=[])
+    applied = run_module(subsystem_main(state, owned=True), verify=[])
     assert applied["verification"] == {"two": "in_sync"}
     assert applied["verified"] == "observed" and state["applies"] == 1
-    quiet = run_module(area_main(state, owned=True), verify=[])
+    quiet = run_module(subsystem_main(state, owned=True), verify=[])
     assert not quiet["changed"] and quiet["verified"] == "observed"
-    forced = run_module(area_main(state, owned=True), verify=[], activate="always")
+    forced = run_module(subsystem_main(state, owned=True), verify=[], activate="always")
     assert forced["changed"] and forced["verified"] == "unverifiable"
 
 
 def test_drift_without_pending_work_is_refused_before_applying(
     run_module: RunModule,
 ) -> None:
-    state = area(saved={"one": "1"}, loaded={"one": "0"}, pending=[])
-    result = run_module(area_main(state, owned=True), verify=[])
+    state = subsystem(saved={"one": "1"}, loaded={"one": "0"}, pending=[])
+    result = run_module(subsystem_main(state, owned=True), verify=[])
     assert result["failed"] and result["error_code"] == "not_effective"
     assert result["not_effective"] == ["one"] and result["outcome"] == "unchanged"
     assert result["operation"] == "compare" and not state["applies"]
@@ -345,9 +345,9 @@ def test_drift_without_pending_work_is_refused_before_applying(
 def test_protect_refuses_before_check_mode_returns(
     run_module: RunModule, check_mode: bool
 ) -> None:
-    state = area(saved={"one": "1"}, refuse=True)
+    state = subsystem(saved={"one": "1"}, refuse=True)
     result = run_module(
-        area_main(state), verify=[{"name": "one"}], _ansible_check_mode=check_mode
+        subsystem_main(state), verify=[{"name": "one"}], _ansible_check_mode=check_mode
     )
     assert result["failed"] and result["error_code"] == "referenced"
     assert result["operation"] == "protect" and not state["applies"]
@@ -356,8 +356,8 @@ def test_protect_refuses_before_check_mode_returns(
 def test_a_lost_reply_on_pending_work_settles_by_reading_back(
     run_module: RunModule,
 ) -> None:
-    state = area(saved={"one": "1"}, pending=["one"], lose=True)
-    result = run_module(area_main(state, owned=True), verify=[])
+    state = subsystem(saved={"one": "1"}, pending=["one"], lose=True)
+    result = run_module(subsystem_main(state, owned=True), verify=[])
     assert not result.get("failed") and result["verification"] == {"one": "in_sync"}
     assert state["applies"] == 1
 
@@ -365,8 +365,8 @@ def test_a_lost_reply_on_pending_work_settles_by_reading_back(
 def test_an_acknowledged_apply_that_never_converges_names_the_objects(
     run_module: RunModule,
 ) -> None:
-    state = area(saved={"one": "1", "two": "2"}, loaded={"two": "2"}, stuck=True)
-    result = run_module(area_main(state, owned=True), verify=[])
+    state = subsystem(saved={"one": "1", "two": "2"}, loaded={"two": "2"}, stuck=True)
+    result = run_module(subsystem_main(state, owned=True), verify=[])
     assert result["failed"] and result["error_code"] == "not_effective"
     assert result["not_effective"] == ["one"] and result["operation"] == "verify"
     assert result["changed"] and result["outcome"] == "changed"

@@ -245,8 +245,8 @@ A module-first skeleton for appliances with these traits:
 - The managed configuration carries the management path, so a change can cut
   off the API the modules use.
 - Activation is global: one apply step activates every pending change.
-- Recovery through the console is rehearsed for each area before the area's
-  first change that can affect the management path.
+- Recovery through the console is rehearsed for each subsystem before the
+  subsystem's first change that can affect the management path.
 
 Choose it by those traits, not by the shape of the API. It requires a single
 writer and a recovery path that does not depend on the API, such as a

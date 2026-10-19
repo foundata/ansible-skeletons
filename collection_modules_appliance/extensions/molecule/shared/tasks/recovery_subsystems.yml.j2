@@ -1,18 +1,18 @@
-# The recovery areas of one scenario. Each area keeps its hooks in
-# "<scenario>/tasks/recovery/<area>/"; a scenario with one area may keep
-# them in "<scenario>/tasks/recovery/" instead, and that area carries the
-# scenario's name. A scenario that has both layouts is refused.
+# The recovery subsystems of one scenario. Each subsystem keeps its hooks in
+# "<scenario>/tasks/recovery/<subsystem>/"; a scenario with one subsystem may
+# keep them in "<scenario>/tasks/recovery/" instead, and that subsystem
+# carries the scenario's name. A scenario that has both layouts is refused.
 #
 # Set "__recovery_scenario_directory" when including this file. It sets
-# "recovery_areas", the area names in order, and "__recovery_flat", whether
-# the hooks sit directly in "tasks/recovery/".
+# "recovery_subsystems", the subsystem names in order, and "__recovery_flat",
+# whether the hooks sit directly in "tasks/recovery/".
 #
 # SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 {% raw %}
 ---
-- name: "Molecule | Recovery | Find the scenario's area hooks"
+- name: "Molecule | Recovery | Find the scenario's subsystem hooks"
   delegate_to: "localhost"
   ansible.builtin.find:
     paths: "{{ __recovery_scenario_directory }}/tasks/recovery"
@@ -21,10 +21,10 @@
     recurse: true
   register: __recovery_hooks_found
 
-- name: "Molecule | Recovery | Name the scenario's areas"
+- name: "Molecule | Recovery | Name the scenario's subsystems"
   ansible.builtin.set_fact:
     __recovery_flat: "{{ __recovery_root in __recovery_directories }}"
-    recovery_areas: >-
+    recovery_subsystems: >-
       {{ [__recovery_scenario_directory | ansible.builtin.basename]
          if __recovery_root in __recovery_directories
          else __recovery_directories | ansible.builtin.map('ansible.builtin.basename')
@@ -35,13 +35,13 @@
       {{ __recovery_hooks_found['files'] | ansible.builtin.map(attribute='path')
          | ansible.builtin.map('ansible.builtin.dirname') | ansible.builtin.list }}
 
-- name: "Molecule | Recovery | Require one layout of the area hooks"
+- name: "Molecule | Recovery | Require one layout of the subsystem hooks"
   ansible.builtin.assert:
     that:
       - not __recovery_flat or __recovery_hooks_found['files'] | ansible.builtin.length == 1
-      - recovery_areas | ansible.builtin.length > 0
+      - recovery_subsystems | ansible.builtin.length > 0
     fail_msg: >-
-      Keep the recovery hooks either in tasks/recovery/<area>/ or, for one area,
-      directly in tasks/recovery/ of {{ __recovery_scenario_directory }}.
+      Keep the recovery hooks either in tasks/recovery/<subsystem>/ or, for one
+      subsystem, directly in tasks/recovery/ of {{ __recovery_scenario_directory }}.
     quiet: true
 {% endraw %}

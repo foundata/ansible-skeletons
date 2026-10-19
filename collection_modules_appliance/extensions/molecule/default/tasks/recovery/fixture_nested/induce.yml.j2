@@ -1,10 +1,10 @@
-# Nested fixture area drill: a nested record covering the API listener's
-# address and port cuts off the fake product's API once its anti-lockout
-# setting is off. fixture_nested refuses that record first. The drill then
-# turns anti-lockout off with a helper it uploads into the appliance, a
-# fixture the restore undoes, and saves the record through the endpoint
-# behind the module.
-# FIXME Replace with the area's researched management-loss change.
+# Nested fixture subsystem drill: a nested record covering the API
+# listener's address and port cuts off the fake product's API once its
+# anti-lockout setting is off. fixture_nested refuses that record first. The
+# drill then turns anti-lockout off with a helper it uploads into the
+# appliance, a fixture the restore undoes, and saves the record through the
+# endpoint behind the module.
+# FIXME Replace with the subsystem's researched management-loss change.
 #
 # SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later

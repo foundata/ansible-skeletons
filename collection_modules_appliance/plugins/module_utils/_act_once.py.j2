@@ -6,9 +6,10 @@ Preflight checks the saved state before check-mode prediction. Compatibility
 precedes preflight when the binding requires a probe before every product read.
 Normal mode activates once and reports verified: unverifiable. A lost reply
 leaves the outcome unknown. Effective may check bounded readiness without
-claiming a loaded-state receipt. An area's apply module supplies the product
-hooks and binding. The base's ``finish`` hook runs after ``act_once`` too: an
-area class that also reconciles resources branches there on its own state.
+claiming a loaded-state receipt. A subsystem's apply module supplies the
+product hooks and binding. The base's ``finish`` hook runs after ``act_once``
+too: a subsystem class that also reconciles resources branches there on its
+own state.
 """
 
 from __future__ import annotations
@@ -27,7 +28,7 @@ from ansible_collections.{{ namespace }}.\
 
 
 class ActOnce(Lifecycle, sequence=("act_once", "execute")):
-    """Mixin for an appliance area with an unobservable activation receipt.
+    """Mixin for an appliance subsystem with an unobservable activation receipt.
 
     List it first, ``class Apply(ActOnce, Binding)``. A mixin extends the class
     it is mixed into: its ``execute`` and ``act_once`` and its hook defaults
@@ -35,7 +36,7 @@ class ActOnce(Lifecycle, sequence=("act_once", "execute")):
     resolution order. Listed after one of them, any member that class defines
     under the same name would replace the activation's without an error, so
     a class that lists another lifecycle class before ActOnce fails when it is
-    created. Define the activation hooks on the area class itself.
+    created. Define the activation hooks on the subsystem class itself.
     """
 
     def __init_subclass__(cls, **kwargs: Any) -> None:

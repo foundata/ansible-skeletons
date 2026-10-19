@@ -374,10 +374,11 @@ def molecule_with_fake(rendered: Rendered) -> None:
 
 
 def drill_alone(rendered: Rendered) -> None:
-    """Prove the drill's skip, then drill one area of the installed artifact alone.
+    """Prove the drill's skip, then drill one subsystem of the installed artifact.
 
-    The standalone playbook must refuse an unknown area and name the ones it
-    found, then drill the nested area, upload included, against a fresh fake.
+    The standalone playbook must refuse an unknown subsystem and name the ones
+    it found, then drill the nested subsystem, upload included, against a fresh
+    fake.
     """
     molecule = rendered.collection / "extensions/molecule"
     play = rendered.work / "recovery-skip.yml"
@@ -426,21 +427,23 @@ def drill_alone(rendered: Rendered) -> None:
         refused = run(
             command,
             cwd=rendered.work,
-            env={**env, "MOLECULE_RECOVERY_AREA": "unknown"},
+            env={**env, "MOLECULE_RECOVERY_SUBSYSTEM": "unknown"},
             capture=True,
             allowed_exit_codes=(2,),
         )
-        if "areas of default: fixture, fixture_nested" not in refused:
-            raise GateError("The standalone drill did not name the scenario's areas")
+        if "subsystems of default: fixture, fixture_nested" not in refused:
+            raise GateError(
+                "The standalone drill did not name the scenario's subsystems"
+            )
         drilled = run(
             command,
             cwd=rendered.work,
-            env={**env, "MOLECULE_RECOVERY_AREA": "fixture_nested"},
+            env={**env, "MOLECULE_RECOVERY_SUBSYSTEM": "fixture_nested"},
             capture=True,
         )
         print(drilled, flush=True)
-        if '\\"area\\": \\"fixture_nested\\"' not in drilled:
-            raise GateError("The standalone drill recorded no drill of the area")
+        if '\\"subsystem\\": \\"fixture_nested\\"' not in drilled:
+            raise GateError("The standalone drill recorded no drill of the subsystem")
 
 
 def pinned_utils_version(root: Path = ROOT) -> str:

@@ -60,9 +60,10 @@ A resource is one kind of product object and the module that manages it.
 A definition in `_definitions.py` describes a definition-driven resource,
 and `_engine.py` runs it. A hook-based resource needs more than a definition
 can express, such as nested values, so its own module utility implements the
-lifecycle's hooks. An area is a group of modules that share one module
-utility, one activation scope and usually one Molecule scenario, such as the
-modules for routes, gateways and their activation.
+lifecycle's hooks. A subsystem is a part of the product that a group of
+modules manages together, such as routes and gateways with their activation.
+Its modules share one module utility, one activation scope where the product
+has one, and usually one Molecule scenario.
 
 `tests/unit/plugins/modules/contract_subject.py` names the product resource
 the shared contract tests run against. A fresh render names the fixture there,

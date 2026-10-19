@@ -1,8 +1,8 @@
 # Fresh management access for the recovery drill: an authenticated API read
 # and a DNS query for the management name, each on a new connection, retried
-# once a second for "__recovery_retries" seconds. An area whose settings set
-# "recovery_fresh_dns" to false skips the DNS query, and so does one set to
-# "auto" until the drill has asked whether the name answers.
+# once a second for "__recovery_retries" seconds. A subsystem whose settings
+# set "recovery_fresh_dns" to false skips the DNS query, and so does one set
+# to "auto" until the drill has asked whether the name answers.
 #
 # SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later

@@ -6,21 +6,21 @@ An activation module compares saved with loaded state per object, applies
 when an object drifts or when asked to, and verifies afterwards. It runs on
 the lifecycle base, so the binding's connection, compatibility policy and
 failure contract apply: :class:`Activation` holds the sequence, an apply
-module supplies the product steps as hooks, and :func:`run` serves an area
-whose steps are plain functions of the client.
+module supplies the product steps as hooks, and :func:`run` serves a
+subsystem whose steps are plain functions of the client.
 
 ``verify`` names the objects to compare, as names or as items with a
-``name`` and an optional ``uuid``. An area whose comparison covers every
+``name`` and an optional ``uuid``. A subsystem whose comparison covers every
 object it owns (``owned``) also accepts an empty ``verify``. The module
 applies when a compared object drifts, also when one cannot be verified if
 ``apply_unverifiable`` is set, and always with ``activate: always``.
 
-An area whose product tracks pending work follows it (``pending``): it
+A subsystem whose product tracks pending work follows it (``pending``): it
 applies when work is pending, reports pending objects as drifting, and
 refuses drift without pending work before applying, because the apply would
-not repair it. After the apply only the pending objects are verified. An
-area whose comparison and pending work read the same state first reads it
-once in ``survey``, which runs before the first comparison.
+not repair it. After the apply only the pending objects are verified. A
+subsystem whose comparison and pending work read the same state first reads
+it once in ``survey``, which runs before the first comparison.
 
 A reply lost after the apply request was sent (a timeout, a dropped
 connection or an undecodable body) proves nothing by itself. The module goes
@@ -126,7 +126,7 @@ def argument_spec(*, objects: bool = False) -> dict[str, Any]:
 
 
 class Activation(Binding, sequence=("verify_activation", "verdict", "converged")):
-    """Verifying activation of one area; an apply module supplies the hooks.
+    """Verifying activation of one subsystem; an apply module supplies the hooks.
 
     ``compare`` reports ``in_sync``, ``drift`` or ``unverifiable`` per
     object and ``activate`` sends the apply. ``requested``, ``survey``,
@@ -159,7 +159,7 @@ class Activation(Binding, sequence=("verify_activation", "verdict", "converged")
 
         A name item stands for itself; an object item for its ``uuid`` when
         given, otherwise for its name. ``activate: auto`` needs a name unless
-        the area is ``owned``.
+        the subsystem is ``owned``.
         """
         identities: dict[str, Any] = {}
         for item in self.params.get("verify") or []:
@@ -190,7 +190,7 @@ class Activation(Binding, sequence=("verify_activation", "verdict", "converged")
         raise NotImplementedError
 
     def pending(self) -> dict[str, Any] | None:
-        """Objects with pending work, or None when the area tracks none."""
+        """Objects with pending work, or None when the subsystem tracks none."""
         return None
 
     def activate(self) -> None:

@@ -542,8 +542,8 @@ def test_collection_readme_closing_sections_are_identical() -> None:
 
 def test_template_inputs_are_not_linted_as_ansible_templates() -> None:
     config = source_yaml(ROOT / "collection_default/.ansible-lint.j2")
-    # The second entry keeps a recovery drill's area settings, data below a
-    # tasks/ directory, from being linted as a task list.
+    # The second entry keeps a recovery drill's subsystem settings, data below
+    # a tasks/ directory, from being linted as a task list.
     assert config["kinds"] == [
         {"inventory": "extensions/molecule/**/inventory/*.yml.j2"},
         {"vars": "extensions/molecule/**/tasks/recovery/**/settings.yml"},

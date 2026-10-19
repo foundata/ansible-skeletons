@@ -125,7 +125,7 @@ def test_management_guard_is_appliance_only() -> None:
 def test_recovery_stage_is_appliance_only() -> None:
     paths = (
         "shared/tasks/recovery.yml.j2",
-        "shared/tasks/recovery_areas.yml.j2",
+        "shared/tasks/recovery_subsystems.yml.j2",
         "shared/tasks/recovery_fresh.yml.j2",
         "shared/tasks/recovery_upload.yml.j2",
         "shared/playbooks/recovery.yml.j2",

@@ -18,7 +18,7 @@ and the project adheres to
 
 - Rename `collection_modules_grid` to `collection_modules_appliance`. Select
   the variant by management-path configuration, global activation and
-  per-area console recovery, not by a grid-style API.
+  per-subsystem console recovery, not by a grid-style API.
 - Both module variants: replace the definition engine's independent
   `Engine.run` and result boundary with hooks on one lifecycle base. Keep
   `Engine(module, resource, client)` for definition-driven reads.
@@ -140,9 +140,9 @@ and the project adheres to
   runtime check's `subprocess.run` call passes `check=False`, which pylint's
   `subprocess-run-check` demanded in every ansible-test sanity lane of a
   rendered collection.
-- Appliance variant: the Molecule README's example for drilling one area on
-  its own names the area `fixture`; `default` is not an area of the rendered
-  scenario, so the playbook refused it.
+- Appliance variant: the Molecule README's example for drilling one subsystem
+  on its own names the subsystem `fixture`; `default` is not a subsystem of
+  the rendered scenario, so the playbook refused it.
 
 ### Added
 
@@ -155,8 +155,8 @@ and the project adheres to
   product's pending work and `protect` to guard the apply. `owned` makes an
   empty `verify` compare every owned object and `apply_unverifiable` applies
   unless every object is in sync. The result reports `verification` per object.
-  `run()` keeps serving areas whose steps are plain functions and takes
-  `settle_seconds` instead of a `settle` function.
+  `run()` keeps serving subsystems whose steps are plain functions and
+  takes `settle_seconds` instead of a `settle` function.
 - Both module variants: a `stages()` hook splits one declared change into
   several writes that `reconcile()` runs in order, such as creating an
   object disabled and enabling it, or disabling it before deleting it. Each
@@ -220,21 +220,23 @@ and the project adheres to
   hooks, its shared tests, a management-path guard scaffold, recovery and
   single-writer prerequisites, and `verified: unverifiable` semantics.
 - Appliance variant: a conditional last-stage recovery drill, generic fresh
-  API and DNS probes, fail-closed area hooks, the console lab contract and
-  a standalone drill playbook for one area. No recovery scenario is added.
-  Each area keeps its hooks in `<scenario>/tasks/recovery/<area>/`, a
-  scenario with one area may keep them in `tasks/recovery/`, and the stage
-  drills a scenario's areas one after another. The standalone playbook takes
-  `MOLECULE_RECOVERY_SCENARIO` and `MOLECULE_RECOVERY_AREA` and refuses an
-  unknown one, naming the areas it found. Console labels derive from the area
-  name in the characters the lab console accepts.
-  An area may add `observe.yml`, which observes a loss that costs only
+  API and DNS probes, fail-closed subsystem hooks, the console lab contract
+  and a standalone drill playbook for one subsystem. No recovery scenario is
+  added. Each subsystem keeps its hooks in
+  `<scenario>/tasks/recovery/<subsystem>/`, a scenario with one subsystem may
+  keep them in `tasks/recovery/`, and the stage drills a scenario's
+  subsystems one after another, as `shared/tasks/recovery_subsystems.yml`
+  finds them. The standalone playbook takes `MOLECULE_RECOVERY_SCENARIO` and
+  `MOLECULE_RECOVERY_SUBSYSTEM` and refuses an unknown one, naming the
+  subsystems it found. Each drill records its `subsystem`, and console labels
+  derive from that name in the characters the lab console accepts.
+  A subsystem may add `observe.yml`, which observes a loss that costs only
   DNS-dependent access instead of the API probe, and `settings.yml`, data
   whose `fresh_dns: false` and `fresh_dns_reason` skip the fresh DNS check for
   a scenario that moves the management resolver, while `fresh_dns: auto`
   asks for the management name once before the drill and requires a fresh
-  answer after the restore only when that one came, for an area that drills
-  in such a scenario and on its own; the drill parses the file without
+  answer after the restore only when that one came, for a subsystem that
+  drills in such a scenario and on its own; the drill parses the file without
   running it and refuses any other key.
   `shared/tasks/recovery_upload.yml` uploads a helper into the appliance
   through the console: base64 chunks within the endpoint's limits of 32
@@ -242,19 +244,19 @@ and the project adheres to
   checked by SHA-256 in the appliance. The Molecule README says that the
   console runs its commands in a POSIX shell, names its limits and sends a
   step that needs a longer command through an uploaded helper.
-  The documents say that an area's hooks may use the console for fixtures the
-  restore undoes, that the drill and lost-reply stages need the scenario's
+  The documents say that a subsystem's hooks may use the console for fixtures
+  the restore undoes, that the drill and lost-reply stages need the scenario's
   dependencies in place rather than running last, and that none of this
   changes the lab contract.
-  The fixture's default scenario drills two areas against the fake product,
-  which serves a console and a resolver under the lab contract: `fixture`
-  loses only DNS and observes it through `observe.yml`, `fixture_nested`
-  loses API access after an uploaded helper turns its anti-lockout fixture
-  off. The fixture's hooks and recovery commands work only against that fake
-  and fail at the backup elsewhere.
-- checks: the full matrix drills the appliance render's two areas against its
-  fake console, drills one area through the standalone playbook after it
-  refused an unknown one, and proves the skip without a console contract.
+  The fixture's default scenario drills two subsystems against the fake
+  product, which serves a console and a resolver under the lab contract:
+  `fixture` loses only DNS and observes it through `observe.yml`,
+  `fixture_nested` loses API access after an uploaded helper turns its
+  anti-lockout fixture off. The fixture's hooks and recovery commands work
+  only against that fake and fail at the backup elsewhere.
+- checks: the full matrix drills the appliance render's two subsystems against
+  its fake console, drills one subsystem through the standalone playbook after
+  it refused an unknown one, and proves the skip without a console contract.
 - Rendered Boundaries documentation names the base, engine, activation,
   harnesses and shared tests as skeleton-owned invariants, plus the
   appliance-only activation and drill files. It describes the contract

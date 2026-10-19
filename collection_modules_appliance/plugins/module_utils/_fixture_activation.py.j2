@@ -69,7 +69,7 @@ def compare_fixture(client: Client, names: list[str]) -> dict[str, str]:
 
 
 def apply_fixture(client: Client) -> None:
-    """Activate the fixture area, including other writers' pending changes."""
+    """Activate the fixture subsystem, including other writers' pending changes."""
     response = client.write("/fixture/reconfigure")
     if not isinstance(response, dict) or response.get("status") != "ok":
         raise ProductError(code="activation_failed")

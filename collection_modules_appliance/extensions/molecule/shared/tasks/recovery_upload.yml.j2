@@ -4,9 +4,10 @@
 # next to its destination, checked by SHA-256 in the appliance and renamed
 # over the destination; see shared/files/recovery_upload.py.
 #
-# Include it from an area's hooks with "recovery_upload_src" (a controller
-# path), "recovery_upload_dest" (a path in the appliance of letters, digits
-# and "._/-") and optionally "recovery_upload_mode" (default "0700").
+# Include it from a subsystem's hooks with "recovery_upload_src" (a
+# controller path), "recovery_upload_dest" (a path in the appliance of
+# letters, digits and "._/-") and optionally "recovery_upload_mode"
+# (default "0700").
 # recovery_defaults["upload"] in the inventory names the appliance's base64
 # decoder ("decode") and SHA-256 tool ("digest"); both read standard input.
 #

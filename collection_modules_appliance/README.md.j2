@@ -32,7 +32,7 @@ invented fixture contract below after qualifying the first product resource.
 | `fixture`        | Converge one saved record |
 | `fixture_nested` | Manage a nested resource through lifecycle hooks |
 | `fixture_info`   | Read its public saved state |
-| `fixture_apply`  | Activate the fixture area and verify named records |
+| `fixture_apply`  | Activate the fixture subsystem and verify named records |
 <!-- END MODULE TABLE -->
 
 This table is maintained by hand. Module documentation is authoritative:
@@ -62,9 +62,9 @@ credentials and TLS trust are caller prerequisites.
 
 The managed configuration carries the management path, so a change can cut
 off the API that the modules use. Activation applies every pending change in
-its area. Console recovery is rehearsed for each area before the area's
-first write that can affect the management path. [Requirements](#requirements)
-lists what this asks of you.
+its subsystem. Console recovery is rehearsed for each subsystem before the
+subsystem's first write that can affect the management path.
+[Requirements](#requirements) lists what this asks of you.
 
 ### Identity
 
@@ -81,19 +81,19 @@ writers, including inventory aliases that address the same endpoint.
 
 Resource writes save state. Run `fixture_apply` with `activate: auto` and a
 `verify` list on every workflow execution. It consumes all pending changes in
-the area, compares only the named objects, and waits for observed convergence.
-`always` forces activation. If the activation reply is lost, `fixture_apply`
-reads the active state again. When it matches the saved state, the run
-succeeds; otherwise it reports `outcome: unknown`.
+the subsystem, compares only the named objects, and waits for observed
+convergence. `always` forces activation. If the activation reply is lost,
+`fixture_apply` reads the active state again. When it matches the saved state,
+the run succeeds; otherwise it reports `outcome: unknown`.
 
-FIXME Describe each area without a probe of its active state, which uses
+FIXME Describe each subsystem without a probe of its active state, which uses
 act-once activation from `_act_once.py`: a preflight, at most one activation
 request per run and optional bounded readiness checks. Normal mode reports
 `verified: unverifiable`, because readiness does not prove what the product
 loaded; check mode reports `verified: predicted`. A lost activation reply
-leaves the outcome unknown and is never retried. State the area's activation
-scope, probe limits and recovery prerequisites. Delete this paragraph if
-every area has a probe.
+leaves the outcome unknown and is never retried. State the subsystem's
+activation scope, probe limits and recovery prerequisites. Delete this paragraph
+if every subsystem has a probe.
 
 ### Check and diff mode
 
