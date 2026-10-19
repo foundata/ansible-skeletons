@@ -14,279 +14,93 @@ and the project adheres to
 
 ## [Unreleased]
 
-### Changed
-
-- Rename `collection_modules_grid` to `collection_modules_appliance`. Select
-  the variant by management-path configuration, global activation and
-  per-subsystem console recovery, not by a grid-style API.
-- Both module variants: replace the definition engine's independent
-  `Engine.run` and result boundary with hooks on one lifecycle base. Keep
-  `Engine(module, resource, client)` for definition-driven reads.
-- Separate activation ownership: the verifying helper stays shared; act-once
-  activation and its hooks ship only in the appliance variant.
-- collection_default, collection_modules, collection_modules_appliance: the
-  noxfile sets `nox.options.default_venv_backend = "uv|virtualenv"`. Nox
-  creates session environments with uv when it is installed and falls back
-  to virtualenv otherwise; `--default-venv-backend` still overrides it.
-- checks: the second module identity keeps its render checks, default Nox
-  sessions, build and installed modules, plus one ansible-test sanity run on
-  the newest released core. Sanity, units and integration on every core stay
-  with the first identity.
-- checks: independent steps run at the same time, `--jobs N` at once and by
-  default half the CPUs, each with its own log under `logs/` and its own
-  temporary directory; infrastructure tiers stay one at a time.
-- checks: one download of the pinned Galaxy collections per run serves the
-  generated lint, the module renders and the infrastructure tiers. The module
-  renders' ansible-test containers use a Podman store of each render's own
-  that reads your images read-only instead of pulling them again. The module
-  renders install their Molecule scenario's collections from that download as
-  well, so antsibull-nox finds them installed and no render calls Galaxy; a
-  scenario collection that `tests/requirements.yml` does not pin fails the
-  render.
-- checks: an output may have any path; the 29-byte limit is gone. Python's
-  multiprocessing listeners, the generated collection's `docs-check` workers,
-  Podman and Molecule's SSH connections bind their Unix sockets in a short
-  directory that the check creates in `XDG_RUNTIME_DIR` and removes at the
-  end. Without `--output`, the check works below `/var/tmp` instead of `/tmp`.
-- checks: Ansible's module files go to `remote-tmp` in each step's work
-  directory; a local connection's `remote_tmp` ignores the relocated `HOME`
-  and had put them below the user's own `~/.ansible/tmp`.
-- Both module variants: a failed write whose read-back moved reports
-  `outcome: changed`, after a lost reply and after an acknowledged write
-  alike. A read-back that did not move stays `unknown`.
-- Both module variants: a definitive refusal reports the step of the write it
-  refused, such as `update`, instead of `reconcile`, the step of its
-  read-back.
-- Both module variants: the base sets `self.changed` before `protect`, so
-  guards and later hooks read whether the declaration changes anything
-  instead of computing it again.
-- Both module variants: `execute(action)` always runs `prepare()` before the
-  action: it connects once and applies the binding's compatibility policy, so
-  an action uses `self.client` and never connects itself. `prepare()` keeps
-  an existing client instead of building a second one. The action starts
-  with the operation the instance had before, and a resource with another
-  transport, such as a command runner, overrides `connect`. `connect()` and
-  the `fixture_nested` scaffold's `__init__` say where a transport that must
-  check its target before use does so: where it builds its first command,
-  not in a method that receives a command already built.
-- Both module variants: the base's docstrings say how a resource that learns
-  the product version from its first read checks compatibility (call
-  `ensure_compatible` in `lookup`), that `execute(action)` is the shape for a
-  write whose read-back is expensive or impossible after a timeout, and that
-  `finish()` also runs after an action and after `act_once`.
-- Both module variants: after a lost apply reply, the verifying activation
-  fails with the outcome unknown while a compared object stays unverifiable;
-  an acknowledged apply that does not converge reports `outcome: changed`.
-  Its failures carry the lifecycle base's fields, with the objects that did
-  not converge under `not_effective`.
-- All skeletons: `requirements.txt` says to list additional Python packages
-  or, when there are none, to keep the file with a comment saying so, which
-  is what every `FIXME.md` now says.
-- Appliance variant: the README template keeps the one-writer and recovery
-  prerequisites in a Requirements section, where product READMEs keep them,
-  and its "Management path and recovery" contract points there instead of
-  repeating them.
-- collection_default, collection_modules, collection_modules_appliance: the
-  rendered `DEVELOPMENT.md` says to run the sessions of one ansible-core
-  release while editing and the default sessions before a commit, not every
-  session its list shows, which includes `molecule`.
-- collection_default, collection_modules, collection_modules_appliance: the
-  rendered noxfile gives a session whose `TMPDIR` is too long for a Unix
-  socket path a short link to it in a private directory below
-  `XDG_RUNTIME_DIR` (or `/tmp`), removed when nox ends. Python's
-  multiprocessing, which `reuse lint` and `docs-check` use, binds its sockets
-  there, so the default sessions also pass in a deeply nested checkout.
-- collection_default, collection_modules, collection_modules_appliance:
-  `docs-check` installs antsibull-docs 2.28.0 or later, the first release that
-  accepts `no_log` in role argument specs.
-- Both module variants: the rendered `DEVELOPMENT.md` lists the files that
-  come from the skeleton by directory and sends changes to them to the
-  skeleton, and its checks start with the commands. The Molecule README
-  describes the loss cases, the recovery drill and its lab contract in steps
-  and lists, and the appliance README turns act-once activation into a FIXME,
-  as no fixture module uses it.
-- role_default, collection_default: the Molecule README lists the `create`
-  and `destroy` task directories and its FAQ covers direct Molecule runs.
-  collection_default's `DEVELOPMENT.md` starts its checks with the commands
-  and explains `runtime-check`, `ansible-lint` and `helper-lint`.
-- collection_default, collection_modules, collection_modules_appliance,
-  role_default: the docs no longer ask to run every container-backed session
-  sequentially, as ansible-test sessions can run in parallel. They say
-  instead that two Molecule runs at once collide, because Molecule names each
-  container after its platform.
-- role_default, collection_default: the README opens with the project's
-  `description`. The role READMEs say that the `always` init tasks run with
-  any `--tags` selection, and Compatibility names the ansible-core floor and
-  asks for the supported platforms in a FIXME. The `_state` and
-  `_autoupgrade` descriptions in `argument_specs.yml`, and their copies in the
-  README and `defaults/main.yml`, read as plain sentences.
-- collection_modules, collection_modules_appliance: a FIXME asks to replace
-  the README's fixture compatibility row with the tested product series.
-- Both module variants: `FIXME.md` and the binding's comment say that
-  building the client sends nothing, no login and no version probe, because
-  `compatibility_always` and the contract tests depend on it. `connect()`'s
-  docstring says that `prepare` builds the client after a supplied action's
-  `validate`.
-
-### Fixed
-
-- Both module variants: honour `Binding.compatibility_always` on lifecycle
-  entry points and information reads, and make the shared noop and info
-  contract tests follow that policy.
-- Both module variants: the verifying activation helper `_activation.run`
-  honours `Binding.compatibility_always` and checks the product version
-  before its comparison when the binding asks for it.
-- collection_default, collection_modules, collection_modules_grid: the
-  runtime check's `subprocess.run` call passes `check=False`, which pylint's
-  `subprocess-run-check` demanded in every ansible-test sanity lane of a
-  rendered collection.
-- Appliance variant: the Molecule README's example for drilling one subsystem
-  on its own names the subsystem `fixture`; `default` is not a subsystem of
-  the rendered scenario, so the playbook refused it.
-
 ### Added
 
-- Both module variants: `Activation` in `_activation.py` is the verifying
-  activation on the lifecycle base, with the binding's connection, compatibility
-  policy and failure contract. An apply module supplies `compare` and
-  `activate`, and where it needs them `requested` for `verify` items with a
-  `name` and an optional `uuid`, `survey` to read once, before the first
-  comparison, what the comparison and `pending` share, `pending` to follow the
-  product's pending work and `protect` to guard the apply. `owned` makes an
-  empty `verify` compare every owned object and `apply_unverifiable` applies
-  unless every object is in sync. The result reports `verification` per object.
-  `run()` keeps serving subsystems whose steps are plain functions and
-  takes `settle_seconds` instead of a `settle` function.
-- Both module variants: a `stages()` hook splits one declared change into
-  several writes that `reconcile()` runs in order, such as creating an
-  object disabled and enabling it, or disabling it before deleting it. Each
-  stage names its step, the state its read-back must show (`want` and
-  `absent`), its request, and whether that request sends a field `secret`
-  names; each later stage starts from the read-back of the one before. A lost
-  reply is settled by its own stage's read-back, and fails `create_unknown`
-  only when that stage sent a secret. A failing stage keeps the outcome the
-  earlier stages confirmed. The default is the single `write`.
-- Both module variants: the lifecycle base's docstring lists the hooks and
-  settings a subclass may override and the names it reserves: the sequence,
-  its helpers and the instance state. A subclass that redefines a reserved
-  name, such as a class attribute `key` or a method `prepare`, fails when
-  its class is created, at import.
-- Appliance variant: `ActOnce` refuses to come after another lifecycle class
-  in a subclass's bases and says why in its docstring: listed after the
-  binding or a resource class, any member of the same name there would
-  replace the activation's silently. Declare `class Apply(ActOnce, Binding)`.
-- Both module variants: the base's failure boundary maps an `OSError` from a
-  local file or process operation to category `local`, code
-  `operation_failed`, without the error's message; the rendered error schema
-  declares the pair.
-- Both module variants: `execute(action, validate=check)` runs `check`, a
-  request-free test of the action's input, before the base connects, so
-  invalid input is refused under the action's operation before a locator or
-  connection error can be. `ActOnce.execute` passes it on.
-- checks: `--resume <output>` reruns only the failed and missing steps of an
-  earlier run of the same sources; `scripts.release check --resume` does the
-  same for the evidence of the same commit.
-- checks: a passing check keeps only its evidence: `run.json`, `records/`,
-  `logs/`, the JUnit results, `checks.json` and the collection archives it
-  lists, which is all that `scripts.release tag` and `verify` read. `--keep`
-  retains everything. `--remove <output>` deletes one check output or release
-  evidence after proving it is one.
-- checks: `--changed` runs the static checks, the repository tests and only
-  the lanes and module skeletons whose sources differ from `HEAD`; it never
-  writes a passing report.
-- Both module variants: skeleton-owned `_lifecycle.py`, a product-bound
-  `_binding.py`, and synthetic `test_lifecycle.py` coverage for resource hooks,
-  custom operations, staged writes and lost-response settlement.
-- Both module variants: a hook-based resource scaffold, `fixture_nested`, with
-  hook contracts, module documentation, unit and file-only integration tests,
-  default scenario tasks, a verifier slot, a Usage placeholder and a copy
-  checklist. Its pass-through overrides say to delete them when unchanged,
-  its `__init__` shows where per-instance state goes, and its docstring says
-  that an override keeps the base's parameter names. `test_lifecycle.py`
-  checks that for every lifecycle class below `plugins/module_utils/`, the
-  scaffold's copies included, which only ansible-test sanity's pylint would
-  otherwise report, so a collection needs no test of its own for it.
-- Both module variants: one parameterized response-loss harness, exercised
-  for create, update and delete by both fixtures. A case declares an empty
-  identity for a module without identity options, `expected_writes` and
-  `drop: all` for a change written in stages, a `route` prefix and `when`
-  keyword arguments, such as `{"write": true}`, that select the counted
-  writes, `rerun: none` for an operation that acts on every run and a
-  `target` other than `_client.Client.write`; the proof names the module
-  file that ran and the selector. The scenario runs the cases hidden, since
-  their parameters carry the credentials, and then shows each proof, which
-  holds none.
-- Appliance variant: `_act_once.py` with preflight and bounded readiness
-  hooks, its shared tests, a management-path guard scaffold, recovery and
-  single-writer prerequisites, and `verified: unverifiable` semantics.
-- Appliance variant: a conditional last-stage recovery drill, generic fresh
-  API and DNS probes, fail-closed subsystem hooks, the console lab contract
-  and a standalone drill playbook for one subsystem. No recovery scenario is
-  added. Each subsystem keeps its hooks in
-  `<scenario>/tasks/recovery/<subsystem>/`, a scenario with one subsystem may
-  keep them in `tasks/recovery/`, and the stage drills a scenario's
-  subsystems one after another, as `shared/tasks/recovery_subsystems.yml`
-  finds them. The standalone playbook takes `MOLECULE_RECOVERY_SCENARIO` and
-  `MOLECULE_RECOVERY_SUBSYSTEM` and refuses an unknown one, naming the
-  subsystems it found. Each drill records its `subsystem`, and console labels
-  derive from that name in the characters the lab console accepts.
-  A subsystem may add `observe.yml`, which observes a loss that costs only
-  DNS-dependent access instead of the API probe, and `settings.yml`, data
-  whose `fresh_dns: false` and `fresh_dns_reason` skip the fresh DNS check for
-  a scenario that moves the management resolver, while `fresh_dns: auto`
-  asks for the management name once before the drill and requires a fresh
-  answer after the restore only when that one came, for a subsystem that
-  drills in such a scenario and on its own; the drill parses the file without
-  running it and refuses any other key.
-  `shared/tasks/recovery_upload.yml` uploads a helper into the appliance
-  through the console: base64 chunks within the endpoint's limits of 32
-  commands of at most 200 printable bytes per request, written atomically and
-  checked by SHA-256 in the appliance. The Molecule README says that the
-  console runs its commands in a POSIX shell, names its limits and sends a
-  step that needs a longer command through an uploaded helper.
-  The documents say that a subsystem's hooks may use the console for fixtures
-  the restore undoes, that the drill and lost-reply stages need the scenario's
-  dependencies in place rather than running last, and that none of this
-  changes the lab contract.
-  The fixture's default scenario drills two subsystems against the fake
-  product, which serves a console and a resolver under the lab contract:
-  `fixture` loses only DNS and observes it through `observe.yml`,
-  `fixture_nested` loses API access after an uploaded helper turns its
-  anti-lockout fixture off. The fixture's hooks and recovery commands work
-  only against that fake and fail at the backup elsewhere.
-- checks: the full matrix drills the appliance render's two subsystems against
-  its fake console, drills one subsystem through the standalone playbook after
-  it refused an unknown one, and proves the skip without a console contract.
-- Rendered Boundaries documentation names the base, engine, activation,
-  harnesses and shared tests as skeleton-owned invariants, plus the
-  appliance-only activation and drill files. It describes the contract
-  subject and the copied scaffold so that it reads right in a fresh render
-  and in a collection whose resources replaced the fixture.
-- collection_default, collection_modules, collection_modules_grid: a default
-  `runtime-check` Nox session checks a built artifact with only `meta/`,
-  `plugins/`, `roles/` and `playbooks/` retained. It checks imports,
-  documentation and role syntax, and runs existing unit tests outside the
-  stripped collection. Skeleton runtime smoke tests also use the stripped
-  installation.
-- collection_default, collection_modules, collection_modules_grid:
-  `requirements-dev.txt` requires `releasing>=7.0.0`, whose `release build`
-  runs sanity tests on the committed revision before building the archive.
-  The file is excluded from Galaxy archives.
-- collection_default, collection_modules, collection_modules_grid: a default
-  `helper-lint` Nox session checks Python under `extensions/molecule/`,
-  `roles/*/files/`, `tools/` and `scripts/` with Ruff, without executing helpers
-  or adding them to mypy's scope. Local runs fix imports and format; `CI=true`
-  only checks. Explicit CI session lists must include `helper-lint`.
-- collection_default: an explicit `ruff.toml` using the module skeletons'
-  lint and formatting policy.
+- collection_modules_appliance: the module-only skeleton for appliances whose
+  managed configuration carries the management path and whose activation is
+  global; it replaces `collection_modules_grid`. Choose it by those traits,
+  not by the shape of the API. It adds act-once activation, a management-path
+  guard scaffold and a recovery drill that backs up through the console,
+  cuts off API access and restores; without a console contract the drill
+  skips with a reason. Declare `class Apply(ActOnce, Binding)`: `ActOnce`
+  refuses to come after another lifecycle class.
+- Both module variants: one skeleton-owned lifecycle base, `_lifecycle.py`,
+  runs every resource module and owns the order of steps, the result and the
+  failure contract; the definition engine supplies hooks to it. A collection
+  binds it once in `_binding.py` to its client, error schema and
+  `compatibility_always`. The client must send nothing when it is built,
+  because that setting decides when the first request goes out.
+- Both module variants: `fixture_nested`, a hook-based resource to copy for
+  every resource a definition cannot express. Edit its hooks, never the
+  sequence.
+- Both module variants: `stages()` writes one change in several requests,
+  such as creating an object disabled and enabling it afterwards. Each stage
+  says whether its request sends a secret field, so a lost reply to a stage
+  that sends none settles by its read-back.
+- Both module variants: `execute(action, validate=check)` runs an operation
+  that fits no resource sequence under the base's connection, probe policy
+  and failure boundary, and refuses invalid input before connecting.
+- Both module variants: `Activation`, the verifying activation as a class on
+  the base; `run()` remains for steps that are plain functions.
+- Both module variants: a subclass that redefines a name the base reserves,
+  such as `key` or `prepare`, fails at import.
+- Both module variants: a local `OSError` fails with category `local`, code
+  `operation_failed`, without its message, which may name private paths.
+- Both module variants: one lost-reply harness for Molecule,
+  `extensions/molecule/shared/files/loss.py`. It drops a real reply and
+  proves that the module settles by read-back without writing again.
+- collection_default, collection_modules, collection_modules_appliance: the
+  default nox sessions `runtime-check`, which checks the built archive with
+  only what ships, and `helper-lint`, which lints Python outside `plugins/`.
+  CI configurations that list sessions must add `helper-lint`.
+  `requirements-dev.txt` requires `releasing>=7.0.0`.
+- checks: `--jobs` runs independent steps in parallel, `--resume` reruns only
+  the failed and missing steps, `--changed` checks only what uncommitted
+  changes affect, and a passing check keeps only its evidence (`--keep` keeps
+  everything, `--remove` deletes an output).
+
+### Changed
+
+- Both module variants: failure outcomes follow the read-back. A failed write
+  whose read-back moved reports `outcome: changed`, one that did not move
+  `unknown`. A refusal stays a failure, reported under the step of the write
+  it refused, even when the read-back shows the declared state. After a lost
+  apply reply, the verifying activation fails with `unknown` while an object
+  stays unverifiable; an acknowledged apply that does not converge reports
+  `changed`.
+- Both module variants: the rendered `DEVELOPMENT.md` lists the files that
+  come from the skeleton. A collection updates them from a newer render
+  instead of editing them.
+- collection_default, collection_modules, collection_modules_appliance: nox
+  creates session environments with uv when it is installed, and gives a
+  session whose `TMPDIR` is too long for a Unix socket a short link, so the
+  default sessions pass in deeply nested checkouts. `docs-check` requires
+  antsibull-docs 2.28.0 or later, the first release that accepts `no_log` in
+  role argument specs.
+- (collection|role)_default: the README opens with the project's
+  `description`, and the role README asks for the supported platforms in a
+  FIXME instead of pointing to an internal variable.
+- All skeletons: keep `requirements.txt` with a comment when no package is
+  needed. The Molecule READMEs say that two runs of one scenario at the same
+  time collide, because Molecule names containers after their platforms.
+- checks: an output may have any path, since Unix sockets bind in a short
+  directory below `XDG_RUNTIME_DIR`; without `--output`, the check works
+  below `/var/tmp`. The pinned Galaxy collections download once per run, and
+  a Molecule scenario collection that `tests/requirements.yml` does not pin
+  fails the render.
 
 ### Removed
 
-- The `collection_modules_grid` initialization path; use
-  `collection_modules_appliance`.
-- The engine's separate lifecycle sequence and local client/schema binding.
-  Invariant tests and product bindings migrate to `_binding.py`; hook-based
-  resources use the base's hooks rather than patching `_engine`.
+- `collection_modules_grid`; render `collection_modules_appliance` instead.
+- The engine's own sequence, `Engine.run`, and its local client binding.
+  Bindings move to `_binding.py`, and hook-based resources use the base's
+  hooks. `Engine(module, resource, client)` remains for definition-driven
+  reads.
+
+### Fixed
+
+- checks: Ansible's module files no longer land in the user's
+  `~/.ansible/tmp`.
 
 
 ## [2.10.0] - 2026-10-15
