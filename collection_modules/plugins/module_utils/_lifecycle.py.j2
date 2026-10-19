@@ -56,9 +56,9 @@ keeps the outcome unknown. A write that the client reports as never started
 (``started``) is unchanged. A field the product never returns (``secret``)
 is always written, to an existing object only with ``update_password:
 always``; it makes a successful write ``unverifiable`` and a lost one
-unknown. In a staged change, each stage says whether its write sends such a
-field, so a lost reply to a stage that sends none settles by its read-back
-alone.
+unknown (``secret_unknown``). In a staged change, each stage says whether its
+write sends such a field, so a lost reply to a stage that sends none settles
+by its read-back alone.
 
 Failures go through the binding's error schema with ``operation``,
 ``outcome`` (``unchanged``, ``unknown`` or ``changed``), the identity
@@ -492,7 +492,7 @@ class Lifecycle:
                 raise
             self.verify(observed, self.want, self.absent)
             if sends:
-                raise Failure(category="verification", code="create_unknown") from None
+                raise Failure(category="verification", code="secret_unknown") from None
         else:
             self.step("verify")
             self.settling = True

@@ -31,6 +31,8 @@ and the project adheres to
 
 - Both module variants: the default `predict()` includes the identity when
   creating.
+- Both module variants: the error code `create_unknown` is now
+  `secret_unknown`, for any lost reply to a request that sends a secret.
 
 
 ## [3.0.0] - 2026-10-19

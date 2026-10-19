@@ -74,7 +74,7 @@ SCHEMA = errors.ErrorSchema(
             "still_present",
             "missing_after_write",
             "not_persisted",
-            "create_unknown",
+            "secret_unknown",
         },
     },
     fallback=("internal", None),
@@ -401,7 +401,7 @@ def test_secret_is_unverifiable_and_rotates_only_when_asked(
     assert rotated["changed"] and rotated["changed_fields"] == ["secret"]
     store.after = lose
     lost = run_module(main, name="a", secret="s5", update_password="always")
-    assert lost["error_code"] == "create_unknown" and lost["outcome"] == "unknown"
+    assert lost["error_code"] == "secret_unknown" and lost["outcome"] == "unknown"
 
 
 @pytest.mark.parametrize("lost_reply", [False, True])
@@ -1104,5 +1104,5 @@ def test_a_lost_stage_settles_by_read_back_unless_it_sends_the_secret(
         assert not result.get("failed") and result["verified"] == "unverifiable"
     else:
         assert store.writes == ["create"]
-        assert result["error_code"] == "create_unknown"
+        assert result["error_code"] == "secret_unknown"
         assert result["outcome"] == "changed"

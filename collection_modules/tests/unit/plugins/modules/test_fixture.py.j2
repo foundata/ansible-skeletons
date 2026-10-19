@@ -158,7 +158,7 @@ def test_lost_secret_write_cannot_be_verified(
     fake.lose_next("create", lost_response)
     result = run_module(fixture.main, name="example", password="SYNTHETIC-unreadable")
     # The object exists after the lost reply; only its secret stays unknown.
-    assert result["failed"] and result["error_code"] == "create_unknown"
+    assert result["failed"] and result["error_code"] == "secret_unknown"
     assert result["changed"] and result["outcome"] == "changed"
     assert len(fake.writes()) == 1
 
