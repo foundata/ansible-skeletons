@@ -14,6 +14,11 @@ and the project adheres to
 
 ## [Unreleased]
 
+- Nothing worth mentioning right now.
+
+
+## [3.0.0] - 2026-10-19
+
 ### Added
 
 - collection_modules_appliance: the module-only skeleton for appliances whose
@@ -575,7 +580,8 @@ and the project adheres to
 - All functionality and files, `role_default`
 
 
-[unreleased]: https://github.com/foundata/ansible-skeletons/compare/v2.10.0...HEAD
+[unreleased]: https://github.com/foundata/ansible-skeletons/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v3.0.0
 [2.10.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.10.0
 [2.9.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.9.0
 [2.8.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.8.0
