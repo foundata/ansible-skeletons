@@ -67,12 +67,18 @@
 # proof holds none and names the module file that settled the reply.
 - name: "Show the proof of each lost reply"
   ansible.builtin.debug:
-    msg: "{{ '{{' }} __loss_run['stdout'] | ansible.builtin.from_json {{ '}}' }}"
+    msg: >-
+      {{ '{{' }}
+        __loss_proofs['results']
+        | ansible.builtin.map(attribute='__loss_case')
+        | ansible.builtin.map(attribute='module')
+        | ansible.builtin.zip(
+            __loss_proofs['results']
+            | ansible.builtin.map(attribute='stdout')
+            | ansible.builtin.map('ansible.builtin.from_json'))
+        | ansible.builtin.list
+      {{ '}}' }}
     verbosity: 0
-  loop: "{{ '{{' }} __loss_proofs['results'] {{ '}}' }}"
-  loop_control:
-    loop_var: "__loss_run"
-    label: "{{ '{{' }} __loss_run['__loss_case']['module'] {{ '}}' }}"
 
 - name: "Report lost-response coverage"
   ansible.builtin.debug:

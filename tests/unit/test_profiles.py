@@ -13,7 +13,17 @@ import pytest
 
 from scripts.common import ROOT, GateError
 from scripts.render import example_metadata, render
-from scripts.smoke import identity_sessions
+from scripts.smoke import identity_sessions, scan_credentials
+
+
+@pytest.mark.parametrize("credential", ["SYNTHETIC-KEY", "SYNTHETIC-SECRET"])
+def test_verbose_fixture_scan_rejects_credentials(credential: str) -> None:
+    with pytest.raises(GateError, match="disclosed"):
+        scan_credentials(json.dumps({"invocation": {"stdin": credential}}))
+
+
+def test_verbose_fixture_scan_accepts_public_proof() -> None:
+    scan_credentials('{"module": "fixture", "writes": 1}')
 
 
 @pytest.mark.parametrize(

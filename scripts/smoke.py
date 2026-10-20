@@ -22,7 +22,7 @@ from typing import TextIO
 
 import yaml
 
-from scripts.common import ROOT, GateError, matrix, run, write_json
+from scripts.common import ROOT, GateError, Lane, matrix, run, uv_command, write_json
 from scripts.controller import NOX_LINK, linked, runtime_directory
 from scripts.render import (
     MODULE_PROFILES,
@@ -363,15 +363,114 @@ def fake_product(rendered: Rendered, state: Path) -> Iterator[dict[str, str]]:
             server.wait(timeout=30)
 
 
+PROOF_CREDENTIALS = ("SYNTHETIC-KEY", "SYNTHETIC-SECRET")
+
+
+def scan_credentials(output: str) -> None:
+    """Refuse a verbose log containing either fake product credential."""
+    if any(credential in output for credential in PROOF_CREDENTIALS):
+        raise GateError("Verbose fixture output disclosed a product credential")
+
+
+def proof_loop_control(rendered: Rendered) -> None:
+    """Prove the old loop discloses credentials hidden in a registered run."""
+    play = rendered.work / "proof-loop-control.yml"
+    write_json(
+        play,
+        [
+            {
+                "hosts": "localhost",
+                "connection": "local",
+                "gather_facts": False,
+                "tasks": [
+                    {
+                        "ansible.builtin.command": {
+                            "argv": [sys.executable, "-c", "print('{}')"],
+                            "stdin": ":".join(PROOF_CREDENTIALS),
+                        },
+                        "loop": [{"module": "fixture"}],
+                        "loop_control": {"loop_var": "__loss_case"},
+                        "register": "__loss_proofs",
+                        "no_log": True,
+                    },
+                    {
+                        "name": "Show the proof of each lost reply",
+                        "ansible.builtin.debug": {
+                            "msg": "{{ __loss_run['stdout'] | from_json }}",
+                            "verbosity": 0,
+                        },
+                        "loop": "{{ __loss_proofs['results'] }}",
+                        "loop_control": {
+                            "loop_var": "__loss_run",
+                            "label": "{{ __loss_run['__loss_case']['module'] }}",
+                        },
+                    },
+                ],
+            }
+        ],
+    )
+    output = run(
+        uv_command(
+            Lane("3.13", "core219"),
+            "ansible-playbook",
+            "-vvv",
+            "-i",
+            "localhost,",
+            str(play),
+        ),
+        env=rendered.env,
+        capture=True,
+    )
+    if not all(credential in output for credential in PROOF_CREDENTIALS):
+        raise GateError("The old proof loop did not disclose both control credentials")
+    for credential in PROOF_CREDENTIALS:
+        output = output.replace(credential, "<redacted-control-credential>")
+    print(output, flush=True)
+    print("Old proof loop control: both credentials detected and redacted", flush=True)
+
+
 def molecule_with_fake(rendered: Rendered) -> None:
-    """Run the module Molecule scenario against the render's own fake product."""
+    """Run and scan a verbose fixture scenario, with the old proof as a control."""
+    with (ROOT / "uv.lock").open("rb") as stream:
+        packages = tomllib.load(stream)["package"]
+    version = next(
+        package["version"]
+        for package in packages
+        if package["name"] == "ansible-core" and package["version"].startswith("2.19.")
+    )
+    constraints = rendered.work / "molecule-constraints.txt"
+    constraints.write_text(f"ansible-core=={version}\n", encoding="utf-8")
     with fake_product(rendered, rendered.work / "molecule-fake") as product:
-        run(
-            ["uv", "run", "--python", "3.13", "noxfile.py", "-s", "molecule"],
+        output = run(
+            [
+                "uv",
+                "run",
+                "--python",
+                "3.13",
+                "noxfile.py",
+                "-s",
+                "molecule",
+                "--",
+                "-vvv",
+                "test",
+            ],
             cwd=rendered.collection,
-            env={**rendered.env, "CI": "true", **product},
+            env={
+                **rendered.env,
+                "CI": "true",
+                **product,
+                "UV_CONSTRAINT": str(constraints),
+                "PIP_CONSTRAINT": str(constraints),
+            },
             timeout=1800,
+            capture=True,
         )
+        print(output, flush=True)
+        scan_credentials(output)
+        if "Lost create, update and delete replies settled" not in output:
+            raise GateError("The verbose fixture scenario showed no loss proof")
+        print("Verbose fixture credential scan: passed", flush=True)
+    proof_loop_control(rendered)
 
 
 def drill_alone(rendered: Rendered) -> None:
@@ -894,7 +993,7 @@ def module_identity(
         )
     if index == 0:
         check_short_tmpdir(rendered)
-    if full and index == 0:
+    if index == 0 and (full or profile == "collection_modules"):
         molecule_with_fake(rendered)
     build_collection(rendered)
     exercise_modules(rendered)

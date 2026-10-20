@@ -133,7 +133,8 @@ def test_patches_are_local_and_restored() -> None:
         clock = Clock(monkeypatch)
         clock.patch(deadline)
         clock.patch(poller)
-        assert deadline.time is clock
+        patched_deadline_time: Any = deadline.time
+        assert patched_deadline_time is clock
         assert poller.time is clock
         assert time.sleep is original_sleep
         assert time.monotonic is original_monotonic

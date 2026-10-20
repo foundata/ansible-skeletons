@@ -39,6 +39,13 @@ and the project adheres to
 
 ### Fixed
 
+- Both module variants: the virtual-clock isolation assertion and the
+  shared-file list pass the rendered typing and Markdown checks.
+
+- Both module variants: lost-reply proofs no longer expose registered
+  credentials in verbose output. A fixture scenario runs at `-vvv` in the
+  quick check, with a credential scan and an old-loop disclosure control.
+
 - collection_default, collection_modules, collection_modules_appliance: the
   next nox run removes the short `TMPDIR` links of a nox that was killed.
 
