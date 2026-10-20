@@ -4,12 +4,14 @@
 
 from __future__ import annotations
 
+import time
+from types import ModuleType
 from typing import Any
 
 import pytest
 from ansible.module_utils.basic import AnsibleModule
 
-from ansible_collections.foundata.utils.plugins.module_utils import errors
+from ansible_collections.foundata.utils.plugins.module_utils import deadline, errors
 
 # isort: split
 # Preserve wrapping for maximum-length Galaxy identities.
@@ -22,7 +24,7 @@ from ansible_collections.{{ namespace }}.\
 # isort: on
 # fmt: on
 
-from ..conftest import RunModule
+from ..conftest import Clock, RunModule
 
 
 @pytest.fixture(autouse=True)
@@ -37,7 +39,9 @@ def compatible(monkeypatch: pytest.MonkeyPatch) -> list[str]:
     return checks
 
 
-def run_main(compare: Any, apply: Any, **options: Any) -> Any:
+def run_main(
+    compare: Any, apply: Any, *, settle_seconds: float = 0, **options: Any
+) -> Any:
     def main() -> None:
         module = AnsibleModule(
             argument_spec=_activation.argument_spec(), supports_check_mode=True
@@ -49,11 +53,103 @@ def run_main(compare: Any, apply: Any, **options: Any) -> Any:
             name_pattern=r"[a-z]+",
             compare=compare,
             apply=apply,
-            settle_seconds=0,
+            settle_seconds=settle_seconds,
             **options,
         )
 
     return main
+
+
+def test_virtual_polling_observes_convergence(
+    fake_clock: Clock, run_module: RunModule
+) -> None:
+    fake_clock.patch(_activation)
+    writes = []
+
+    def compare(client: Any, names: list[str]) -> dict[str, str]:
+        return {"one": "in_sync" if fake_clock.now >= 1.5 else "drift"}
+
+    result = run_module(
+        run_main(compare, lambda client: writes.append("apply"), settle_seconds=5),
+        verify=["one"],
+        deadline=3,
+    )
+    assert not result.get("failed")
+    assert result["changed"] and result["verified"] == "observed"
+    assert writes == ["apply"]
+    assert fake_clock.now == 1.5
+
+
+@pytest.mark.parametrize(
+    "budget,limit,elapsed,error_code",
+    [(1, 5, 1, "deadline_exceeded"), (5, 1, 1.25, "not_effective")],
+)
+def test_virtual_timeout_preserves_a_confirmed_write(
+    fake_clock: Clock,
+    run_module: RunModule,
+    budget: float,
+    limit: float,
+    elapsed: float,
+    error_code: str,
+) -> None:
+    fake_clock.patch(_activation)
+    writes = []
+
+    def apply(client: Any) -> None:
+        writes.append("apply")
+        fake_clock.advance(0.25)
+
+    result = run_module(
+        run_main(lambda client, names: {"one": "drift"}, apply, settle_seconds=limit),
+        verify=["one"],
+        deadline=budget,
+    )
+    assert result["failed"]
+    assert result["changed"] and result["outcome"] == "changed"
+    assert writes == ["apply"]
+    assert fake_clock.now == elapsed
+    assert result["error_code"] == error_code
+
+
+def test_sleep_and_work_share_the_real_deadline(fake_clock: Clock) -> None:
+    budget = deadline.Deadline(3)
+    fake_clock.sleep(0.5)
+    fake_clock.advance(1)
+    assert fake_clock.monotonic() == 1.5
+    assert budget.remaining() == 1.5
+    fake_clock.advance(1.5)
+    with pytest.raises(errors.TransportTimeout):
+        budget.remaining()
+
+
+def test_patches_are_local_and_restored() -> None:
+    original_deadline_time = deadline.time
+    assert original_deadline_time is time
+    original_sleep = time.sleep
+    original_monotonic = time.monotonic
+    poller: Any = ModuleType("poller")
+    poller.time = time
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        clock = Clock(monkeypatch)
+        clock.patch(deadline)
+        clock.patch(poller)
+        assert deadline.time is clock
+        assert poller.time is clock
+        assert time.sleep is original_sleep
+        assert time.monotonic is original_monotonic
+    assert deadline.time is original_deadline_time
+    assert poller.time is time
+
+
+@pytest.mark.parametrize("seconds", [-1, float("inf"), float("-inf"), float("nan")])
+def test_invalid_elapsed_time_is_rejected(fake_clock: Clock, seconds: float) -> None:
+    with pytest.raises(ValueError, match="finite and non-negative"):
+        fake_clock.advance(seconds)
+    assert fake_clock.now == 0
+
+
+def test_each_clock_starts_at_zero(fake_clock: Clock) -> None:
+    assert fake_clock.now == 0
 
 
 @pytest.mark.parametrize("category", ["timeout", "transport", "response"])

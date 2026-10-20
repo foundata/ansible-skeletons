@@ -1,21 +1,57 @@
 # SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Generic runner over the real Ansible parser; the fake owns connection defaults."""
+"""Generic module runner and opt-in virtual time over a product-owned fake."""
 
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
+from types import ModuleType
 from typing import Any, Callable
 
 import pytest
 from ansible.module_utils import basic
 
+from ansible_collections.foundata.utils.plugins.module_utils import deadline
+
 from .fake_product import connection, fake
 
-__all__ = ("RunModule", "connection", "fake")
+__all__ = ("Clock", "RunModule", "connection", "fake")
 
 RunModule = Callable[..., dict[str, Any]]
+
+
+class Clock:
+    """Virtual time shared by deadlines and synchronous fake polling."""
+
+    def __init__(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self.now = 0.0
+        self._monkeypatch = monkeypatch
+
+    def patch(self, module: ModuleType) -> None:
+        """Replace a module's local time reference until the test ends."""
+        self._monkeypatch.setattr(module, "time", self)
+
+    def monotonic(self) -> float:
+        return self.now
+
+    def advance(self, seconds: float) -> None:
+        """Model elapsed work without waiting or allowing time to go backwards."""
+        if not math.isfinite(seconds) or seconds < 0:
+            raise ValueError("seconds must be finite and non-negative")
+        self.now += seconds
+
+    def sleep(self, seconds: float) -> None:
+        self.advance(seconds)
+
+
+@pytest.fixture
+def fake_clock(monkeypatch: pytest.MonkeyPatch) -> Clock:
+    """Share virtual time with the real deadline; opt pollers in with patch()."""
+    clock = Clock(monkeypatch)
+    clock.patch(deadline)
+    return clock
 
 
 @pytest.fixture

@@ -73,7 +73,7 @@ def settle(
     client: Client,
     names: list[str],
     compare: Callable[[Client, list[str]], dict[str, str]],
-    sleep: Any = time.sleep,
+    sleep: Any = None,
     limit: float | None = None,
 ) -> dict[str, str]:
     """Poll ``compare`` until no name drifts, within the shared deadline.
@@ -83,6 +83,7 @@ def settle(
             objects when the wait or the deadline ends first.
     """
     limit = SETTLE_SECONDS if limit is None else limit
+    sleep = time.sleep if sleep is None else sleep
     interval = 0.5
     waited = 0.0
     while True:

@@ -54,6 +54,30 @@ While editing, run the sessions of one ansible-core release, such as
 `uv run noxfile.py -s ansible-test-units-2.21` (`-l` lists them), and the
 default sessions before a commit.
 
+## Unit-test clocks<a id="unit-test-clocks"></a>
+
+Use the opt-in `fake_clock` fixture when a test's expected outcome depends
+on polling or a short deadline. It keeps the real `foundata.utils`
+`Deadline`, but replaces its module-local clock. Patch each polling module
+before invoking the code under test:
+
+```python
+fake_clock.patch(_activation)
+```
+
+`fake_clock.sleep(seconds)` advances virtual time immediately.
+`fake_clock.advance(seconds)` models work in a fake handler, and
+`fake_clock.now` exposes elapsed time. Budget the deadline for these
+deliberate advances, not for host speed. Tests that do not request the
+fixture keep real time; pytest restores all patches after each test.
+
+`patch(module)` replaces that module's `time` reference, not Python's
+global time functions. Modules that import a clock function directly or
+capture it in a default argument need explicit injection instead.
+Use this fixture only with synchronous fake products, not real I/O,
+background workers or event loops. See `test_activation.py` for complete
+polling and timeout examples.
+
 ## Boundaries<a id="boundaries"></a>
 
 A resource is one kind of product object and the module that manages it.
@@ -78,7 +102,7 @@ Some files come from foundata's module skeleton and are the same in every
 collection rendered from it:
 
 - `plugins/module_utils/`: `_lifecycle.py`, `_engine.py` and `_activation.py`.
-- `tests/unit/plugins/`: `conftest.py`, and `test_contract.py`,
+- `tests/unit/plugins/`: `conftest.py` (including `fake_clock`), and `test_contract.py`,
   `test_engine.py`, `test_activation.py` and `test_lifecycle.py` in
   `modules/`.
 - `extensions/molecule/shared/`: everything.
