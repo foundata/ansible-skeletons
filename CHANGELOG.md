@@ -16,6 +16,9 @@ and the project adheres to
 
 ### Added
 
+- Both module variants: `refused_before_change(failure)` classifies failures
+  that prove no request change, before read-back. `started()` keeps its
+  signature and confirmed earlier stages keep their outcome.
 - Both module variants: `Failure(message=...)` supplies a local verdict
   message in place of the lifecycle class's default. Client exception text
   stays private.

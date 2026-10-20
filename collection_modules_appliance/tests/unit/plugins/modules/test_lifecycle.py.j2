@@ -66,7 +66,7 @@ SCHEMA = errors.ErrorSchema(
     codes_by_category={
         "internal": {None},
         "timeout": {"socket_timeout"},
-        "product": {"rejected"},
+        "product": {"rejected", "conflict", "not_found"},
         "eligibility": {"referenced", "stale"},
         "compatibility": {"ineligible"},
         "local": {"operation_failed"},
@@ -360,6 +360,65 @@ def test_write_that_never_started_is_unchanged(
     result = run_module(main, name="a", value="1")
     assert result["failed"] and result["outcome"] == "unchanged"
     assert not result["changed"] and result["operation"] == "create"
+
+
+@pytest.mark.parametrize(
+    "category,code",
+    [("local", "operation_failed"), ("product", "conflict"), ("product", "not_found")],
+)
+def test_known_prechange_failure_skips_read_back(
+    store: Store,
+    run_module: RunModule,
+    monkeypatch: pytest.MonkeyPatch,
+    category: str,
+    code: str,
+) -> None:
+    reads: list[str] = []
+    if code == "not_found":
+        store.rows["a"] = {"name": "a", "value": "1"}
+
+    def lookup(subject: Synthetic) -> Any:
+        reads.append("read")
+        assert len(reads) == 1, "A known pre-change failure must not read back"
+        return store.rows.get("a")
+
+    def write(subject: Synthetic) -> None:
+        if code == "conflict":
+            store.rows["a"] = {"name": "a", "value": "another writer"}
+        elif code == "not_found":
+            store.rows.pop("a")
+        raise errors.ApiError(category=category, code=code)
+
+    monkeypatch.setattr(Synthetic, "lookup", lookup)
+    monkeypatch.setattr(Synthetic, "write", write)
+    monkeypatch.setattr(
+        Synthetic,
+        "refused_before_change",
+        lambda self, failure: (failure.category, failure.code) == (category, code),
+    )
+    result = run_module(main, name="a", value="2")
+    assert result["failed"] and result["error_code"] == code
+    assert result["error_category"] == category
+    assert not result["changed"] and result["outcome"] == "unchanged"
+    assert result["operation"] == ("update" if code == "not_found" else "create")
+    assert reads == ["read"]
+
+
+def test_prechange_refusal_preserves_an_earlier_stage(
+    run_module: RunModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(Synthetic, "refused_before_change", lambda self, failure: True)
+
+    def action(subject: Synthetic) -> dict[str, Any]:
+        subject.confirmed = True
+        subject.operation = "upload"
+        subject.stage(refuse)
+        raise AssertionError("The refusal must end the operation")
+
+    result = run_module(action_main(action), name="a")
+    assert result["failed"] and result["error_code"] == "rejected"
+    assert result["changed"] and result["outcome"] == "changed"
+    assert result["operation"] == "upload"
 
 
 def test_guard_and_identity_on_failure(store: Store, run_module: RunModule) -> None:

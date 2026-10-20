@@ -53,8 +53,10 @@ refusal is reported as refused, under the step of the write it refused; the
 read-back only tells whether something changed anyway, unless the refused
 write may change what no read-back shows (``refusal_may_change``), which
 keeps the outcome unknown. A write that the client reports as never started
-(``started``) is unchanged. A field the product never returns (``secret``)
-is always written, to an existing object only with ``update_password:
+(``started``), or whose failure proves it preceded any change
+(``refused_before_change``), skips read-back and is unchanged. Confirmed
+progress from an earlier stage survives. A field the product never returns
+(``secret``) is always written, to an existing object only with ``update_password:
 always``; it makes a successful write ``unverifiable`` and a lost one
 unknown (``secret_unknown``). In a staged change, each stage says whether its
 write sends such a field, so a lost reply to a stage that sends none settles
@@ -83,7 +85,8 @@ that does fails when it is created, at import:
   binding), ``identify``, ``declared``, ``lookup``, ``managed``, ``same``,
   ``difference``, ``protect``, ``secret``, ``predict``, ``public``,
   ``diff``, ``recheck``, ``write``, ``stages``, ``started``, ``lost``,
-  ``refusal_may_change``, ``moved``, ``verify``, ``changed_fields``,
+  ``refused_before_change``, ``refusal_may_change``, ``moved``,
+  ``verify``, ``changed_fields``,
   ``finish``, ``operation_id`` and ``identity_fields``; ``__init__`` for
   per-instance state, calling the base first.
 - Settings, class attributes to set: ``schema``, ``result_key``,
@@ -127,6 +130,7 @@ HOOKS = frozenset(
         "write",
         "stages",
         "started",
+        "refused_before_change",
         "lost",
         "refusal_may_change",
         "moved",
@@ -401,12 +405,28 @@ class Lifecycle:
         """Whether a failed write may have reached the product."""
         return True
 
+    def refused_before_change(self, failure: errors.ApiError) -> bool:
+        """Whether this failure proves the request made no change.
+
+        Use the product's error codes for failures known to precede a change:
+        an unreadable upload or a push conflict. This runs before read-back,
+        so another writer's change cannot be attributed to this request and
+        a failed read cannot replace the original verdict. Earlier confirmed
+        stages remain changed. The default preserves the started() contract.
+        """
+        return False
+
     def lost(self, failure: errors.ApiError) -> bool:
         """Whether read-back alone may settle this uncertain write response."""
         return failure.category in LOSS
 
     def refusal_may_change(self, failure: errors.ApiError) -> bool:
-        """Whether a refused write may change state its read-back cannot show."""
+        """Whether a refused write may change state its read-back cannot show.
+
+        This runs after read-back, for a definitive refusal only. It cannot
+        classify failures that precede a change; refused_before_change does
+        that before any read-back, while started() keeps the client's state.
+        """
         return False
 
     def moved(self, observed: Any) -> bool:
@@ -490,7 +510,7 @@ class Lifecycle:
         try:
             request()
         except errors.ApiError as failure:
-            if not self.started():
+            if not self.started() or self.refused_before_change(failure):
                 self.attempted = self.confirmed
                 raise
             self.step("reconcile")
