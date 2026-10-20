@@ -50,6 +50,13 @@ def require(capability: str) -> None:
         pytest.skip(subject.SKIP_REASONS[capability])
 
 
+def prepare_deletion(fake: Any) -> None:
+    """Apply optional setup for instance-dependent deletion semantics."""
+    prepare = getattr(subject, "prepare_deletion", None)
+    if prepare is not None:
+        prepare(fake)
+
+
 def rows(fake: Any) -> dict[tuple[Any, ...], dict[str, Any]]:
     """Index mutable stored rows by the resource's natural identity."""
     return {
@@ -96,6 +103,7 @@ def test_lifecycle_preserves_unmanaged_fields(fake: Any, run_module: RunModule) 
 
 def test_delete_is_idempotent(fake: Any, run_module: RunModule) -> None:
     require("delete")
+    prepare_deletion(fake)
     subject.add(fake, **arguments(**{subject.VALUE: subject.VALUES[0]}))
     assert run_module(subject.main, **arguments(state="absent"))[subject.RESULT] is None
     count = len(fake.writes())
@@ -140,6 +148,7 @@ def test_lost_response_never_repeats_write(
 ) -> None:
     if operation == "delete":
         require("delete")
+        prepare_deletion(fake)
     if operation != "create":
         subject.add(fake, **arguments(**{subject.VALUE: subject.VALUES[0]}))
     subject.lose_next(fake, operation, subject.lost_response)
@@ -204,6 +213,7 @@ def test_delete_acknowledgement_does_not_prove_absence(
     fake: Any, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     require("delete")
+    prepare_deletion(fake)
     subject.add(fake, **arguments())
     monkeypatch.setattr(Client, "delete", lambda self, resource, identity: None)
     result = run_module(subject.main, **arguments(state="absent"))
@@ -252,6 +262,7 @@ def test_check_mode_and_secrets(
 ) -> None:
     if state == "absent":
         require("delete")
+        prepare_deletion(fake)
     if exists:
         subject.add(fake, **arguments(**{subject.VALUE: subject.VALUES[0]}))
     result = run_module(

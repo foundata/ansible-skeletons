@@ -87,3 +87,18 @@ def test_contract_creation_requires_assigned_field_absent(
             check(fake, lambda *args, **kwargs: result, "present", False, False)
     else:
         check(fake, lambda *args, **kwargs: result, "present", False, False)
+
+
+@pytest.mark.parametrize("adapter", [False, True])
+def test_contract_deletion_preparation_is_optional(adapter: bool) -> None:
+    fake = SimpleNamespace(deletion="Unlist")
+    subject = SimpleNamespace()
+
+    def prepare_instance(product: Any) -> None:
+        product.deletion = "HardDelete"
+
+    if adapter:
+        subject.prepare_deletion = prepare_instance
+    prepare = contract_functions(subject, "prepare_deletion")["prepare_deletion"]
+    prepare(fake)
+    assert fake.deletion == ("HardDelete" if adapter else "Unlist")

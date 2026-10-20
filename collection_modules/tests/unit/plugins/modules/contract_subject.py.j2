@@ -72,6 +72,14 @@ def add(fake: FakeProduct, **values: Any) -> Any:
     return fake.add(**values)
 
 
+def prepare_deletion(fake: FakeProduct) -> None:
+    """Prepare instance-dependent deletion semantics for the deletion cases.
+
+    Optional: set the fake's instance policy here when deletion otherwise
+    unlists or retires a resource. Other contract cases keep the default policy.
+    """
+
+
 def lose_next(fake: FakeProduct, operation: str, callback: Callable[[], None]) -> None:
     """Run ``callback`` after the next create, update or delete took effect."""
     fake.lose_next(operation, callback)

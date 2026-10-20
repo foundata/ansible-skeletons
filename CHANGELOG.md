@@ -16,6 +16,8 @@ and the project adheres to
 
 ### Added
 
+- Both module variants: the optional contract adapter `prepare_deletion(fake)`
+  prepares instance-dependent deletion behavior before deletion cases.
 - Both module variants: contract subjects may name `ASSIGNED` separately
   from their identifier. Shared contract tests locate stored rows by natural
   identity, including composite keys, without a server-identifier stand-in.
