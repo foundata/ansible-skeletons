@@ -16,6 +16,9 @@ and the project adheres to
 
 ### Added
 
+- Both module variants: the shared `setup_loopback` helper owns fake HTTP
+  dispatch, authenticated shutdown, bounded lifetime and port publication.
+  Product fixtures supply their routes and configuration.
 - Both module variants: `refused_before_change(failure)` classifies failures
   that prove no request change, before read-back. `started()` keeps its
   signature and confirmed earlier stages keep their outcome.

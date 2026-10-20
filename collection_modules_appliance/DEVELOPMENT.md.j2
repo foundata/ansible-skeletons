@@ -106,6 +106,7 @@ collection rendered from it:
   `test_contract.py`, `test_engine.py`, `test_activation.py` and
   `test_lifecycle.py` in `modules/`.
 - `extensions/molecule/shared/`: everything.
+- `tests/integration/targets/setup_loopback/`: everything.
 
 Leave them unchanged, so that you can update them from a newer render of
 [foundata/ansible-skeletons](https://github.com/foundata/ansible-skeletons);
@@ -138,6 +139,13 @@ compatibility check.
 `foundata.utils` owns byte transport, deadlines, JSON decoding and safe error
 translation. Everything else is product-owned, including the client, the
 definitions, the fake product and the scenario hooks.
+
+File-only API fixtures use the hidden `setup_loopback` integration target.
+Add it to the product setup target's dependencies, then load
+`setup_loopback/files/server.py` beside that target and call `serve`.
+The product supplies its routes and shutdown authentication; the helper owns
+HTTP dispatch, the loopback listener, the lifetime timer and the port file.
+Its docstring describes the callbacks and configuration.
 
 The inventory extractor writes `tools/inventory/<series>.yml` beside itself.
 That inventory is development evidence: it never ships and nothing reads it

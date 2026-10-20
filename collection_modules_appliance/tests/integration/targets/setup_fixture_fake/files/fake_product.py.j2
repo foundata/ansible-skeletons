@@ -27,6 +27,7 @@ import fcntl
 import ipaddress
 import json
 import re
+import runpy
 import socket
 import socketserver
 import struct
@@ -35,7 +36,6 @@ import sys
 import threading
 import time
 import uuid
-from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any
 
@@ -62,38 +62,36 @@ class Appliance:
         staged.replace(self.path)
 
 
-class Handler(BaseHTTPRequestHandler):
-    server: HTTPServer
-    credentials = ""
-    appliance: Appliance
+class Routes:
+    def __init__(self, appliance: Appliance, credentials: str) -> None:
+        self.appliance = appliance
+        self.credentials = credentials
 
-    def log_message(self, format: str, *args: Any) -> None:
-        pass
+    def authorized(self, request: Any) -> bool:
+        expected = "Basic " + base64.b64encode(self.credentials.encode()).decode()
+        return request.headers.get("Authorization") == expected
 
-    def send_json(self, status: int, payload: Any) -> None:
-        body = json.dumps(payload).encode()
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
-
-    def locked_out(self, config: dict[str, Any]) -> bool:
+    def locked_out(self, config: dict[str, Any], port: int) -> bool:
         if config["antilockout"]:
             return False
         listener = ipaddress.ip_address("127.0.0.1")
         return any(
             listener in ipaddress.ip_network(row["settings"]["network"])
-            and row["settings"]["port"] == self.server.server_port
+            and row["settings"]["port"] == port
             for row in config["nested_rows"].values()
         )
 
     def nested_request(
-        self, config: dict[str, Any], action: str, name: str, data: dict[str, Any]
+        self,
+        request: Any,
+        config: dict[str, Any],
+        action: str,
+        name: str,
+        data: dict[str, Any],
     ) -> None:
         rows = config["nested_rows"]
         if action == "get_item":
-            self.send_json(200, {"nested": rows.get(name)})
+            request.send_json(200, {"nested": rows.get(name)})
             return
         if action == "del_item":
             rows.pop(name, None)
@@ -115,37 +113,35 @@ class Handler(BaseHTTPRequestHandler):
             record["settings"].update(data.get("settings", {}))
             rows[name] = record
         self.appliance.save(config)
-        self.send_json(200, {"status": "ok"})
+        request.send_json(200, {"status": "ok"})
 
-    def dispatch(self) -> None:
-        expected = "Basic " + base64.b64encode(self.credentials.encode()).decode()
-        if self.headers.get("Authorization") != expected:
-            self.send_json(401, {"status": "failed"})
+    def dispatch(self, request: Any) -> None:
+        if not self.authorized(request):
+            request.send_json(401, {"status": "failed"})
             return
-        size = int(self.headers.get("Content-Length", "0"))
-        data = json.loads(self.rfile.read(size)) if size else {}
-        if self.path == "/api/shutdown":
-            self.send_json(200, {"status": "ok"})
-            threading.Thread(target=self.server.shutdown, daemon=True).start()
-            return
+        size = int(request.headers.get("Content-Length", "0"))
+        data = json.loads(request.rfile.read(size)) if size else {}
         config = self.appliance.load()
-        if self.locked_out(config):
-            self.send_json(503, {"status": "unreachable"})
+        if self.locked_out(config, request.server.server_port):
+            request.send_json(503, {"status": "unreachable"})
             return
         records, active = config["records"], config["active"]
-        if self.path == "/api/system/version":
-            self.send_json(200, {"version": "1.0.0"})
+        if request.path == "/api/system/version":
+            request.send_json(200, {"version": "1.0.0"})
             return
-        if self.path == "/api/fixture/reconfigure":
+        if request.path == "/api/fixture/reconfigure":
             config["active"] = copy.deepcopy(records)
             self.appliance.save(config)
-            self.send_json(200, {"status": "ok"})
+            request.send_json(200, {"status": "ok"})
             return
-        if self.path in ("/api/fixture/search_item", "/api/fixture/active/search_item"):
-            source = active if "/active/" in self.path else records
+        if request.path in (
+            "/api/fixture/search_item",
+            "/api/fixture/active/search_item",
+        ):
+            source = active if "/active/" in request.path else records
             rows = [{"uuid": key, **row} for key, row in source.items()]
             page, page_size = data["current"], min(2, data["rowCount"])
-            self.send_json(
+            request.send_json(
                 200,
                 {
                     "current": page,
@@ -154,36 +150,36 @@ class Handler(BaseHTTPRequestHandler):
                 },
             )
             return
-        if self.path == "/api/nested/context":
-            self.send_json(
+        if request.path == "/api/nested/context":
+            request.send_json(
                 200,
                 {
                     "listener": {
                         "address": "127.0.0.1",
-                        "port": self.server.server_port,
+                        "port": request.server.server_port,
                     },
                     "defaults": {"network": "198.51.100.0/24", "port": 8080},
                 },
             )
             return
-        if self.path.startswith("/api/nested/"):
-            _prefix, _api, _route, action, name = self.path.split("/")
-            self.nested_request(config, action, name, data.get("nested", {}))
+        if request.path.startswith("/api/nested/"):
+            _prefix, _api, _route, action, name = request.path.split("/")
+            self.nested_request(request, config, action, name, data.get("nested", {}))
             return
         match = re.fullmatch(
             r"/api/fixture/(get_item|add_item|set_item|del_item)(?:/([^/]+))?",
-            self.path,
+            request.path,
         )
         if match is None:
-            self.send_json(404, {})
+            request.send_json(404, {})
             return
         action, key = match.groups()
         if action == "get_item":
-            self.send_json(200, {"fixture": records.get(key, {})})
+            request.send_json(200, {"fixture": records.get(key, {})})
         elif action == "del_item":
             removed = records.pop(key, None)
             self.appliance.save(config)
-            self.send_json(200, {"result": "deleted" if removed else "not found"})
+            request.send_json(200, {"result": "deleted" if removed else "not found"})
         else:
             row = (
                 dict(records[key])
@@ -203,17 +199,14 @@ class Handler(BaseHTTPRequestHandler):
                 for identity, other in records.items()
                 if identity != key
             ):
-                self.send_json(
+                request.send_json(
                     200, {"result": "failed", "validations": {"value": "invalid"}}
                 )
                 return
             key = key or str(uuid.uuid4())
             records[key] = row
             self.appliance.save(config)
-            self.send_json(200, {"result": "saved", "uuid": key})
-
-    do_GET = dispatch
-    do_POST = dispatch
+            request.send_json(200, {"result": "saved", "uuid": key})
 
 
 class Resolver(socketserver.BaseRequestHandler):
@@ -313,28 +306,29 @@ def main() -> None:
     state = Path(sys.argv[1])
     appliance = Appliance(state)
     appliance.load()
-    Handler.credentials = (state / "credentials").read_text().strip()
-    Handler.appliance = Resolver.appliance = appliance
-    server = HTTPServer(("127.0.0.1", 0), Handler)
+    routes = Routes(appliance, (state / "credentials").read_text().strip())
+    Resolver.appliance = appliance
+    serve = runpy.run_path(
+        str(Path(__file__).parents[2] / "setup_loopback/files/server.py")
+    )["serve"]
     resolver = socketserver.ThreadingTCPServer(("127.0.0.1", 0), Resolver)
     resolver.daemon_threads = True
     threading.Thread(target=resolver.serve_forever, daemon=True).start()
-    for name, port in (
-        ("dns-port", resolver.server_address[1]),
-        ("port", server.server_port),
-    ):
-        (state / f"{name}.tmp").write_text(str(port))
-        (state / f"{name}.tmp").replace(state / name)
-    timer = threading.Timer(float(sys.argv[2]), server.shutdown)
-    timer.daemon = True
-    timer.start()
     try:
-        server.serve_forever()
+        (state / "dns-port.tmp").write_text(str(resolver.server_address[1]))
+        (state / "dns-port.tmp").replace(state / "dns-port")
+        serve(
+            state,
+            float(sys.argv[2]),
+            routes.dispatch,
+            routes.authorized,
+            methods=("GET", "POST"),
+            shutdown_payload={"status": "ok"},
+            denied_payload={"status": "failed"},
+        )
     finally:
-        timer.cancel()
         resolver.shutdown()
         resolver.server_close()
-        server.server_close()
 
 
 if __name__ == "__main__":

@@ -8,9 +8,8 @@ from __future__ import annotations
 import base64
 import copy
 import json
+import runpy
 import sys
-import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import parse_qs, unquote, urlsplit
@@ -208,56 +207,29 @@ class FakeProduct:
         return response if replacement is None else replacement
 
 
-class Handler(BaseHTTPRequestHandler):
-    product = FakeProduct()
-
-    def log_message(self, format: str, *args: Any) -> None:
-        pass
-
-    def dispatch(self) -> None:
-        size = int(self.headers.get("Content-Length", "0"))
-        if self.path == "/api/shutdown":
-            expected = (
-                "Basic " + base64.b64encode(self.product.credentials.encode()).decode()
-            )
-            response = Response(
-                200 if self.headers.get("Authorization") == expected else 401, {}
-            )
-            if response.status == 200:
-                threading.Thread(target=self.server.shutdown, daemon=True).start()
-        else:
-            response = self.product.request(
-                self.command,
-                self.path.removeprefix("/api"),
-                self.rfile.read(size) if size else None,
-                dict(self.headers),
-            )
-        self.send_response(response.status)
-        self.send_header("Content-Length", str(len(response.body)))
-        self.end_headers()
-        self.wfile.write(response.body)
-
-    do_GET = dispatch
-    do_POST = dispatch
-    do_PUT = dispatch
-    do_PATCH = dispatch
-    do_DELETE = dispatch
-
-
 def main() -> None:
     state = Path(sys.argv[1])
-    Handler.product.credentials = (state / "credentials").read_text().strip()
-    server = HTTPServer(("127.0.0.1", 0), Handler)
-    (state / "port.tmp").write_text(str(server.server_port))
-    (state / "port.tmp").replace(state / "port")
-    timer = threading.Timer(float(sys.argv[2]), server.shutdown)
-    timer.daemon = True
-    timer.start()
-    try:
-        server.serve_forever()
-    finally:
-        timer.cancel()
-        server.server_close()
+    product = FakeProduct()
+    product.credentials = (state / "credentials").read_text().strip()
+    expected = "Basic " + base64.b64encode(product.credentials.encode()).decode()
+
+    def authorized(request: Any) -> bool:
+        return request.headers.get("Authorization") == expected
+
+    def route(request: Any) -> None:
+        size = int(request.headers.get("Content-Length", "0"))
+        response = product.request(
+            request.command,
+            request.path.removeprefix("/api"),
+            request.rfile.read(size) if size else None,
+            dict(request.headers),
+        )
+        request.reply(response.status, response.body, response.headers)
+
+    serve = runpy.run_path(
+        str(Path(__file__).parents[2] / "setup_loopback/files/server.py")
+    )["serve"]
+    serve(state, float(sys.argv[2]), route, authorized)
 
 
 if __name__ == "__main__":

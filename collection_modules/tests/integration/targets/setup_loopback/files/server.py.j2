@@ -1,0 +1,87 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Loopback HTTP lifetime and dispatch for file-only product fixtures."""
+
+from __future__ import annotations
+
+import json
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
+from typing import Any, Callable
+
+
+def serve(
+    state: Path,
+    lifetime: float,
+    route: Callable[[Any], None],
+    authorized: Callable[[Any], bool],
+    *,
+    methods: tuple[str, ...] = ("GET", "POST", "PUT", "PATCH", "DELETE"),
+    shutdown_path: str = "/api/shutdown",
+    shutdown_payload: Any = None,
+    denied_payload: Any = None,
+) -> None:
+    """Serve product routes on loopback until shutdown or the lifetime expires.
+
+    The route receives a request handler with the standard HTTP attributes,
+    plus reply(status, body, headers) and send_json(status, payload). It owns
+    product authentication and parsing. authorized gates the shutdown route.
+    The atomic port file is published after the listener binds.
+    """
+
+    class Handler(BaseHTTPRequestHandler):
+        server: HTTPServer
+
+        def log_message(self, message_format: str, *values: Any) -> None:
+            pass
+
+        def reply(
+            self, status: int, body: bytes, headers: dict[str, str] | None = None
+        ) -> None:
+            self.send_response(status)
+            for name, value in (headers or {}).items():
+                if name.lower() != "content-length":
+                    self.send_header(name, value)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def send_json(self, status: int, payload: Any) -> None:
+            self.reply(
+                status,
+                json.dumps(payload).encode(),
+                {"Content-Type": "application/json"},
+            )
+
+        def dispatch(self) -> None:
+            if self.command not in methods:
+                self.send_error(501)
+            elif self.path == shutdown_path:
+                allowed = authorized(self)
+                payload = shutdown_payload if allowed else denied_payload
+                self.send_json(
+                    200 if allowed else 401, {} if payload is None else payload
+                )
+                if allowed:
+                    threading.Thread(target=self.server.shutdown, daemon=True).start()
+            else:
+                route(self)
+
+        do_GET = dispatch
+        do_POST = dispatch
+        do_PUT = dispatch
+        do_PATCH = dispatch
+        do_DELETE = dispatch
+
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    timer = threading.Timer(lifetime, server.shutdown)
+    timer.daemon = True
+    try:
+        (state / "port.tmp").write_text(str(server.server_port), encoding="utf-8")
+        (state / "port.tmp").replace(state / "port")
+        timer.start()
+        server.serve_forever()
+    finally:
+        timer.cancel()
+        server.server_close()
