@@ -89,14 +89,13 @@ modules manages together, such as routes and gateways with their activation.
 Its modules share one module utility, one activation scope where the product
 has one, and usually one Molecule scenario.
 
-`tests/unit/plugins/modules/contract_subject.py` names the product resource
-the shared contract tests run against. A fresh render names the fixture there,
-`plugins/modules/fixture.py`, which the first product resource replaces
-together with its definition and tests. A new hook-based resource starts as a
+`tests/unit/plugins/modules/contract_subject.py` names the product resource,
+fake adapters and entry points the shared contract tests run against.
+A new hook-based resource starts as a
 copy of the skeleton's `_fixture_nested.py` with its module and tests and
 changes only the hook methods; the order of the lifecycle steps belongs to the
 base. The shared base and engine tests bring their own synthetic resource and
-fake product, so replacing the fixture needs no change to them.
+fake product, so adapting the contract subject needs no change to them.
 
 Some files come from foundata's module skeleton and are the same in every
 collection rendered from it:

@@ -45,6 +45,9 @@ and the project adheres to
 
 ### Changed
 
+- Both module variants: the API scenario documents retained test data,
+  per-run identities and additional endpoints. The development guide describes
+  the contract subject without depending on the rendered fixture.
 - Both module variants: the default `predict()` includes the identity when
   creating.
 - Both module variants: the error code `create_unknown` is now

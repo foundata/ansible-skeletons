@@ -66,6 +66,9 @@ Paths are relative to this directory unless stated otherwise.
 FIXME Rename the `MOLECULE_PRODUCT_*` variables and the credential keys to the
 product, in `default/inventory/hosts.yml` and here.
 
+FIXME Document any additional endpoints and their credential files or keys,
+then add their variables to the inventory and the table.
+
 |             Variable              | Default | Purpose |
 | --------------------------------- | ------- | ------- |
 | `MOLECULE_PRODUCT_URL`            | (none)  | API base URL, for example `https://lab.example.com/api` |
@@ -281,6 +284,12 @@ copy the nested fixture's task files along with its utility and module, as
 FIXME in the copy of `tasks/verify/fixture_nested.yml` with an independent
 check of the product, and add the module to `zz_loss.yml`; keep
 `shared/files/loss.py` unchanged.
+
+If the product cannot remove test data, include a per-run test id in every
+record identity. Carry that id through converge, verify, side effects and
+cleanup, so parallel and later runs cannot reuse retained records. Cleanup
+unlists records where it cannot delete them. Document which data remains and
+how to find it; do not claim that cleanup leaves the endpoint empty.
 
 Set the connection once per block with `module_defaults` for the
 `{{ namespace }}.{{ collection_name }}.api`
