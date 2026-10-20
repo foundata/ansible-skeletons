@@ -8,7 +8,8 @@ No set field, boolean field, info module or deletion guard is required.
 
 ASSIGNED names a server-assigned field absent from a predicted creation;
 it defaults to RESOURCE.identifier.name. The shared tests index rows by
-RESOURCE.keys, independent of the keys the fake uses to store them.
+RESOURCE.keys, or use the store's normalized identity tuples when its raw
+rows use different wire-field names.
 """
 # FIXME Bind the first researched resource, its fake and its entry points here;
 # keep test_contract.py unchanged.
@@ -63,7 +64,12 @@ INFO_MAIN: Callable[[], None] | None = info_main
 
 
 def rows(fake: FakeProduct) -> dict[Any, dict[str, Any]]:
-    """Stored records of the subject resource by server identifier."""
+    """The mutable store, by server identifier or normalized identity tuple.
+
+    Rows with public identity fields are indexed by those fields in the shared
+    tests. With different wire-field names, return the native identity-keyed
+    store. Older server-keyed adapters retain their identifier fallback.
+    """
     return fake.rows
 
 

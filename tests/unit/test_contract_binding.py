@@ -11,27 +11,33 @@ from scripts.common import ROOT
 
 
 def contract_functions(subject: Any, *names: str) -> dict[str, Any]:
-    path = ROOT / "collection_modules/tests/unit/plugins/modules/test_contract.py.j2"
-    source = path.read_text().replace("{{ namespace }}", "example")
-    source = source.replace("{{ collection_name }}", "product")
-    tree = ast.parse(source)
-    tree.body = [
-        node
-        for node in tree.body
-        if isinstance(node, ast.FunctionDef) and node.name in names
-    ]
-    for node in tree.body:
-        assert isinstance(node, ast.FunctionDef)
-        node.decorator_list = []
     namespace: dict[str, Any] = {
         "Any": Any,
+        "Key": Any,
         "RunModule": Any,
         "subject": subject,
         "json": json,
         "pytest": pytest,
         "arguments": lambda **values: values,
     }
-    exec(compile(tree, str(path), "exec"), namespace)
+    files = (
+        ("plugins/module_utils/_engine.py.j2", {"canonical", "key_value"}),
+        ("tests/unit/plugins/modules/test_contract.py.j2", {*names, "identity"}),
+    )
+    for filename, selected in files:
+        path = ROOT / "collection_modules" / filename
+        source = path.read_text().replace("{{ namespace }}", "example")
+        source = source.replace("{{ collection_name }}", "product")
+        tree = ast.parse(source)
+        tree.body = [
+            node
+            for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name in selected
+        ]
+        for node in tree.body:
+            assert isinstance(node, ast.FunctionDef)
+            node.decorator_list = []
+        exec(compile(tree, str(path), "exec"), namespace)
     return namespace
 
 
@@ -46,7 +52,10 @@ def test_contract_rows_use_composite_identity(storage: str) -> None:
     )
     subject = SimpleNamespace(
         RESOURCE=SimpleNamespace(
-            keys=(SimpleNamespace(name="name"), SimpleNamespace(name="version"))
+            keys=tuple(
+                SimpleNamespace(name=name, normalizer=None, canonical="")
+                for name in ("name", "version")
+            )
         ),
         rows=lambda fake: stored,
     )
@@ -54,6 +63,70 @@ def test_contract_rows_use_composite_identity(storage: str) -> None:
     indexed[("Example", "2.0")]["unmanaged"] = "kept"
     assert first == {"name": "Example", "version": "1.0", "published": "yesterday"}
     assert second["unmanaged"] == "kept"
+
+
+@pytest.mark.parametrize("legacy", [False, True])
+def test_contract_preserves_rows_with_different_wire_names(legacy: bool) -> None:
+    row = {"id": "Example", "version": "1.0.0", "published": "today"}
+    stored = {"today" if legacy else ("example", "1.0.0"): row}
+    resource = SimpleNamespace(
+        keys=tuple(
+            SimpleNamespace(name=name, normalizer=None, canonical="lower")
+            for name in ("name", "version")
+        )
+    )
+    if legacy:
+        resource.identifier = SimpleNamespace(name="published")
+    subject = SimpleNamespace(
+        RESOURCE=resource,
+        ASSIGNED="published",
+        RESULT="package",
+        VALUE="listed",
+        VALUES=(False, True),
+        OLD_SECRET="private",
+        rows=lambda fake: stored,
+        main=None,
+    )
+    results = iter(
+        [
+            {
+                "package": {
+                    "name": "Example",
+                    "version": "1.0.0",
+                    "published": "today",
+                },
+                "changed_fields": [],
+                "verified": "observed",
+            },
+            {"changed": False},
+            {
+                "changed_fields": ["listed"],
+                "diff": {"before": {"listed": False}, "after": {"listed": True}},
+            },
+        ]
+    )
+    check = contract_functions(
+        subject, "rows", "test_lifecycle_preserves_unmanaged_fields"
+    )["test_lifecycle_preserves_unmanaged_fields"]
+    check(None, lambda *args, **kwargs: next(results))
+    assert row["unmanaged"] == "private"
+
+
+@pytest.mark.parametrize("canonical", ["lower", "casefold"])
+def test_contract_identity_uses_key_normalization(canonical: str) -> None:
+    subject = SimpleNamespace(
+        RESOURCE=SimpleNamespace(
+            keys=(
+                SimpleNamespace(
+                    name="address",
+                    canonical=canonical,
+                    normalizer=lambda value: value.replace("-", ":"),
+                ),
+            )
+        )
+    )
+    identity = contract_functions(subject, "identity")["identity"]
+    assert identity({"address": "AA-BB"}) == ("aa:bb",)
 
 
 @pytest.mark.parametrize("explicit", [False, True])

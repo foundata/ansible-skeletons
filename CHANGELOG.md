@@ -29,7 +29,9 @@ and the project adheres to
   prepares instance-dependent deletion behavior before deletion cases.
 - Both module variants: contract subjects may name `ASSIGNED` separately
   from their identifier. Shared contract tests locate stored rows by natural
-  identity, including composite keys, without a server-identifier stand-in.
+  identity, including normalized composite keys, without a server-identifier
+  stand-in. Native stores with different wire-field names and older
+  server-keyed adapters both work.
 - Both module variants: the lifecycle hook `refusal_may_change(failure)`
   keeps a refused write `unknown` when it may change state no read-back
   shows.

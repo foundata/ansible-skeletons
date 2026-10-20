@@ -28,6 +28,8 @@ from ansible_collections.{{ namespace }}.\
     {{ collection_name }}.plugins.module_utils._engine import (
         Resource,
         build_spec,
+        canonical,
+        key_value,
         run_resource,
     )
 from ansible_collections.{{ namespace }}.\
@@ -57,11 +59,21 @@ def prepare_deletion(fake: Any) -> None:
         prepare(fake)
 
 
-def rows(fake: Any) -> dict[tuple[Any, ...], dict[str, Any]]:
-    """Index mutable stored rows by the resource's natural identity."""
+def identity(record: dict[str, Any]) -> tuple[Any, ...]:
+    """Use the resource's normalization and case rules for its natural key."""
+    return tuple(
+        canonical(key_value(key, record[key.name]), key.canonical)
+        for key in subject.RESOURCE.keys
+    )
+
+
+def rows(fake: Any) -> dict[Any, dict[str, Any]]:
+    """Index rows by natural identity, retaining opaque native storage keys."""
     return {
-        tuple(row[key.name] for key in subject.RESOURCE.keys): row
-        for row in subject.rows(fake).values()
+        identity(row)
+        if all(key.name in row for key in subject.RESOURCE.keys)
+        else stored_key: row
+        for stored_key, row in subject.rows(fake).items()
     }
 
 
@@ -84,9 +96,11 @@ def entry(resource: Resource) -> Callable[[], None]:
 def test_lifecycle_preserves_unmanaged_fields(fake: Any, run_module: RunModule) -> None:
     first, second = subject.VALUES
     created = run_module(subject.main, **arguments(**{subject.VALUE: first}))
-    identity = tuple(created[subject.RESULT][key.name] for key in subject.RESOURCE.keys)
+    stored_key = identity(created[subject.RESULT])
+    if stored_key not in rows(fake):
+        stored_key = created[subject.RESULT][subject.RESOURCE.identifier.name]
     assert created["changed_fields"] == [] and created["verified"] == "observed"
-    rows(fake)[identity]["unmanaged"] = subject.OLD_SECRET
+    rows(fake)[stored_key]["unmanaged"] = subject.OLD_SECRET
     assert not run_module(subject.main, **arguments(**{subject.VALUE: first}))[
         "changed"
     ]
@@ -98,7 +112,7 @@ def test_lifecycle_preserves_unmanaged_fields(fake: Any, run_module: RunModule) 
         "before": {subject.VALUE: first},
         "after": {subject.VALUE: second},
     }
-    assert rows(fake)[identity]["unmanaged"] == subject.OLD_SECRET
+    assert rows(fake)[stored_key]["unmanaged"] == subject.OLD_SECRET
 
 
 def test_delete_is_idempotent(fake: Any, run_module: RunModule) -> None:
