@@ -9,10 +9,12 @@ profile: "production"
 strict: true
 
 # Molecule links this as inventory; it is not an ansible.builtin.template input.
-# A recovery drill's subsystem settings below tasks/ are data, not a task list.
 kinds:
   - inventory: "extensions/molecule/**/inventory/*.yml.j2"
+{# skeleton-variant: drill-settings #}
+  # A recovery drill's subsystem settings below tasks/ are data, not a task list.
   - vars: "extensions/molecule/**/tasks/recovery/**/settings.yml"
+{# end skeleton-variant #}
 
 enable_list:
   - "jinja-template-extension"

@@ -544,14 +544,15 @@ def test_collection_readme_closing_sections_are_identical() -> None:
     assert not differing, f"README closing sections differ in: {', '.join(differing)}"
 
 
-def test_template_inputs_are_not_linted_as_ansible_templates() -> None:
-    config = source_yaml(ROOT / "collection_default/.ansible-lint.j2")
-    # The second entry keeps a recovery drill's subsystem settings, data below
-    # a tasks/ directory, from being linted as a task list.
-    assert config["kinds"] == [
-        {"inventory": "extensions/molecule/**/inventory/*.yml.j2"},
-        {"vars": "extensions/molecule/**/tasks/recovery/**/settings.yml"},
-    ]
+@pytest.mark.parametrize("skeleton", SKELETONS)
+def test_template_inputs_are_not_linted_as_ansible_templates(skeleton: str) -> None:
+    config = source_yaml(ROOT / skeleton / ".ansible-lint.j2")
+    kinds = [{"inventory": "extensions/molecule/**/inventory/*.yml.j2"}]
+    if skeleton == "collection_modules_appliance":
+        # Only this skeleton has a recovery drill; its subsystem settings are
+        # data below a tasks/ directory, not a task list.
+        kinds.append({"vars": "extensions/molecule/**/tasks/recovery/**/settings.yml"})
+    assert config["kinds"] == kinds
 
 
 @pytest.mark.parametrize("skeleton", SKELETONS)

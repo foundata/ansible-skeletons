@@ -33,6 +33,9 @@ and the project adheres to
   creating.
 - Both module variants: the error code `create_unknown` is now
   `secret_unknown`, for any lost reply to a request that sends a secret.
+- role_default, collection_default, collection_modules: `.ansible-lint` no
+  longer declares recovery drill settings; collection_modules_appliance
+  keeps it.
 
 ### Fixed
 
