@@ -60,6 +60,11 @@ unknown (``secret_unknown``). In a staged change, each stage says whether its
 write sends such a field, so a lost reply to a stage that sends none settles
 by its read-back alone.
 
+Hooks may raise ``Failure(message=...)`` with a local public verdict message,
+which takes precedence over the class setting ``message``. Client exception
+text remains private. ``message`` remains a class setting on the lifecycle;
+hooks do not assign it on the instance.
+
 Failures go through the binding's error schema with ``operation``,
 ``outcome`` (``unchanged``, ``unknown`` or ``changed``), the identity
 options the schema accepts and the fields the failure names. A local
@@ -180,13 +185,22 @@ whether that request sends a field ``secret`` names."""
 
 
 class Failure(errors.ApiError):
-    """A verdict the base reaches itself, such as a missing read-back."""
+    """A verdict from the base or a hook, with an optional public message.
+
+    ``message`` is trusted local text, never a response body or exception text.
+    """
 
     def __init__(
-        self, *, category: str, code: str, fields: list[str] | None = None
+        self,
+        *,
+        category: str,
+        code: str,
+        fields: list[str] | None = None,
+        message: str | None = None,
     ) -> None:
         super().__init__("Lifecycle verdict", category=category, code=code)
         self.fields = fields or []
+        self.message = message
 
 
 class Lifecycle:
@@ -582,7 +596,9 @@ class Lifecycle:
             self.module,
             failure,
             schema=self.schema,
-            msg=self.message,
+            msg=failure.message
+            if isinstance(failure, Failure) and failure.message is not None
+            else self.message,
             changed=self.attempted,
             outcome="changed"
             if self.confirmed

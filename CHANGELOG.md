@@ -16,6 +16,9 @@ and the project adheres to
 
 ### Added
 
+- Both module variants: `Failure(message=...)` supplies a local verdict
+  message in place of the lifecycle class's default. Client exception text
+  stays private.
 - Both module variants: the optional contract adapter `prepare_deletion(fake)`
   prepares instance-dependent deletion behavior before deletion cases.
 - Both module variants: contract subjects may name `ASSIGNED` separately

@@ -594,6 +594,35 @@ def test_custom_operation_uses_the_same_failure_boundary(
     assert result["operation"] == "job" and result["name"] == "a"
 
 
+@pytest.mark.parametrize("message", [None, "The instance keeps unlisted versions"])
+def test_verdict_message_overrides_the_class_default(
+    run_module: RunModule, message: str | None
+) -> None:
+    def action(subject: Synthetic) -> dict[str, Any]:
+        assert "message" not in vars(subject)
+        raise Failure(category="product", code="rejected", message=message)
+
+    result = run_module(action_main(action), name="a")
+    assert result["failed"] and result["error_code"] == "rejected"
+    assert result["msg"] == (Synthetic.message if message is None else message)
+    assert not result["changed"] and result["outcome"] == "unchanged"
+
+
+def test_client_error_text_cannot_override_the_public_message(
+    run_module: RunModule,
+) -> None:
+    def action(subject: Synthetic) -> dict[str, Any]:
+        failure: Any = errors.ApiError(
+            "SYNTHETIC-private-argument", category="product", code="rejected"
+        )
+        failure.message = "SYNTHETIC-private-field"
+        raise failure
+
+    result = run_module(action_main(action), name="a")
+    assert result["msg"] == Synthetic.message
+    assert "SYNTHETIC-private" not in json.dumps(result)
+
+
 def test_local_os_error_fails_without_its_message(run_module: RunModule) -> None:
     def action(subject: Synthetic) -> dict[str, Any]:
         subject.operation = "deliver"
