@@ -12,6 +12,7 @@ from typing import Any, Callable
 
 import pytest
 from ansible.module_utils import basic
+from ansible.module_utils.common import warnings
 
 from ansible_collections.foundata.utils.plugins.module_utils import deadline
 
@@ -44,6 +45,13 @@ class Clock:
 
     def sleep(self, seconds: float) -> None:
         self.advance(seconds)
+
+
+@pytest.fixture(autouse=True)
+def reset_warnings(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Give each test fresh ansible-core process-global module warnings."""
+    pending = warnings._global_warnings
+    monkeypatch.setattr(warnings, "_global_warnings", type(pending)())
 
 
 @pytest.fixture

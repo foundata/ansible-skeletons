@@ -50,6 +50,9 @@ and the project adheres to
 
 ### Fixed
 
+- Both module variants: the unit runner resets ansible-core's process-global
+  module warnings before each test, preserving their type across core versions.
+
 - Both module variants: the virtual-clock isolation assertion and the
   shared-file list pass the rendered typing and Markdown checks.
 

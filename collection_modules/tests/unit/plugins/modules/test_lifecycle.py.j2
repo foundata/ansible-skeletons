@@ -9,11 +9,13 @@ import inspect
 import json
 import pkgutil
 import sys
+from collections.abc import Iterator
 from types import SimpleNamespace
 from typing import Any, Callable
 
 import pytest
 from ansible.module_utils.basic import AnsibleModule
+from ansible.module_utils.common import warnings
 
 from ansible_collections.foundata.utils.plugins.module_utils import errors
 
@@ -50,6 +52,25 @@ from ansible_collections.{{ namespace }}.\
 # fmt: on
 
 from ..conftest import RunModule
+
+
+@pytest.fixture(scope="module")
+def earlier_module_warning() -> Iterator[None]:
+    previous = warnings._global_warnings
+    warnings._global_warnings = type(previous)()
+    warnings.warn("A warning from an earlier module invocation")
+    try:
+        yield
+    finally:
+        warnings._global_warnings = previous
+
+
+@pytest.mark.usefixtures("earlier_module_warning")
+@pytest.mark.parametrize("message", ["First test warning", "Second test warning"])
+def test_module_warnings_start_empty_for_each_test(message: str) -> None:
+    assert warnings.get_warning_messages() == ()
+    warnings.warn(message)
+    assert warnings.get_warning_messages() == (message,)
 
 
 def field_names(value: object) -> list[str]:
