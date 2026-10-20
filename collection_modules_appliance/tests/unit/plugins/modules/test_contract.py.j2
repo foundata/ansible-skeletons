@@ -50,6 +50,14 @@ def require(capability: str) -> None:
         pytest.skip(subject.SKIP_REASONS[capability])
 
 
+def rows(fake: Any) -> dict[tuple[Any, ...], dict[str, Any]]:
+    """Index mutable stored rows by the resource's natural identity."""
+    return {
+        tuple(row[key.name] for key in subject.RESOURCE.keys): row
+        for row in subject.rows(fake).values()
+    }
+
+
 def info_main() -> Callable[[], None]:
     if subject.INFO_MAIN is None:
         pytest.skip(subject.SKIP_REASONS["info"])
@@ -69,9 +77,9 @@ def entry(resource: Resource) -> Callable[[], None]:
 def test_lifecycle_preserves_unmanaged_fields(fake: Any, run_module: RunModule) -> None:
     first, second = subject.VALUES
     created = run_module(subject.main, **arguments(**{subject.VALUE: first}))
-    identity = created[subject.RESULT][subject.RESOURCE.identifier.name]
+    identity = tuple(created[subject.RESULT][key.name] for key in subject.RESOURCE.keys)
     assert created["changed_fields"] == [] and created["verified"] == "observed"
-    subject.rows(fake)[identity]["unmanaged"] = subject.OLD_SECRET
+    rows(fake)[identity]["unmanaged"] = subject.OLD_SECRET
     assert not run_module(subject.main, **arguments(**{subject.VALUE: first}))[
         "changed"
     ]
@@ -83,7 +91,7 @@ def test_lifecycle_preserves_unmanaged_fields(fake: Any, run_module: RunModule) 
         "before": {subject.VALUE: first},
         "after": {subject.VALUE: second},
     }
-    assert subject.rows(fake)[identity]["unmanaged"] == subject.OLD_SECRET
+    assert rows(fake)[identity]["unmanaged"] == subject.OLD_SECRET
 
 
 def test_delete_is_idempotent(fake: Any, run_module: RunModule) -> None:
@@ -256,7 +264,10 @@ def test_check_mode_and_secrets(
     assert not fake.writes() and not result.get("failed")
     assert result["verified"] == ("predicted" if result["changed"] else "observed")
     if not exists and state == "present":
-        assert subject.RESOURCE.identifier.name not in result[subject.RESULT]
+        assigned = getattr(subject, "ASSIGNED", None)
+        if assigned is None:
+            assigned = subject.RESOURCE.identifier.name
+        assert assigned not in result[subject.RESULT]
     secrets = result.pop("_ansible_new_secrets", [])
     assert set(secrets) <= set(subject.SECRETS)
     assert all(

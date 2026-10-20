@@ -16,6 +16,9 @@ and the project adheres to
 
 ### Added
 
+- Both module variants: contract subjects may name `ASSIGNED` separately
+  from their identifier. Shared contract tests locate stored rows by natural
+  identity, including composite keys, without a server-identifier stand-in.
 - Both module variants: the lifecycle hook `refusal_may_change(failure)`
   keeps a refused write `unknown` when it may change state no read-back
   shows.

@@ -5,6 +5,10 @@
 Use real creation arguments, valid identities and two values of one mutable
 public field. Disable unsupported capabilities with a concrete skip reason.
 No set field, boolean field, info module or deletion guard is required.
+
+ASSIGNED names a server-assigned field absent from a predicted creation;
+it defaults to RESOURCE.identifier.name. The shared tests index rows by
+RESOURCE.keys, independent of the keys the fake uses to store them.
 """
 # FIXME Bind the first researched resource, its fake and its entry points here;
 # keep test_contract.py unchanged.
@@ -39,6 +43,7 @@ from ..fake_product import (
 __all__ = ("OLD_SECRET", "lost_response")
 
 RESOURCE = FIXTURE
+ASSIGNED = RESOURCE.identifier.name
 RESULT = "fixture"
 KEY = "name"
 IDENTITIES = ("example", "other", "third", "fourth", "fifth")
