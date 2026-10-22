@@ -54,6 +54,10 @@ While editing, run the sessions of one ansible-core release, such as
 `uv run noxfile.py -s ansible-test-units-2.21` (`-l` lists them), and the
 default sessions before a commit.
 
+Below a deep checkout, nox gives each session a short symbolic link as
+`TMPDIR`, because Unix socket paths are limited in length. A test of code that
+refuses symbolic links in a path resolves `TMPDIR` first.
+
 ## Unit-test clocks<a id="unit-test-clocks"></a>
 
 Use the opt-in `fake_clock` fixture when a test's expected outcome depends

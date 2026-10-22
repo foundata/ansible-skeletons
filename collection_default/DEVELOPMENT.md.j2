@@ -58,6 +58,10 @@ names. While editing, run the sessions of one ansible-core release, such as
 `uv run noxfile.py -s ansible-test-sanity-2.21` (`-l` lists them), and the
 default sessions before a commit.
 
+Below a deep checkout, nox gives each session a short symbolic link as
+`TMPDIR`, because Unix socket paths are limited in length. A test of code that
+refuses symbolic links in a path resolves `TMPDIR` first.
+
 ## Releases<a id="releases"></a>
 
 Releases require `releasing>=7.0.0` for the `release` command. Install the
