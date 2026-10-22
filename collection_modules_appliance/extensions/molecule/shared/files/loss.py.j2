@@ -11,7 +11,8 @@ Input is one JSON object:
 - ``params``: the module parameters.
 - ``expected_writes`` (default 1): how many counted writes the module makes.
 - ``drop`` (default ``first``): replace the first counted response with a
-  timeout, or ``all`` of them, as a resource that writes in stages needs.
+  timeout, ``all`` of them, as a resource that writes in stages needs, or
+  those at the listed positions, counting from 0.
 - ``route`` (default none): count only writes with a string argument, such
   as the request path, that starts with this prefix.
 - ``when`` (default none): count only writes whose keyword arguments carry
@@ -24,6 +25,16 @@ Input is one JSON object:
 - ``target`` (default ``_client.Client.write``): the method that sends a
   write, as ``<module_utils module>.<class>.<method>``, for a product whose
   writes leave through another transport.
+- ``expect`` (default none): the result a lost reply must give instead of an
+  observed success, as values of ``failed`` (default false), ``changed``,
+  ``verified``, ``outcome``, ``error_category``, ``error_code`` and
+  ``operation``; for example the failure of a lost write that sends a secret
+  no read-back can prove.
+- ``calls`` (default none): the counted writes in order, each as its leading
+  string arguments joined by a space, up to the one that starts with
+  ``route``, without a query; ``["POST /api/users"]`` for
+  ``write("POST", "/api/users?x=1", body)``. It sets ``expected_writes``, and
+  the proof lists the calls; use it only where those arguments hold no secret.
 
 The proxy calls the real method first and only then replaces the response;
 no synthetic product result is supplied. The proof names the module file
@@ -45,6 +56,15 @@ from ansible.module_utils import basic
 from ansible.plugins.loader import init_plugin_loader
 
 FQCN = re.compile(r"[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*")
+REPORTED = (
+    "failed",
+    "changed",
+    "verified",
+    "outcome",
+    "error_category",
+    "error_code",
+    "operation",
+)
 TARGET = re.compile(r"_?[a-z][a-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*\.[a-z_][a-z0-9_]*")
 
 
@@ -89,12 +109,45 @@ def options(request: dict[str, Any]) -> dict[str, Any]:
         "when": request.get("when", {}),
         "rerun": request.get("rerun", "unchanged"),
         "target": request.get("target", "_client.Client.write"),
+        "expect": request.get("expect"),
+        "calls": request.get("calls"),
     }
+    calls = chosen["calls"]
+    if calls is not None:
+        if (
+            not isinstance(calls, list)
+            or not calls
+            or not all(isinstance(call, str) and call for call in calls)
+        ):
+            raise ValueError("calls must list each counted write as a string")
+        if request.get("expected_writes", len(calls)) != len(calls):
+            raise ValueError("expected_writes must match the number of calls")
+        chosen["expected_writes"] = len(calls)
     writes = chosen["expected_writes"]
     if isinstance(writes, bool) or not isinstance(writes, int) or writes < 1:
         raise ValueError("expected_writes must be a positive integer")
-    if chosen["drop"] not in ("first", "all"):
-        raise ValueError("drop must be first or all")
+    drop = chosen["drop"]
+    if isinstance(drop, list):
+        if not drop or any(
+            isinstance(index, bool)
+            or not isinstance(index, int)
+            or not 0 <= index < writes
+            for index in drop
+        ):
+            raise ValueError("drop must list positions of counted writes")
+    elif drop not in ("first", "all"):
+        raise ValueError("drop must be first, all or a list of positions")
+    expect = chosen["expect"]
+    if expect is not None and (
+        not isinstance(expect, dict)
+        or not expect
+        or set(expect) - set(REPORTED)
+        or not all(
+            value is None or isinstance(value, (bool, int, str))
+            for value in expect.values()
+        )
+    ):
+        raise ValueError("expect must map reported result keys to JSON scalars")
     if chosen["rerun"] not in ("unchanged", "none"):
         raise ValueError("rerun must be unchanged or none")
     if not isinstance(chosen["route"], str):
@@ -126,8 +179,9 @@ def main() -> None:
     )
     module = importlib.import_module(f"{package}.modules.{name}")
     original = getattr(holder, method)
-    route, when = chosen["route"], chosen["when"]
+    route, when, drop = chosen["route"], chosen["when"], chosen["drop"]
     writes = dropped = 0
+    seen: list[str] = []
 
     def counted(args: tuple[Any, ...], kwargs: dict[str, Any]) -> bool:
         if any(
@@ -139,13 +193,28 @@ def main() -> None:
             for value in (*args, *kwargs.values())
         )
 
+    def described(args: tuple[Any, ...]) -> str:
+        words = []
+        for value in args:
+            if not isinstance(value, str):
+                break
+            words.append(value.split("?", 1)[0])
+            if route and value.startswith(route):
+                break
+        return " ".join(words)
+
     def proxy(instance: Any, *args: Any, **kwargs: Any) -> Any:
         nonlocal writes, dropped
         response = original(instance, *args, **kwargs)
         if not counted(args, kwargs):
             return response
-        writes += 1
-        if chosen["drop"] == "all" or not dropped:
+        index, writes = writes, writes + 1
+        seen.append(described(args))
+        if (
+            drop == "all"
+            or (drop == "first" and not dropped)
+            or (isinstance(drop, list) and index in drop)
+        ):
             dropped += 1
             raise errors.TransportTimeout(code="socket_timeout")
         return response
@@ -157,8 +226,19 @@ def main() -> None:
         assert writes == chosen["expected_writes"], (
             f"Expected {chosen['expected_writes']} counted writes, saw {writes}"
         )
-        assert not result.get("failed") and result["changed"]
-        assert result["verified"] == "observed"
+        if isinstance(drop, list):
+            assert dropped == len(set(drop)), "A listed position was never written"
+        if chosen["calls"] is not None:
+            assert seen == chosen["calls"], (
+                f"Expected calls {chosen['calls']}, saw {seen}"
+            )
+        if chosen["expect"] is None:
+            assert not result.get("failed") and result["changed"]
+            assert result["verified"] == "observed"
+        else:
+            for key, value in {"failed": False, **chosen["expect"]}.items():
+                observed = bool(result.get(key)) if key == "failed" else result.get(key)
+                assert observed == value, f"Expected {key} {value!r}, saw {observed!r}"
         if chosen["rerun"] == "unchanged":
             observed = invoke(module.main, params)
             assert not observed.get("failed") and not observed["changed"]
@@ -178,6 +258,12 @@ def main() -> None:
                 "writes": writes,
                 "dropped": dropped,
                 "rerun": chosen["rerun"],
+                **({"calls": seen} if chosen["calls"] is not None else {}),
+                **(
+                    {"result": {key: result[key] for key in REPORTED if key in result}}
+                    if chosen["expect"] is not None
+                    else {}
+                ),
             }
         )
     )

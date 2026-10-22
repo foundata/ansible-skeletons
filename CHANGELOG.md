@@ -35,6 +35,10 @@ and the project adheres to
   find stored rows by their natural identity.
 - Both module variants: the opt-in `fake_clock` unit fixture runs polling and
   deadlines on virtual time.
+- Both module variants: the lost-reply harness `loss.py` takes `expect`, the
+  result a lost reply must give instead of an observed success, `calls`, the
+  exact writes, and positions to drop. collection_modules proves a lost write
+  of a password with it.
 
 ### Changed
 

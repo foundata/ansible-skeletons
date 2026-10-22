@@ -33,6 +33,21 @@
       name: "molecule_fixture_loss"
       declaration:
         state: "absent"
+{# skeleton-variant: loss-secret #}
+    # The record exists after this lost reply, but no read-back proves the
+    # write-only password the creation sent.
+    - module: "{{ namespace }}.{{ collection_name }}.fixture"
+      name: "molecule_fixture_loss"
+      declaration:
+        password: "SYNTHETIC-loss-password"
+      options:
+        expect:
+          failed: true
+          changed: true
+          outcome: "changed"
+          error_category: "verification"
+          error_code: "secret_unknown"
+{# end skeleton-variant #}
     - module: "{{ namespace }}.{{ collection_name }}.fixture_nested"
       name: "molecule_fixture_nested_loss"
       declaration:

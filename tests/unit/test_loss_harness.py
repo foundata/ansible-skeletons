@@ -49,7 +49,8 @@ STUBS = {
     ),
     # Writes "value" in "stages" requests, one path each; "always" acts on
     # every run; "audit" sends an extra request outside the /items/ route;
-    # "keyword" reads and writes through one method told apart by "write".
+    # "keyword" reads and writes through one method told apart by "write";
+    # "secret" fails like a lost write of a secret no read-back can prove.
     "ansible_collections/acme/demo/plugins/modules/thing.py": """
 import json
 import sys
@@ -85,7 +86,16 @@ def main():
             else:
                 Client().write(path, params["value"])
         except TransportTimeout:
-            pass
+            if params.get("secret"):
+                print(json.dumps({
+                    "failed": True,
+                    "changed": True,
+                    "outcome": "changed",
+                    "error_category": "verification",
+                    "error_code": "secret_unknown",
+                    "msg": "SYNTHETIC-not-reported",
+                }))
+                sys.exit(1)
         if STORE.get(path) != params["value"]:
             print(json.dumps({"failed": True, "changed": True}))
             sys.exit(1)
@@ -268,6 +278,15 @@ def test_a_keyword_selects_the_writes_of_a_method_that_also_reads(
         ("when", {"write": [True]}),
         ("target", "os.system"),
         ("module", "not a module"),
+        ("drop", []),
+        ("drop", [1]),
+        ("drop", [True]),
+        ("expect", {}),
+        ("expect", {"msg": "x"}),
+        ("expect", {"changed": [True]}),
+        ("calls", []),
+        ("calls", [""]),
+        ("calls", "/items/a/0"),
     ],
 )
 def test_invalid_options_are_refused_before_any_write(
@@ -280,3 +299,74 @@ def test_invalid_options_are_refused_before_any_write(
         **{option: value},
     )
     assert result.returncode != 0 and "ValueError" in result.stderr
+
+
+def test_an_expected_result_replaces_the_observed_success(harness: Path) -> None:
+    expect = {
+        "failed": True,
+        "changed": True,
+        "outcome": "changed",
+        "error_code": "secret_unknown",
+    }
+    params = {"name": "s", "value": "1", "secret": True}
+    result = proof(
+        lose(
+            harness, identity={"name": "s"}, params=params, expect=expect, rerun="none"
+        )
+    )
+    assert result["result"] == {**expect, "error_category": "verification"}
+    assert "msg" not in result["result"] and "calls" not in result
+    wrong = lose(
+        harness,
+        identity={"name": "t"},
+        params={**params, "name": "t"},
+        expect={**expect, "outcome": "unknown"},
+        rerun="none",
+    )
+    assert wrong.returncode != 0 and "Expected outcome 'unknown'" in wrong.stderr
+    unexpected = lose(harness, identity={"name": "u"}, params={**params, "name": "u"})
+    assert unexpected.returncode != 0
+
+
+def test_listed_positions_drop_only_those_writes(harness: Path) -> None:
+    params = {"name": "p", "value": "1", "stages": 3}
+    result = proof(
+        lose(
+            harness, identity={"name": "p"}, params=params, expected_writes=3, drop=[1]
+        )
+    )
+    assert result["writes"] == 3 and result["dropped"] == 1
+
+
+def test_the_calls_are_exact_and_stop_at_the_route(harness: Path) -> None:
+    params = {"name": "c", "value": "1", "stages": 2}
+    calls = ["/items/c/0", "/items/c/1"]
+    result = proof(
+        lose(
+            harness,
+            identity={"name": "c"},
+            params=params,
+            calls=calls,
+            drop="all",
+            route="/items/",
+        )
+    )
+    assert result["calls"] == calls and result["writes"] == 2
+    wrong = lose(
+        harness,
+        identity={"name": "d"},
+        params={**params, "name": "d"},
+        calls=["/items/d/0"],
+        route="/items/",
+    )
+    assert wrong.returncode != 0 and "Expected 1 counted writes, saw 2" in wrong.stderr
+    mismatched = lose(
+        harness,
+        identity={"name": "e"},
+        params={**params, "name": "e"},
+        calls=calls,
+        expected_writes=3,
+    )
+    assert (
+        mismatched.returncode != 0 and "match the number of calls" in mismatched.stderr
+    )

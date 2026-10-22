@@ -146,8 +146,10 @@ through, replaces the reply with a timeout and then requires:
 
 Each case names a module, a record and the parameters to declare. Its
 `options` adapt the check to modules that write in stages, send writes through
-another method than `_client.Client.write` or act on every run; the docstring
-of `loss.py` describes each option. The cases run hidden because their
+another method than `_client.Client.write` or act on every run. A lost reply
+that cannot end in an observed success, such as one to a write that sends a
+secret, states the result it must give in `expect`. The docstring of `loss.py`
+describes each option. The cases run hidden because their
 parameters contain the credentials. `zz_loss.yml` then shows each case's
 proof, which contains no credentials and names the module file that ran.
 

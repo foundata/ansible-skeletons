@@ -33,6 +33,8 @@
       name: "molecule_fixture_loss"
       declaration:
         state: "absent"
+{# skeleton-variant: loss-secret #}
+{# end skeleton-variant #}
     - module: "{{ namespace }}.{{ collection_name }}.fixture_nested"
       name: "molecule_fixture_nested_loss"
       declaration:
