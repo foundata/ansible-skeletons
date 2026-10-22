@@ -14,6 +14,11 @@ and the project adheres to
 
 ## [Unreleased]
 
+- Nothing worth mentioning right now.
+
+
+## [3.1.0] - 2026-10-22
+
 ### Added
 
 - Both module variants: the lifecycle hooks `refused_before_change(failure)`,
@@ -643,7 +648,8 @@ and the project adheres to
 - All functionality and files, `role_default`
 
 
-[unreleased]: https://github.com/foundata/ansible-skeletons/compare/v3.0.0...HEAD
+[unreleased]: https://github.com/foundata/ansible-skeletons/compare/v3.1.0...HEAD
+[3.1.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v3.1.0
 [3.0.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v3.0.0
 [2.10.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.10.0
 [2.9.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v2.9.0
