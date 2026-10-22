@@ -16,58 +16,44 @@ and the project adheres to
 
 ### Added
 
-- Both module variants: the shared `setup_loopback` helper owns fake HTTP
-  dispatch, authenticated shutdown, bounded lifetime and port publication.
-  Product fixtures supply their routes and configuration.
-- Both module variants: `refused_before_change(failure)` classifies failures
-  that prove no request change, before read-back. `started()` keeps its
-  signature and confirmed earlier stages keep their outcome.
-- Both module variants: `Failure(message=...)` supplies a local verdict
-  message in place of the lifecycle class's default. Client exception text
-  stays private.
-- Both module variants: the optional contract adapter `prepare_deletion(fake)`
-  prepares instance-dependent deletion behavior before deletion cases.
-- Both module variants: contract subjects may name `ASSIGNED` separately
-  from their identifier. Shared contract tests locate stored rows by natural
-  identity, including normalized composite keys, without a server-identifier
-  stand-in. Native stores with different wire-field names and older
-  server-keyed adapters both work.
-- Both module variants: the lifecycle hook `refusal_may_change(failure)`
-  keeps a refused write `unknown` when it may change state no read-back
-  shows.
-- Both module variants: `fixture_nested_info`, the information read to copy
-  with a hook-based resource.
-- Both module variants: `Key(normalizer=...)` brings a declared or stored
-  identity into the form its pattern describes.
+- Both module variants: the lifecycle hooks `refused_before_change(failure)`,
+  for a failure that proves the request changed nothing, and
+  `refusal_may_change(failure)`, which keeps a refused write `unknown` when it
+  may change state no read-back shows.
+- Both module variants: `Failure(message=...)` replaces the class's failure
+  message for one verdict.
 - Both module variants: the engine's `Field` takes `created`, a value the
   product forces on creation; `implied`, a value every declaration implies;
-  and `step`, for a field written by its own request.
+  and `step`, for a field written by its own request. `Key(normalizer=...)`
+  brings a declared or stored identity into the form its pattern describes.
+- Both module variants: `fixture_nested_info`, the information read to copy
+  with a hook-based resource.
+- Both module variants: the hidden integration target `setup_loopback` runs a
+  product's fake HTTP server; the product supplies its routes.
+- Both module variants: contract subjects may name `ASSIGNED` apart from their
+  identifier and supply `prepare_deletion(fake)`; the shared contract tests
+  find stored rows by their natural identity.
+- Both module variants: the opt-in `fake_clock` unit fixture runs polling and
+  deadlines on virtual time.
 
 ### Changed
 
-- Both module variants: the API scenario documents retained test data,
-  per-run identities and additional endpoints. The development guide describes
-  the contract subject without depending on the rendered fixture.
-- Both module variants: the default `predict()` includes the identity when
-  creating.
 - Both module variants: the error code `create_unknown` is now
   `secret_unknown`, for any lost reply to a request that sends a secret.
+- Both module variants: the default `predict()` includes the identity when
+  creating.
+- Both module variants: the API scenario's README covers test data that
+  cannot be removed, per-run identities and additional endpoints.
 - role_default, collection_default, collection_modules: `.ansible-lint` no
-  longer declares recovery drill settings; collection_modules_appliance
-  keeps it.
+  longer declares recovery drill settings; collection_modules_appliance keeps
+  it.
 
 ### Fixed
 
-- Both module variants: the unit runner resets ansible-core's process-global
-  module warnings before each test, preserving their type across core versions.
-
-- Both module variants: the virtual-clock isolation assertion and the
-  shared-file list pass the rendered typing and Markdown checks.
-
-- Both module variants: lost-reply proofs no longer expose registered
-  credentials in verbose output. A fixture scenario runs at `-vvv` in the
-  quick check, with a credential scan and an old-loop disclosure control.
-
+- Both module variants: lost-reply proofs no longer show the module
+  parameters, credentials included, in verbose output.
+- Both module variants: the unit runner resets ansible-core's module warnings
+  before each test.
 - collection_default, collection_modules, collection_modules_appliance: the
   next nox run removes the short `TMPDIR` links of a nox that was killed.
 
