@@ -17,6 +17,7 @@ def serve(
     route: Callable[[Any], None],
     authorized: Callable[[Any], bool],
     *,
+    request_timeout: float = 1.0,
     methods: tuple[str, ...] = ("GET", "POST", "PUT", "PATCH", "DELETE"),
     shutdown_path: str = "/api/shutdown",
     shutdown_payload: Any = None,
@@ -28,10 +29,13 @@ def serve(
     plus reply(status, body, headers) and send_json(status, payload). It owns
     product authentication and parsing. authorized gates the shutdown route.
     The atomic port file is published after the listener binds.
+    A stalled request times out after request_timeout seconds, so the process
+    ends no later than lifetime plus request_timeout.
     """
 
     class Handler(BaseHTTPRequestHandler):
         server: HTTPServer
+        timeout = request_timeout
 
         def log_message(self, message_format: str, *values: Any) -> None:
             pass
@@ -81,7 +85,7 @@ def serve(
         (state / "port.tmp").write_text(str(server.server_port), encoding="utf-8")
         (state / "port.tmp").replace(state / "port")
         timer.start()
-        server.serve_forever()
+        server.serve_forever(poll_interval=min(0.5, request_timeout))
     finally:
         timer.cancel()
         server.server_close()

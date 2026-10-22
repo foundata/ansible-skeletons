@@ -61,6 +61,8 @@ and the project adheres to
 
 ### Fixed
 
+- Both module variants: the loopback fake server bounds stalled requests with
+  a socket timeout, so they cannot prevent its lifetime shutdown.
 - Both module variants: lost-reply proofs no longer show the module
   parameters, credentials included, in verbose output.
 - Both module variants: the unit runner resets ansible-core's module warnings

@@ -3,12 +3,15 @@
 import contextlib
 import http.client
 import json
+import socket
 import subprocess
 import sys
 import time
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
+
+import pytest
 
 from scripts.common import ROOT
 
@@ -41,6 +44,7 @@ def route(request):
 serve(
     state, float(sys.argv[2]), route, authorized,
     methods=tuple(sys.argv[3].split(",")),
+    request_timeout=float(sys.argv[4]),
     shutdown_path="/fixture/stop",
     shutdown_payload={"stopped": True},
     denied_payload={"stopped": False},
@@ -54,10 +58,12 @@ def server(
     *,
     lifetime: float = 120,
     methods: str = "GET,POST,PUT,PATCH,DELETE",
+    request_timeout: float = 1.0,
+    helper: Path = HELPER,
 ) -> Iterator[tuple[subprocess.Popen[str], int]]:
     source = "".join(
         line
-        for line in HELPER.read_text().splitlines(keepends=True)
+        for line in helper.read_text().splitlines(keepends=True)
         if not line.startswith("# SPDX")
     )
     (state / "server.py").write_text(source, encoding="utf-8")
@@ -65,7 +71,14 @@ def server(
     driver.write_text(DRIVER, encoding="utf-8")
     with (state / "server.log").open("w", encoding="utf-8") as log:
         process = subprocess.Popen(
-            [sys.executable, str(driver), str(state), str(lifetime), methods],
+            [
+                sys.executable,
+                str(driver),
+                str(state),
+                str(lifetime),
+                methods,
+                str(request_timeout),
+            ],
             stdin=subprocess.DEVNULL,
             stdout=log,
             stderr=subprocess.STDOUT,
@@ -145,3 +158,34 @@ def test_configured_methods_are_respected(tmp_path: Path) -> None:
 def test_lifetime_stops_the_listener(tmp_path: Path) -> None:
     with server(tmp_path, lifetime=0.1) as (process, _port):
         assert process.wait(timeout=30) == 0
+
+
+@pytest.mark.parametrize(
+    "variant", ["collection_modules", "collection_modules_appliance"]
+)
+@pytest.mark.parametrize(
+    "partial_request",
+    [
+        b"GET /product HTTP/1.1\r\nHost: localhost\r\n",
+        b"POST /product HTTP/1.1\r\nHost: localhost\r\nContent-Length: 100\r\n\r\nX",
+    ],
+    ids=["incomplete-header", "incomplete-body"],
+)
+def test_lifetime_stops_with_a_stalled_peer(
+    tmp_path: Path, variant: str, partial_request: bytes
+) -> None:
+    lifetime = 0.2
+    request_timeout = 0.2
+    allowance = 0.3
+    helper = (
+        ROOT / variant / "tests/integration/targets/setup_loopback/files/server.py.j2"
+    )
+    with server(
+        tmp_path,
+        lifetime=lifetime,
+        request_timeout=request_timeout,
+        helper=helper,
+    ) as (process, port):
+        with socket.create_connection(("127.0.0.1", port), timeout=5) as peer:
+            peer.sendall(partial_request)
+            assert process.wait(timeout=lifetime + request_timeout + allowance) == 0
