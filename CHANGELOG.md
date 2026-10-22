@@ -39,6 +39,10 @@ and the project adheres to
   result a lost reply must give instead of an observed success, `calls`, the
   exact writes, and positions to drop. collection_modules proves a lost write
   of a password with it.
+- Both module variants: the engine's `Field` takes `minimum` and `maximum`,
+  an inclusive range for a declared integer, and `input_only`, which applies
+  `choices` and `pattern` to declared values only, so a stored value outside
+  them stays readable.
 
 ### Changed
 

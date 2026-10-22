@@ -143,7 +143,7 @@ def synthetic(monkeypatch: pytest.MonkeyPatch) -> SyntheticClient:
     schema = errors.ErrorSchema(
         codes_by_category={
             "product": {None, "validation_failed", "rejected"},
-            "argument": {"invalid_identity"},
+            "argument": {"invalid_identity", "invalid_field"},
             "response": {"schema"},
             "eligibility": {"referenced"},
             "verification": {"not_persisted"},
@@ -233,6 +233,106 @@ def test_stored_strings_are_read_beyond_the_limit() -> None:
         normalize(field, "x" * 11, input_value=True)
 
 
+def test_an_integer_range_applies_to_declared_values_only(
+    synthetic: SyntheticClient, run_module: RunModule
+) -> None:
+    port = Field("port", "int", "Port", minimum=1, maximum=65535)
+    for value in (1, 65535):
+        assert normalize(port, value, input_value=True) == value
+    for value in (0, 65536):
+        with pytest.raises(ProductError) as refused:
+            normalize(port, value, input_value=True)
+        assert (refused.value.category, refused.value.code) == (
+            "argument",
+            "invalid_field",
+        )
+        assert refused.value.fields == ["port"]
+        assert normalize(port, value) == value
+    resource = replace(SYNTHETIC, fields=(*SYNTHETIC.fields, port))
+    synthetic.add(port=70000)
+    kept = run_module(entry(resource), label="example")
+    assert not kept.get("failed") and not kept["changed"]
+    assert kept["synthetic"]["port"] == 70000
+    refused_run = run_module(entry(resource), label="example", port=70000)
+    assert refused_run["failed"] and refused_run["error_code"] == "invalid_field"
+    assert refused_run["fields"] == ["port"] and not synthetic.writes
+    moved = run_module(entry(resource), label="example", port=443)
+    assert moved["changed"] and synthetic.rows[1]["port"] == 443
+
+
+@pytest.mark.parametrize(
+    "field,valid,invalid,malformed",
+    [
+        (
+            Field("mode", "choice", "Mode", choices=("local",), input_only=True),
+            "local",
+            ["remote"],
+            [7],
+        ),
+        (
+            Field("code", "str", "Code", pattern=r"[a-z]+", input_only=True),
+            "ab",
+            ["A1"],
+            [7],
+        ),
+        *(
+            (
+                Field(
+                    "tags",
+                    kind,
+                    "Tags",
+                    choices=("a", "Z"),
+                    pattern=r"[a-z]",
+                    input_only=True,
+                ),
+                ["a"],
+                [["c"], ["Z"]],
+                [7, [""], [None]],
+            )
+            for kind in ("set", "names")
+        ),
+    ],
+)
+def test_input_only_rules_apply_to_declared_values_only(
+    field: Field, valid: Any, invalid: list[Any], malformed: list[Any]
+) -> None:
+    assert normalize(field, valid, input_value=True) == valid
+    for value in invalid:
+        with pytest.raises(ProductError) as refused:
+            normalize(field, value, input_value=True)
+        assert (refused.value.category, refused.value.code) == (
+            "argument",
+            "invalid_field",
+        )
+        assert refused.value.fields == [field.name]
+        assert normalize(field, value) == value
+    for value in malformed:
+        with pytest.raises(ProductError) as broken:
+            normalize(field, value)
+        assert (broken.value.category, broken.value.code) == ("response", "schema")
+
+
+def test_an_input_only_field_reads_stored_values_and_leaves_null_unmanaged(
+    synthetic: SyntheticClient, run_module: RunModule
+) -> None:
+    mode = Field("mode", "choice", "Mode", choices=("local",), input_only=True)
+    resource = replace(SYNTHETIC, fields=(*SYNTHETIC.fields, mode))
+    assert build_spec(resource)["mode"] == {"type": "str"}
+    listed = replace(resource, fields=(replace(mode, input_only=False),))
+    assert build_spec(listed)["mode"]["choices"] == ["local"]
+    synthetic.add(mode="remote")
+    for args in ({}, {"mode": None}):
+        kept = run_module(entry(resource), label="example", **args)
+        assert not kept.get("failed") and not kept["changed"]
+        assert kept["synthetic"]["mode"] == "remote"
+    refused = run_module(entry(resource), label="example", mode="remote")
+    assert refused["failed"] and refused["error_code"] == "invalid_field"
+    assert refused["fields"] == ["mode"] and not synthetic.writes
+    moved = run_module(entry(resource), label="example", mode="local")
+    assert moved["changed"] and synthetic.rows[1]["mode"] == "local"
+    assert synthetic.writes == ["update"]
+
+
 def test_definition_can_allow_an_empty_identity_component(
     synthetic: SyntheticClient, run_module: RunModule
 ) -> None:
@@ -318,6 +418,22 @@ def test_identity_keys_are_strings() -> None:
     resource = replace(SYNTHETIC, keys=(Key("tag", "Tag", kind="int"),))
     with pytest.raises(ValueError, match="identity keys are strings"):
         build_spec(resource)
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        Field("text", "str", "Text", minimum=1),
+        Field("enabled", "bool", "Enabled", maximum=1),
+        Field("port", "int", "Port", input_only=True),
+        Field("rights", "map", "Rights", choices=("read",), input_only=True),
+        Field("owner", "ref", "Owner", input_only=True),
+        Field("password", "secret", "Password", input_only=True),
+    ],
+)
+def test_build_spec_refuses_an_option_for_another_kind(field: Field) -> None:
+    with pytest.raises(ValueError, match=r"minimum and maximum|input_only"):
+        build_spec(replace(SYNTHETIC, fields=(field,)))
 
 
 @pytest.mark.parametrize("reference", ["present", "malformed", "missing-key"])

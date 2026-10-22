@@ -22,8 +22,8 @@ lookup records and mutation responses can contain secrets: only project()
 publishes reviewed fields. After a possible mutation, a failure remains unknown
 until independent read-back establishes the outcome. No blind write retry.
 
-A definition's size bounds apply to input values only; a stored object of any
-size is read, compared, deleted and reported as is.
+A definition's size bounds and integer ranges apply to input values only; a
+stored object of any size is read, compared, deleted and reported as is.
 """
 
 from __future__ import annotations
@@ -111,6 +111,14 @@ class Field:
     declaration implies, such as a flag that marks an object as managed; the
     field is then no option. A field with a ``step`` is written by its own
     request under that step, alone and before the other changes.
+
+    ``minimum`` and ``maximum`` bound a declared ``int``, inclusive; a stored
+    integer outside them is read, compared and reported as is. ``input_only``
+    applies ``choices`` and ``pattern`` to declared values only, for the kinds
+    ``str``, ``choice``, ``set`` and ``names``; a stored value outside them
+    stays readable but keeps its type checks. The argument spec of such a
+    field lists no ``choices``, so an explicit null stays unmanaged and the
+    module documentation names the allowed values in prose.
     """
 
     name: str
@@ -129,6 +137,9 @@ class Field:
     created: Any = None
     implied: Any = None
     step: str = ""
+    minimum: int | None = None
+    maximum: int | None = None
+    input_only: bool = False
 
 
 @dataclass(frozen=True)
@@ -176,7 +187,9 @@ def build_spec(resource: Resource) -> dict[str, Any]:
 
     Raises:
         ValueError: If an identity key is not a string; the engine matches
-            identities as text.
+            identities as text. Also if ``minimum`` or ``maximum`` is set on
+            a kind other than ``int``, or ``input_only`` on a kind other than
+            ``str``, ``choice``, ``set`` and ``names``.
     """
     spec = api_argument_spec()
     for key in resource.keys:
@@ -190,6 +203,10 @@ def build_spec(resource: Resource) -> dict[str, Any]:
         if key.choices:
             spec[key.name]["choices"] = list(key.choices)
     for field in resource.fields:
+        if field.kind != "int" and (field.minimum, field.maximum) != (None, None):
+            raise ValueError("minimum and maximum bound an int field")
+        if field.input_only and field.kind not in ("str", "choice", "set", "names"):
+            raise ValueError("input_only applies to str, choice, set and names")
         if field.implied is not None:
             continue
         kind = {
@@ -203,7 +220,7 @@ def build_spec(resource: Resource) -> dict[str, Any]:
         spec[field.name] = {"type": kind}
         if kind == "list":
             spec[field.name]["elements"] = "str"
-        if field.choices and kind != "dict":
+        if field.choices and kind != "dict" and not field.input_only:
             spec[field.name]["choices"] = list(field.choices)
         if field.kind == "secret":
             spec[field.name]["no_log"] = True
@@ -263,9 +280,10 @@ def item_within(field: Field, item: str) -> bool:
 def normalize(field: Field, raw: Any, *, input_value: bool = False) -> Any:
     """Validate native public values; clients decode their wire values first.
 
-    The size bounds ``limit``, ``maximum_items`` and ``item_limit`` apply to
-    input values only. A stored value of any size is read, compared, deleted
-    and reported as is.
+    The size bounds ``limit``, ``maximum_items`` and ``item_limit`` and the
+    range ``minimum`` and ``maximum`` apply to input values only, and so do
+    ``choices`` and ``pattern`` of an ``input_only`` field. A stored value of
+    any size is read, compared, deleted and reported as is.
     """
     invalid = ProductError(
         category="argument" if input_value else "response",
@@ -274,20 +292,26 @@ def normalize(field: Field, raw: Any, *, input_value: bool = False) -> Any:
     )
     if raw is None and not input_value:
         return "" if field.kind == "ref" else None
+    checked = input_value or not field.input_only
     if field.kind in ("str", "choice", "ref", "secret"):
         if not isinstance(raw, str) or (input_value and len(raw) > field.limit):
             raise invalid
         if field.kind == "secret" and not raw:
             raise invalid
-        if field.pattern and not re.fullmatch(field.pattern, raw):
+        if checked and field.pattern and not re.fullmatch(field.pattern, raw):
             raise invalid
-        if field.choices and raw not in field.choices:
+        if checked and field.choices and raw not in field.choices:
             raise invalid
         value = canonical(raw, field.canonical)
         return field.normalizer(value) if field.normalizer else value
     if field.kind == "bool" and isinstance(raw, bool):
         return raw
     if field.kind == "int" and isinstance(raw, int) and not isinstance(raw, bool):
+        if input_value and (
+            (field.minimum is not None and raw < field.minimum)
+            or (field.maximum is not None and raw > field.maximum)
+        ):
+            raise invalid
         return raw
     if field.kind in ("set", "names"):
         if not isinstance(raw, list) or any(
@@ -300,7 +324,18 @@ def normalize(field: Field, raw: Any, *, input_value: bool = False) -> Any:
             or not all(item_within(field, v) for v in raw)
         ):
             raise invalid
-        if field.pattern and any(not re.fullmatch(field.pattern, v) for v in raw):
+        if (
+            checked
+            and field.pattern
+            and any(not re.fullmatch(field.pattern, v) for v in raw)
+        ):
+            raise invalid
+        if (
+            input_value
+            and field.input_only
+            and field.choices
+            and any(v not in field.choices for v in raw)
+        ):
             raise invalid
         return list(dict.fromkeys(raw))
     if field.kind == "map":
