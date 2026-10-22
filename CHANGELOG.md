@@ -48,6 +48,8 @@ and the project adheres to
 
 - Both module variants: the error code `create_unknown` is now
   `secret_unknown`, for any lost reply to a request that sends a secret.
+  Backports must update the collection-owned error schema, documentation and
+  tests.
 - Both module variants: the default `predict()` includes the identity when
   creating.
 - Both module variants: the API scenario's README covers test data that
@@ -73,8 +75,9 @@ and the project adheres to
   scenario state as an empty mapping, not as null.
 - collection_default: the role's entry point declares `version_added`, so
   the first release's changelog lists the role under "New Roles".
-- Both module variants: an `Engine` subclass without a state option checks
-  its own compatibility operation before the first read, not the `_info` one.
+- Both module variants: with `compatibility_always` enabled, an `Engine`
+  subclass without a state option checks its own compatibility operation
+  before the first read, not the `_info` one.
 
 
 ## [3.0.0] - 2026-10-19
