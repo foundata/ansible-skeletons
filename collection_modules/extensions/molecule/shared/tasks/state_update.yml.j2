@@ -21,7 +21,7 @@
     __testing_state: >-
       {{ '{{' }}
         __testing_state
-        | ansible.builtin.default({})
+        | ansible.builtin.default({}, true)
         | ansible.builtin.combine(__testing_state_update, recursive=True)
       {{ '}}' }}
   when:

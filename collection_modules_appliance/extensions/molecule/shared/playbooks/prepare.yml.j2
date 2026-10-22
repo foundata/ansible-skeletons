@@ -97,9 +97,9 @@
           {{ '{{' }}
             lookup('ansible.builtin.file', molecule_ephemeral_directory
                    ~ '/__testing_state_' ~ (inventory_hostname | ansible.builtin.md5) ~ '.yml', errors='ignore')
-            | ansible.builtin.default('{}')
+            | ansible.builtin.default('{}', true)
             | ansible.builtin.from_yaml
-            | ansible.builtin.default({})
+            | ansible.builtin.default({}, true)
           {{ '}}' }}
       when:
         - (__testing_state is not ansible.builtin.defined) or (__testing_state is not ansible.builtin.mapping)

@@ -56,6 +56,8 @@ and the project adheres to
   before each test.
 - collection_default, collection_modules, collection_modules_appliance: the
   next nox run removes the short `TMPDIR` links of a nox that was killed.
+- All skeletons: Molecule's shared playbooks load a missing or empty
+  scenario state as an empty mapping, not as null.
 
 
 ## [3.0.0] - 2026-10-19

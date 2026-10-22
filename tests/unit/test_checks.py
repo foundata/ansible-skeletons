@@ -560,6 +560,28 @@ def test_template_inputs_are_not_linted_as_ansible_templates(skeleton: str) -> N
 
 
 @pytest.mark.parametrize("skeleton", SKELETONS)
+def test_scenario_state_defaults_cover_a_missing_state_file(skeleton: str) -> None:
+    # A missing or empty state file makes the lookup and from_yaml return null,
+    # which default() replaces only with its boolean argument set.
+    shared = (
+        ROOT
+        / skeleton
+        / ("molecule" if skeleton == "role_default" else "extensions/molecule")
+        / "shared"
+    )
+    paths = [
+        *sorted(shared.glob("playbooks/*.yml.j2")),
+        shared / "tasks/state_update.yml.j2",
+    ]
+    restoring = [path for path in paths if "__testing_state" in path.read_text()]
+    assert len(restoring) == 12
+    for path in restoring:
+        text = path.read_text(encoding="utf-8")
+        assert "ansible.builtin.default('{}')" not in text, path
+        assert not re.search(r"ansible\.builtin\.default\(\{\}\)", text), path
+
+
+@pytest.mark.parametrize("skeleton", SKELETONS)
 def test_skeletons_ship_no_repository_tooling(skeleton: str) -> None:
     assert not (ROOT / skeleton / "pyproject.toml").exists()
     assert not (ROOT / skeleton / "scripts").exists()
