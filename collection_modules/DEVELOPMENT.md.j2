@@ -147,6 +147,11 @@ its reason belong in its utility's docstring.
 
 ## Releases<a id="releases"></a>
 
+Each change users notice adds a fragment to `changelogs/fragments/`;
+`00-fragment-template.txt` lists the sections. `release` turns the fragments
+into `CHANGELOG.rst` and `changelogs/changelog.yaml`, so neither file is edited
+by hand.
+
 Releases require `releasing>=7.0.0` for the `release` command. Install the
 development requirement in the maintainer's Python environment:
 

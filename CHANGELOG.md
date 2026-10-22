@@ -47,6 +47,9 @@ and the project adheres to
 - role_default, collection_default, collection_modules: `.ansible-lint` no
   longer declares recovery drill settings; collection_modules_appliance keeps
   it.
+- collection_default and both module variants: the changelog instructions
+  live in `DEVELOPMENT.md` and the fragment template instead of
+  `changelogs/changelog.yaml`, which the first release rewrites.
 
 ### Fixed
 
