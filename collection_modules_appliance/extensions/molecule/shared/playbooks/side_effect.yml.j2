@@ -2,9 +2,10 @@
 # simulates failure conditions that are not part of the normal converge or
 # verify phases. Used for fault injection, resilience, and degradation testing.
 #
-# Runs after idempotence and before verify. Any state introduced here must be
-# self-contained and either reverted within this playbook or cleaned up during
-# the subsequent cleanup phase. Optional.
+# Molecule's default sequence runs it after idempotence and before verify; a
+# scenario's test_sequence may move it, for example after verify. Any state
+# introduced here must be self-contained and either reverted within this
+# playbook or cleaned up during the subsequent cleanup phase. Optional.
 #
 # SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later

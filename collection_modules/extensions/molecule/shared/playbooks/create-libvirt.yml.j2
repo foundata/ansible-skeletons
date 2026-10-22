@@ -102,8 +102,8 @@
                 (libvirt_platforms | ansible.builtin.length)
             fail_msg: "At least two platforms in molecule.yml share the same ssh_port value."
 
-        # Using virsh on purpose: As of 2026-Q3, the community.libvirt collection
-        # requires the libvirt-python binding which has no pre-built wheels.
+        # virsh on purpose: community.libvirt needs the libvirt-python binding,
+        # which has no pre-built wheels. Switch once the binding ships wheels.
         - name: "Molecule | Create (libvirt) | Check for required command line tools"
           # The command module is used intentionally: this only probes for the
           # existence of the tools themselves, there is nothing to manage yet.
