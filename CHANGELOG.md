@@ -58,6 +58,8 @@ and the project adheres to
   next nox run removes the short `TMPDIR` links of a nox that was killed.
 - All skeletons: Molecule's shared playbooks load a missing or empty
   scenario state as an empty mapping, not as null.
+- collection_default: the role's entry point declares `version_added`, so
+  the first release's changelog lists the role under "New Roles".
 
 
 ## [3.0.0] - 2026-10-19
