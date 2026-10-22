@@ -568,6 +568,37 @@ def test_failure_after_a_write_keeps_changed_and_outcome(
         assert "fields" not in result and result["label"] == "example"
 
 
+@pytest.mark.parametrize(
+    "option,checked", [("state", "synthetic:present"), ("", "synthetic")]
+)
+def test_find_checks_the_operation_of_the_definition(
+    synthetic: SyntheticClient,
+    run_module: RunModule,
+    monkeypatch: pytest.MonkeyPatch,
+    option: str,
+    checked: str,
+) -> None:
+    class Checked(Engine):
+        compatibility_always = True
+        state_option = option
+
+    operations: list[str] = []
+    monkeypatch.setattr(
+        _binding._compat, "check", lambda *args: operations.append(args[-1])
+    )
+    synthetic.add()
+
+    def main() -> None:
+        module = AnsibleModule(
+            argument_spec=build_spec(SYNTHETIC), supports_check_mode=True
+        )
+        Checked(module, SYNTHETIC).execute()
+
+    result = run_module(main, label="example")
+    assert not result.get("failed") and not result["changed"]
+    assert operations == [checked]
+
+
 def test_stored_object_beyond_the_bounds_is_read_compared_and_deleted(
     synthetic: SyntheticClient, run_module: RunModule
 ) -> None:

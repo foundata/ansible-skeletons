@@ -71,6 +71,8 @@ and the project adheres to
   scenario state as an empty mapping, not as null.
 - collection_default: the role's entry point declares `version_added`, so
   the first release's changelog lists the role under "New Roles".
+- Both module variants: an `Engine` subclass without a state option checks
+  its own compatibility operation before the first read, not the `_info` one.
 
 
 ## [3.0.0] - 2026-10-19

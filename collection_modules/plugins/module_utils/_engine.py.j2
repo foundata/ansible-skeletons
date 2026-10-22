@@ -368,7 +368,12 @@ def equal(field: Field, current: Any, desired: Any) -> bool:
 
 
 class Engine(Binding):
-    """Plan one minimal write and recover by the declared lookup, never by retry."""
+    """Plan one minimal write and recover by the declared lookup, never by retry.
+
+    A key-less definition runs through a collection subclass without a state
+    option, ``class Theme(Engine): state_option = ""``; for a key-less lookup
+    its client raises and never returns None.
+    """
 
     message = "Resource reconciliation failed; see error_category and error_code"
     steps = (("lookup", "find"), ("protect", "find"))
@@ -486,7 +491,7 @@ class Engine(Binding):
             self.step("compatibility")
             self.ensure_compatible(
                 self.operation_id()
-                if self.state_option in self.params
+                if not self.state_option or self.state_option in self.params
                 else resource.name + "_info"
             )
             self.operation = operation
