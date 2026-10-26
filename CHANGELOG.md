@@ -14,7 +14,11 @@ and the project adheres to
 
 ## [Unreleased]
 
-- Nothing worth mentioning right now.
+### Fixed
+
+- Both module variants: the loopback fake server stops at its lifetime even
+  when a client keeps sending an incomplete request. Product routes still run
+  one at a time.
 
 
 ## [3.1.0] - 2026-10-22

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Callable
 
@@ -29,13 +29,20 @@ def serve(
     plus reply(status, body, headers) and send_json(status, payload). It owns
     product authentication and parsing. authorized gates the shutdown route.
     The atomic port file is published after the listener binds.
-    A stalled request times out after request_timeout seconds, so the process
-    ends no later than lifetime plus request_timeout.
+    request_timeout bounds socket inactivity. Requests run serially in daemon
+    threads so a handler cannot delay lifetime shutdown. The serving loop ends
+    no later than lifetime plus request_timeout.
     """
 
+    request_lock = threading.Lock()
+
     class Handler(BaseHTTPRequestHandler):
-        server: HTTPServer
+        server: ThreadingHTTPServer
         timeout = request_timeout
+
+        def handle(self) -> None:
+            with request_lock:
+                super().handle()
 
         def log_message(self, message_format: str, *values: Any) -> None:
             pass
@@ -78,7 +85,7 @@ def serve(
         do_PATCH = dispatch
         do_DELETE = dispatch
 
-    server = HTTPServer(("127.0.0.1", 0), Handler)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     timer = threading.Timer(lifetime, server.shutdown)
     timer.daemon = True
     try:

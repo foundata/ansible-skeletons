@@ -8,6 +8,7 @@ import subprocess
 import sys
 import time
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
@@ -60,6 +61,7 @@ def server(
     methods: str = "GET,POST,PUT,PATCH,DELETE",
     request_timeout: float = 1.0,
     helper: Path = HELPER,
+    driver_source: str = DRIVER,
 ) -> Iterator[tuple[subprocess.Popen[str], int]]:
     source = "".join(
         line
@@ -68,7 +70,7 @@ def server(
     )
     (state / "server.py").write_text(source, encoding="utf-8")
     driver = state / "routes.py"
-    driver.write_text(DRIVER, encoding="utf-8")
+    driver.write_text(driver_source, encoding="utf-8")
     with (state / "server.log").open("w", encoding="utf-8") as log:
         process = subprocess.Popen(
             [
@@ -189,3 +191,79 @@ def test_lifetime_stops_with_a_stalled_peer(
         with socket.create_connection(("127.0.0.1", port), timeout=5) as peer:
             peer.sendall(partial_request)
             assert process.wait(timeout=lifetime + request_timeout + allowance) == 0
+
+
+@pytest.mark.parametrize(
+    "variant", ["collection_modules", "collection_modules_appliance"]
+)
+@pytest.mark.parametrize(
+    "partial_request",
+    [
+        b"GET /product HTTP/1.1\r\nHost: localhost\r\nX-Partial: ",
+        b"POST /product HTTP/1.1\r\nHost: localhost\r\nContent-Length: 100000\r\n\r\nX",
+    ],
+    ids=["trickling-header", "trickling-body"],
+)
+def test_lifetime_stops_with_a_trickling_peer(
+    tmp_path: Path, variant: str, partial_request: bytes
+) -> None:
+    lifetime = 0.5
+    request_timeout = 0.5
+    allowance = 0.5
+    helper = (
+        ROOT / variant / "tests/integration/targets/setup_loopback/files/server.py.j2"
+    )
+    with server(
+        tmp_path,
+        lifetime=lifetime,
+        request_timeout=request_timeout,
+        helper=helper,
+    ) as (process, port):
+        with socket.create_connection(("127.0.0.1", port), timeout=5) as peer:
+            peer.sendall(partial_request)
+            deadline = time.monotonic() + lifetime + request_timeout + allowance
+            while process.poll() is None and time.monotonic() < deadline:
+                try:
+                    peer.sendall(b"X")
+                except (BrokenPipeError, ConnectionResetError):
+                    break
+                time.sleep(0.05)
+            assert process.wait(timeout=max(0.01, deadline - time.monotonic())) == 0
+
+
+@pytest.mark.parametrize(
+    "variant", ["collection_modules", "collection_modules_appliance"]
+)
+def test_product_routes_remain_serialized(tmp_path: Path, variant: str) -> None:
+    driver = """
+import sys
+import time
+from pathlib import Path
+from server import serve
+
+state = Path(sys.argv[1])
+active = False
+
+def route(request):
+    global active
+    if active:
+        (state / "overlap").touch()
+    active = True
+    time.sleep(0.1)
+    active = False
+    request.send_json(200, {})
+
+serve(state, float(sys.argv[2]), route, lambda request: True)
+"""
+    helper = (
+        ROOT / variant / "tests/integration/targets/setup_loopback/files/server.py.j2"
+    )
+    with server(tmp_path, helper=helper, driver_source=driver) as (process, port):
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            pending = [
+                executor.submit(request, port, "GET", "/product") for _ in range(4)
+            ]
+            assert all(future.result(timeout=5)[0] == 200 for future in pending)
+        assert not (tmp_path / "overlap").exists()
+        assert request(port, "POST", "/api/shutdown")[0] == 200
+        assert process.wait(timeout=5) == 0
