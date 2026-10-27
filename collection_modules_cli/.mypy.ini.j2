@@ -1,0 +1,13 @@
+; SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+; SPDX-License-Identifier: GPL-3.0-or-later
+
+[mypy]
+check_untyped_defs = True
+disallow_untyped_defs = True
+strict_equality = True
+strict_bytes = True
+warn_redundant_casts = True
+warn_unreachable = True
+
+[mypy-ansible.*]
+follow_untyped_imports = True

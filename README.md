@@ -49,6 +49,7 @@ The skeletons follow these style guides:
 - [Provided skeletons](#content)
   - [`collection_default`](#collection_default)
   - [`collection_modules_rest`](#collection_modules_rest)
+  - [`collection_modules_cli`](#collection_modules_cli)
   - [`collection_modules_appliance`](#collection_modules_appliance)
   - [`role_default`](#role_default)
 - [Compatibility](#compatibility)
@@ -236,6 +237,38 @@ ansible-galaxy collection init \
 `version` defaults to `1.0.0`; the core floor defaults to `2.19.0`. The
 rendered collection requires `foundata.utils >=1.0.0`. Follow the rendered
 `FIXME.md` to replace the fixtures with the product's resources.
+
+
+### `collection_modules_cli`<a id="collection_modules_cli"></a>
+
+A module skeleton for products whose supported administration interface is a
+command line on the managed host. Use `collection_modules_rest` for remote HTTP
+resources and `collection_modules_appliance` for management-path and global
+activation requirements. Transport alone does not establish supported operations
+or native concurrency guarantees.
+
+The CLI variant includes an existing-only hook fixture with a composite
+selector, its information and planning modules, and a real executable over
+seeded files. Its contract exercises ordinary falsy values, missing-target
+refusals, uncertainty and actual subprocess faults. A trusted foreground locator
+uses `foundata.utils.exec` with one deadline and secrets on stdin. The caller
+supplies the installed program and execution user. Container entry and user
+switching require separate product qualification.
+
+Using the metadata file above:
+
+```sh
+ansible-galaxy collection init \
+  --collection-skeleton ./collection_modules_cli \
+  --extra-vars @metadata.json \
+  --extra-vars "skeleton_revision=$(git describe --tags --always)" \
+  --extra-vars '{"product": "Example CLI Product"}' namespace.product
+```
+
+The lifecycle and definition engine stay shared. The example uses hooks;
+creation and deletion cases arrive with a CLI fixture that exercises them.
+This variant supplies no settings engine. Follow its rendered `FIXME.md` for
+the product's locator, compatibility and ownership decisions.
 
 
 ### `collection_modules_appliance`<a id="collection_modules_appliance"></a>

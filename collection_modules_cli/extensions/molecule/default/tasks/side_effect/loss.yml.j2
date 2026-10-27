@@ -1,0 +1,47 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+---
+- name: "Install the process-fault harness on the target"
+  ansible.builtin.copy:
+    src: "{% raw %}{{ molecule_scenario_directory }}{% endraw %}/../shared/files/loss.py"
+    dest: "{% raw %}{{ product_connection['exec']['chdir'] }}{% endraw %}/loss.py"
+    mode: "u=rwx,g=,o=" # 0700
+
+- name: "Run the process-fault contract on the target"
+  ansible.builtin.command:
+    argv:
+      - "{% raw %}{{ ansible_python_interpreter }}{% endraw %}"
+      - "{% raw %}{{ product_connection['exec']['chdir'] }}{% endraw %}/loss.py"
+    stdin: >-
+      {{ '{{' }} {'module':
+      '{{ namespace }}.{{ collection_name }}.fixture',
+      'params': product_connection | ansible.builtin.combine({'app': 'alpha', 'key': 'quota',
+      'expected_id': '090d190b-c80a-4917-8532-6b62a2836d0c'}),
+      'fault_file': product_connection['exec']['chdir'] ~ '/controls.json',
+      'receipt_file': product_connection['exec']['chdir'] ~ '/writes.jsonl',
+      'private': [product_connection['credential'], 'SYNTHETIC-UNMANAGED-PRIVATE'],
+      'cases': [{'control': {'update': 'lost'}, 'params': {'limit': 11},
+      'expect': {'changed': true, 'verified': 'observed'}},
+      {'control': {'update': 'exit_after_effect'}, 'params': {'limit': 12},
+      'expect': {'changed': true, 'verified': 'observed'}},
+      {'control': {'update': 'exit124'}, 'params': {'limit': 13},
+      'expect': {'changed': true, 'verified': 'observed'}},
+      {'control': {'update': 'readback_failed'}, 'params': {'limit': 14},
+      'expect': {'failed': true, 'outcome': 'unknown'}}]}
+      | ansible.builtin.to_json {{ '}}' }}
+  changed_when:
+    - true
+  register: __loss_result
+  no_log: true
+
+- name: "Verify the process-fault evidence"
+  ansible.builtin.assert:
+    that:
+      - (__loss_result['stdout'] | ansible.builtin.from_json)['writes'] == 4
+      - (__loss_result['stdout'] | ansible.builtin.from_json)['unknown_readback']
+
+- name: "Report process-fault coverage"
+  ansible.builtin.debug:
+    msg: "Lost CLI replies settled without redispatch; failed readback stays unknown."
+    verbosity: 0

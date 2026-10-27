@@ -63,6 +63,7 @@ CHANGED_SCOPES = {
     "role_default/": ("lanes", "generated-lint"),
     "collection_default/": ("lanes", "generated-lint"),
     "collection_modules_rest/": ("collection_modules_rest",),
+    "collection_modules_cli/": ("collection_modules_cli",),
     "collection_modules_appliance/": ("collection_modules_appliance",),
 }
 

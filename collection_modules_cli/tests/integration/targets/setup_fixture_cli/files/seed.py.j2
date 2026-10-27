@@ -1,0 +1,44 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Seed an exclusively owned fixture directory before module execution."""
+
+from __future__ import annotations
+
+import json
+import os
+import sys
+from pathlib import Path
+
+
+def seed(directory: Path) -> None:
+    directory = directory.resolve(strict=True)
+    if directory.stat().st_uid != os.geteuid() or directory.stat().st_mode & 0o077:
+        raise ValueError("Fixture directory must be private to its owner")
+    initial = {
+        "app": "alpha",
+        "key": "quota",
+        "id": "090d190b-c80a-4917-8532-6b62a2836d0c",
+        "enabled": True,
+        "limit": 10,
+        "label": "initial",
+        "unmanaged": "SYNTHETIC-UNMANAGED-PRIVATE",
+    }
+    documents = {
+        "owner.json": {"uid": os.geteuid(), "root": str(directory)},
+        "state.json": {
+            "objects": {
+                json.dumps(["alpha", "quota"]): initial,
+                json.dumps(["beta", "quota"]): {**initial, "app": "beta"},
+            }
+        },
+        "controls.json": {},
+    }
+    for name, content in documents.items():
+        with (directory / name).open("x") as stream:
+            json.dump(content, stream)
+    for name in ("calls.jsonl", "writes.jsonl", "state.lock"):
+        (directory / name).touch(exist_ok=False)
+
+
+if __name__ == "__main__":
+    seed(Path(sys.argv[1]))

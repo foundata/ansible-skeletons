@@ -14,6 +14,15 @@ and the project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- `collection_modules_cli` for products administered through a command line on
+  the managed host. It shares the lifecycle and check scaffolding, with an
+  existing-only hook fixture, real information and planning modules, bounded
+  executable transport and its own mandatory CLI contract. The foreground
+  locator and conditional file fixture make no claim about a product's native
+  concurrency guarantees or container wrappers.
+
 ### Changed
 
 - `collection_modules_rest` is the name of the REST module skeleton.
@@ -24,7 +33,7 @@ and the project adheres to
 
 ### Fixed
 
-- Both module variants: the loopback fake server stops at its lifetime even
+- Both HTTP module variants: the loopback fake server stops at its lifetime even
   when a client keeps sending an incomplete request. Product routes still run
   one at a time.
 

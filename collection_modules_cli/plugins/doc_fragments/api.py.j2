@@ -1,0 +1,54 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Execution options for the product's foreground command locator."""
+
+from __future__ import annotations
+
+
+class ModuleDocFragment:
+    DOCUMENTATION = r"""
+---
+options:
+  credential:
+    description: Product credential sent on stdin and registered as secret input.
+    type: str
+    required: true
+  deadline:
+    description: Shared monotonic budget in seconds for reads, identity probes, write and readback.
+    type: float
+    default: 5.0
+  exec:
+    description: Trusted foreground locator on the execution host. Does not switch users or enter containers.
+    type: dict
+    required: true
+    suboptions:
+      kind:
+        description: Locator kind. Only V(custom) is qualified by this fixture.
+        type: str
+        required: true
+      executable:
+        description: Absolute path of the trusted Python interpreter.
+        type: path
+        required: true
+      argv:
+        description: One absolute path of the installed fixture program, passed to the interpreter.
+        type: list
+        elements: str
+        required: true
+      chdir:
+        description: Absolute path of the caller-owned, seeded fixture directory.
+        type: path
+        required: true
+      user:
+        description: Numeric UID of the module and foreground application process. Use Ansible become to establish it.
+        type: str
+        required: true
+notes:
+  - "Runs on the managed host selected by Ansible, or an explicitly authorized delegate."
+  - "The host needs Python 3.9+, GNU timeout and /usr/bin/env. The caller installs the program and seeds its private directory."
+  - "The foreground locator uses one deadline and process-group cleanup; detached commands and container wrappers are unsupported."
+  - "The fixture's conditional file update is synthetic behavior. Qualify each product's native concurrency guarantees separately."
+  - >-
+    Use C(group/{{ namespace }}.{{ collection_name }}.api)
+    in C(module_defaults) for execution options.
+"""

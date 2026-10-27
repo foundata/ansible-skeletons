@@ -1,0 +1,44 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+---
+- name: "Exercise a standalone public module process"
+  block:
+    - name: "Run the file-only process contract"
+      ansible.builtin.command:
+        argv:
+          - "{% raw %}{{ ansible_python_interpreter }}{% endraw %}"
+          - "{% raw %}{{ role_path }}{% endraw %}/files/process.py"
+        stdin: >-
+          {{ '{{' }} {'module':
+          '{{ namespace }}.{{ collection_name }}.fixture',
+          'params': fixture_cli_connection | ansible.builtin.combine({'app': 'alpha', 'key': 'quota',
+          'expected_id': '090d190b-c80a-4917-8532-6b62a2836d0c'}),
+          'fault_file': fixture_cli_connection['exec']['chdir'] ~ '/controls.json',
+          'receipt_file': fixture_cli_connection['exec']['chdir'] ~ '/writes.jsonl',
+          'private': [fixture_cli_connection['credential'], 'SYNTHETIC-UNMANAGED-PRIVATE'],
+          'cases': [{'control': {'update': 'lost'}, 'params': {'limit': 11},
+          'expect': {'changed': true, 'verified': 'observed'}},
+          {'control': {'update': 'exit_after_effect'}, 'params': {'limit': 12},
+          'expect': {'changed': true, 'verified': 'observed'}},
+          {'control': {'update': 'exit124'}, 'params': {'limit': 13},
+          'expect': {'changed': true, 'verified': 'observed'}},
+          {'control': {'update': 'readback_failed'}, 'params': {'limit': 14},
+          'expect': {'failed': true, 'outcome': 'unknown'}}]}
+          | ansible.builtin.to_json {{ '}}' }}
+      changed_when:
+        - true
+      register: __process_contract
+      no_log: true
+
+    - name: "Verify the process contract"
+      ansible.builtin.assert:
+        that:
+          - (__process_contract['stdout'] | ansible.builtin.from_json)['writes'] == 4
+          - (__process_contract['stdout'] | ansible.builtin.from_json)['unknown_readback']
+
+  always:
+    - name: "Remove owned process fixture state"
+      ansible.builtin.file:
+        path: "{% raw %}{{ __fixture_cli_state['path'] }}{% endraw %}"
+        state: "absent"

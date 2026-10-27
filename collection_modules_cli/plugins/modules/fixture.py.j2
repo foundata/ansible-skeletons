@@ -1,0 +1,134 @@
+#!/usr/bin/python
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+from __future__ import annotations
+
+DOCUMENTATION = r"""
+---
+module: fixture
+short_description: Update an existing CLI fixture
+description:
+  - "Updates declared ordinary fields on a pre-existing object selected by app and key."
+  - "The opaque expected identity is a caller assertion. Failed or incomplete reads never establish absence."
+  - "False, zero and the empty string are values; omitted and null fields remain unmanaged."
+version_added: "{{ version | default('1.0.0') }}"
+author:
+{% for author in authors %}
+  - {{ (author if '(@' in author or '!UNKNOWN' in author else author ~ ' !UNKNOWN') | to_json }}
+{% endfor %}
+extends_documentation_fragment:
+  - {{ namespace }}.{{ collection_name }}.api
+attributes:
+  check_mode:
+    description: Performs real reads and predicts changes without a write.
+    support: full
+  diff_mode:
+    description: Returns only changed public fields when requested.
+    support: full
+notes:
+  - "FIXME Replace the invented resource with qualified product commands, identity and ownership rules."
+options:
+  app:
+    description: Application selector, starting with a lowercase letter and at most 32 lowercase letters, digits, underscores or hyphens.
+    type: str
+    required: true
+  key:
+    description: Key within the application, using the same syntax as O(app).
+    type: str
+    required: true
+  expected_id:
+    description: Expected opaque UUID. A different observed object is refused before a write.
+    type: str
+    required: true
+  enabled:
+    description: Whether the fixture is enabled. Omitted or null leaves it unmanaged.
+    type: bool
+  limit:
+    description: Limit from 0 through 100. Omitted or null leaves it unmanaged.
+    type: int
+  label:
+    description: Public label of at most 96 characters. Empty clears it; omitted or null leaves it unmanaged.
+    type: str
+"""
+
+EXAMPLES = r"""
+---
+- name: "Update an existing CLI fixture"
+  {{ namespace }}.{{ collection_name }}.fixture:
+    exec:
+      kind: "custom"
+      executable: "/usr/bin/python3"
+      argv:
+        - "/opt/fixture/fixture_command.py"
+      chdir: "/var/lib/fixture/owned-state"
+      user: "1000"
+    credential: "{% raw %}{{ fixture_credential }}{% endraw %}"
+    app: "alpha"
+    key: "quota"
+    expected_id: "090d190b-c80a-4917-8532-6b62a2836d0c"
+    enabled: false
+    limit: 0
+    label: ""
+"""
+
+RETURN = r"""
+---
+fixture:
+  description: Public observed or predicted state, without unmanaged data. Null for an absent information read.
+  returned: success
+  type: dict
+  contains:
+    app:
+      description: Application selector.
+      type: str
+    key:
+      description: Key within the application.
+      type: str
+    id:
+      description: Opaque object identity.
+      type: str
+    enabled:
+      description: Enablement value.
+      type: bool
+    limit:
+      description: Limit value.
+      type: int
+    label:
+      description: Public label.
+      type: str
+verified:
+  description: V(observed) for actual state, V(predicted) for a planned change.
+  returned: success
+  type: str
+changed_fields:
+  description: Names of the declared fields changed or predicted to change.
+  returned: success
+  type: list
+  elements: str
+"""
+
+from ansible.module_utils.basic import AnsibleModule
+
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._fixture import (
+        Fixture,
+        argument_spec,
+    )
+# isort: on
+# fmt: on
+
+
+def main() -> None:
+    module = AnsibleModule(
+        argument_spec=argument_spec(info=False), supports_check_mode=True
+    )
+    Fixture(module).execute()
+
+
+if __name__ == "__main__":
+    main()

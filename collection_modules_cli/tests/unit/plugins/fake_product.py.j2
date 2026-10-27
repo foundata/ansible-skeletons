@@ -1,0 +1,91 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Owned file backend for real bounded CLI commands."""
+
+from __future__ import annotations
+
+import json
+import os
+import sys
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+SECRET = "SYNTHETIC-CLI-CREDENTIAL"
+FOREIGN = "SYNTHETIC-UNMANAGED-PRIVATE"
+IDENTITY = "090d190b-c80a-4917-8532-6b62a2836d0c"
+ROOT = (
+    Path(__file__).resolve().parents[2] / "integration/targets/setup_fixture_cli/files"
+)
+
+
+class Lab:
+    def __init__(self, directory: Path) -> None:
+        self.directory = directory.resolve()
+        self.directory.chmod(0o700)
+        self.seed()
+
+    def seed(self) -> None:
+        directory = self.directory
+        self.selector = json.dumps(["alpha", "quota"])
+        self.initial = {
+            "app": "alpha",
+            "key": "quota",
+            "id": IDENTITY,
+            "enabled": True,
+            "limit": 10,
+            "label": "initial",
+            "unmanaged": FOREIGN,
+        }
+        self.state = {
+            "objects": {
+                self.selector: self.initial,
+                json.dumps(["beta", "quota"]): {**self.initial, "app": "beta"},
+            }
+        }
+        (directory / "owner.json").write_text(
+            json.dumps({"uid": os.geteuid(), "root": str(directory)})
+        )
+        (directory / "state.json").write_text(json.dumps(self.state))
+        self.control()
+
+    def control(self, **values: Any) -> None:
+        (self.directory / "controls.json").write_text(json.dumps(values))
+
+    def read(self) -> dict[str, Any]:
+        return json.loads((self.directory / "state.json").read_text())
+
+    def records(self, name: str) -> list[dict[str, Any]]:
+        filename = self.directory / name
+        return (
+            [json.loads(line) for line in filename.read_text().splitlines()]
+            if filename.exists()
+            else []
+        )
+
+    def arguments(self) -> dict[str, Any]:
+        return {
+            "app": "alpha",
+            "key": "quota",
+            "expected_id": IDENTITY,
+            "credential": SECRET,
+            "exec": {
+                "kind": "custom",
+                "executable": sys.executable,
+                "argv": [str(ROOT / "fixture_command.py")],
+                "chdir": str(self.directory),
+                "user": str(os.geteuid()),
+            },
+        }
+
+
+@pytest.fixture
+def fake(tmp_path: Path) -> Lab:
+    return Lab(tmp_path)
+
+
+@pytest.fixture
+def connection(fake: Lab) -> dict[str, Any]:
+    args = fake.arguments()
+    return {key: args[key] for key in ("credential", "exec")}

@@ -1,0 +1,55 @@
+# Molecule CLI fixture tests
+
+<!--
+SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
+The default scenario executes modules on the inventory target against an
+installed foreground fixture program. It updates existing objects, checks
+idempotence, reads public state and predicts a change without writing. Its
+process-fault helper runs the public module in another process, injects lost
+replies and nonzero exits, and verifies failed readback remains unknown without
+redispatch.
+
+## Requirements
+
+The caller supplies an authorized target with Python 3.9+, GNU `timeout`,
+`/usr/bin/env`, the installed collection and `foundata.utils`. The standalone
+process harness also requires a supported ansible-core on that target. Install
+the fixture program from `tests/integration/targets/setup_fixture_cli/files/`
+and seed a new mode-0700 directory with `seed.py`. Use one exclusively owned
+directory per scenario run. The locator and its numeric user must describe that
+target.
+
+Put the connection object in a mode-0600 JSON file on the controller and set
+`MOLECULE_PRODUCT_CREDENTIALS` to its absolute path. Its members are
+`credential`, `deadline` and `exec`, as the modules document. Credentials are
+never command-line arguments. Replace the inventory's local connection with the
+authorized host connection when testing remotely. Installation and target
+provisioning remain caller prerequisites.
+
+## Run the scenario
+
+```sh
+uv run noxfile.py -s molecule -- test
+```
+
+The sequence is syntax, cleanup, converge, idempotence, verify, side effect and
+cleanup. Cleanup restores the ordinary baseline values; it cannot delete objects
+because the fixture exposes no deletion command. The caller removes the owned
+state directory and credentials after the run.
+
+## Adapt the scenario
+
+Replace the fixture commands and seeded state from product evidence. Keep lost
+replies, immediate status 124, observed effects and unavailable readback
+distinct. A native status never establishes deadline expiry. Qualify every
+admitted locator's process cleanup and native concurrency guarantees.
+
+Shared playbooks dispatch task files by phase. Product tasks are under
+`default/tasks/`; `shared/files/loss.py` is the CLI invariant process harness. A
+product supplies the fault-control and write-receipt paths, cases, expected
+results and private values through stdin. Each case must dispatch exactly one
+write. Extend the invariant in the skeleton when another operation needs a
+different receipt model.

@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+---
+all:
+  children:
+    molecule:
+      hosts:
+        product-cli:
+          # FIXME Replace local with the authorized managed host connection.
+          ansible_connection: "local"
+          ansible_become: false
+          ansible_python_interpreter: "{% raw %}{{ ansible_playbook_python }}{% endraw %}"
+          product_connection: >-
+            {{ '{{' }} lookup('ansible.builtin.file', lookup('ansible.builtin.env', 'MOLECULE_PRODUCT_CREDENTIALS'))
+            | ansible.builtin.from_json {{ '}}' }}

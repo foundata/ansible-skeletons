@@ -1,0 +1,144 @@
+#!/usr/bin/env python
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Synthetic existing-only backend. All state belongs to a test-owned directory."""
+
+from __future__ import annotations
+
+import fcntl
+import json
+import os
+import sys
+import time
+from pathlib import Path
+from typing import Any
+
+SECRET = "SYNTHETIC-CLI-CREDENTIAL"
+
+
+def emit(document: object, status: int = 0) -> None:
+    print(json.dumps(document), flush=True)
+    raise SystemExit(status)
+
+
+def append(filename: str, document: object) -> None:
+    with Path(filename).open("a") as stream:
+        stream.write(json.dumps(document) + "\n")
+
+
+def save(document: object) -> None:
+    Path("state.next").write_text(json.dumps(document))
+    Path("state.next").replace("state.json")
+
+
+def main() -> None:
+    root = Path.cwd()
+    if root.stat().st_uid != os.geteuid() or root.stat().st_mode & 0o077:
+        raise SystemExit(90)
+    owner = json.loads(Path("owner.json").read_text())
+    if owner != {"uid": os.geteuid(), "root": str(Path.cwd())}:
+        raise SystemExit(90)
+    command = sys.argv[1:]
+    operation = command[0]
+    append(
+        "calls.jsonl",
+        {"argv": sys.argv, "uid": os.geteuid(), "environment": dict(os.environ)},
+    )
+    if operation == "uid":
+        controls = json.loads(Path("controls.json").read_text())
+        print(os.geteuid() + int(controls.get("identity_refused", False)))
+        return
+    request = json.load(sys.stdin)
+    if request.get("credential") != SECRET:
+        emit({"error": "unauthenticated"}, 11)
+    if operation == "version":
+        controls = json.loads(Path("controls.json").read_text())
+        emit({"version": controls.get("version", "1.0.0")})
+    if len(command) != 4 or command[1] != "--" or operation not in {"show", "update"}:
+        emit({"error": "unsupported"}, 10)
+    controls = json.loads(Path("controls.json").read_text())
+    with Path("state.lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        state: dict[str, Any] = json.loads(Path("state.json").read_text())
+        selector = json.dumps(command[2:])
+        record = state["objects"].get(selector)
+        if operation == "show":
+            history = [
+                json.loads(line)
+                for line in Path("calls.jsonl").read_text().splitlines()
+            ]
+            reads = sum(event["argv"][1] == "show" for event in history)
+            if reads == 2 and record is not None:
+                if controls.get("replace_on_recheck"):
+                    record["id"] = "8a7bf6f9-4965-4718-8dd4-a4fcbbeb845a"
+                    save(state)
+                if controls.get("stale_on_recheck"):
+                    record["label"] = "peer-change"
+                    save(state)
+            mode = controls.get("read", "")
+            if mode == "failed":
+                print(SECRET, file=sys.stderr)
+                raise SystemExit(5)
+            if mode == "empty":
+                raise SystemExit(0)
+            if mode == "truncated":
+                print('{"item":')
+                raise SystemExit(0)
+            if mode == "oversized":
+                print("x" * 10000)
+                raise SystemExit(0)
+            if mode == "malformed":
+                print(SECRET)
+                raise SystemExit(0)
+            if mode == "wrong_schema":
+                emit({"item": {"enabled": "false", "private": SECRET}})
+            if mode == "duplicate":
+                print('{"item":null,"item":null}')
+                raise SystemExit(0)
+            emit({"item": record})
+        append(
+            "writes.jsonl",
+            {
+                "selector": command[2:],
+                "mode": controls.get("update", ""),
+                "pid": os.getpid(),
+            },
+        )
+        if record is None:
+            emit({"error": "missing"}, 10)
+        if request["expected_id"] != record["id"]:
+            emit({"error": "conflict"}, 10)
+        mode = controls.get("update", "")
+        if mode == "reject":
+            emit({"error": "refused"}, 10)
+        if mode == "timeout_before":
+            time.sleep(30)
+        values = request["values"]
+        if not isinstance(values, dict) or set(values) - {"enabled", "limit", "label"}:
+            emit({"error": "refused"}, 10)
+        if mode != "drop":
+            for name, value in values.items():
+                if mode != "partial" or name == "limit":
+                    record[name] = value
+            save(state)
+        if mode == "readback_failed":
+            Path("controls.json").write_text(json.dumps({"read": "failed"}))
+        if mode == "timeout_after":
+            time.sleep(30)
+        if mode in {
+            "lost",
+            "readback_failed",
+            "partial",
+            "exit124",
+            "exit_after_effect",
+        }:
+            print(SECRET, file=sys.stderr)
+            if mode == "lost":
+                print("{")
+                raise SystemExit(0)
+            raise SystemExit(124 if mode == "exit124" else 12)
+        emit({"updated": True})
+
+
+if __name__ == "__main__":
+    main()

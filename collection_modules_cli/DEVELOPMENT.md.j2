@@ -1,0 +1,148 @@
+# Development
+
+<!--
+SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
+## Prerequisites<a id="prerequisites"></a>
+
+- [uv](https://docs.astral.sh/uv/), or [nox](https://nox.thea.codes/) with
+  [antsibull-nox](https://docs.ansible.com/projects/antsibull-nox/) in one
+  Python environment.
+- [Podman](https://podman.io/) for the container-backed `ansible-test` sessions.
+- An authorized lab for each
+  [Molecule scenario](./extensions/molecule/README.md).
+
+## Checks<a id="checks"></a>
+
+Run the checks from the collection's Git root. With nox installed, `nox`
+replaces `uv run noxfile.py`.
+
+```bash
+uv run noxfile.py                 # fix, then run default checks
+CI=true uv run noxfile.py         # check only
+uv run noxfile.py -l              # list sessions
+uv run noxfile.py -s lint         # Python, plugin YAML and typing
+uv run noxfile.py -s helper-lint  # Python helpers
+uv run noxfile.py -s ansible-test-sanity
+uv run noxfile.py -s ansible-test-units
+uv run noxfile.py -s ansible-test-integration
+uv run noxfile.py -s molecule
+```
+
+Among the default sessions:
+
+- `runtime-check` installs the built collection in isolation and keeps only
+  what ships: `meta/`, `plugins/`, `roles/` and `playbooks/`. It checks Python
+  imports, module documentation and the syntax of any roles, then runs the
+  unit tests against that installation. To check the exact archive of a
+  release:
+
+  ```sh
+  uv run noxfile.py -s runtime-check -- --artifact /path/to/collection.tar.gz
+  ```
+
+- `helper-lint` checks the Python outside `plugins/` with
+  [ruff.toml](ruff.toml): `extensions/molecule/`, any role's `files/`,
+  `tools/`, `scripts/` and `tests/runtime_check.py`. Add it to CI
+  configurations that list sessions explicitly.
+
+Session definitions: [noxfile.py](noxfile.py).
+Built-in session settings: [antsibull-nox.toml](antsibull-nox.toml).
+While editing, run the sessions of one ansible-core release, such as
+`uv run noxfile.py -s ansible-test-units-2.21` (`-l` lists them), and the
+default sessions before a commit.
+
+Below a deep checkout, nox gives each session a short symbolic link as
+`TMPDIR`, because Unix socket paths are limited in length. A test of code that
+refuses symbolic links in a path resolves `TMPDIR` first.
+
+## Unit-test clocks<a id="unit-test-clocks"></a>
+
+Use the opt-in `fake_clock` fixture when a test's expected outcome depends
+on polling or a short deadline. It keeps the real `foundata.utils`
+`Deadline`, but replaces its module-local clock. Patch each polling module
+before invoking the code under test:
+
+```python
+fake_clock.patch(_activation)
+```
+
+`fake_clock.sleep(seconds)` advances virtual time immediately.
+`fake_clock.advance(seconds)` models work in a fake handler, and
+`fake_clock.now` exposes elapsed time. Budget the deadline for these
+deliberate advances, not for host speed. Tests that do not request the
+fixture keep real time; pytest restores all patches after each test.
+
+`patch(module)` replaces that module's `time` reference, not Python's
+global time functions. Modules that import a clock function directly or
+capture it in a default argument need explicit injection instead.
+Use this fixture only with synchronous fake products, not real I/O,
+background workers or event loops. See `test_activation.py` for complete
+polling and timeout examples.
+
+## Boundaries<a id="boundaries"></a>
+
+The CLI fixture is a hook-based existing-only resource. Its opaque expected
+identity and composite selector are product assertions. The shared lifecycle
+owns sequencing, prediction and reconciliation. `_engine.py` remains available
+for products with a qualified definition model; this variant ships no
+definition-driven CLI example. `_definitions.FIXTURE` names the hook class used
+by the frozen resource registry.
+
+The following files are invariant within collections rendered from this variant:
+
+- `plugins/module_utils/`: `_lifecycle.py`, `_engine.py` and `_activation.py`.
+- `tests/unit/plugins/`: `conftest.py` (including `fake_clock`), and
+  `contracts.py`, `test_contract.py`, `test_engine.py`, `test_activation.py` and
+  `test_lifecycle.py` in `modules/`.
+- `extensions/molecule/shared/`: everything.
+
+Leave these files unchanged when adapting a product. Propose a change in
+[foundata/ansible-skeletons](https://github.com/foundata/ansible-skeletons) when
+an invariant needs to change.
+
+`tests/unit/plugins/modules/contract_subject.py` is product-adapted. It
+registers actual public entry points, one of two explicit modes, and a fake
+adapter. An existing-only subject requires a writer; an observational subject
+forbids one. Both require an information entry point. Incomplete registrations
+fail during collection. Observational-only products import no fabricated mutable
+exports. Every public module must be registered.
+
+`plugins/module_utils/_binding.py` and `_compat.py` retain their shared
+structure with product policy. The client, hook resource, definitions,
+documentation fragment, fake program, fake adapter, other unit tests,
+integration targets and scenario tasks are product-owned. The fixture setup
+target is product-owned because the executable, its seeded state and its faults
+describe this product.
+
+`foundata.utils` owns bounded byte transport, the monotonic deadline and safe
+error translation. The client supplies the command grammar, parser, locator and
+version probe. Credential input stays on stdin. Native concurrency guarantees
+and locator qualification remain the product's responsibility.
+
+The REST inventory extractor is omitted. Add a product-specific extractor when a
+versioned CLI reference supplies a useful inventory; keep its output under
+`tools/inventory/`, excluded from collection archives.
+
+## Releases<a id="releases"></a>
+
+Each change users notice adds a fragment to `changelogs/fragments/`;
+`00-fragment-template.txt` lists the sections. `release` turns the fragments
+into `CHANGELOG.rst` and `changelogs/changelog.yaml`, so neither file is edited
+by hand.
+
+Releases require `releasing>=7.0.0` for the `release` command. Install the
+development requirement in the maintainer's Python environment:
+
+```sh
+python -m pip install -r requirements-dev.txt
+```
+
+`release build` runs the committed revision's Ansible sanity tests before
+building the archive. Set `repository` in `.releasing.toml` before the first
+release.
+
+FIXME Describe what a release of this collection consists of, its product
+qualification and the steps to make one.

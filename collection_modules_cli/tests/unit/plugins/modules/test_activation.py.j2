@@ -1,0 +1,470 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Shared activation workflow, including uncertain acknowledgements."""
+
+from __future__ import annotations
+
+import time
+from types import ModuleType
+from typing import Any
+
+import pytest
+from ansible.module_utils.basic import AnsibleModule
+
+from ansible_collections.foundata.utils.plugins.module_utils import deadline, errors
+
+# isort: split
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils import (
+        _activation,
+    )
+# isort: on
+# fmt: on
+
+from ..conftest import Clock, RunModule
+
+
+@pytest.fixture(autouse=True)
+def compatible(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Record compatibility checks instead of asking a product."""
+    checks: list[str] = []
+    monkeypatch.setattr(
+        _activation.Binding,
+        "compatibility",
+        lambda self, operation: checks.append(operation),
+    )
+    return checks
+
+
+def run_main(
+    compare: Any, apply: Any, *, settle_seconds: float = 0, **options: Any
+) -> Any:
+    def main() -> None:
+        module = AnsibleModule(
+            argument_spec=_activation.argument_spec(), supports_check_mode=True
+        )
+        _activation.run(
+            module,
+            operation_id="synthetic_apply",
+            label="synthetic state",
+            name_pattern=r"[a-z]+",
+            compare=compare,
+            apply=apply,
+            settle_seconds=settle_seconds,
+            **options,
+        )
+
+    return main
+
+
+def test_virtual_polling_observes_convergence(
+    fake_clock: Clock, run_module: RunModule
+) -> None:
+    fake_clock.patch(_activation)
+    writes = []
+
+    def compare(client: Any, names: list[str]) -> dict[str, str]:
+        return {"one": "in_sync" if fake_clock.now >= 1.5 else "drift"}
+
+    result = run_module(
+        run_main(compare, lambda client: writes.append("apply"), settle_seconds=5),
+        verify=["one"],
+        deadline=3,
+    )
+    assert not result.get("failed")
+    assert result["changed"] and result["verified"] == "observed"
+    assert writes == ["apply"]
+    assert fake_clock.now == 1.5
+
+
+@pytest.mark.parametrize(
+    "budget,limit,elapsed,error_code",
+    [(1, 5, 1, "deadline_exceeded"), (5, 1, 1.25, "not_effective")],
+)
+def test_virtual_timeout_preserves_a_confirmed_write(
+    fake_clock: Clock,
+    run_module: RunModule,
+    budget: float,
+    limit: float,
+    elapsed: float,
+    error_code: str,
+) -> None:
+    fake_clock.patch(_activation)
+    writes = []
+
+    def apply(client: Any) -> None:
+        writes.append("apply")
+        fake_clock.advance(0.25)
+
+    result = run_module(
+        run_main(lambda client, names: {"one": "drift"}, apply, settle_seconds=limit),
+        verify=["one"],
+        deadline=budget,
+    )
+    assert result["failed"]
+    assert result["changed"] and result["outcome"] == "changed"
+    assert writes == ["apply"]
+    assert fake_clock.now == elapsed
+    assert result["error_code"] == error_code
+
+
+def test_sleep_and_work_share_the_real_deadline(fake_clock: Clock) -> None:
+    budget = deadline.Deadline(3)
+    fake_clock.sleep(0.5)
+    fake_clock.advance(1)
+    assert fake_clock.monotonic() == 1.5
+    assert budget.remaining() == 1.5
+    fake_clock.advance(1.5)
+    with pytest.raises(errors.TransportTimeout):
+        budget.remaining()
+
+
+def test_patches_are_local_and_restored() -> None:
+    original_deadline_time = deadline.time
+    assert original_deadline_time is time
+    original_sleep = time.sleep
+    original_monotonic = time.monotonic
+    poller: Any = ModuleType("poller")
+    poller.time = time
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        clock = Clock(monkeypatch)
+        clock.patch(deadline)
+        clock.patch(poller)
+        patched_deadline_time: Any = deadline.time
+        assert patched_deadline_time is clock
+        assert poller.time is clock
+        assert time.sleep is original_sleep
+        assert time.monotonic is original_monotonic
+    assert deadline.time is original_deadline_time
+    assert poller.time is time
+
+
+@pytest.mark.parametrize("seconds", [-1, float("inf"), float("-inf"), float("nan")])
+def test_invalid_elapsed_time_is_rejected(fake_clock: Clock, seconds: float) -> None:
+    with pytest.raises(ValueError, match="finite and non-negative"):
+        fake_clock.advance(seconds)
+    assert fake_clock.now == 0
+
+
+def test_each_clock_starts_at_zero(fake_clock: Clock) -> None:
+    assert fake_clock.now == 0
+
+
+@pytest.mark.parametrize("category", ["timeout", "transport", "response"])
+@pytest.mark.parametrize(
+    "before,after,activate,success",
+    [
+        ({"one": "drift"}, {"one": "in_sync"}, "auto", True),
+        ({"one": "drift"}, {"one": "drift"}, "auto", False),
+        ({"one": "drift"}, {}, "auto", False),
+        ({"one": "drift"}, {"one": "unverifiable"}, "auto", False),
+        ({"one": "drift"}, None, "auto", False),
+        (
+            {"one": "drift", "two": "drift"},
+            {"one": "in_sync", "two": "unverifiable"},
+            "auto",
+            False,
+        ),
+        (
+            {"one": "drift", "two": "drift"},
+            {"one": "in_sync"},
+            "auto",
+            False,
+        ),
+        (
+            {"one": "drift", "two": "drift"},
+            {"one": "in_sync", "two": "in_sync"},
+            "auto",
+            True,
+        ),
+        (
+            {"one": "drift", "two": "unverifiable"},
+            {"one": "in_sync", "two": "unverifiable"},
+            "auto",
+            False,
+        ),
+        ({"one": "in_sync"}, {"one": "in_sync"}, "always", False),
+    ],
+)
+def test_lost_reply_requires_each_triggering_object_observed_in_sync(
+    run_module: RunModule,
+    category: str,
+    before: dict[str, str],
+    after: dict[str, str] | None,
+    activate: str,
+    success: bool,
+) -> None:
+    writes = []
+    reads: list[list[str]] = []
+
+    def apply(client: Any) -> None:
+        writes.append(client)
+        raise errors.ApiError(category=category)
+
+    def compare(client: Any, names: list[str]) -> dict[str, str]:
+        reads.append(names)
+        if len(reads) == 1:
+            return before
+        if after is None:
+            raise errors.ApiError(category="transport")
+        return after
+
+    result = run_module(
+        run_main(compare, apply), verify=list(before), activate=activate
+    )
+    assert len(writes) == 1 and result["changed"]
+    if success:
+        assert not result.get("failed") and result["verified"] == "observed"
+    else:
+        assert result["failed"] and result["outcome"] == "unknown"
+
+
+@pytest.mark.parametrize(
+    "always,drift,expected",
+    [
+        (False, False, ["compare"]),
+        (False, True, ["compare", "compatibility", "apply", "compare"]),
+        (True, False, ["compatibility", "compare"]),
+        (True, True, ["compatibility", "compare", "apply", "compare"]),
+    ],
+)
+def test_activation_follows_the_binding_probe_policy(
+    run_module: RunModule,
+    monkeypatch: pytest.MonkeyPatch,
+    always: bool,
+    drift: bool,
+    expected: list[str],
+) -> None:
+    events: list[str] = []
+    monkeypatch.setattr(_activation.Binding, "compatibility_always", always)
+    monkeypatch.setattr(
+        _activation.Binding,
+        "compatibility",
+        lambda self, operation: events.append("compatibility"),
+    )
+
+    def compare(client: Any, names: list[str]) -> dict[str, str]:
+        events.append("compare")
+        stale = drift and "apply" not in events
+        return dict.fromkeys(names, "drift" if stale else "in_sync")
+
+    result = run_module(
+        run_main(compare, lambda client: events.append("apply")), verify=["one"]
+    )
+    assert result["changed"] is drift and not result.get("failed")
+    assert events == expected
+
+
+class Subsystem(_activation.Activation):
+    """An in-memory subsystem: saved and loaded values, optional pending work."""
+
+    compatibility_id = "subsystem_apply"
+    name_pattern = r"[a-z]+"
+    settle_seconds = 0.0
+
+    def __init__(self, module: Any, state: dict[str, Any]) -> None:
+        super().__init__(module)
+        self.state = state
+
+    def compare(self, identities: dict[str, Any]) -> dict[str, str]:
+        self.state["compared"].append(dict(identities))
+        names = set(identities) | (set(self.state["saved"]) if self.owned else set())
+        status = {}
+        for name in sorted(names):
+            saved = self.state["saved"].get(name)
+            loaded = self.state["loaded"].get(name)
+            status[name] = (
+                "unverifiable"
+                if saved == "opaque"
+                else "in_sync"
+                if saved == loaded
+                else "drift"
+            )
+        return status
+
+    def pending(self) -> dict[str, Any] | None:
+        if self.state.get("pending") is None:
+            return None
+        return dict.fromkeys(self.state["pending"])
+
+    def protect(self) -> None:
+        if self.state.get("refuse"):
+            raise _activation.ProductError(category="eligibility", code="referenced")
+
+    def activate(self) -> None:
+        self.state["applies"] += 1
+        if not self.state.get("stuck"):
+            self.state["loaded"] = dict(self.state["saved"])
+        self.state["pending"] = None if self.state.get("pending") is None else []
+        if self.state.get("lose"):
+            raise errors.ApiError(category="timeout", code="socket_timeout")
+
+
+def subsystem_main(state: dict[str, Any], **settings: Any) -> Any:
+    def main() -> None:
+        module = AnsibleModule(
+            argument_spec=_activation.argument_spec(objects=True),
+            supports_check_mode=True,
+        )
+        activation = Subsystem(module, state)
+        for name, value in settings.items():
+            setattr(activation, name, value)
+        activation.execute(activation.verify_activation)
+
+    return main
+
+
+def subsystem(**values: Any) -> dict[str, Any]:
+    return {
+        "saved": {},
+        "loaded": {},
+        "compared": [],
+        "applies": 0,
+        **values,
+    }
+
+
+@pytest.mark.parametrize("refused", [False, True])
+def test_survey_runs_once_connected_before_the_first_comparison(
+    run_module: RunModule, refused: bool
+) -> None:
+    events: list[str] = []
+
+    class Surveyed(Subsystem):
+        def survey(self) -> None:
+            assert self.client is not None
+            events.append("survey " + self.operation)
+            if refused:
+                raise _activation.ProductError(
+                    category="eligibility", code="referenced"
+                )
+
+        def compare(self, identities: dict[str, Any]) -> dict[str, str]:
+            events.append("compare")
+            return super().compare(identities)
+
+    def main() -> None:
+        module = AnsibleModule(
+            argument_spec=_activation.argument_spec(objects=True),
+            supports_check_mode=True,
+        )
+        activation = Surveyed(module, state)
+        activation.execute(activation.verify_activation)
+
+    state = subsystem(saved={"one": "1"}, loaded={"one": "0"})
+    result = run_module(main, verify=[{"name": "one"}])
+    if refused:
+        assert result["failed"] and result["error_code"] == "referenced"
+        assert result["operation"] == "compare" and events == ["survey compare"]
+        assert not state["applies"]
+    else:
+        assert result["changed"] and result["verification"] == {"one": "in_sync"}
+        assert events[:2] == ["survey compare", "compare"]
+        assert events.count("survey compare") == 1 and state["applies"] == 1
+
+
+def test_an_owned_subsystem_compares_every_object_without_verify(
+    run_module: RunModule,
+) -> None:
+    state = subsystem(saved={"one": "1", "two": "2"}, loaded={"one": "1"})
+    named = run_module(subsystem_main(state), verify=[])
+    assert named["failed"] and named["error_code"] == "validation_failed"
+    result = run_module(subsystem_main(state, owned=True), verify=[])
+    assert result["changed"] and result["verification"] == {
+        "one": "in_sync",
+        "two": "in_sync",
+    }
+    assert state["applies"] == 1 and state["compared"][-1] == {}
+
+
+def test_object_items_carry_their_uuid_as_identity(run_module: RunModule) -> None:
+    state = subsystem(saved={"one": "1"}, loaded={"one": "1"})
+    uuid = "0f8fad5b-d9cb-469f-a165-70867728950e"
+    result = run_module(subsystem_main(state), verify=[{"name": "one", "uuid": uuid}])
+    assert not result["changed"] and state["compared"] == [{"one": uuid}]
+    for verify in (
+        [{"name": "one", "uuid": "not-a-uuid"}],
+        [{"name": "one", "uuid": uuid}, {"name": "one"}],
+    ):
+        refused = run_module(subsystem_main(state), verify=verify)
+        assert refused["failed"] and refused["error_code"] == "validation_failed"
+        assert refused["fields"] == ["verify"] and not refused["changed"]
+
+
+@pytest.mark.parametrize("apply_unverifiable", [False, True])
+def test_unverifiable_objects_apply_only_when_the_subsystem_asks(
+    run_module: RunModule, apply_unverifiable: bool
+) -> None:
+    state = subsystem(saved={"one": "opaque"}, loaded={"one": "opaque"})
+    result = run_module(
+        subsystem_main(state, apply_unverifiable=apply_unverifiable),
+        verify=[{"name": "one"}],
+    )
+    assert result["changed"] is apply_unverifiable
+    assert result["verified"] == "unverifiable"
+    assert state["applies"] == int(apply_unverifiable)
+
+
+def test_pending_work_drives_the_activation(run_module: RunModule) -> None:
+    state = subsystem(
+        saved={"one": "1", "two": "2"},
+        loaded={"one": "1"},
+        pending=["two"],
+    )
+    predicted = run_module(
+        subsystem_main(state, owned=True), verify=[], _ansible_check_mode=True
+    )
+    assert predicted["verification"] == {"one": "in_sync", "two": "drift"}
+    assert predicted["verified"] == "predicted" and not state["applies"]
+    applied = run_module(subsystem_main(state, owned=True), verify=[])
+    assert applied["verification"] == {"two": "in_sync"}
+    assert applied["verified"] == "observed" and state["applies"] == 1
+    quiet = run_module(subsystem_main(state, owned=True), verify=[])
+    assert not quiet["changed"] and quiet["verified"] == "observed"
+    forced = run_module(subsystem_main(state, owned=True), verify=[], activate="always")
+    assert forced["changed"] and forced["verified"] == "unverifiable"
+
+
+def test_drift_without_pending_work_is_refused_before_applying(
+    run_module: RunModule,
+) -> None:
+    state = subsystem(saved={"one": "1"}, loaded={"one": "0"}, pending=[])
+    result = run_module(subsystem_main(state, owned=True), verify=[])
+    assert result["failed"] and result["error_code"] == "not_effective"
+    assert result["not_effective"] == ["one"] and result["outcome"] == "unchanged"
+    assert result["operation"] == "compare" and not state["applies"]
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_protect_refuses_before_check_mode_returns(
+    run_module: RunModule, check_mode: bool
+) -> None:
+    state = subsystem(saved={"one": "1"}, refuse=True)
+    result = run_module(
+        subsystem_main(state), verify=[{"name": "one"}], _ansible_check_mode=check_mode
+    )
+    assert result["failed"] and result["error_code"] == "referenced"
+    assert result["operation"] == "protect" and not state["applies"]
+
+
+def test_a_lost_reply_on_pending_work_settles_by_reading_back(
+    run_module: RunModule,
+) -> None:
+    state = subsystem(saved={"one": "1"}, pending=["one"], lose=True)
+    result = run_module(subsystem_main(state, owned=True), verify=[])
+    assert not result.get("failed") and result["verification"] == {"one": "in_sync"}
+    assert state["applies"] == 1
+
+
+def test_an_acknowledged_apply_that_never_converges_names_the_objects(
+    run_module: RunModule,
+) -> None:
+    state = subsystem(saved={"one": "1", "two": "2"}, loaded={"two": "2"}, stuck=True)
+    result = run_module(subsystem_main(state, owned=True), verify=[])
+    assert result["failed"] and result["error_code"] == "not_effective"
+    assert result["not_effective"] == ["one"] and result["operation"] == "verify"
+    assert result["changed"] and result["outcome"] == "changed"
+    assert result["msg"].startswith("Activation failed")

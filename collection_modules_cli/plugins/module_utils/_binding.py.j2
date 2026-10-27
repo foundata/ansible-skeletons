@@ -1,0 +1,46 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Binding of the skeleton's lifecycle base to this collection; internal.
+
+Hook-based resources subclass :class:`Binding`: the client, the public error
+schema and the compatibility check are this collection's own.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils import (
+        _compat,
+    )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._client import (
+        SCHEMA,
+        Client,
+    )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._lifecycle import (
+        Lifecycle,
+    )
+# isort: on
+# fmt: on
+
+
+class Binding(Lifecycle):
+    schema = SCHEMA
+
+    # When true, every module checks the product version before its first
+    # request, including unchanged and read-only runs. Either way, building
+    # the client in connect() sends nothing, so the policy decides when the
+    # first request happens.
+    compatibility_always = False
+
+    def connect(self) -> Any:
+        return Client(self.params)
+
+    def compatibility(self, operation: str) -> None:
+        _compat.check(self.module, self.client, operation)

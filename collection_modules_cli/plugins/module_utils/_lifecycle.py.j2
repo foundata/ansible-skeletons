@@ -1,0 +1,667 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Skeleton-owned lifecycle of one declared object or operation; internal.
+
+A resource subclasses :class:`Lifecycle` through the collection's binding
+(the rendered ``_binding.py``) and supplies the product steps as hooks. The
+base owns the order and the result and failure contracts, so that no
+resource implements them again:
+
+``reconcile`` validates the declaration without a request (``identify``,
+``declared``), connects, reads the object completely (``lookup``) and
+projects it (``managed``), computes the minimal difference, runs the
+resource's guards (``protect``) and predicts the result. Unless
+``compatibility_always`` is set, an unchanged run returns without
+discovering the product version; check mode returns after the eligibility
+check. Otherwise ``recheck`` repeats a guard right before the writes.
+After each write the object is read again by the same lookup and checked
+(``verify``); a write never repeats.
+
+A change is one ``write`` unless ``stages`` splits it into several, such as
+creating an object disabled and enabling it, or disabling it before it is
+deleted. Each stage names its step, the state its read-back must show
+(``want`` and ``absent``) and its request; the stages run in order, and each
+later one starts from the read-back of the one before (``record`` and
+``current``). A lost reply is settled by its own stage's read-back, and a
+failing stage ends the run with the outcome the earlier ones confirmed.
+
+``compatibility_always`` decides when the version is checked: before the
+first read when it is set, otherwise only before a write or a changed
+prediction. A resource that learns the version from its first read, such as
+a command runner that reports it with the data, checks right after that
+read instead: it leaves the setting off and calls
+``ensure_compatible(self.operation_id())`` at the end of ``lookup``. The
+verdict is cached per operation, so the later check before a write repeats
+nothing.
+
+An operation that fits no resource sequence runs under ``execute(action)``.
+It keeps the base's connection, probe policy and failure boundary and
+supplies its own steps, settling each write through ``stage`` where a
+read-back can prove it. Its input check goes into ``execute``'s
+``validate``, which runs before the base connects, as ``identify`` and
+``declared`` do for a resource, so invalid input is refused before a
+locator or connection error can be. ``execute(action)`` is also the shape for a write
+whose read-back is expensive, or impossible after a timeout because the
+write may have spent the deadline: the action reports the outcome its own
+evidence supports instead of reading back.
+
+A reply lost after sending (category ``transport``, ``timeout`` or
+``response``) proves nothing: the read-back alone decides. A read-back that
+moved (``moved``) but misses the declaration fails with the outcome
+changed; one that did not move fails with the outcome unknown. A definitive
+refusal is reported as refused, under the step of the write it refused; the
+read-back only tells whether something changed anyway, unless the refused
+write may change what no read-back shows (``refusal_may_change``), which
+keeps the outcome unknown. A write that the client reports as never started
+(``started``), or whose failure proves it preceded any change
+(``refused_before_change``), skips read-back and is unchanged. Confirmed
+progress from an earlier stage survives. A field the product never returns
+(``secret``) is always written, to an existing object only with ``update_password:
+always``; it makes a successful write ``unverifiable`` and a lost one
+unknown (``secret_unknown``). In a staged change, each stage says whether its
+write sends such a field, so a lost reply to a stage that sends none settles
+by its read-back alone.
+
+Hooks may raise ``Failure(message=...)`` with a local public verdict message,
+which takes precedence over the class setting ``message``. Client exception
+text remains private. ``message`` remains a class setting on the lifecycle;
+hooks do not assign it on the instance.
+
+Failures go through the binding's error schema with ``operation``,
+``outcome`` (``unchanged``, ``unknown`` or ``changed``), the identity
+options the schema accepts and the fields the failure names. A local
+operation that raises ``OSError``, such as writing a file on the controller,
+fails with category ``local`` and code ``operation_failed``, never with the
+error's message, which may name private paths. Hooks keep their state on the
+instance; a hook may refine ``operation`` within its step and may set
+``confirmed`` when its own evidence proves an effect. ``changed`` tells
+``protect`` and every later hook whether the declaration changes anything.
+
+A subclass overrides hooks and settings and may add names of its own; it
+never redefines the sequence, its helpers or the instance state, and a class
+that does fails when it is created, at import:
+
+- Hooks, methods to override: ``connect`` and ``compatibility`` (the
+  binding), ``identify``, ``declared``, ``lookup``, ``managed``, ``same``,
+  ``difference``, ``protect``, ``secret``, ``predict``, ``public``,
+  ``diff``, ``recheck``, ``write``, ``stages``, ``started``, ``lost``,
+  ``refused_before_change``, ``refusal_may_change``, ``moved``,
+  ``verify``, ``changed_fields``,
+  ``finish``, ``operation_id`` and ``identity_fields``; ``__init__`` for
+  per-instance state, calling the base first.
+- Settings, class attributes to set: ``schema``, ``result_key``,
+  ``compatibility_id``, ``message``, ``state_option``,
+  ``compatibility_always``, ``whole_diff``, ``recheck_code``,
+  ``recheck_category``, ``identity_options`` and ``steps``.
+- Reserved, never redefined: the sequence ``reconcile``, ``stage`` and
+  ``execute``; its helpers ``step``, ``prepare``, ``ensure_compatible``,
+  ``visible``, ``write_only`` and ``fail``; the instance state ``module``,
+  ``params``, ``client``, ``operation``, ``attempted``, ``confirmed``,
+  ``settling``, ``compatible``, ``absent``, ``key``, ``want``, ``record``,
+  ``current``, ``delta`` and ``changed``, which hooks read and assign as
+  their step requires.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Callable
+
+from ansible_collections.foundata.utils.plugins.module_utils import errors
+
+LOSS = frozenset({"transport", "timeout", "response"})
+"""Failure categories of a reply lost after the request may have been sent."""
+
+HOOKS = frozenset(
+    {
+        "connect",
+        "compatibility",
+        "identify",
+        "declared",
+        "lookup",
+        "managed",
+        "same",
+        "difference",
+        "protect",
+        "secret",
+        "predict",
+        "public",
+        "diff",
+        "recheck",
+        "write",
+        "stages",
+        "started",
+        "refused_before_change",
+        "lost",
+        "refusal_may_change",
+        "moved",
+        "verify",
+        "changed_fields",
+        "finish",
+        "operation_id",
+        "identity_fields",
+    }
+)
+"""Methods a subclass may override."""
+
+SETTINGS = frozenset(
+    {
+        "schema",
+        "result_key",
+        "compatibility_id",
+        "message",
+        "state_option",
+        "compatibility_always",
+        "whole_diff",
+        "recheck_code",
+        "recheck_category",
+        "identity_options",
+        "steps",
+    }
+)
+"""Class attributes a subclass may set."""
+
+STATE = frozenset(
+    {
+        "module",
+        "params",
+        "client",
+        "operation",
+        "attempted",
+        "confirmed",
+        "settling",
+        "compatible",
+        "absent",
+        "key",
+        "want",
+        "record",
+        "current",
+        "delta",
+        "changed",
+    }
+)
+"""Instance state the sequence owns; hooks assign it, no subclass redefines it."""
+
+MISSING = object()
+
+Stage = tuple[str, dict[str, Any], bool, Callable[[], None], bool]
+"""One write of a change: step, wanted state, whether absent, request, and
+whether that request sends a field ``secret`` names."""
+
+
+class Failure(errors.ApiError):
+    """A verdict from the base or a hook, with an optional public message.
+
+    ``message`` is trusted local text, never a response body or exception text.
+    """
+
+    def __init__(
+        self,
+        *,
+        category: str,
+        code: str,
+        fields: list[str] | None = None,
+        message: str | None = None,
+    ) -> None:
+        super().__init__("Lifecycle verdict", category=category, code=code)
+        self.fields = fields or []
+        self.message = message
+
+
+class Lifecycle:
+    """One module invocation; subclasses supply the product steps."""
+
+    _sequence: tuple[str, ...] = ()
+    """Reserved names a skeleton-owned extension adds; see __init_subclass__."""
+
+    schema: Any = None
+    """The collection's public error schema, set by the binding."""
+
+    result_key = ""
+    """Singular product key of the public object; empty for none."""
+
+    compatibility_id = ""
+    """Operation name for the compatibility check, without the state."""
+
+    message = "Operation failed; see error_category and error_code"
+    state_option = "state"
+    """Option whose value ``absent`` requests deletion; empty for none."""
+
+    compatibility_always = False
+    """Check compatibility before product reads, including unchanged runs."""
+
+    whole_diff = False
+    """Publish the whole public object in a diff instead of changed fields."""
+
+    recheck_code = ""
+    """Refuse a moved record before writing when this error code is set."""
+
+    recheck_category = "eligibility"
+    identity_options: tuple[str, ...] = ()
+    steps: tuple[tuple[str, str], ...] = ()
+    """Base steps a resource reports under another public name."""
+
+    def __init__(self, module: Any) -> None:
+        self.module, self.params = module, module.params
+        self.client: Any = None
+        self.operation = "validate"
+        self.attempted = self.confirmed = False
+        self.settling = False
+        self.changed = False
+        self.compatible: set[str] = set()
+        self.absent = bool(self.state_option) and (
+            self.params.get(self.state_option) == "absent"
+        )
+        self.key: Any = None
+        self.want: dict[str, Any] = {}
+        self.record: Any = None
+        self.current: Any = None
+        self.delta: dict[str, Any] = {}
+
+    def __init_subclass__(
+        cls, *, sequence: tuple[str, ...] = (), **kwargs: Any
+    ) -> None:
+        """Refuse a subclass that redefines a reserved name.
+
+        ``sequence`` is for the skeleton's own extensions of the sequence, such
+        as act-once activation: they may define those reserved names, which
+        stay reserved for their subclasses.
+        """
+        super().__init_subclass__(**kwargs)
+        reserved = set(STATE) | (
+            {name for name in vars(Lifecycle) if not name.startswith("__")}
+            - HOOKS
+            - SETTINGS
+        )
+        for base in cls.__mro__[1:]:
+            reserved.update(vars(base).get("_sequence", ()))
+        clash = sorted(set(vars(cls)) & (reserved - set(sequence)))
+        if clash:
+            raise TypeError(
+                f"{cls.__qualname__} redefines names the lifecycle base reserves: "
+                + ", ".join(clash)
+                + "; rename them (see the _lifecycle module docstring)"
+            )
+        cls._sequence = tuple(sequence)
+
+    # Binding: one implementation per collection.
+
+    def connect(self) -> Any:
+        """Build the client without a request or a command.
+
+        ``prepare`` calls it before ``reconcile`` reads, and after a supplied
+        action's ``validate`` but before the action, so building it must have
+        no effect. A
+        transport that must check its target before use does so where it
+        builds its first command, not in a method that receives a command
+        already built.
+        """
+        raise NotImplementedError
+
+    def compatibility(self, operation: str) -> None:
+        raise NotImplementedError
+
+    # Product steps of a resource.
+
+    def identify(self) -> Any:
+        """Validate and canonicalize the identity options; no request."""
+        return None
+
+    def declared(self) -> dict[str, Any]:
+        """Validate the declared managed values; no request."""
+        return {}
+
+    def lookup(self) -> Any:
+        """Read the object of ``self.key`` completely, or None when absent."""
+        raise NotImplementedError
+
+    def managed(self, record: Any) -> Any:
+        """Project a stored object onto the comparable managed values."""
+        return record
+
+    def same(self, name: str, current: Any, desired: Any) -> bool:
+        """Whether a stored managed value already satisfies the declared one."""
+        return bool(current == desired)
+
+    def difference(self) -> dict[str, Any]:
+        if (
+            self.record is not None
+            and self.params.get("update_password") == "on_create"
+        ):
+            self.want = {k: v for k, v in self.want.items() if not self.secret(k)}
+        current = self.current or {}
+        return {
+            key: value
+            for key, value in self.want.items()
+            if self.record is None
+            or self.secret(key)
+            or not self.same(key, current.get(key, MISSING), value)
+        }
+
+    def protect(self) -> None:
+        """Refuse an ineligible change before the result is predicted."""
+
+    def secret(self, name: str) -> bool:
+        """Whether a managed field is written but never read back."""
+        return False
+
+    def predict(self) -> Any:
+        """The public object after the change, with the visible changes applied.
+
+        Without a stored object, the identity starts it: ``key`` when that is
+        a mapping, otherwise ``key`` under the only identity option.
+        """
+        if self.current is not None:
+            start = self.current
+        elif isinstance(self.key, dict):
+            start = self.key
+        elif len(self.identity_options) == 1 and self.key is not None:
+            start = {self.identity_options[0]: self.key}
+        else:
+            start = {}
+        return {**start, **self.visible()}
+
+    def public(self, record: Any) -> Any:
+        return self.managed(record)
+
+    def diff(self) -> dict[str, Any] | None:
+        if self.whole_diff:
+            return {
+                "before": self.current or {},
+                "after": {} if self.absent else self.predict(),
+            }
+        if self.absent:
+            return {"before": self.current, "after": {}}
+        visible, current = self.visible(), self.current or {}
+        before = {key: current[key] for key in visible if key in current}
+        return {"before": before, "after": visible}
+
+    def recheck(self) -> None:
+        """Read again and refuse a moved record when recheck_code is configured."""
+        if self.recheck_code and self.moved(self.lookup()):
+            raise Failure(category=self.recheck_category, code=self.recheck_code)
+
+    def write(self) -> None:
+        raise NotImplementedError
+
+    def stages(self) -> list[Stage]:
+        """The writes of the declared change, in order; never empty.
+
+        Each stage is ``(step, want, absent, request, secret)``: the step it
+        runs under, the state its read-back must show, its request, and
+        whether that request sends a field ``secret`` names. A lost reply to
+        such a request leaves the secret unknown even when the read-back
+        matches. The default is the single ``write`` under the step
+        ``create``, ``update`` or ``delete`` with the declared ``want`` and
+        ``absent``, sending every declared secret. A request reads ``record``
+        and ``current`` when it runs, so a later stage sees the read-back of
+        the stage before it.
+        """
+        step = (
+            "delete" if self.absent else "create" if self.record is None else "update"
+        )
+        return [(step, self.want, self.absent, self.write, self.write_only())]
+
+    def started(self) -> bool:
+        """Whether a failed write may have reached the product."""
+        return True
+
+    def refused_before_change(self, failure: errors.ApiError) -> bool:
+        """Whether this failure proves the request made no change.
+
+        Use the product's error codes for failures known to precede a change:
+        an unreadable upload or a push conflict. This runs before read-back,
+        so another writer's change cannot be attributed to this request and
+        a failed read cannot replace the original verdict. Earlier confirmed
+        stages remain changed. The default preserves the started() contract.
+        """
+        return False
+
+    def lost(self, failure: errors.ApiError) -> bool:
+        """Whether read-back alone may settle this uncertain write response."""
+        return failure.category in LOSS
+
+    def refusal_may_change(self, failure: errors.ApiError) -> bool:
+        """Whether a refused write may change state its read-back cannot show.
+
+        This runs after read-back, for a definitive refusal only. It cannot
+        classify failures that precede a change; refused_before_change does
+        that before any read-back, while started() keeps the client's state.
+        """
+        return False
+
+    def moved(self, observed: Any) -> bool:
+        """Whether read-back proves an effect relative to this stage's snapshot."""
+        return (None if observed is None else self.managed(observed)) != self.current
+
+    def changed_fields(self) -> list[str]:
+        """Return public field names for an update, or an empty list otherwise."""
+        return sorted(self.delta) if self.record is not None and not self.absent else []
+
+    def finish(self, result: dict[str, Any]) -> dict[str, Any]:
+        """Complete every successful result before execute passes it to exit_json.
+
+        It runs after whatever ``execute`` ran: ``reconcile``, a supplied action
+        and, in the appliance variant, ``act_once``. A class that offers several
+        of them branches on its own state.
+        """
+        return result
+
+    def verify(self, record: Any, desired: dict[str, Any], absent: bool) -> None:
+        if absent:
+            if record is not None:
+                raise Failure(category="verification", code="still_present")
+            return
+        if record is None:
+            raise Failure(category="verification", code="missing_after_write")
+        observed = self.managed(record) or {}
+        mismatch = sorted(
+            key
+            for key, value in desired.items()
+            if not self.secret(key)
+            and not self.same(key, observed.get(key, MISSING), value)
+        )
+        if mismatch:
+            raise Failure(
+                category="verification", code="not_persisted", fields=mismatch
+            )
+
+    # The sequence.
+
+    def step(self, name: str) -> None:
+        self.operation = dict(self.steps).get(name, name)
+
+    def operation_id(self) -> str:
+        if self.state_option:
+            return f"{self.compatibility_id}:{self.params[self.state_option]}"
+        return self.compatibility_id
+
+    def ensure_compatible(self, operation: str) -> None:
+        if operation not in self.compatible:
+            self.compatibility(operation)
+            self.compatible.add(operation)
+
+    def prepare(self, operation: str) -> None:
+        """Connect once and check compatibility when the binding's policy asks."""
+        self.step("connect")
+        if self.client is None:
+            self.client = self.connect()
+        if self.compatibility_always:
+            self.step("compatibility")
+            self.ensure_compatible(operation)
+
+    def visible(self) -> dict[str, Any]:
+        return {k: v for k, v in self.delta.items() if not self.secret(k)}
+
+    def write_only(self) -> bool:
+        return any(self.secret(key) for key in self.delta)
+
+    def stage(self, request: Callable[[], None], secret: bool | None = None) -> Any:
+        """Write once and settle against the current stage's declared state.
+
+        Set record, current, want, delta and absent for this stage before calling.
+        ``secret`` tells whether the request sends a field ``secret`` names;
+        without it, the request counts as sending every declared secret.
+        The returned read-back can seed the next stage. Confirmed progress survives
+        a later refusal, uncertain response or request that never started.
+        """
+        self.attempted = True
+        operation = self.operation
+        sends = self.write_only() if secret is None else secret
+        try:
+            request()
+        except errors.ApiError as failure:
+            if not self.started() or self.refused_before_change(failure):
+                self.attempted = self.confirmed
+                raise
+            self.step("reconcile")
+            self.settling = True
+            observed = self.lookup()
+            self.confirmed = self.confirmed or self.moved(observed)
+            if not self.lost(failure):
+                # The refusal belongs to the write, not to its read-back.
+                self.attempted = (
+                    self.confirmed or sends or self.refusal_may_change(failure)
+                )
+                self.operation = operation
+                raise
+            self.verify(observed, self.want, self.absent)
+            if sends:
+                raise Failure(category="verification", code="secret_unknown") from None
+        else:
+            self.step("verify")
+            self.settling = True
+            observed = self.lookup()
+            self.confirmed = self.confirmed or self.moved(observed)
+            self.verify(observed, self.want, self.absent)
+        self.confirmed = True
+        return observed
+
+    def reconcile(self) -> dict[str, Any]:
+        self.step("validate")
+        self.key = self.identify()
+        self.want = self.declared()
+        self.prepare(self.operation_id())
+        self.step("lookup")
+        self.record = self.lookup()
+        self.current = None if self.record is None else self.managed(self.record)
+        self.delta = {} if self.absent else self.difference()
+        self.changed = (
+            self.record is not None
+            if self.absent
+            else self.record is None or bool(self.delta)
+        )
+        self.step("protect")
+        self.protect()
+        result: dict[str, Any] = {
+            "changed": self.changed,
+            "changed_fields": self.changed_fields(),
+            "verified": "predicted"
+            if self.module.check_mode and self.changed
+            else "observed",
+        }
+        if self.result_key:
+            result[self.result_key] = None if self.absent else self.predict()
+        diff = self.diff() if self.module._diff and self.changed else None
+        if diff is not None:
+            result["diff"] = diff
+        if not self.changed:
+            return result
+        self.step("compatibility")
+        self.ensure_compatible(self.operation_id())
+        if self.module.check_mode:
+            return result
+        self.step("recheck")
+        self.recheck()
+        plan = self.stages()
+        if not plan:
+            raise ValueError("stages() returned no write for a change")
+        declared, absent = self.want, self.absent
+        observed: Any = None
+        for index, (step, want, gone, request, secret) in enumerate(plan):
+            if index:
+                self.record = observed
+                self.current = None if observed is None else self.managed(observed)
+            self.want, self.absent = want, gone
+            self.step(step)
+            observed = self.stage(request, secret)
+        self.want, self.absent = declared, absent
+        if self.result_key:
+            result[self.result_key] = (
+                None if observed is None else self.public(observed)
+            )
+        if self.write_only():
+            result["verified"] = "unverifiable"
+        return result
+
+    # The catch boundary.
+
+    def identity_fields(self) -> dict[str, Any]:
+        return {
+            name: self.params[name]
+            for name in self.identity_options
+            if self.params.get(name) is not None
+        }
+
+    def fail(self, failure: errors.ApiError) -> None:
+        fields: dict[str, Any] = {
+            "operation": self.operation,
+            **self.identity_fields(),
+        }
+        named = getattr(failure, "fields", None)
+        if named:
+            # Objects an activation could not converge, otherwise fields.
+            key = "not_effective" if failure.code == "not_effective" else "fields"
+            fields[key] = named
+        errors.fail_from(
+            self.module,
+            failure,
+            schema=self.schema,
+            msg=failure.message
+            if isinstance(failure, Failure) and failure.message is not None
+            else self.message,
+            changed=self.attempted,
+            outcome="changed"
+            if self.confirmed
+            else "unknown"
+            if self.attempted
+            else "unchanged",
+            fields=fields,
+        )
+
+    def execute(
+        self,
+        action: Callable[[], dict[str, Any]] | None = None,
+        *,
+        compatibility_operation: str | None = None,
+        validate: Callable[[], None] | None = None,
+    ) -> None:
+        """Run a resource or supplied operation under the failure boundary.
+
+        A supplied action runs in this order. ``validate``, when given, checks
+        the action's input without a request or a command and raises to
+        refuse it, so invalid input fails before anything connects. Then
+        ``prepare`` builds ``self.client`` and applies the compatibility
+        policy for ``compatibility_operation`` (default ``operation_id()``),
+        so the action starts connected and never connects itself. A resource
+        whose transport is not the binding's client, such as a command
+        runner, overrides ``connect`` to return it. A refusal by ``validate``
+        reports the operation the instance had, ``validate`` or what
+        ``__init__`` set, and that operation is restored after preparing.
+        """
+        if validate is not None and action is None:
+            raise ValueError("validate checks a supplied action's input")
+        try:
+            if action is not None:
+                operation = self.operation
+                if validate is not None:
+                    validate()
+                self.prepare(compatibility_operation or self.operation_id())
+                self.operation = operation
+            sequence = action if action is not None else self.reconcile
+            result = self.finish(sequence())
+        except errors.ApiError as failure:
+            self.fail(failure)
+        except OSError:
+            self.fail(Failure(category="local", code="operation_failed"))
+        else:
+            self.module.exit_json(**result)

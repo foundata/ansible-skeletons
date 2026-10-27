@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+---
+- name: "Exercise fixture_plan through the installed executable"
+  module_defaults:
+    group/{{ namespace }}.{{ collection_name }}.api: >-
+      {{ '{{' }} fixture_cli_connection {{ '}}' }}
+  block:
+    - name: "Read the existing object"
+      {{ namespace }}.{{ collection_name }}.fixture_plan:
+        app: "alpha"
+        key: "quota"
+        expected_id: "090d190b-c80a-4917-8532-6b62a2836d0c"
+        enabled: false
+      register: __observed
+
+    - name: "Verify the observation"
+      ansible.builtin.assert:
+        that:
+          - not __observed['changed']
+          - __observed['fixture']['id'] == '090d190b-c80a-4917-8532-6b62a2836d0c'
+          - __observed['would_change']
+          - __observed['verified'] == 'predicted'
+
+  always:
+    - name: "Remove owned fixture state"
+      ansible.builtin.file:
+        path: "{% raw %}{{ __fixture_cli_state['path'] }}{% endraw %}"
+        state: "absent"

@@ -202,8 +202,14 @@ def build_collection(rendered: Rendered) -> Path:
             if rendered.profile == "collection_default"
             else (
                 "plugins/modules/fixture.py",
-                "plugins/modules/fixture_nested.py",
-                "plugins/modules/fixture_nested_info.py",
+                *(
+                    ("plugins/modules/fixture_plan.py",)
+                    if rendered.profile == "collection_modules_cli"
+                    else (
+                        "plugins/modules/fixture_nested.py",
+                        "plugins/modules/fixture_nested_info.py",
+                    )
+                ),
                 "plugins/modules/fixture_info.py",
                 *(
                     ("plugins/modules/fixture_apply.py",)
@@ -312,6 +318,10 @@ def fake_product(rendered: Rendered, state: Path) -> Iterator[dict[str, str]]:
     The appliance's credentials file also carries the lab contract of the
     fake console, resolver and management address, so its scenario drills.
     """
+    if rendered.profile == "collection_modules_cli":
+        with cli_product(rendered, state) as product:
+            yield product
+        return
     state.mkdir()
     credentials = state / "credentials"
     credentials.write_text("SYNTHETIC-KEY:SYNTHETIC-SECRET", encoding="utf-8")
@@ -361,6 +371,37 @@ def fake_product(rendered: Rendered, state: Path) -> Iterator[dict[str, str]]:
         finally:
             server.terminate()
             server.wait(timeout=30)
+
+
+@contextlib.contextmanager
+def cli_product(rendered: Rendered, state: Path) -> Iterator[dict[str, str]]:
+    """Install a foreground program and seed its run-owned target directory."""
+    state.mkdir(mode=0o700)
+    source = rendered.collection / "tests/integration/targets/setup_fixture_cli/files"
+    program = state / "fixture_command.py"
+    shutil.copy2(source / "fixture_command.py", program)
+    program.chmod(0o700)
+    run([sys.executable, str(source / "seed.py"), str(state)], env=rendered.env)
+    credentials = state / "connection.json"
+    write_json(
+        credentials,
+        {
+            "credential": "SYNTHETIC-CLI-CREDENTIAL",
+            "deadline": 30,
+            "exec": {
+                "kind": "custom",
+                "executable": sys.executable,
+                "argv": [str(program)],
+                "chdir": str(state),
+                "user": str(os.geteuid()),
+            },
+        },
+    )
+    credentials.chmod(0o600)
+    try:
+        yield {"MOLECULE_PRODUCT_CREDENTIALS": str(credentials)}
+    finally:
+        credentials.unlink()
 
 
 PROOF_CREDENTIALS = ("SYNTHETIC-KEY", "SYNTHETIC-SECRET")
@@ -467,7 +508,17 @@ def molecule_with_fake(rendered: Rendered) -> None:
         )
         print(output, flush=True)
         scan_credentials(output)
-        if "Lost create, update and delete replies settled" not in output:
+        expected = (
+            "Lost CLI replies settled without redispatch"
+            if rendered.profile == "collection_modules_cli"
+            else "Lost create, update and delete replies settled"
+        )
+        if rendered.profile == "collection_modules_cli" and any(
+            secret in output
+            for secret in ("SYNTHETIC-CLI-CREDENTIAL", "SYNTHETIC-UNMANAGED-PRIVATE")
+        ):
+            raise GateError("Verbose CLI fixture output disclosed private data")
+        if expected not in output:
             raise GateError("The verbose fixture scenario showed no loss proof")
         print("Verbose fixture credential scan: passed", flush=True)
     proof_loop_control(rendered)
@@ -674,8 +725,15 @@ def exercise_modules(rendered: Rendered) -> None:
         / namespace
         / name
     )
-    modules = ("fixture", "fixture_nested", "fixture_nested_info", "fixture_info") + (
-        ("fixture_apply",) if rendered.profile == "collection_modules_appliance" else ()
+    modules = (
+        ("fixture", "fixture_info", "fixture_plan")
+        if rendered.profile == "collection_modules_cli"
+        else ("fixture", "fixture_nested", "fixture_nested_info", "fixture_info")
+        + (
+            ("fixture_apply",)
+            if rendered.profile == "collection_modules_appliance"
+            else ()
+        )
     )
     for module in modules:
         docs = run(
@@ -700,7 +758,14 @@ def exercise_modules(rendered: Rendered) -> None:
                 "vars": {"ansible_python_interpreter": sys.executable},
                 "roles": [role],
             }
-            for role in modules
+            for role in (
+                *modules,
+                *(
+                    ("fixture_process",)
+                    if rendered.profile == "collection_modules_cli"
+                    else ()
+                ),
+            )
         ],
     )
     run(
@@ -934,7 +999,10 @@ def module_identity(
     if galaxy["version"] != metadata.get("version", "1.0.0"):
         raise GateError("Module profile changed the collection version")
     client = (rendered.collection / "plugins/module_utils/_client.py").read_text()
-    if f'USER_AGENT = "{namespace}.{name}/{galaxy["version"]}"' not in client:
+    if (
+        rendered.profile != "collection_modules_cli"
+        and f'USER_AGENT = "{namespace}.{name}/{galaxy["version"]}"' not in client
+    ):
         raise GateError(
             "Module user agent must identify the collection and its version"
         )
@@ -993,7 +1061,9 @@ def module_identity(
         )
     if index == 0:
         check_short_tmpdir(rendered)
-    if index == 0 and (full or profile == "collection_modules_rest"):
+    if index == 0 and (
+        full or profile in ("collection_modules_rest", "collection_modules_cli")
+    ):
         molecule_with_fake(rendered)
     build_collection(rendered)
     exercise_modules(rendered)

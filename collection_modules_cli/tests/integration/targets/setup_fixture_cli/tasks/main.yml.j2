@@ -1,0 +1,45 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+---
+- name: "Create private fixture state"
+  ansible.builtin.tempfile:
+    state: "directory"
+    suffix: "-cli-fixture"
+  register: __fixture_cli_state
+
+- name: "Install the executable fixture"
+  ansible.builtin.copy:
+    src: "fixture_command.py"
+    dest: "{% raw %}{{ __fixture_cli_state['path'] }}{% endraw %}/fixture_command.py"
+    mode: "u=rwx,g=,o=" # 0700
+
+- name: "Seed existing objects"
+  ansible.builtin.script:
+    cmd: "seed.py {% raw %}{{ __fixture_cli_state['path'] | ansible.builtin.quote }}{% endraw %}"
+    executable: "{% raw %}{{ ansible_python_interpreter }}{% endraw %}"
+  changed_when:
+    - true
+
+- name: "Observe the module user"
+  ansible.builtin.command:
+    argv:
+      - "/usr/bin/id"
+      - "-u"
+  changed_when:
+    - false
+  register: __fixture_cli_uid
+
+- name: "Publish the fixture locator"
+  ansible.builtin.set_fact:
+    fixture_cli_connection:
+      credential: "SYNTHETIC-CLI-CREDENTIAL"
+      deadline: 30
+      exec:
+        kind: "custom"
+        executable: "{% raw %}{{ ansible_python_interpreter }}{% endraw %}"
+        argv:
+          - "{% raw %}{{ __fixture_cli_state['path'] }}{% endraw %}/fixture_command.py"
+        chdir: "{% raw %}{{ __fixture_cli_state['path'] }}{% endraw %}"
+        user: "{% raw %}{{ __fixture_cli_uid['stdout'] }}{% endraw %}"
+  no_log: true

@@ -90,7 +90,12 @@ def test_the_locked_nox_still_sets_tmpdir_where_the_noxfile_expects(
 
 @pytest.mark.parametrize(
     "noxfile",
-    ["collection_default", "collection_modules_rest", "collection_modules_appliance"],
+    [
+        "collection_default",
+        "collection_modules_rest",
+        "collection_modules_appliance",
+        "collection_modules_cli",
+    ],
     indirect=True,
 )
 def test_a_deep_temporary_directory_gets_a_short_path(
@@ -122,7 +127,12 @@ def test_a_deep_temporary_directory_gets_a_short_path(
 
 @pytest.mark.parametrize(
     "noxfile",
-    ["collection_default", "collection_modules_rest", "collection_modules_appliance"],
+    [
+        "collection_default",
+        "collection_modules_rest",
+        "collection_modules_appliance",
+        "collection_modules_cli",
+    ],
     indirect=True,
 )
 def test_the_short_links_of_a_killed_nox_go_with_the_next_run(
@@ -161,7 +171,12 @@ def lint_session(noxfile: dict[str, object]) -> Callable[[Mock], None]:
 
 @pytest.mark.parametrize(
     "noxfile",
-    ["collection_default", "collection_modules_rest", "collection_modules_appliance"],
+    [
+        "collection_default",
+        "collection_modules_rest",
+        "collection_modules_appliance",
+        "collection_modules_cli",
+    ],
     indirect=True,
 )
 def test_sessions_prefer_uv_and_fall_back_to_virtualenv(
@@ -173,7 +188,12 @@ def test_sessions_prefer_uv_and_fall_back_to_virtualenv(
 
 @pytest.mark.parametrize(
     "noxfile",
-    ["collection_default", "collection_modules_rest", "collection_modules_appliance"],
+    [
+        "collection_default",
+        "collection_modules_rest",
+        "collection_modules_appliance",
+        "collection_modules_cli",
+    ],
     indirect=True,
 )
 def test_runtime_check_passes_prepared_dependencies_and_artifact(
@@ -202,7 +222,11 @@ def test_runtime_check_passes_prepared_dependencies_and_artifact(
 
 @pytest.mark.parametrize(
     "noxfile",
-    ["collection_modules_rest", "collection_modules_appliance"],
+    [
+        "collection_modules_rest",
+        "collection_modules_appliance",
+        "collection_modules_cli",
+    ],
     indirect=True,
 )
 @pytest.mark.parametrize(
@@ -262,7 +286,11 @@ def test_import_check_requires_installed_artifact_docs(
 
 @pytest.mark.parametrize(
     "noxfile",
-    ["collection_modules_rest", "collection_modules_appliance"],
+    [
+        "collection_modules_rest",
+        "collection_modules_appliance",
+        "collection_modules_cli",
+    ],
     indirect=True,
 )
 def test_importer_output_stays_in_its_temporary_directory(

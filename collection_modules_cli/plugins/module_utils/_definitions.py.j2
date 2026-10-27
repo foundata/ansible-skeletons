@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Product registry of hook resources.
+
+FIXTURE is a hook class. There is no definition-driven CLI example. Add curated
+engine definitions only after a product proves that interface.
+"""
+
+from __future__ import annotations
+
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._fixture import (
+        Fixture as FIXTURE,
+    )
+# isort: on
+# fmt: on
+
+__all__ = ("FIXTURE",)

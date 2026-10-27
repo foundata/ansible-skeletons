@@ -1,0 +1,333 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Internal activation workflow of the ``*_apply`` modules; not a public interface.
+
+An activation module compares saved with loaded state per object, applies
+when an object drifts or when asked to, and verifies afterwards. It runs on
+the lifecycle base, so the binding's connection, compatibility policy and
+failure contract apply: :class:`Activation` holds the sequence, an apply
+module supplies the product steps as hooks, and :func:`run` serves a
+subsystem whose steps are plain functions of the client.
+
+``verify`` names the objects to compare, as names or as items with a
+``name`` and an optional ``uuid``. A subsystem whose comparison covers every
+object it owns (``owned``) also accepts an empty ``verify``. The module
+applies when a compared object drifts, also when one cannot be verified if
+``apply_unverifiable`` is set, and always with ``activate: always``.
+
+A subsystem whose product tracks pending work follows it (``pending``): it
+applies when work is pending, reports pending objects as drifting, and
+refuses drift without pending work before applying, because the apply would
+not repair it. After the apply only the pending objects are verified. A
+subsystem whose comparison and pending work read the same state first reads
+it once in ``survey``, which runs before the first comparison.
+
+A reply lost after the apply request was sent (a timeout, a dropped
+connection or an undecodable body) proves nothing by itself. The module goes
+on to verify only when an object drifted before: its convergence shows that
+the apply ran, and a drifting object that stays out of sync fails as not
+effective. An object that stays unverifiable leaves the lost reply
+unresolved, so the module fails with it and the outcome unknown. Without
+any drift, for example ``activate: always`` on objects already in sync, the
+module fails with the outcome unknown and never sends the apply again.
+"""
+
+from __future__ import annotations
+
+import re
+import time
+from typing import Any, Callable
+
+from ansible_collections.foundata.utils.plugins.module_utils import errors
+
+# Keep dependency and local imports stable across rendered namespace ordering.
+# isort: split
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._binding import (
+        Binding,
+    )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._client import (
+        Client,
+        ProductError,
+        api_argument_spec,
+    )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._lifecycle import (
+        Failure,
+    )
+# isort: on
+# fmt: on
+
+SETTLE_SECONDS = 20.0
+"""Longest wait for an applied change to become observable."""
+
+UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+"""Form of a ``uuid`` in ``verify``."""
+
+
+def settle(
+    client: Client,
+    names: list[str],
+    compare: Callable[[Client, list[str]], dict[str, str]],
+    sleep: Any = None,
+    limit: float | None = None,
+) -> dict[str, str]:
+    """Poll ``compare`` until no name drifts, within the shared deadline.
+
+    Raises:
+        ProductError: With code ``not_effective`` naming the drifting
+            objects when the wait or the deadline ends first.
+    """
+    limit = SETTLE_SECONDS if limit is None else limit
+    sleep = time.sleep if sleep is None else sleep
+    interval = 0.5
+    waited = 0.0
+    while True:
+        status = compare(client, names)
+        if "drift" not in status.values():
+            return status
+        remaining = min(limit - waited, client.deadline.remaining())
+        if remaining <= 0:
+            raise ProductError(
+                category="verification",
+                code="not_effective",
+                fields=sorted(n for n, s in status.items() if s == "drift"),
+            )
+        delay = min(interval, remaining)
+        sleep(delay)
+        waited += delay
+        interval = min(interval * 2, 4.0)
+
+
+def argument_spec(*, objects: bool = False) -> dict[str, Any]:
+    """Return a fresh specification of an activation module.
+
+    With ``objects``, ``verify`` takes items with a ``name`` and an optional
+    ``uuid`` instead of names.
+    """
+    spec = api_argument_spec()
+    spec["activate"] = {"type": "str", "default": "auto", "choices": ["auto", "always"]}
+    spec["verify"] = (
+        {
+            "type": "list",
+            "elements": "dict",
+            "options": {
+                "name": {"type": "str", "required": True},
+                "uuid": {"type": "str"},
+            },
+        }
+        if objects
+        else {"type": "list", "elements": "str"}
+    )
+    return spec
+
+
+class Activation(Binding, sequence=("verify_activation", "verdict", "converged")):
+    """Verifying activation of one subsystem; an apply module supplies the hooks.
+
+    ``compare`` reports ``in_sync``, ``drift`` or ``unverifiable`` per
+    object and ``activate`` sends the apply. ``requested``, ``survey``,
+    ``pending`` and the base's ``protect`` and ``finish`` are optional. Run it
+    with ``execute(activation.verify_activation)``.
+    """
+
+    message = "Activation failed; see operation, error_category and error_code"
+    state_option = ""
+
+    name_pattern = r"[^\x00-\x1f\x7f]{1,253}"
+    """Pattern of a name in ``verify``."""
+
+    owned = False
+    """Whether ``compare`` covers every owned object besides the named ones."""
+
+    apply_unverifiable = False
+    """Whether an object that cannot be verified also makes the module apply."""
+
+    settle_seconds: float | None = None
+    """Longest wait after the apply; ``None`` uses SETTLE_SECONDS."""
+
+    def __init__(self, module: Any) -> None:
+        super().__init__(module)
+        self.identities: dict[str, Any] = {}
+        self.waiting: dict[str, Any] | None = None
+
+    def requested(self) -> dict[str, Any]:
+        """Validate ``verify`` without a request: each name with its identity.
+
+        A name item stands for itself; an object item for its ``uuid`` when
+        given, otherwise for its name. ``activate: auto`` needs a name unless
+        the subsystem is ``owned``.
+        """
+        identities: dict[str, Any] = {}
+        for item in self.params.get("verify") or []:
+            name = item if isinstance(item, str) else item.get("name")
+            remote = None if isinstance(item, str) else item.get("uuid")
+            if (
+                not isinstance(name, str)
+                or not re.fullmatch(self.name_pattern, name)
+                or (remote is not None and not UUID.fullmatch(str(remote)))
+                or identities.get(name, remote or name) != (remote or name)
+            ):
+                raise ProductError(code="validation_failed", fields=["verify"])
+            identities[name] = remote or name
+        if not identities and self.params["activate"] == "auto" and not self.owned:
+            raise ProductError(code="validation_failed", fields=["verify"])
+        return identities
+
+    def survey(self) -> None:
+        """Read what the first comparison and ``pending`` share; no write.
+
+        It runs once, connected and under the step ``compare``, before the
+        first comparison, for example to read a protection state that both
+        need. The default reads nothing.
+        """
+
+    def compare(self, identities: dict[str, Any]) -> dict[str, str]:
+        """Compare saved with loaded state for these objects, and every owned one."""
+        raise NotImplementedError
+
+    def pending(self) -> dict[str, Any] | None:
+        """Objects with pending work, or None when the subsystem tracks none."""
+        return None
+
+    def activate(self) -> None:
+        """Send the apply once; raise when the product refuses it."""
+        raise NotImplementedError
+
+    def verdict(self, status: dict[str, str], *, applied: bool) -> str:
+        if "unverifiable" in status.values():
+            return "unverifiable"
+        if not status and (applied or self.waiting is None):
+            return "unverifiable"
+        return "observed"
+
+    def converged(self, names: list[str]) -> dict[str, str]:
+        """Poll until no object of ``names`` drifts; pending ones are asked for."""
+        waiting = self.waiting
+
+        def compare(client: Client, wanted: list[str]) -> dict[str, str]:
+            if waiting is None:
+                return self.compare(self.identities)
+            status = self.compare({**self.identities, **dict.fromkeys(waiting)})
+            return {name: status.get(name, "drift") for name in wanted}
+
+        return settle(self.client, names, compare, limit=self.settle_seconds)
+
+    def verify_activation(self) -> dict[str, Any]:
+        """Compare, apply when needed or asked, and verify the result."""
+        self.step("validate")
+        self.identities = self.requested()
+        self.prepare(self.operation_id())
+        self.step("compare")
+        self.survey()
+        before = self.compare(self.identities)
+        self.waiting = self.pending()
+        if self.waiting is not None:
+            stuck = sorted(
+                name
+                for name, status in before.items()
+                if status == "drift" and name not in self.waiting
+            )
+            if stuck:
+                raise Failure(
+                    category="verification", code="not_effective", fields=stuck
+                )
+            before = {**before, **dict.fromkeys(self.waiting, "drift")}
+        due = {"drift", "unverifiable"} if self.apply_unverifiable else {"drift"}
+        needed = self.params["activate"] == "always" or bool(due & set(before.values()))
+        result: dict[str, Any] = {
+            "changed": needed,
+            "activated": needed,
+            "verified": "predicted"
+            if self.module.check_mode and needed
+            else self.verdict(before, applied=False),
+            "verification": before,
+        }
+        if not needed:
+            return result
+        self.step("compatibility")
+        self.ensure_compatible(self.operation_id())
+        self.step("protect")
+        self.protect()
+        if self.module.check_mode:
+            return result
+        self.step("apply")
+        self.attempted = True
+        lost: errors.ApiError | None = None
+        try:
+            self.activate()
+        except errors.ApiError as failure:
+            # A lost reply is settled by the read-back only when something
+            # drifted before: that drift's resolution proves the effect.
+            if not self.lost(failure) or "drift" not in before.values():
+                raise
+            lost = failure
+        else:
+            self.confirmed = True
+        self.step("verify")
+        names = sorted(before if self.waiting is None else self.waiting)
+        after = self.converged(names)
+        if lost is not None:
+            unresolved = sorted(
+                name
+                for name, status in before.items()
+                if status == "drift" and after.get(name) != "in_sync"
+            )
+            if unresolved:
+                raise Failure(
+                    category="verification", code="not_effective", fields=unresolved
+                )
+            if "unverifiable" in after.values():
+                raise lost
+        self.confirmed = True
+        result["verification"] = after
+        result["verified"] = self.verdict(after, applied=True)
+        return result
+
+
+class Supplied(Activation):
+    """An activation whose product steps are plain functions of the client."""
+
+    def __init__(
+        self,
+        module: Any,
+        compare: Callable[[Client, list[str]], dict[str, str]],
+        apply: Callable[[Client], None],
+    ) -> None:
+        super().__init__(module)
+        self.functions = (compare, apply)
+
+    def compare(self, identities: dict[str, Any]) -> dict[str, str]:
+        return self.functions[0](self.client, list(identities))
+
+    def activate(self) -> None:
+        self.functions[1](self.client)
+
+
+def run(
+    module: Any,
+    *,
+    operation_id: str,
+    label: str,
+    name_pattern: str,
+    compare: Callable[[Client, list[str]], dict[str, str]],
+    apply: Callable[[Client], None],
+    settle_seconds: float | None = None,
+    owned: bool = False,
+    apply_unverifiable: bool = False,
+) -> None:
+    """Compare, apply when needed or asked, verify, and exit the module."""
+    activation = Supplied(module, compare, apply)
+    activation.compatibility_id = operation_id
+    activation.message = (
+        f"Activating the {label} failed; see operation, error_category and error_code"
+    )
+    activation.name_pattern = name_pattern
+    activation.settle_seconds = settle_seconds
+    activation.owned = owned
+    activation.apply_unverifiable = apply_unverifiable
+    activation.execute(activation.verify_activation)

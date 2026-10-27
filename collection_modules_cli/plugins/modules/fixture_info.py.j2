@@ -1,0 +1,118 @@
+#!/usr/bin/python
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+from __future__ import annotations
+
+DOCUMENTATION = r"""
+---
+module: fixture_info
+short_description: Read an existing CLI fixture
+description:
+  - "Reads public state through the real product command; authoritative absence returns null."
+  - "The opaque expected identity is a caller assertion. Failed or incomplete reads never establish absence."
+  - "False, zero and the empty string are values; omitted and null fields remain unmanaged."
+version_added: "{{ version | default('1.0.0') }}"
+author:
+{% for author in authors %}
+  - {{ (author if '(@' in author or '!UNKNOWN' in author else author ~ ' !UNKNOWN') | to_json }}
+{% endfor %}
+extends_documentation_fragment:
+  - {{ namespace }}.{{ collection_name }}.api
+attributes:
+  check_mode:
+    description: Performs real reads and predicts changes without a write.
+    support: full
+  diff_mode:
+    description: Does not return a diff.
+    support: none
+notes:
+  - "FIXME Replace the invented resource with qualified product commands, identity and ownership rules."
+options:
+  app:
+    description: Application selector, starting with a lowercase letter and at most 32 lowercase letters, digits, underscores or hyphens.
+    type: str
+    required: true
+  key:
+    description: Key within the application, using the same syntax as O(app).
+    type: str
+    required: true
+  expected_id:
+    description: Expected opaque UUID. A different observed object is refused before a write.
+    type: str
+    required: false
+"""
+
+EXAMPLES = r"""
+---
+- name: "Read an existing CLI fixture"
+  {{ namespace }}.{{ collection_name }}.fixture_info:
+    exec:
+      kind: "custom"
+      executable: "/usr/bin/python3"
+      argv:
+        - "/opt/fixture/fixture_command.py"
+      chdir: "/var/lib/fixture/owned-state"
+      user: "1000"
+    credential: "{% raw %}{{ fixture_credential }}{% endraw %}"
+    app: "alpha"
+    key: "quota"
+    expected_id: "090d190b-c80a-4917-8532-6b62a2836d0c"
+"""
+
+RETURN = r"""
+---
+fixture:
+  description: Public observed or predicted state, without unmanaged data. Null for an absent information read.
+  returned: success
+  type: dict
+  contains:
+    app:
+      description: Application selector.
+      type: str
+    key:
+      description: Key within the application.
+      type: str
+    id:
+      description: Opaque object identity.
+      type: str
+    enabled:
+      description: Enablement value.
+      type: bool
+    limit:
+      description: Limit value.
+      type: int
+    label:
+      description: Public label.
+      type: str
+verified:
+  description: V(observed) for actual state, V(predicted) for a planned change.
+  returned: success
+  type: str
+"""
+
+from ansible.module_utils.basic import AnsibleModule
+
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._fixture import (
+        FixtureInfo,
+        argument_spec,
+    )
+# isort: on
+# fmt: on
+
+
+def main() -> None:
+    module = AnsibleModule(
+        argument_spec=argument_spec(info=True), supports_check_mode=True
+    )
+    subject = FixtureInfo(module)
+    subject.execute(subject.observe, validate=subject.validate_query)
+
+
+if __name__ == "__main__":
+    main()

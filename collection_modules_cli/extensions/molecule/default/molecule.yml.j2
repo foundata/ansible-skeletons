@@ -1,0 +1,50 @@
+# Configuration for the Ansible Molecule "default" scenario.
+#
+# See the official documentation for details on this file and all settings:
+# https://docs.ansible.com/projects/molecule/configuration/
+#
+# This scenario runs modules on targets with an installed foreground fixture.
+# The caller owns target provisioning, program installation and seeded state.
+# See extensions/molecule/README.md for requirements and usage details.
+#
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+---
+driver:
+  name: "default"
+  options:
+    managed: false
+
+platforms:
+  - name: "product-cli"
+
+provisioner:
+  name: "ansible"
+  inventory:
+    links:
+      hosts: "inventory/hosts.yml"
+  playbooks:
+    converge: "../shared/playbooks/converge.yml"
+    verify: "../shared/playbooks/verify.yml"
+    side_effect: "../shared/playbooks/side_effect.yml"
+    cleanup: "../shared/playbooks/cleanup.yml"
+    # Owned provisioning alternative: add create/prepare/destroy to the sequence,
+    # set managed: true and declare lab platforms. The shared dispatcher selects
+    # create-libvirt.yml/destroy-libvirt.yml or create-podman.yml/destroy-podman.yml.
+    # create: "../shared/playbooks/create.yml"
+    # prepare: "../shared/playbooks/prepare.yml"
+    # destroy: "../shared/playbooks/destroy.yml"
+
+verifier:
+  name: "ansible"
+
+scenario:
+  test_sequence:
+    - "syntax"
+    - "cleanup"
+    - "converge"
+    - "idempotence"
+    - "verify"
+    - "side_effect"
+    - "cleanup"

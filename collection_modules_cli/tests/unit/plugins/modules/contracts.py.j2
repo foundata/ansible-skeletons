@@ -1,0 +1,71 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Typed CLI subject declarations and collection-time inventory validation."""
+
+from __future__ import annotations
+
+import inspect
+from collections.abc import Callable
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Literal, Protocol
+
+Entry = Callable[[], None]
+
+
+class Adapter(Protocol):
+    """Product-owned observations and declarations for the existing-only cases."""
+
+    arguments: dict[str, Any]
+    change: dict[str, Any]
+    original: dict[str, Any]
+    missing: dict[str, Any]
+    wrong_identity: dict[str, Any]
+    unsupported: tuple[dict[str, Any], ...]
+    private: tuple[str, ...]
+    result_key: str
+
+    def identity(self, row: dict[str, Any]) -> object: ...
+    def rows(self) -> dict[str, dict[str, Any]]: ...
+    def selected(self) -> dict[str, Any]: ...
+    def control(self, **values: Any) -> None: ...
+    def records(self, name: str) -> list[dict[str, Any]]: ...
+
+
+@dataclass(frozen=True)
+class Subject:
+    name: str
+    mode: Literal["existing_only", "observational"]
+    info: Entry
+    adapter: Callable[[Any], Adapter]
+    writer: Entry | None = None
+    observe_args: dict[str, Any] | None = None
+
+    def __post_init__(self) -> None:
+        if self.mode not in {"existing_only", "observational"}:
+            raise ValueError("Unsupported contract mode")
+        if not self.name or not callable(self.info) or not callable(self.adapter):
+            raise ValueError("Incomplete subject declaration")
+        if self.mode == "existing_only" and not callable(self.writer):
+            raise ValueError("Existing-only subjects require a writer")
+        if self.mode == "observational" and self.writer is not None:
+            raise ValueError("Observational subjects forbid a writer")
+
+
+def validate(subjects: tuple[Subject, ...], modules: Path) -> None:
+    """Require every public module to have its real entry point registered."""
+    if not subjects or len({s.name for s in subjects}) != len(subjects):
+        raise ValueError("Empty or duplicate subject declarations")
+    entries = {entry for s in subjects for entry in (s.info, s.writer) if entry}
+    registered = set()
+    for entry in entries:
+        source = inspect.getsourcefile(entry)
+        if source is None or entry.__name__ != "main":
+            raise ValueError("Register actual public entry points")
+        path = Path(source).resolve()
+        if path.parent != modules.resolve():
+            raise ValueError("Entry point is outside the public module inventory")
+        registered.add(path.name)
+    inventory = {p.name for p in modules.glob("*.py") if not p.name.startswith("_")}
+    if registered != inventory:
+        raise ValueError("Incomplete public module inventory")

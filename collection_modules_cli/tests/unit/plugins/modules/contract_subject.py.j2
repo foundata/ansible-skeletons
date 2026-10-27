@@ -1,0 +1,81 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Bind the CLI contract to the hook fixture and its real information modules.
+
+Replace these declarations and the adapter together for the product. An
+observational collection registers its actual information and planning entries
+with no writers; no mutable exports are needed by the contract.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.modules import (
+        fixture,
+        fixture_info,
+        fixture_plan,
+    )
+# isort: on
+# fmt: on
+
+from ..fake_product import FOREIGN, IDENTITY, SECRET, Lab
+from .contracts import Subject, validate
+
+
+class FixtureAdapter:
+    result_key = "fixture"
+    private: tuple[str, ...] = (SECRET, FOREIGN)
+
+    def __init__(self, fake: Lab) -> None:
+        self.fake = fake
+        self.arguments: dict[str, Any] = {
+            "app": "alpha",
+            "key": "quota",
+            "expected_id": IDENTITY,
+        }
+        self.change: dict[str, Any] = {"enabled": False, "limit": 0, "label": ""}
+        self.original: dict[str, Any] = {
+            "enabled": True,
+            "limit": 10,
+            "label": "initial",
+        }
+        self.missing: dict[str, Any] = {"key": "missing"}
+        self.wrong_identity: dict[str, Any] = {
+            "expected_id": "8a7bf6f9-4965-4718-8dd4-a4fcbbeb845a"
+        }
+        self.unsupported: tuple[dict[str, Any], ...] = (
+            {"state": "absent"},
+            {"state": "present"},
+            {"unmanaged": "overwrite"},
+        )
+
+    def identity(self, row: dict[str, Any]) -> tuple[str, str, str]:
+        return row["app"], row["key"], row["id"]
+
+    def rows(self) -> dict[str, dict[str, Any]]:
+        return self.fake.read()["objects"]
+
+    def selected(self) -> dict[str, Any]:
+        return self.rows()[self.fake.selector]
+
+    def control(self, **values: Any) -> None:
+        self.fake.control(**values)
+
+    def records(self, name: str) -> list[dict[str, Any]]:
+        return self.fake.records(name)
+
+
+SUBJECTS = (
+    Subject(
+        "fixture", "existing_only", fixture_info.main, FixtureAdapter, fixture.main
+    ),
+    Subject("fixture_info", "observational", fixture_info.main, FixtureAdapter),
+    Subject("fixture_plan", "observational", fixture_plan.main, FixtureAdapter),
+)
+validate(SUBJECTS, Path(fixture_info.__file__).parent)

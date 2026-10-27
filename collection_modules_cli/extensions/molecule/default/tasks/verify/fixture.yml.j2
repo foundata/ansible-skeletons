@@ -1,0 +1,38 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+---
+- name: "Observe the existing fixture"
+  {{ namespace }}.{{ collection_name }}.fixture_info:
+    app: "alpha"
+    key: "quota"
+  module_defaults:
+    group/{{ namespace }}.{{ collection_name }}.api: >-
+      {{ '{{' }} product_connection {{ '}}' }}
+  register: __observed
+
+- name: "Verify public state"
+  ansible.builtin.assert:
+    that:
+      - not __observed['changed']
+      - not __observed['fixture']['enabled']
+      - __observed['fixture']['limit'] == 0
+      - __observed['fixture']['label'] == ''
+
+- name: "Plan a declaration without writing"
+  {{ namespace }}.{{ collection_name }}.fixture_plan:
+    app: "alpha"
+    key: "quota"
+    expected_id: "090d190b-c80a-4917-8532-6b62a2836d0c"
+    limit: 1
+  module_defaults:
+    group/{{ namespace }}.{{ collection_name }}.api: >-
+      {{ '{{' }} product_connection {{ '}}' }}
+  register: __plan
+
+- name: "Verify the plan"
+  ansible.builtin.assert:
+    that:
+      - not __plan['changed']
+      - __plan['would_change']
+      - __plan['fixture']['limit'] == 1

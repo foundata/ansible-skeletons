@@ -1,0 +1,91 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Exercise process faults through the public module and real utils boundary.
+
+Input on stdin names a module, its parameters, private values, a fault-control
+JSON file, a JSON-lines write receipt file, and cases. Each case supplies
+control data, parameter changes and expected public result fields. Product
+tasks own those values; this harness owns subprocess execution and receipt
+checks. The program and files must already be installed on this host.
+"""
+
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any
+
+BOOTSTRAP = """\
+import importlib
+import sys
+from ansible.plugins.loader import init_plugin_loader
+init_plugin_loader()
+module = sys.argv.pop(1)
+importlib.import_module(module).main()
+"""
+
+
+def invoke(module: str, params: dict[str, Any], private: list[str]) -> dict[str, Any]:
+    namespace, collection, name = module.split(".")
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            BOOTSTRAP,
+            f"ansible_collections.{namespace}.{collection}.plugins.modules.{name}",
+        ],
+        input=json.dumps(
+            {
+                "ANSIBLE_MODULE_ARGS": {
+                    **params,
+                    "_ansible_remote_tmp": params["exec"]["chdir"],
+                }
+            }
+        ),
+        text=True,
+        capture_output=True,
+        timeout=45,
+        check=False,
+    )
+    document: dict[str, Any] = json.loads(result.stdout)
+    document.pop("_ansible_new_secrets", None)
+    if result.returncode != int(bool(document.get("failed"))):
+        raise AssertionError("Unexpected module process exit")
+    for secret in private:
+        if secret in json.dumps(document) + result.stderr:
+            raise AssertionError("Private data escaped the module")
+    return document
+
+
+def exercise(request: dict[str, Any]) -> dict[str, Any]:
+    module, params = request["module"], request["params"]
+    calls = Path(request["receipt_file"])
+    controls = Path(request["fault_file"])
+    cases = request["cases"]
+    if not cases:
+        raise ValueError("At least one process-fault case is required")
+    count = len(calls.read_text().splitlines())
+    previous = controls.read_bytes()
+    unknown_readback = False
+    try:
+        for case in cases:
+            controls.write_text(json.dumps(case["control"]))
+            result = invoke(module, {**params, **case["params"]}, request["private"])
+            for key, value in case["expect"].items():
+                assert result.get(key) == value, f"Unexpected {key}"
+            unknown_readback |= result.get("outcome") == "unknown"
+            count += 1
+            assert len(calls.read_text().splitlines()) == count
+    finally:
+        controls.write_bytes(previous)
+    return {
+        "module": module,
+        "writes": len(cases),
+        "unknown_readback": unknown_readback,
+    }
+
+
+if __name__ == "__main__":
+    print(json.dumps(exercise(json.load(sys.stdin))))

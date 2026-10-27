@@ -1,0 +1,11 @@
+# Configuration for ansible-test, see
+# https://docs.ansible.com/projects/ansible/devel/dev_guide/testing/sanity/index.html
+#
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+---
+modules:
+  # Python versions supported by module code on managed nodes. Controller-side
+  # plugins follow the Python versions of the supported ansible-core releases.
+  python_requires: ">=3.9"

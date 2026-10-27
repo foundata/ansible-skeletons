@@ -1,0 +1,335 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""CLI contracts exercised through real public modules and bounded processes."""
+
+from __future__ import annotations
+
+import json
+from dataclasses import replace
+from pathlib import Path
+from typing import Any
+
+import pytest
+from ansible.module_utils.basic import AnsibleModule
+
+from ..conftest import RunModule
+from .contract_subject import SUBJECTS
+from .contracts import Adapter
+
+WRITERS = tuple(subject for subject in SUBJECTS if subject.mode == "existing_only")
+
+
+def public(result: dict[str, Any], adapter: Adapter) -> dict[str, Any]:
+    result = dict(result)
+    announced = result.pop("_ansible_new_secrets", [])
+    assert set(announced) <= set(adapter.private)
+    assert all(secret not in json.dumps(result) for secret in adapter.private)
+    return result
+
+
+def test_every_writer_changes_repeats_predicts_and_preserves(
+    fake: Any, run_module: RunModule
+) -> None:
+    for subject in WRITERS:
+        adapter = subject.adapter(fake)
+        before = adapter.rows()
+        selected = adapter.selected()
+        prediction = public(
+            run_module(
+                subject.writer,
+                **adapter.arguments,
+                **adapter.change,
+                _ansible_check_mode=True,
+                _ansible_diff=True,
+            ),
+            adapter,
+        )
+        assert prediction["changed"] and prediction["verified"] == "predicted"
+        assert adapter.rows() == before and not adapter.records("writes.jsonl")
+        result = public(
+            run_module(
+                subject.writer,
+                **adapter.arguments,
+                **adapter.change,
+                _ansible_diff=True,
+            ),
+            adapter,
+        )
+        assert result["changed"] and result["verified"] == "observed"
+        assert result["changed_fields"] == sorted(adapter.change)
+        assert result["diff"] == {"before": adapter.original, "after": adapter.change}
+        assert adapter.identity(result[adapter.result_key]) == adapter.identity(
+            selected
+        )
+        for name, value in adapter.change.items():
+            assert adapter.selected()[name] == value
+        for key, row in before.items():
+            expected = (
+                {**row, **adapter.change}
+                if adapter.identity(row) == adapter.identity(selected)
+                else row
+            )
+            assert adapter.rows()[key] == expected
+        repeated = public(
+            run_module(subject.writer, **adapter.arguments, **adapter.change), adapter
+        )
+        assert not repeated["changed"] and repeated["verified"] == "observed"
+        assert len(adapter.records("writes.jsonl")) == 1
+
+
+@pytest.mark.parametrize("nulls", [False, True])
+def test_omitted_and_null_fields_are_unmanaged(
+    fake: Any, run_module: RunModule, nulls: bool
+) -> None:
+    for subject in WRITERS:
+        adapter = subject.adapter(fake)
+        before = adapter.rows()
+        declaration = dict.fromkeys(adapter.change) if nulls else {}
+        result = public(
+            run_module(subject.writer, **adapter.arguments, **declaration), adapter
+        )
+        assert not result["changed"] and adapter.rows() == before
+        assert not adapter.records("writes.jsonl")
+
+
+@pytest.mark.parametrize("check", [False, True])
+def test_missing_target_refuses(fake: Any, run_module: RunModule, check: bool) -> None:
+    for subject in WRITERS:
+        adapter = subject.adapter(fake)
+        result = public(
+            run_module(
+                subject.writer,
+                **{**adapter.arguments, **adapter.missing},
+                **adapter.change,
+                _ansible_check_mode=check,
+            ),
+            adapter,
+        )
+        assert result["failed"] and result["error_code"] == "missing"
+        assert not result["changed"] and result["outcome"] == "unchanged"
+        assert not adapter.records("writes.jsonl")
+        observed = public(
+            run_module(subject.info, **{**adapter.arguments, **adapter.missing}),
+            adapter,
+        )
+        assert observed[adapter.result_key] is None and not observed["changed"]
+
+
+@pytest.mark.parametrize("check", [False, True])
+@pytest.mark.parametrize(
+    "mode",
+    [
+        "failed",
+        "empty",
+        "truncated",
+        "wrong_schema",
+        "duplicate",
+        "oversized",
+        "malformed",
+    ],
+)
+def test_bad_reads_never_authorize_absence(
+    fake: Any, run_module: RunModule, mode: str, check: bool
+) -> None:
+    for subject in SUBJECTS:
+        adapter = subject.adapter(fake)
+        adapter.control(read=mode)
+        for entry in (subject.info, *([subject.writer] if subject.writer else [])):
+            result = public(
+                run_module(entry, **adapter.arguments, _ansible_check_mode=check),
+                adapter,
+            )
+            assert (
+                result["failed"]
+                and not result["changed"]
+                and result["outcome"] == "unchanged"
+            )
+            assert result["error_code"] != "missing" and result["http_status"] is None
+            assert not adapter.records("writes.jsonl")
+
+
+@pytest.mark.parametrize("check", [False, True])
+def test_unsupported_options_and_identity_assertion(
+    fake: Any, run_module: RunModule, check: bool
+) -> None:
+    for subject in WRITERS:
+        adapter = subject.adapter(fake)
+        for options in adapter.unsupported:
+            result = public(
+                run_module(
+                    subject.writer,
+                    **adapter.arguments,
+                    **options,
+                    _ansible_check_mode=check,
+                ),
+                adapter,
+            )
+            assert result["failed"] and not adapter.records("calls.jsonl")
+        result = public(
+            run_module(
+                subject.writer,
+                **{**adapter.arguments, **adapter.wrong_identity},
+                **adapter.change,
+                _ansible_check_mode=check,
+            ),
+            adapter,
+        )
+        assert result["error_code"] == "object_identity" and not result["changed"]
+        assert not adapter.records("writes.jsonl")
+
+
+@pytest.mark.parametrize("mode", ["lost", "exit_after_effect", "exit124"])
+def test_uncertain_reply_is_reconciled_without_redispatch(
+    fake: Any, run_module: RunModule, mode: str
+) -> None:
+    for subject in WRITERS:
+        adapter = subject.adapter(fake)
+        adapter.control(update=mode)
+        result = public(
+            run_module(subject.writer, **adapter.arguments, **adapter.change), adapter
+        )
+        assert (
+            not result.get("failed")
+            and result["changed"]
+            and result["verified"] == "observed"
+        )
+        assert len(adapter.records("writes.jsonl")) == 1
+        assert not run_module(subject.writer, **adapter.arguments, **adapter.change)[
+            "changed"
+        ]
+        assert len(adapter.records("writes.jsonl")) == 1
+
+
+@pytest.mark.parametrize(
+    "mode,code,outcome",
+    [
+        ("readback_failed", "read_failed", "unknown"),
+        ("drop", "not_persisted", "unknown"),
+        ("partial", "not_persisted", "changed"),
+        ("reject", "refused", "unchanged"),
+    ],
+)
+def test_effect_evidence_controls_outcome(
+    fake: Any, run_module: RunModule, mode: str, code: str, outcome: str
+) -> None:
+    for subject in WRITERS:
+        adapter = subject.adapter(fake)
+        before = adapter.selected()
+        adapter.control(update=mode)
+        result = public(
+            run_module(subject.writer, **adapter.arguments, **adapter.change), adapter
+        )
+        assert result["failed"] and result["error_code"] == code
+        assert result["outcome"] == outcome and result["changed"] == (
+            outcome != "unchanged"
+        )
+        assert (
+            result["http_status"] is None and len(adapter.records("writes.jsonl")) == 1
+        )
+        stored = adapter.selected()
+        if mode in {"drop", "reject"}:
+            assert stored == before
+        elif mode == "partial":
+            matches = [stored[key] == value for key, value in adapter.change.items()]
+            assert any(matches) and not all(matches)
+        else:
+            assert all(stored[key] == value for key, value in adapter.change.items())
+
+
+@pytest.mark.parametrize("mode", ["timeout_before", "timeout_after"])
+def test_expiry_keeps_uncertainty_and_terminates_child(
+    fake: Any, run_module: RunModule, mode: str
+) -> None:
+    for subject in WRITERS:
+        adapter = subject.adapter(fake)
+        before = adapter.selected()
+        adapter.control(update=mode)
+        result = public(
+            run_module(
+                subject.writer, **adapter.arguments, **adapter.change, deadline=3.0
+            ),
+            adapter,
+        )
+        assert result["failed"] and result["changed"] and result["outcome"] == "unknown"
+        assert result["error_code"] == "deadline_exceeded"
+        writes = adapter.records("writes.jsonl")
+        assert len(writes) == 1 and not Path(f"/proc/{writes[0]['pid']}").exists()
+        expected = before if mode == "timeout_before" else {**before, **adapter.change}
+        assert adapter.selected() == expected
+
+
+@pytest.mark.parametrize(
+    "fault,code",
+    [
+        ("identity_refused", "target_identity"),
+        ("replace_on_recheck", "object_identity"),
+        ("stale_on_recheck", "stale"),
+    ],
+)
+def test_prewrite_refusal(
+    fake: Any, run_module: RunModule, fault: str, code: str
+) -> None:
+    for subject in WRITERS:
+        adapter = subject.adapter(fake)
+        adapter.control(**{fault: True})
+        result = public(
+            run_module(subject.writer, **adapter.arguments, **adapter.change), adapter
+        )
+        assert result["failed"] and result["error_code"] == code
+        assert not result["changed"] and result["outcome"] == "unchanged"
+        assert not adapter.records("writes.jsonl")
+
+
+def test_failure_before_start_preserves_unchanged(
+    fake: Any, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original = AnsibleModule.run_command
+
+    def refuse(self: Any, args: list[str], **kwargs: Any) -> Any:
+        if "update" in args:
+            raise FileNotFoundError("private diagnostic")
+        return original(self, args, **kwargs)
+
+    monkeypatch.setattr(AnsibleModule, "run_command", refuse)
+    for subject in WRITERS:
+        adapter = subject.adapter(fake)
+        result = public(
+            run_module(subject.writer, **adapter.arguments, **adapter.change), adapter
+        )
+        assert result["failed"] and result["error_code"] == "command_start"
+        assert not result["changed"] and result["outcome"] == "unchanged"
+        assert not adapter.records("writes.jsonl")
+
+
+@pytest.mark.parametrize("check", [False, True])
+def test_real_observation_with_no_writes(
+    fake: Any, run_module: RunModule, check: bool
+) -> None:
+    for subject in SUBJECTS:
+        adapter = subject.adapter(fake)
+        before = adapter.rows()
+        calls = len(adapter.records("calls.jsonl"))
+        result = public(
+            run_module(
+                subject.info,
+                **{**adapter.arguments, **(subject.observe_args or {})},
+                _ansible_check_mode=check,
+            ),
+            adapter,
+        )
+        assert not result["changed"] and not result.get("failed")
+        assert adapter.identity(result[adapter.result_key]) == adapter.identity(
+            adapter.selected()
+        )
+        assert len(adapter.records("calls.jsonl")) > calls
+        assert adapter.rows() == before and not adapter.records("writes.jsonl")
+
+
+def test_subject_declarations_require_real_modes_and_entries() -> None:
+    subject = SUBJECTS[0]
+    with pytest.raises(ValueError, match="require a writer"):
+        replace(subject, mode="existing_only", writer=None)
+    with pytest.raises(ValueError, match="forbid a writer"):
+        replace(subject, mode="observational", writer=subject.info)
+    with pytest.raises(ValueError, match="Incomplete"):
+        replace(subject, name="")

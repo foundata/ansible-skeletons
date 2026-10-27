@@ -1,0 +1,20 @@
+{{ '{#' }}
+SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+SPDX-License-Identifier: GPL-3.0-or-later
+{{ '#}' }}
+#cloud-config
+# cloud-init user-data of a Molecule test instance (NoCloud datasource).
+# Rendered per platform by the create-libvirt.yml playbook. The "#cloud-config"
+# marker above must stay on the very first line, cloud-init requires it there.
+users:
+  - name: "molecule"
+    shell: "/bin/bash"
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    ssh_authorized_keys:
+      - "{{ '{{' }} tpl_ssh_public_key {{ '}}' }}"
+ssh_pwauth: false
+package_update: true
+packages:
+  - "qemu-guest-agent"
+runcmd:
+  - ["systemctl", "enable", "--now", "qemu-guest-agent"]

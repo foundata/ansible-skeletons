@@ -1,0 +1,1124 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Lifecycle base invariants over a synthetic resource and in-memory product."""
+
+from __future__ import annotations
+
+import importlib
+import inspect
+import json
+import pkgutil
+import sys
+from collections.abc import Iterator
+from types import SimpleNamespace
+from typing import Any, Callable
+
+import pytest
+from ansible.module_utils.basic import AnsibleModule
+from ansible.module_utils.common import warnings
+
+from ansible_collections.foundata.utils.plugins.module_utils import errors
+
+# isort: split
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins import (
+        module_utils,
+    )
+{# skeleton-variant: activation-import #}
+{# end skeleton-variant #}
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._engine import (
+        Engine,
+        Key,
+        Resource,
+    )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._binding import (
+        Binding,
+    )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._lifecycle import (
+        HOOKS,
+        SETTINGS,
+        STATE,
+        Failure,
+        Lifecycle,
+        Stage,
+    )
+# isort: on
+# fmt: on
+
+from ..conftest import RunModule
+
+
+@pytest.fixture(scope="module")
+def earlier_module_warning() -> Iterator[None]:
+    previous = warnings._global_warnings
+    warnings._global_warnings = type(previous)()
+    warnings.warn("A warning from an earlier module invocation")
+    try:
+        yield
+    finally:
+        warnings._global_warnings = previous
+
+
+@pytest.mark.usefixtures("earlier_module_warning")
+@pytest.mark.parametrize("message", ["First test warning", "Second test warning"])
+def test_module_warnings_start_empty_for_each_test(message: str) -> None:
+    assert warnings.get_warning_messages() == ()
+    warnings.warn(message)
+    assert warnings.get_warning_messages() == (message,)
+
+
+def field_names(value: object) -> list[str]:
+    if not isinstance(value, list) or not all(isinstance(name, str) for name in value):
+        raise ValueError("Fields must be a list of names")
+    return value
+
+
+SCHEMA = errors.ErrorSchema(
+    codes_by_category={
+        "internal": {None},
+        "timeout": {"socket_timeout"},
+        "product": {"rejected", "conflict", "not_found"},
+        "eligibility": {"referenced", "stale"},
+        "compatibility": {"ineligible"},
+        "local": {"operation_failed"},
+        "verification": {
+            "still_present",
+            "missing_after_write",
+            "not_persisted",
+            "secret_unknown",
+        },
+    },
+    fallback=("internal", None),
+    field_validators={"operation": str, "name": str, "fields": field_names},
+)
+
+
+class Store:
+    def __init__(self) -> None:
+        self.rows: dict[str, dict[str, Any]] = {}
+        self.writes: list[str] = []
+        self.versions = 0
+        self.after: Callable[[], None] | None = None
+        self.drop = False
+
+    def write(self, kind: str, apply: Callable[[], None]) -> None:
+        self.writes.append(kind)
+        if not self.drop:
+            apply()
+        hook, self.after = self.after, None
+        if hook:
+            hook()
+
+
+def lose() -> None:
+    raise errors.TransportTimeout(code="socket_timeout")
+
+
+def refuse() -> None:
+    raise errors.ApiError(category="product", code="rejected")
+
+
+class Synthetic(Lifecycle):
+    schema = SCHEMA
+    result_key = "synthetic"
+    compatibility_id = "synthetic"
+    identity_options = ("name",)
+    steps = (("lookup", "find"),)
+
+    def connect(self) -> Store:
+        raise NotImplementedError
+
+    def compatibility(self, operation: str) -> None:
+        self.client.versions += 1
+
+    def identify(self) -> str:
+        return str(self.params["name"])
+
+    def declared(self) -> dict[str, Any]:
+        return {
+            key: self.params[key]
+            for key in ("value", "secret")
+            if self.params.get(key) is not None
+        }
+
+    def lookup(self) -> dict[str, Any] | None:
+        return self.client.rows.get(self.key)
+
+    def managed(self, record: dict[str, Any]) -> dict[str, Any]:
+        return {"name": record["name"], "value": record.get("value")}
+
+    def secret(self, name: str) -> bool:
+        return name == "secret"
+
+    def protect(self) -> None:
+        if self.absent and self.record and self.record.get("referenced"):
+            raise Failure(category="eligibility", code="referenced")
+
+    def write(self) -> None:
+        rows, key, delta = self.client.rows, self.key, dict(self.delta)
+        if self.absent:
+            self.client.write("delete", lambda: rows.pop(key))
+        elif self.record is None:
+            self.client.write(
+                "create", lambda: rows.update({key: {"name": key, **delta}})
+            )
+        else:
+            self.client.write("update", lambda: rows[key].update(delta))
+
+
+@pytest.mark.parametrize(
+    "name", ["key", "prepare", "stage", "record", "execute", "changed", "step"]
+)
+def test_redefining_a_reserved_name_fails_when_the_class_is_created(
+    name: str,
+) -> None:
+    with pytest.raises(TypeError, match=f"reserves: {name};"):
+        type("Colliding", (Synthetic,), {name: None})
+
+
+def test_hooks_settings_and_new_names_may_be_defined() -> None:
+    namespace: dict[str, Any] = dict.fromkeys((*HOOKS, *SETTINGS))
+    namespace.update(refresh=None, calendar_key="x")
+    assert issubclass(type("Allowed", (Synthetic,), namespace), Synthetic)
+
+
+def test_the_base_docstring_names_every_hook_setting_and_reserved_name() -> None:
+    sequence = {name for name in vars(Lifecycle) if not name.startswith("_")}
+    documentation = sys.modules[Lifecycle.__module__].__doc__ or ""
+    for name in sequence | HOOKS | SETTINGS | STATE:
+        assert f"``{name}``" in documentation, name
+
+
+def lifecycle_classes() -> list[type[Lifecycle]]:
+    """Every lifecycle class defined below the collection's module_utils."""
+    found: list[type[Lifecycle]] = []
+    for info in pkgutil.walk_packages(
+        module_utils.__path__, module_utils.__name__ + "."
+    ):
+        module = importlib.import_module(info.name)
+        found.extend(
+            cls
+            for cls in vars(module).values()
+            if inspect.isclass(cls)
+            and issubclass(cls, Lifecycle)
+            and cls.__module__ == module.__name__
+        )
+    return found
+
+
+def test_overrides_keep_the_parameter_names_of_what_they_override() -> None:
+    # Only ansible-test sanity's pylint (arguments-renamed) reports a renamed
+    # one; this covers the product's copies of the scaffold as well.
+    classes = lifecycle_classes()
+    assert Binding in classes
+    for cls in classes:
+        for name, method in vars(cls).items():
+            base = next(
+                (vars(b)[name] for b in cls.__mro__[1:] if name in vars(b)), None
+            )
+            if (
+                name.startswith("__")
+                or name in cls._sequence
+                or not inspect.isfunction(method)
+                or not inspect.isfunction(base)
+            ):
+                continue
+            assert list(inspect.signature(method).parameters) == list(
+                inspect.signature(base).parameters
+            ), f"{cls.__qualname__}.{name}"
+
+
+def spec() -> dict[str, Any]:
+    return {
+        "name": {"type": "str"},
+        "value": {"type": "str"},
+        "secret": {"type": "str", "no_log": True},
+        "update_password": {
+            "type": "str",
+            "choices": ["on_create", "always"],
+            "default": "on_create",
+            "no_log": False,
+        },
+        "state": {
+            "type": "str",
+            "choices": ["present", "absent"],
+            "default": "present",
+        },
+    }
+
+
+def main() -> None:
+    module = AnsibleModule(argument_spec=spec(), supports_check_mode=True)
+    Synthetic(module).execute()
+
+
+@pytest.fixture
+def connection() -> dict[str, Any]:
+    return {}
+
+
+@pytest.fixture(autouse=True)
+def store(monkeypatch: pytest.MonkeyPatch) -> Store:
+    instance = Store()
+    monkeypatch.setattr(Synthetic, "connect", lambda self: instance)
+    return instance
+
+
+def test_resource_lifecycle(store: Store, run_module: RunModule) -> None:
+    predicted = run_module(main, name="a", value="1", _ansible_check_mode=True)
+    assert predicted["verified"] == "predicted" and not store.writes
+    assert predicted["synthetic"] == {"name": "a", "value": "1"}
+    created = run_module(main, name="a", value="1", _ansible_diff=True)
+    assert created["changed"] and created["verified"] == "observed"
+    assert created["changed_fields"] == [] and created["diff"]["after"] == {
+        "value": "1"
+    }
+    versions = store.versions
+    assert not run_module(main, name="a", value="1")["changed"]
+    assert store.versions == versions
+    updated = run_module(main, name="a", value="2", _ansible_diff=True)
+    assert updated["changed_fields"] == ["value"]
+    assert updated["diff"] == {"before": {"value": "1"}, "after": {"value": "2"}}
+    assert run_module(main, name="a", state="absent")["synthetic"] is None
+    assert not run_module(main, name="a", state="absent")["changed"]
+    assert store.writes == ["create", "update", "delete"]
+
+
+@pytest.mark.parametrize("operation", ["create", "update", "delete"])
+def test_lost_reply_settles_by_read_back(
+    store: Store, run_module: RunModule, operation: str
+) -> None:
+    if operation != "create":
+        store.rows["a"] = {"name": "a", "value": "1"}
+    store.after = lose
+    result = run_module(
+        main,
+        name="a",
+        value="2",
+        state="absent" if operation == "delete" else "present",
+    )
+    assert not result.get("failed") and result["verified"] == "observed"
+    assert store.writes == [operation]
+
+
+@pytest.mark.parametrize(
+    "existing,code", [(False, "missing_after_write"), (True, "not_persisted")]
+)
+def test_lost_reply_without_effect_is_unknown(
+    store: Store, run_module: RunModule, existing: bool, code: str
+) -> None:
+    if existing:
+        store.rows["a"] = {"name": "a", "value": "1"}
+    store.drop, store.after = True, lose
+    result = run_module(main, name="a", value="2")
+    assert result["failed"] and result["error_code"] == code
+    assert result["changed"] and result["outcome"] == "unknown"
+    assert result["operation"] == "reconcile" and result["name"] == "a"
+
+
+@pytest.mark.parametrize("lost_reply", [False, True])
+def test_moved_read_back_that_misses_the_declaration_is_changed(
+    store: Store, run_module: RunModule, lost_reply: bool
+) -> None:
+    store.rows["a"] = {"name": "a", "value": "1"}
+
+    def elsewhere() -> None:
+        store.rows["a"]["value"] = "other"
+        if lost_reply:
+            lose()
+
+    store.drop, store.after = True, elsewhere
+    result = run_module(main, name="a", value="2")
+    assert result["failed"] and result["error_code"] == "not_persisted"
+    assert result["changed"] and result["outcome"] == "changed"
+    assert result["operation"] == ("reconcile" if lost_reply else "verify")
+    assert store.writes == ["update"]
+
+
+@pytest.mark.parametrize("drop,outcome", [(False, "changed"), (True, "unchanged")])
+def test_refusal_reports_what_the_read_back_shows(
+    store: Store, run_module: RunModule, drop: bool, outcome: str
+) -> None:
+    store.rows["a"] = {"name": "a", "value": "1"}
+    store.drop, store.after = drop, refuse
+    result = run_module(main, name="a", value="2")
+    assert result["failed"] and result["error_code"] == "rejected"
+    assert result["outcome"] == outcome and result["changed"] == (not drop)
+    assert result["operation"] == "update" and store.writes == ["update"]
+
+
+def test_a_refusal_that_may_change_unseen_state_stays_unknown(
+    store: Store, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        Synthetic,
+        "refusal_may_change",
+        lambda self, failure: failure.code == "rejected",
+    )
+    store.rows["a"] = {"name": "a", "value": "1"}
+    store.drop, store.after = True, refuse
+    result = run_module(main, name="a", value="2")
+    assert result["failed"] and result["error_code"] == "rejected"
+    assert result["changed"] and result["outcome"] == "unknown"
+    assert result["operation"] == "update" and store.writes == ["update"]
+
+
+def test_write_that_never_started_is_unchanged(
+    store: Store, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(Synthetic, "started", lambda self: False)
+    store.drop, store.after = True, lose
+    result = run_module(main, name="a", value="1")
+    assert result["failed"] and result["outcome"] == "unchanged"
+    assert not result["changed"] and result["operation"] == "create"
+
+
+@pytest.mark.parametrize(
+    "category,code",
+    [("local", "operation_failed"), ("product", "conflict"), ("product", "not_found")],
+)
+def test_known_prechange_failure_skips_read_back(
+    store: Store,
+    run_module: RunModule,
+    monkeypatch: pytest.MonkeyPatch,
+    category: str,
+    code: str,
+) -> None:
+    reads: list[str] = []
+    if code == "not_found":
+        store.rows["a"] = {"name": "a", "value": "1"}
+
+    def lookup(subject: Synthetic) -> Any:
+        reads.append("read")
+        assert len(reads) == 1, "A known pre-change failure must not read back"
+        return store.rows.get("a")
+
+    def write(subject: Synthetic) -> None:
+        if code == "conflict":
+            store.rows["a"] = {"name": "a", "value": "another writer"}
+        elif code == "not_found":
+            store.rows.pop("a")
+        raise errors.ApiError(category=category, code=code)
+
+    monkeypatch.setattr(Synthetic, "lookup", lookup)
+    monkeypatch.setattr(Synthetic, "write", write)
+    monkeypatch.setattr(
+        Synthetic,
+        "refused_before_change",
+        lambda self, failure: (failure.category, failure.code) == (category, code),
+    )
+    result = run_module(main, name="a", value="2")
+    assert result["failed"] and result["error_code"] == code
+    assert result["error_category"] == category
+    assert not result["changed"] and result["outcome"] == "unchanged"
+    assert result["operation"] == ("update" if code == "not_found" else "create")
+    assert reads == ["read"]
+
+
+def test_prechange_refusal_preserves_an_earlier_stage(
+    run_module: RunModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(Synthetic, "refused_before_change", lambda self, failure: True)
+
+    def action(subject: Synthetic) -> dict[str, Any]:
+        subject.confirmed = True
+        subject.operation = "upload"
+        subject.stage(refuse)
+        raise AssertionError("The refusal must end the operation")
+
+    result = run_module(action_main(action), name="a")
+    assert result["failed"] and result["error_code"] == "rejected"
+    assert result["changed"] and result["outcome"] == "changed"
+    assert result["operation"] == "upload"
+
+
+def test_guard_and_identity_on_failure(store: Store, run_module: RunModule) -> None:
+    store.rows["a"] = {"name": "a", "value": "1", "referenced": True}
+    for check in (True, False):
+        result = run_module(main, name="a", state="absent", _ansible_check_mode=check)
+        assert result["error_code"] == "referenced" and result["outcome"] == "unchanged"
+        assert result["operation"] == "protect" and result["name"] == "a"
+    assert not store.writes
+
+
+@pytest.mark.parametrize(
+    "arguments,changed",
+    [({"value": "1"}, False), ({"value": "2"}, True), ({"state": "absent"}, True)],
+)
+def test_guards_see_whether_the_declaration_changes_anything(
+    store: Store,
+    run_module: RunModule,
+    monkeypatch: pytest.MonkeyPatch,
+    arguments: dict[str, Any],
+    changed: bool,
+) -> None:
+    store.rows["a"] = {"name": "a", "value": "1"}
+    seen: list[bool] = []
+    monkeypatch.setattr(Synthetic, "protect", lambda self: seen.append(self.changed))
+    result = run_module(main, name="a", _ansible_check_mode=True, **arguments)
+    assert seen == [changed] and result["changed"] is changed
+
+
+def test_secret_is_unverifiable_and_rotates_only_when_asked(
+    store: Store, run_module: RunModule
+) -> None:
+    created = run_module(main, name="a", secret="s3")
+    registered = created.pop("_ansible_new_secrets", [])
+    assert set(registered) <= {"s3"}
+    assert created["verified"] == "unverifiable" and "s3" not in str(created)
+    assert not run_module(main, name="a", secret="s4")["changed"]
+    rotated = run_module(main, name="a", secret="s4", update_password="always")
+    assert rotated["changed"] and rotated["changed_fields"] == ["secret"]
+    store.after = lose
+    lost = run_module(main, name="a", secret="s5", update_password="always")
+    assert lost["error_code"] == "secret_unknown" and lost["outcome"] == "unknown"
+
+
+@pytest.mark.parametrize("lost_reply", [False, True])
+def test_settling_distinguishes_initial_and_post_write_reads(
+    store: Store,
+    run_module: RunModule,
+    monkeypatch: pytest.MonkeyPatch,
+    lost_reply: bool,
+) -> None:
+    phases: list[bool] = []
+    original = Synthetic.lookup
+
+    def lookup(self: Synthetic) -> dict[str, Any] | None:
+        phases.append(self.settling)
+        return original(self)
+
+    monkeypatch.setattr(Synthetic, "lookup", lookup)
+    if lost_reply:
+        store.after = lose
+    result = run_module(main, name="a", value="1")
+    assert result["verified"] == "observed"
+    assert phases == [False, True] and store.writes == ["create"]
+
+
+def test_product_loss_classification_is_a_hook(
+    store: Store, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def uncertain() -> None:
+        raise errors.ApiError(category="product", code="rejected", status=503)
+
+    monkeypatch.setattr(Synthetic, "lost", lambda self, failure: failure.status == 503)
+    store.after = uncertain
+    result = run_module(main, name="a", value="1")
+    assert not result.get("failed") and result["verified"] == "observed"
+    assert store.writes == ["create"]
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_compatibility_can_run_before_every_lookup(
+    store: Store,
+    run_module: RunModule,
+    monkeypatch: pytest.MonkeyPatch,
+    check_mode: bool,
+) -> None:
+    monkeypatch.setattr(Synthetic, "compatibility_always", True)
+    run_module(main, name="a", value="1")
+    result = run_module(main, name="a", value="1", _ansible_check_mode=check_mode)
+    assert not result["changed"] and store.versions == 2
+    assert store.writes == ["create"]
+
+    def ineligible(self: Synthetic, operation: str) -> None:
+        raise Failure(category="compatibility", code="ineligible")
+
+    monkeypatch.setattr(Synthetic, "compatibility", ineligible)
+    refused = run_module(main, name="a", value="1", _ansible_check_mode=check_mode)
+    assert refused["error_code"] == "ineligible"
+    assert refused["operation"] == "compatibility"
+    assert refused["outcome"] == "unchanged" and store.writes == ["create"]
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        {"value": "1"},
+        {"value": "2", "_ansible_check_mode": True},
+        {"value": "2"},
+        {"state": "absent"},
+    ],
+)
+def test_result_hooks_cover_unchanged_predicted_written_and_deleted_results(
+    store: Store,
+    run_module: RunModule,
+    monkeypatch: pytest.MonkeyPatch,
+    arguments: dict[str, Any],
+) -> None:
+    store.rows["a"] = {"name": "a", "value": "1"}
+
+    def finish(self: Synthetic, result: dict[str, Any]) -> dict[str, Any]:
+        result["pending"] = self.module.check_mode and result["changed"]
+        result["completed"] = True
+        return result
+
+    monkeypatch.setattr(Synthetic, "finish", finish)
+    monkeypatch.setattr(
+        Synthetic,
+        "changed_fields",
+        lambda self: ["settings.value"] if self.delta else [],
+    )
+    result = run_module(main, name="a", **arguments)
+    assert result["completed"]
+    assert result["pending"] == bool(arguments.get("_ansible_check_mode"))
+    expected = ["settings.value"] if arguments.get("value") == "2" else []
+    assert result["changed_fields"] == expected
+
+
+def test_whole_object_diff_contains_only_public_state(
+    store: Store, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(Synthetic, "whole_diff", True)
+    store.rows["a"] = {"name": "a", "value": "1", "secret": "private"}
+    result = run_module(main, name="a", value="2", _ansible_diff=True)
+    assert result["diff"] == {
+        "before": {"name": "a", "value": "1"},
+        "after": {"name": "a", "value": "2"},
+    }
+    created = run_module(
+        main, name="b", value="3", secret="private", _ansible_diff=True
+    )
+    assert created["diff"] == {
+        "before": {},
+        "after": {"name": "b", "value": "3"},
+    }
+    deleted = run_module(main, name="a", state="absent", _ansible_diff=True)
+    assert deleted["diff"] == {
+        "before": {"name": "a", "value": "2"},
+        "after": {},
+    }
+    for response in (result, created, deleted):
+        registered = response.pop("_ansible_new_secrets", [])
+        assert set(registered) <= {"private"}
+        assert "private" not in str(response)
+
+
+@pytest.mark.parametrize("existing", [False, True])
+def test_default_recheck_refuses_a_moved_record_with_the_configured_code(
+    store: Store,
+    run_module: RunModule,
+    monkeypatch: pytest.MonkeyPatch,
+    existing: bool,
+) -> None:
+    if existing:
+        store.rows["a"] = {"name": "a", "value": "1"}
+    monkeypatch.setattr(Synthetic, "recheck_code", "stale")
+    original = Synthetic.lookup
+    reads = 0
+
+    def lookup(self: Synthetic) -> dict[str, Any] | None:
+        nonlocal reads
+        reads += 1
+        if reads == 2:
+            store.rows["a"] = {"name": "a", "value": "external"}
+        return original(self)
+
+    monkeypatch.setattr(Synthetic, "lookup", lookup)
+    result = run_module(main, name="a", value="2")
+    assert result["error_code"] == "stale" and result["operation"] == "recheck"
+    assert result["outcome"] == "unchanged" and not store.writes
+    assert reads == 2
+
+
+def test_refusal_can_measure_progress_over_the_whole_context(
+    store: Store, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store.rows["a"] = {"name": "a", "value": "1"}
+    store.rows["peer"] = {"name": "peer", "value": "1"}
+
+    def partial() -> None:
+        store.rows["peer"]["value"] = "2"
+        refuse()
+
+    monkeypatch.setattr(
+        Synthetic, "moved", lambda self, observed: store.rows["peer"]["value"] != "1"
+    )
+    store.drop, store.after = True, partial
+    result = run_module(main, name="a", value="2")
+    assert result["failed"] and result["error_code"] == "rejected"
+    assert result["changed"] and result["outcome"] == "changed"
+    assert store.rows["a"]["value"] == "1" and store.writes == ["update"]
+
+
+def action_main(action: Callable[[Synthetic], dict[str, Any]]) -> Callable[[], None]:
+    def entrypoint() -> None:
+        module = AnsibleModule(argument_spec=spec(), supports_check_mode=True)
+        subject = Synthetic(module)
+        subject.execute(action=lambda: action(subject))
+
+    return entrypoint
+
+
+@pytest.mark.parametrize(
+    "attempted,confirmed,outcome",
+    [(False, False, "unchanged"), (True, False, "unknown"), (True, True, "changed")],
+)
+def test_custom_operation_uses_the_same_failure_boundary(
+    run_module: RunModule, attempted: bool, confirmed: bool, outcome: str
+) -> None:
+    def action(subject: Synthetic) -> dict[str, Any]:
+        subject.operation = "job"
+        subject.attempted, subject.confirmed = attempted, confirmed
+        raise Failure(category="product", code="rejected")
+
+    result = run_module(action_main(action), name="a")
+    assert result["failed"] and result["outcome"] == outcome
+    assert result["operation"] == "job" and result["name"] == "a"
+
+
+@pytest.mark.parametrize("message", [None, "The instance keeps unlisted versions"])
+def test_verdict_message_overrides_the_class_default(
+    run_module: RunModule, message: str | None
+) -> None:
+    def action(subject: Synthetic) -> dict[str, Any]:
+        assert "message" not in vars(subject)
+        raise Failure(category="product", code="rejected", message=message)
+
+    result = run_module(action_main(action), name="a")
+    assert result["failed"] and result["error_code"] == "rejected"
+    assert result["msg"] == (Synthetic.message if message is None else message)
+    assert not result["changed"] and result["outcome"] == "unchanged"
+
+
+def test_client_error_text_cannot_override_the_public_message(
+    run_module: RunModule,
+) -> None:
+    def action(subject: Synthetic) -> dict[str, Any]:
+        failure: Any = errors.ApiError(
+            "SYNTHETIC-private-argument", category="product", code="rejected"
+        )
+        failure.message = "SYNTHETIC-private-field"
+        raise failure
+
+    result = run_module(action_main(action), name="a")
+    assert result["msg"] == Synthetic.message
+    assert "SYNTHETIC-private" not in json.dumps(result)
+
+
+def test_local_os_error_fails_without_its_message(run_module: RunModule) -> None:
+    def action(subject: Synthetic) -> dict[str, Any]:
+        subject.operation = "deliver"
+        subject.attempted = subject.confirmed = True
+        raise PermissionError(13, "Permission denied", "/private/SYNTHETIC-path")
+
+    result = run_module(action_main(action), name="a")
+    assert (result["error_category"], result["error_code"]) == (
+        "local",
+        "operation_failed",
+    )
+    assert result["operation"] == "deliver" and result["outcome"] == "changed"
+    assert "SYNTHETIC-path" not in json.dumps(result)
+    assert Binding.schema.allows("local", "operation_failed")
+
+
+def test_custom_operation_finishes_its_result(
+    run_module: RunModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        Synthetic, "finish", lambda self, result: {**result, "receipt": "complete"}
+    )
+    result = run_module(action_main(lambda subject: {"changed": False}), name="a")
+    assert not result["changed"] and result["receipt"] == "complete"
+
+
+@pytest.mark.parametrize("always", [False, True])
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_custom_operation_probes_before_action(
+    store: Store,
+    run_module: RunModule,
+    monkeypatch: pytest.MonkeyPatch,
+    always: bool,
+    check_mode: bool,
+) -> None:
+    monkeypatch.setattr(Synthetic, "compatibility_always", always)
+
+    def action(subject: Synthetic) -> dict[str, Any]:
+        assert store.versions == int(always) and subject.client is store
+        assert subject.operation == "validate"
+        if always:
+            subject.ensure_compatible(subject.operation_id())
+        return {"changed": False}
+
+    result = run_module(action_main(action), name="a", _ansible_check_mode=check_mode)
+    assert not result["changed"] and store.versions == int(always)
+    assert not store.writes
+
+
+def test_custom_operation_keeps_its_preset_operation_after_preparing(
+    run_module: RunModule,
+) -> None:
+    def entrypoint() -> None:
+        module = AnsibleModule(argument_spec=spec(), supports_check_mode=True)
+        subject = Synthetic(module)
+        subject.operation = "job"
+
+        def action() -> dict[str, Any]:
+            raise Failure(category="product", code="rejected")
+
+        subject.execute(action=action)
+
+    result = run_module(entrypoint, name="a")
+    assert result["failed"] and result["operation"] == "job"
+
+
+def test_custom_operation_never_runs_without_a_connection(
+    store: Store, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def refuse_connection(self: Synthetic) -> Store:
+        raise Failure(category="product", code="rejected")
+
+    def action(subject: Synthetic) -> dict[str, Any]:
+        raise AssertionError("An action without a client must not run")
+
+    monkeypatch.setattr(Synthetic, "connect", refuse_connection)
+    result = run_module(action_main(action), name="a")
+    assert result["failed"] and result["operation"] == "connect"
+    assert result["outcome"] == "unchanged" and not store.writes
+
+
+def test_custom_operation_refuses_before_action(
+    store: Store, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(Synthetic, "compatibility_always", True)
+
+    def ineligible(self: Synthetic, operation: str) -> None:
+        raise Failure(category="compatibility", code="ineligible")
+
+    def action(subject: Synthetic) -> dict[str, Any]:
+        raise AssertionError("An ineligible action must not run")
+
+    monkeypatch.setattr(Synthetic, "compatibility", ineligible)
+    result = run_module(action_main(action), name="a")
+    assert result["error_code"] == "ineligible"
+    assert result["operation"] == "compatibility"
+    assert result["outcome"] == "unchanged" and not store.writes
+
+
+@pytest.mark.parametrize("always", [False, True])
+def test_custom_operation_validates_before_it_connects(
+    store: Store,
+    run_module: RunModule,
+    monkeypatch: pytest.MonkeyPatch,
+    always: bool,
+) -> None:
+    monkeypatch.setattr(Synthetic, "compatibility_always", always)
+    events: list[str] = []
+
+    def connect(self: Synthetic) -> Store:
+        events.append("connect")
+        return store
+
+    def entrypoint() -> None:
+        module = AnsibleModule(argument_spec=spec(), supports_check_mode=True)
+        subject = Synthetic(module)
+
+        def validate() -> None:
+            assert subject.client is None and not store.versions
+            events.append("validate")
+
+        def action() -> dict[str, Any]:
+            assert subject.client is store
+            events.append("action")
+            return {"changed": False}
+
+        subject.execute(action=action, validate=validate)
+
+    monkeypatch.setattr(Synthetic, "connect", connect)
+    result = run_module(entrypoint, name="a")
+    assert not result["changed"] and events == ["validate", "connect", "action"]
+    assert store.versions == int(always) and not store.writes
+
+
+@pytest.mark.parametrize("always", [False, True])
+def test_custom_operation_refuses_its_input_before_any_connection(
+    store: Store,
+    run_module: RunModule,
+    monkeypatch: pytest.MonkeyPatch,
+    always: bool,
+) -> None:
+    monkeypatch.setattr(Synthetic, "compatibility_always", always)
+    events: list[str] = []
+
+    def unreachable(self: Synthetic) -> Store:
+        events.append("connect")
+        raise Failure(category="product", code="rejected")
+
+    def entrypoint() -> None:
+        module = AnsibleModule(argument_spec=spec(), supports_check_mode=True)
+        subject = Synthetic(module)
+        subject.operation = "job"
+
+        def validate() -> None:
+            events.append("validate")
+            raise Failure(category="eligibility", code="stale", fields=["value"])
+
+        def action() -> dict[str, Any]:
+            raise AssertionError("Refused input must not reach the action")
+
+        subject.execute(action=action, validate=validate)
+
+    monkeypatch.setattr(Synthetic, "connect", unreachable)
+    result = run_module(entrypoint, name="a")
+    assert result["failed"] and result["error_code"] == "stale"
+    assert result["operation"] == "job" and result["fields"] == ["value"]
+    assert result["outcome"] == "unchanged" and events == ["validate"]
+    assert not store.versions and not store.writes
+
+
+def test_validate_belongs_to_a_supplied_action() -> None:
+    module = SimpleNamespace(params={"name": "a", "state": "present"})
+    with pytest.raises(ValueError, match="supplied action"):
+        Synthetic(module).execute(validate=lambda: None)
+
+
+@pytest.mark.parametrize("always", [False, True])
+@pytest.mark.parametrize("refused", [False, True])
+def test_engine_info_probes_before_product_reads(
+    monkeypatch: pytest.MonkeyPatch, always: bool, refused: bool
+) -> None:
+    events: list[str] = []
+    resource = Resource(
+        name="synthetic",
+        route="synthetic",
+        keys=(Key("name", "Name"),),
+        fields=(),
+        result_key="synthetic",
+        identifier=Key("id", "Identifier", kind="int"),
+        lookup="by_key",
+        permission_probe="read",
+    )
+    record = {"id": 1, "name": "a"}
+
+    def compatibility(self: Binding, operation: str) -> None:
+        events.append(operation)
+        if refused:
+            raise Failure(category="compatibility", code="ineligible")
+
+    def lookup(definition: Resource, ident: dict[str, str]) -> dict[str, Any]:
+        events.append("lookup")
+        return record
+
+    monkeypatch.setattr(Binding, "compatibility_always", always)
+    monkeypatch.setattr(Binding, "compatibility", compatibility)
+    client = SimpleNamespace(probe=events.append, lookup=lookup)
+    engine = Engine(SimpleNamespace(params={"name": "a"}), resource, client)
+    assert not events
+    if always and refused:
+        with pytest.raises(Failure):
+            engine.find({"name": "a"})
+        assert events == ["synthetic_info"]
+        assert engine.operation == "compatibility"
+        return
+    for operation in ("find", "verify"):
+        engine.operation = operation
+        assert engine.find({"name": "a"}) == record
+        assert engine.operation == operation
+    assert events == (["synthetic_info"] if always else []) + [
+        "read",
+        "lookup",
+        "read",
+        "lookup",
+    ]
+
+
+{# skeleton-variant: activation-policy #}
+{# end skeleton-variant #}
+@pytest.mark.parametrize(
+    "second",
+    ["success", "lost", "lost_without_effect", "refused", "not_started"],
+)
+def test_stages_keep_confirmed_progress_and_never_repeat_a_write(
+    store: Store,
+    run_module: RunModule,
+    monkeypatch: pytest.MonkeyPatch,
+    second: str,
+) -> None:
+    if second == "not_started":
+        monkeypatch.setattr(Synthetic, "started", lambda self: False)
+
+    def action(subject: Synthetic) -> dict[str, Any]:
+        subject.client = subject.connect()
+        subject.key = subject.identify()
+        subject.want = subject.delta = {"value": "1"}
+        subject.step("create")
+        observed = subject.stage(subject.write)
+        subject.record = observed
+        subject.current = subject.managed(observed)
+        subject.want = subject.delta = {"value": "2"}
+        store.drop = second in ("lost_without_effect", "refused", "not_started")
+        if second == "refused":
+            store.after = refuse
+        elif second != "success":
+            store.after = lose
+        subject.step("update")
+        observed = subject.stage(subject.write)
+        return {"changed": True, "verified": "observed", "synthetic": observed}
+
+    result = run_module(action_main(action), name="a")
+    assert store.writes == ["create", "update"]
+    if second in ("success", "lost"):
+        assert not result.get("failed") and result["synthetic"]["value"] == "2"
+    else:
+        assert result["failed"] and result["outcome"] == "changed"
+        assert result["changed"] and store.rows["a"]["value"] == "1"
+        expected = (
+            "rejected"
+            if second == "refused"
+            else ("socket_timeout" if second == "not_started" else "not_persisted")
+        )
+        assert result["error_code"] == expected
+
+
+class Staged(Synthetic):
+    """Created inactive and enabled in a second write; disabled before deletion.
+
+    The secret goes out with the create request only.
+    """
+
+    def declared(self) -> dict[str, Any]:
+        return {**super().declared(), "active": True}
+
+    def managed(self, record: dict[str, Any]) -> dict[str, Any]:
+        return {**super().managed(record), "active": record.get("active", False)}
+
+    def request(
+        self, kind: str, change: Callable[[dict[str, Any]], None]
+    ) -> Callable[[], None]:
+        return lambda: self.client.write(kind, lambda: change(self.client.rows))
+
+    def stages(self) -> list[Stage]:
+        key, current = self.key, self.current or {}
+        if self.absent:
+            plan: list[Stage] = []
+            if current.get("active"):
+                plan.append(
+                    (
+                        "disable",
+                        {**current, "active": False},
+                        False,
+                        self.request(
+                            "disable", lambda rows: rows[key].update(active=False)
+                        ),
+                        False,
+                    )
+                )
+            plan.append(
+                (
+                    "delete",
+                    {},
+                    True,
+                    self.request("delete", lambda rows: rows.pop(key)),
+                    False,
+                )
+            )
+            return plan
+        if self.record is None:
+            value = self.want.get("value")
+            return [
+                (
+                    "create",
+                    {**self.want, "active": False},
+                    False,
+                    self.request(
+                        "create",
+                        lambda rows: rows.update(
+                            {key: {"name": key, "value": value, "active": False}}
+                        ),
+                    ),
+                    self.write_only(),
+                ),
+                (
+                    "enable",
+                    self.want,
+                    False,
+                    self.request("enable", lambda rows: rows[key].update(active=True)),
+                    False,
+                ),
+            ]
+        return super().stages()
+
+
+def staged_main() -> None:
+    module = AnsibleModule(argument_spec=spec(), supports_check_mode=True)
+    Staged(module).execute()
+
+
+def test_stages_run_in_order_and_settle_each_write(
+    store: Store, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(Staged, "connect", lambda self: store)
+    predicted = run_module(staged_main, name="a", value="1", _ansible_check_mode=True)
+    assert predicted["changed"] and not store.writes
+    created = run_module(staged_main, name="a", value="1")
+    assert created["verified"] == "observed" and created["synthetic"]["active"]
+    assert store.writes == ["create", "enable"]
+    assert not run_module(staged_main, name="a", value="1")["changed"]
+    updated = run_module(staged_main, name="a", value="2")
+    assert updated["changed_fields"] == ["value"] and store.rows["a"]["active"]
+    deleted = run_module(staged_main, name="a", state="absent")
+    assert deleted["synthetic"] is None and "a" not in store.rows
+    assert store.writes == ["create", "enable", "update", "disable", "delete"]
+
+
+@pytest.mark.parametrize(
+    "second", ["lost", "lost_without_effect", "refused", "not_started"]
+)
+def test_a_failing_stage_keeps_the_progress_of_earlier_ones(
+    store: Store,
+    run_module: RunModule,
+    monkeypatch: pytest.MonkeyPatch,
+    second: str,
+) -> None:
+    monkeypatch.setattr(Staged, "connect", lambda self: store)
+    if second == "not_started":
+        monkeypatch.setattr(Staged, "started", lambda self: False)
+
+    def after_first() -> None:
+        store.drop = second != "lost"
+        store.after = refuse if second == "refused" else lose
+
+    store.after = after_first
+    result = run_module(staged_main, name="a", value="1")
+    assert store.writes == ["create", "enable"]
+    if second == "lost":
+        assert not result.get("failed") and store.rows["a"]["active"]
+        return
+    assert result["failed"] and result["changed"] and result["outcome"] == "changed"
+    assert not store.rows["a"]["active"]
+    expected = {
+        "lost_without_effect": ("not_persisted", "reconcile"),
+        "refused": ("rejected", "enable"),
+        "not_started": ("socket_timeout", "enable"),
+    }[second]
+    assert (result["error_code"], result["operation"]) == expected
+
+
+@pytest.mark.parametrize("lost", ["create", "enable"])
+def test_a_lost_stage_settles_by_read_back_unless_it_sends_the_secret(
+    store: Store,
+    run_module: RunModule,
+    monkeypatch: pytest.MonkeyPatch,
+    lost: str,
+) -> None:
+    monkeypatch.setattr(Staged, "connect", lambda self: store)
+
+    def after_first() -> None:
+        store.after = lose
+
+    store.after = lose if lost == "create" else after_first
+    result = run_module(staged_main, name="a", value="1", secret="s1")
+    if lost == "enable":
+        assert store.writes == ["create", "enable"] and store.rows["a"]["active"]
+        assert not result.get("failed") and result["verified"] == "unverifiable"
+    else:
+        assert store.writes == ["create"]
+        assert result["error_code"] == "secret_unknown"
+        assert result["outcome"] == "changed"

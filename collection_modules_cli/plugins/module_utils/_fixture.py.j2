@@ -1,0 +1,149 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Existing-only resource: composite identity and a CLI-specific read contract.
+
+The unchanged lifecycle owns sequencing and settlement. This hook subject has
+no engine Resource, HTTP transport, state option, creation or deletion route.
+The fixture implements a conditional update under a file lock. Each product
+must qualify its own native identity and concurrency protections.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from ansible_collections.foundata.utils.plugins.module_utils.errors import ApiError
+
+# isort: split
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._client import (
+        FIELDS,
+        Client,
+        ProductError,
+        api_argument_spec,
+        identifier,
+        opaque_id,
+    )
+# isort: on
+# fmt: on
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._binding import (
+        Binding,
+    )
+# isort: on
+# fmt: on
+
+
+class Fixture(Binding):
+    result_key = "fixture"
+    compatibility_id = "fixture"
+    identity_options = ("app", "key", "expected_id")
+    recheck_code = "stale"
+    state_option = ""
+
+    def connect(self) -> Client:
+        client = Client(self.params)
+        client.module = self.module
+        return client
+
+    def identify(self) -> tuple[str, str]:
+        try:
+            if self.params.get("expected_id") is not None:
+                opaque_id(self.params["expected_id"])
+            return identifier(self.params["app"]), identifier(self.params["key"])
+        except (TypeError, ValueError):
+            raise ProductError(category="argument", code="invalid_selector") from None
+
+    def declared(self) -> dict[str, Any]:
+        values = {
+            name: self.params[name]
+            for name in FIELDS
+            if self.params.get(name) is not None
+        }
+        if ("limit" in values and not 0 <= values["limit"] <= 100) or (
+            "label" in values and len(values["label"]) > 96
+        ):
+            raise ProductError(category="argument", code="invalid_value")
+        return values
+
+    def lookup(self) -> Any:
+        return self.client.read()
+
+    def managed(self, record: Any) -> dict[str, Any]:
+        return {
+            name: record[name]
+            for name in ("app", "key", "id", "enabled", "limit", "label")
+        }
+
+    def protect(self) -> None:
+        if self.record is None:
+            raise ProductError(category="product", code="missing")
+
+    def recheck(self) -> None:
+        if self.lookup() != self.record:
+            raise ProductError(category="eligibility", code="stale")
+
+    def write(self) -> None:
+        self.client.update(self.record["id"], self.delta)
+
+    def started(self) -> bool:
+        return bool(self.client.write_started)
+
+    def refused_before_change(self, failure: ApiError) -> bool:
+        return failure.category == "product" and failure.code in {
+            "refused",
+            "unauthenticated",
+        }
+
+
+class FixtureInfo(Fixture):
+    def validate_query(self) -> None:
+        self.key = self.identify()
+
+    def observe(self) -> dict[str, Any]:
+        self.operation = "lookup"
+        record = self.lookup()
+        return {
+            "changed": False,
+            "fixture": None if record is None else self.public(record),
+            "verified": "observed",
+        }
+
+
+class FixturePlan(FixtureInfo):
+    """Read current state and predict the declaration without dispatching writes."""
+
+    def observe(self) -> dict[str, Any]:
+        self.step("plan")
+        self.record = self.lookup()
+        self.current = None if self.record is None else self.managed(self.record)
+        self.want = self.declared()
+        self.protect()
+        self.delta = self.difference()
+        self.ensure_compatible(self.operation_id())
+        return {
+            "changed": False,
+            "verified": "predicted" if self.delta else "observed",
+            "would_change": bool(self.delta),
+            "fixture": self.predict(),
+        }
+
+
+def argument_spec(*, info: bool = False) -> dict[str, Any]:
+    spec = api_argument_spec()
+    spec.update(
+        app={"type": "str", "required": True},
+        key={"type": "str", "required": True, "no_log": False},
+        expected_id={"type": "str", "required": not info},
+    )
+    if not info:
+        spec.update(
+            enabled={"type": "bool"}, limit={"type": "int"}, label={"type": "str"}
+        )
+    return spec

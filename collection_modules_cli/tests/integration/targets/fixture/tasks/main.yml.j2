@@ -1,0 +1,57 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+---
+- name: "Exercise fixture through the installed executable"
+  module_defaults:
+    group/{{ namespace }}.{{ collection_name }}.api: >-
+      {{ '{{' }} fixture_cli_connection {{ '}}' }}
+  block:
+    - name: "Predict the update"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        app: "alpha"
+        key: "quota"
+        expected_id: "090d190b-c80a-4917-8532-6b62a2836d0c"
+        enabled: false
+        limit: 0
+        label: ""
+      register: __prediction
+      check_mode: true
+
+    - name: "Apply the update"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        app: "alpha"
+        key: "quota"
+        expected_id: "090d190b-c80a-4917-8532-6b62a2836d0c"
+        enabled: false
+        limit: 0
+        label: ""
+      register: __changed
+
+    - name: "Repeat the declaration"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        app: "alpha"
+        key: "quota"
+        expected_id: "090d190b-c80a-4917-8532-6b62a2836d0c"
+        enabled: false
+        limit: 0
+        label: ""
+      register: __repeat
+
+    - name: "Verify convergence and prediction"
+      ansible.builtin.assert:
+        that:
+          - __prediction['changed']
+          - __prediction['verified'] == 'predicted'
+          - __changed['changed']
+          - __changed['verified'] == 'observed'
+          - not __repeat['changed']
+          - not __repeat['fixture']['enabled']
+          - __repeat['fixture']['limit'] == 0
+          - __repeat['fixture']['label'] == ''
+
+  always:
+    - name: "Remove owned fixture state"
+      ansible.builtin.file:
+        path: "{% raw %}{{ __fixture_cli_state['path'] }}{% endraw %}"
+        state: "absent"

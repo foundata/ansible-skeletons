@@ -6,11 +6,12 @@ SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
 This repository ships skeletons for `ansible-galaxy`. Before a release, the
-checks generate projects from all four skeletons, run their roles, and build
+checks generate projects from all five skeletons, run their roles, and build
 and install the generated collections.
 
-Both module skeletons also render two identities and exercise installed fixture
-modules against the `foundata.utils` release pinned in `tests/requirements.yml`.
+All three module skeletons also render two identities and exercise installed
+fixture modules against the `foundata.utils` release pinned in
+`tests/requirements.yml`.
 
 
 ## Table of contents<a id="toc"></a>
@@ -86,6 +87,7 @@ variables. The helper refuses to overwrite an existing directory.
 | `collection_default/`           | Collection skeleton, including its `run` role |
 | `collection_modules_appliance/` | Management-path appliance module skeleton |
 | `collection_modules_rest/`      | Module skeleton with an immediate-write REST fixture |
+| `collection_modules_cli/`       | Command-line module skeleton with an existing-only executable fixture |
 | `scripts/render.py`             | Render a role and the selected collection skeleton with Galaxy |
 | `scripts/smoke.py`              | Validate rendering, artifacts and role behavior |
 | `scripts/check.sh`              | Local quality-check entry point |
@@ -103,10 +105,12 @@ Do not reject all remaining Jinja expressions or placeholders as render errors.
 
 Edit each skeleton directly in its own directory.
 `scripts.render --profile collection_modules_rest` or
-`--profile collection_modules_appliance` renders a module skeleton. Their
-rendered `DEVELOPMENT.md` explains the lifecycle base, the binding, the engine
-and the two fixtures. Only the appliance variant carries act-once activation,
-the management-path guard scaffold and the recovery drill.
+`--profile collection_modules_appliance` or `--profile collection_modules_cli`
+renders a module skeleton. Their rendered `DEVELOPMENT.md` explains the
+lifecycle base, the binding, the engine and each variant's fixtures. The CLI
+variant has an existing-only hook resource and information and planning modules.
+Only the appliance variant carries act-once activation, the management-path
+guard scaffold and the recovery drill.
 
 `tests/unit/test_checks.py` lists the files that skeletons share. Copies of a
 shared file are identical except inside variant regions, which wrap the few
@@ -167,20 +171,20 @@ generated projects include:
 - The rendered collection's default Nox sessions in check-only mode, with tool
   versions pinned to the check environment, plus a stock-only `--no-venv` run.
   Repository checks require successful foundata rule verification.
-- Both module skeletons under two identities: their default Nox sessions in
+- All three module skeletons under two identities: their default Nox sessions in
   check-only mode (Ruff and mypy include the integration targets' Python), a
   build, and runs of the installed definition-driven and hook-based fixture
   modules.
 
 The check runs independent steps at the same time: the repository tests, the
-lanes, `generated-lint` and each identity of both module skeletons. `--jobs N`
-sets how many run at once, by default half the CPUs. Each step writes
+lanes, `generated-lint` and each identity of all three module skeletons.
+`--jobs N` sets how many run at once, by default half the CPUs. Each step writes
 `logs/<step>.log` below the check's output and prints one line when it starts
 and one when it ends, with its duration. A failing step prints the end of its
 log and the log's path. With `--jobs 1`, the steps run one after another in a
-fixed order and the first failure ends the run. With more jobs, every step
-whose prerequisites passed still runs, so a [resumed run](#check-results)
-repeats only what failed.
+fixed order and the first failure ends the run. With more jobs, every step whose
+prerequisites passed still runs, so a [resumed run](#check-results) repeats only
+what failed.
 
 Durations on a 16-core workstation with the default eight jobs, October 2026:
 

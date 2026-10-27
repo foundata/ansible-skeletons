@@ -559,6 +559,10 @@ def test_exported_sources_use_the_supplied_digest(
         (["collection_default/galaxy.yml.j2"], {"lanes", "generated-lint"}),
         (["collection_modules_rest/noxfile.py.j2"], {"collection_modules_rest"}),
         (
+            ["collection_modules_cli/plugins/module_utils/_client.py.j2"],
+            {"collection_modules_cli"},
+        ),
+        (
             ["collection_modules_appliance/FIXME.md.j2"],
             {"collection_modules_appliance"},
         ),

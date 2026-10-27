@@ -1,0 +1,455 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# /// script
+# dependencies = ["nox>=2025.02.09", "antsibull-nox"]
+# ///
+"""Checks of this collection. ``nox -l`` lists them, DEVELOPMENT.md explains them.
+
+A plain ``nox`` runs the default sessions. They apply the project's own
+rewrites first, such as lint fixes, generated documentation and Markdown
+formatting, and then check. With ``CI=true`` in the environment every session
+only checks and fails on what a rewrite would have changed.
+
+Arguments after ``--`` go to the session's tool unchanged, for example
+``nox -s molecule -- test --platform-name product-api``.
+
+Sessions defined here are foundata's own. The others come from antsibull-nox
+and are configured in antsibull-nox.toml.
+"""
+
+import atexit
+import json
+import os
+import shutil
+import sys
+import tarfile
+from pathlib import Path
+
+import nox
+
+try:
+    import antsibull_nox
+    import antsibull_nox.sessions
+except ImportError:
+    print("Install antsibull-nox in the same Python environment as nox.")
+    sys.exit(1)
+
+import yaml  # a dependency of antsibull-nox
+
+# Prefer Podman when both Podman and Docker are installed. Docker is still used
+# when it is the only one. Override through the environment, for example with
+# ANTSIBULL_NOX_CONTAINER_ENGINE=auto-prefer-docker.
+os.environ.setdefault("ANTSIBULL_NOX_CONTAINER_ENGINE", "auto-prefer-podman")
+
+# uv creates and fills the session environments much faster than virtualenv
+# and pip. Without uv, nox falls back to virtualenv; --default-venv-backend
+# on the command line still chooses another backend.
+nox.options.default_venv_backend = "uv|virtualenv"
+
+# Python's multiprocessing binds Unix sockets below TMPDIR (its forkserver is
+# the default from Python 3.14 on), and Linux allows 108 bytes for a socket
+# path. Below a deep checkout the sessions' TMPDIR is too long for that, so the
+# sessions see a short link to the same directory instead, in a private
+# directory below XDG_RUNTIME_DIR (or /tmp). Files stay on disk; the links go
+# when nox ends, or with the next nox run when nox was killed.
+TMPDIR_LIMIT = 64
+"""Longest TMPDIR that leaves room for the socket names below it."""
+_SHORT: list[Path] = []
+
+
+def _sweep(parent: Path) -> None:
+    """Remove the short-link directories of nox processes that are gone.
+
+    Each is named after its process ID. One named after this process is a
+    dead one's too, because this process has not created its own yet.
+    """
+    for entry in parent.glob("nox.*"):
+        pid = entry.name.removeprefix("nox.")
+        if not pid.isdigit() or entry.is_symlink() or not entry.is_dir():
+            continue
+        try:
+            if entry.lstat().st_uid != os.getuid():
+                continue
+            if int(pid) != os.getpid():
+                os.kill(int(pid), 0)
+                continue
+        except ProcessLookupError:
+            pass
+        except (OSError, OverflowError):
+            continue
+        shutil.rmtree(entry, ignore_errors=True)
+
+
+def _short_path(directory: str) -> str:
+    """Return ``directory``, or a short link to it when its path is too long."""
+    target = Path(directory).absolute()
+    if len(str(target)) <= TMPDIR_LIMIT:
+        return str(target)
+    try:
+        if not _SHORT:
+            runtime = Path(os.environ.get("XDG_RUNTIME_DIR", ""))
+            usable = runtime.is_absolute() and runtime.is_dir()
+            parent = runtime if usable else Path("/tmp")
+            _sweep(parent)
+            short = parent / f"nox.{os.getpid()}"
+            short.mkdir(mode=0o700)
+            _SHORT.append(short)
+            atexit.register(shutil.rmtree, short, True)
+        link = _SHORT[0] / str(len(list(_SHORT[0].iterdir())))
+        link.symlink_to(target, target_is_directory=True)
+    except OSError:
+        # Without a writable short directory the long path is all there is.
+        return str(target)
+    return str(link)
+
+
+_create_tmp = nox.Session.create_tmp
+
+
+def _create_tmp_on_a_short_path(self: nox.Session) -> str:
+    """Create the session's temporary directory and name it by a short path."""
+    tmpdir = _create_tmp(self)
+    self.env["TMPDIR"] = _short_path(tmpdir)
+    return tmpdir
+
+
+nox.Session.create_tmp = _create_tmp_on_a_short_path
+if os.environ.get("TMPDIR"):
+    os.environ["TMPDIR"] = _short_path(os.environ["TMPDIR"])
+
+antsibull_nox.load_antsibull_nox_toml()
+
+# True when CI=true is set: check only, never rewrite. Same switch as antsibull-nox.
+CHECK_ONLY = antsibull_nox.IN_CI
+
+# Collections the content under test needs. Molecule scenarios bring their own.
+REQUIREMENT_FILES = [
+    "requirements.yml",
+    "tests/requirements.yml",
+    "tests/integration/requirements.yml",
+    "extensions/molecule/default/requirements.yml",
+]
+
+# Absolute: the molecule session changes into "extensions" before it runs.
+MOLECULE_SCENARIO = Path("extensions/molecule/default/molecule.yml").resolve()
+
+
+def _prepare(session: nox.Session) -> dict[str, str]:
+    """Install the collection and its dependencies into a temporary tree."""
+    requirements: list[str | os.PathLike[str]] = [
+        path for path in REQUIREMENT_FILES if Path(path).is_file()
+    ]
+    prepared = antsibull_nox.sessions.prepare_collections(
+        session,
+        install_in_site_packages=False,
+        install_out_of_tree=True,
+        extra_deps_files=requirements,
+    )
+    if prepared is None:
+        session.error("Collection dependency preparation failed")
+    return {"ANSIBLE_COLLECTIONS_PATH": str(prepared.current_place)}
+
+
+@nox.session(name="runtime-check", default=True)
+@antsibull_nox.sessions.install_packages(packages=["ansible-core", "pytest"])
+def runtime_check(session: nox.Session) -> None:
+    """Check the built artifact with only its runtime directories retained."""
+    env = _prepare(session)
+    for requirements in ("requirements.txt", "tests/unit/requirements.txt"):
+        if Path(requirements).is_file():
+            session.install("-r", requirements)
+    session.run(
+        "python",
+        "tests/runtime_check.py",
+        "--dependencies",
+        env["ANSIBLE_COLLECTIONS_PATH"],
+        *session.posargs,
+    )
+
+
+@nox.session(name="ansible-lint", default=True)
+@antsibull_nox.sessions.install_packages(packages=["ansible-lint-foundata"])
+def ansible_lint(session: nox.Session) -> None:
+    """ansible-lint with the foundata rules; fixes what it can unless CI=true."""
+    env = _prepare(session) if session.virtualenv.is_sandboxed else {}
+    installed = session.run(
+        "python",
+        "-c",
+        "from importlib.util import find_spec; "
+        "print(find_spec('ansible_lint_foundata') is not None)",
+        silent=True,
+        env=env,
+    )
+    if installed == "True\n":
+        # ansible-lint-foundata verify --project-dir .
+        session.run(
+            "python",
+            "-m",
+            "ansible_lint_foundata.cli",
+            "verify",
+            "--project-dir",
+            ".",
+            env=env,
+        )
+    elif installed == "False\n":
+        session.warn(
+            "ansible-lint-foundata is not installed; running stock rules only."
+        )
+    else:
+        session.error("Could not determine whether ansible-lint-foundata is installed")
+    # ansible-lint --offline --strict [--fix]
+    # Exit status 8 means "fixed something", which is fine in rewrite mode.
+    fix = [] if CHECK_ONLY or "--fix" in session.posargs else ["--fix"]
+    session.run(
+        "python",
+        "-m",
+        "ansiblelint",
+        "--offline",
+        "--strict",
+        *fix,
+        *session.posargs,
+        env=env,
+        success_codes=[0] if CHECK_ONLY else [0, 8],
+    )
+
+
+@nox.session(name="helper-lint", default=True)
+@antsibull_nox.sessions.install_packages(packages=["ruff"])
+def helper_lint(session: nox.Session) -> None:
+    """Ruff for Python helpers; fix imports and format unless CI=true."""
+    if session.posargs:
+        session.error("helper-lint has a fixed scope and accepts no arguments")
+    candidates = [
+        Path("extensions/molecule"),
+        Path("tools"),
+        Path("scripts"),
+        Path("tests/runtime_check.py"),
+        *sorted(Path("roles").glob("*/files")),
+    ]
+    roots = [str(candidate) for candidate in candidates if candidate.exists()]
+    if not roots:
+        session.skip("No Python helpers found")
+    options = [
+        "--config",
+        "ruff.toml",
+        "--force-exclude",
+        "--config",
+        'include = ["*.py"]',
+    ]
+    files = session.run(
+        "ruff",
+        "check",
+        "--quiet",
+        "--show-files",
+        "--no-fix",
+        *options,
+        *roots,
+        silent=True,
+    )
+    if not files or not files.strip():
+        session.skip("No Python helpers found after Ruff exclusions")
+    if not CHECK_ONLY:
+        session.run(
+            "ruff",
+            "check",
+            "--select",
+            "I",
+            "--fix",
+            "--no-unsafe-fixes",
+            *options,
+            *roots,
+        )
+        session.run("ruff", "format", *options, *roots)
+    session.run("ruff", "check", "--no-fix", *options, *roots)
+    session.run("ruff", "format", "--check", *options, *roots)
+
+
+@nox.session(name="markdown", default=True)
+@antsibull_nox.sessions.install_packages(packages=["rumdl"])
+def markdown(session: nox.Session) -> None:
+    """Markdown style with rumdl; formats unless CI=true."""
+    if not CHECK_ONLY:
+        # rumdl fmt --config .rumdl.toml .
+        session.run("rumdl", "fmt", "--config", ".rumdl.toml", ".")
+    # rumdl check --config .rumdl.toml .
+    session.run("rumdl", "check", "--config", ".rumdl.toml", ".")
+
+
+@nox.session(name="changelog", default=True)
+@antsibull_nox.sessions.install_packages(packages=["antsibull-changelog"])
+def changelog(session: nox.Session) -> None:
+    """Changelog fragments and changelog.yaml with antsibull-changelog."""
+    # antsibull-changelog lint
+    # antsibull-changelog lint-changelog-yaml changelogs/changelog.yaml
+    session.run("antsibull-changelog", "lint")
+    session.run(
+        "antsibull-changelog", "lint-changelog-yaml", "changelogs/changelog.yaml"
+    )
+
+
+@nox.session(name="import-check", default=True)
+@antsibull_nox.sessions.install_packages(packages=["ansible-core", "galaxy-importer"])
+def import_check(session: nox.Session) -> None:
+    """Galaxy importer on the built archive with every dependency resolvable.
+
+    The stock build-import-check session treats an unresolved documentation
+    fragment as a non-fatal error, which hides a missing or unpublished
+    dependency. This session prepares the dependency tree, lets ansible-doc
+    find it through sys.path scanning (the importer sets its own collections
+    path) and fails on any documentation error the importer reports.
+    """
+    env = _prepare(session)
+    collections = env["ANSIBLE_COLLECTIONS_PATH"]
+    env = {
+        **env,
+        "PYTHONPATH": collections,
+        "ANSIBLE_COLLECTIONS_SCAN_SYS_PATH": "true",
+    }
+    output = (Path(session.create_tmp()) / "import-check").resolve()
+    session.run(
+        "ansible-galaxy",
+        "collection",
+        "build",
+        "--force",
+        "--output-path",
+        str(output),
+        silent=True,
+        env=env,
+    )
+    archives = sorted(output.glob("*.tar.gz"))
+    if len(archives) != 1:
+        session.error(f"Expected one built archive, found {len(archives)}")
+    _artifact_docs(session, archives[0], output / "installed", collections)
+    # The importer writes importer_result.json in its current directory.
+    with session.chdir(output):
+        log = session.run(
+            "python",
+            "-m",
+            "galaxy_importer.main",
+            str(archives[0]),
+            env=env,
+            silent=True,
+        )
+    problems = [
+        line
+        for line in str(log or "").splitlines()
+        if "Error running ansible-doc" in line or line.lstrip().startswith("ERROR")
+    ]
+    if problems:
+        session.error(
+            "galaxy-importer reported documentation errors:\n" + "\n".join(problems)
+        )
+    session.log("galaxy-importer resolved every plugin's documentation")
+
+
+def _artifact_docs(
+    session: nox.Session, archive: Path, installed: Path, dependencies: str
+) -> None:
+    """Require complete documentation resolved from the installed archive."""
+    with tarfile.open(archive) as stream:
+        manifest = stream.extractfile("MANIFEST.json")
+        if manifest is None:
+            session.error("Built archive has no manifest")
+        metadata = json.load(manifest)["collection_info"]
+    fqcn = f"{metadata['namespace']}.{metadata['name']}"
+    env = {
+        "ANSIBLE_COLLECTIONS_PATH": os.pathsep.join((str(installed), dependencies)),
+        "ANSIBLE_COLLECTIONS_SCAN_SYS_PATH": "false",
+        "PYTHONPATH": "",
+    }
+    session.run(
+        "ansible-galaxy",
+        "collection",
+        "install",
+        "--no-deps",
+        "--force",
+        "--collections-path",
+        str(installed),
+        str(archive),
+        env=env,
+        silent=True,
+    )
+    modules = (
+        installed
+        / "ansible_collections"
+        / metadata["namespace"]
+        / metadata["name"]
+        / "plugins/modules"
+    ).resolve()
+    if not modules.is_relative_to(installed.resolve()):
+        session.error("Installed module directory escapes the artifact")
+    expected = {
+        fqcn
+        + "."
+        + ".".join(path.relative_to(modules).with_suffix("").parts): path.resolve()
+        for path in modules.rglob("*.py")
+        if path.name != "__init__.py"
+    }
+    if not expected:
+        session.error("Built archive contains no modules")
+    with session.chdir(installed):
+        output = session.run(
+            "ansible-doc",
+            "--json",
+            *sorted(expected),
+            env=env,
+            silent=True,
+        )
+    try:
+        docs = json.loads(output or "")
+    except (ValueError, TypeError):
+        session.error("ansible-doc did not return documentation JSON")
+    if not isinstance(docs, dict) or set(docs) != set(expected):
+        session.error("ansible-doc omitted or added module entries")
+    for name, path in expected.items():
+        entry = docs[name]
+        doc = entry.get("doc") if isinstance(entry, dict) else None
+        filename = doc.get("filename") if isinstance(doc, dict) else None
+        if not isinstance(filename, str) or Path(filename).resolve() != path:
+            session.error(f"ansible-doc resolved {name} outside the installed artifact")
+        if not path.is_relative_to(modules):
+            session.error(f"Installed module {name} escapes the artifact")
+    session.log(f"ansible-doc verified {len(expected)} installed artifact modules")
+
+
+def _platforms() -> list[tuple[str, str]]:
+    """Platform names and types of the default scenario, in file order."""
+    data = yaml.safe_load(MOLECULE_SCENARIO.read_text(encoding="utf-8"))
+    return [(p["name"], p.get("type", "podman")) for p in data.get("platforms", [])]
+
+
+@nox.session(name="molecule", default=False)
+@antsibull_nox.sessions.install_packages(packages=["molecule"])
+def molecule(session: nox.Session) -> None:
+    """Molecule: full "default" scenario, or any Molecule command after "--"."""
+    env = _prepare(session)
+    with session.chdir("extensions"):
+        if session.posargs:
+            # molecule <arguments as given>
+            session.run("molecule", *session.posargs, env=env)
+            return
+        platforms = _platforms()
+        serial = os.environ.get("MOLECULE_SERIAL", "").lower() in ("1", "true")
+        if "MOLECULE_SERIAL" not in os.environ:
+            # Virtual machines are heavy: one at a time unless told otherwise.
+            serial = any(kind == "libvirt" for _name, kind in platforms)
+        if os.environ.get("MOLECULE_PLATFORM_NAME") or not serial:
+            # molecule test --scenario-name default
+            session.run("molecule", "test", "--scenario-name", "default", env=env)
+            return
+        for name, _kind in platforms:
+            # molecule test --scenario-name default --platform-name <name>, per platform
+            session.run(
+                "molecule",
+                "test",
+                "--scenario-name",
+                "default",
+                "--platform-name",
+                name,
+                env=env,
+            )
+
+
+if __name__ == "__main__":
+    nox.main()

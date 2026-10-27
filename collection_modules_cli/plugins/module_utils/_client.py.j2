@@ -1,0 +1,287 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Synthetic CLI protocol on utils; no HTTP, shell, create or delete adapter."""
+
+from __future__ import annotations
+
+import json
+import re
+import uuid
+from collections.abc import Mapping, Sequence
+from pathlib import Path
+from typing import Any
+
+from ansible_collections.foundata.utils.plugins.module_utils import deadline as budget
+from ansible_collections.foundata.utils.plugins.module_utils import errors
+from ansible_collections.foundata.utils.plugins.module_utils import exec as execution
+
+
+class ProductError(errors.ApiError):
+    """Local codes only; native streams and exception text remain private."""
+
+    def __init__(
+        self,
+        *,
+        category: str = "product",
+        code: str | None = None,
+        fields: list[str] | None = None,
+    ) -> None:
+        super().__init__(category=category, code=code)
+        self.fields = fields or []
+
+
+def identifier(value: Any) -> str:
+    if not isinstance(value, str) or not re.fullmatch(r"[a-z][a-z0-9_-]{0,31}", value):
+        raise ValueError("Invalid selector")
+    return value
+
+
+def opaque_id(value: Any) -> str:
+    if not isinstance(value, str) or str(uuid.UUID(value)) != value:
+        raise ValueError("Invalid identity")
+    return value
+
+
+def named_fields(value: Any) -> list[str]:
+    if not isinstance(value, list) or not all(
+        name in FIELDS | {"verify"} for name in value
+    ):
+        raise ValueError("Invalid fields")
+    return value
+
+
+def named_objects(value: object) -> list[str]:
+    if not isinstance(value, list) or len(value) > 256:
+        raise ValueError("Invalid object names")
+    return [identifier(item) for item in value]
+
+
+FIELDS = frozenset({"enabled", "limit", "label"})
+SCHEMA = errors.ErrorSchema(
+    codes_by_category=errors.merge_error_codes(
+        execution.ERROR_CODES,
+        budget.ERROR_CODES,
+        {
+            "argument": {"invalid_selector", "invalid_value"},
+            "product": {
+                "read_failed",
+                "missing",
+                "refused",
+                "unauthenticated",
+                "validation_failed",
+            },
+            "identity": {"object_identity"},
+            "response": {"schema", "command_failed"},
+            "eligibility": {"stale", "referenced"},
+            "compatibility": {"version_unknown", "ineligible"},
+            "verification": {"not_persisted", "missing_after_write", "not_effective"},
+            "local": {"operation_failed"},
+            "internal": {"unexpected"},
+        },
+    ),
+    fallback=("internal", "unexpected"),
+    field_validators={
+        "app": identifier,
+        "key": identifier,
+        "expected_id": opaque_id,
+        "operation": identifier,
+        "fields": named_fields,
+        "not_effective": named_objects,
+    },
+)
+
+
+def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    document: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in document:
+            raise ValueError("Duplicate field")
+        document[key] = value
+    return document
+
+
+def safe_environment(environment: Mapping[str, str]) -> None:
+    if any(
+        environment.get(name)
+        for name in ("LD_PRELOAD", "LD_LIBRARY_PATH", "PYTHONHOME")
+    ):
+        raise ProductError(category="argument", code="invalid_environment")
+
+
+def api_argument_spec() -> dict[str, Any]:
+    spec: dict[str, Any] = {
+        "credential": {"type": "str", "required": True, "no_log": True},
+        "deadline": {"type": "float", "default": 5.0},
+        "exec": {
+            "type": "dict",
+            "required": True,
+            "options": {
+                "kind": {"type": "str", "required": True},
+                "executable": {"type": "path", "required": True},
+                "argv": {"type": "list", "elements": "str", "required": True},
+                "chdir": {"type": "path", "required": True},
+                "user": {"type": "str", "required": True},
+            },
+        },
+    }
+    return spec
+
+
+class Client:
+    def __init__(self, params: dict[str, Any]) -> None:
+        self.module: Any = None
+        self.params = params
+        self.deadline = budget.Deadline(params.get("deadline", 5.0))
+        self.compatibility_warned = False
+        self._version: tuple[str, str] | None = None
+        self.write_started = False
+        self.profile = execution.LocatorProfile(
+            kind="custom",
+            fields=frozenset({"executable", "argv", "chdir", "user"}),
+            prepare=self.prepare,
+            qualification={
+                "deadline": "File-only fixture tests use the shared monotonic supervisor",
+                "cleanup": "Foreground process group; no remote or detached work supported",
+                "identity": "Host UID plus same-prefix synthetic CLI uid command",
+                "environment": "Reject loader injection; env -i and Python -I -B",
+            },
+        )
+
+    def prepare(
+        self, locator: Mapping[str, Any], command: Sequence[str]
+    ) -> execution.Execution:
+        executable, arguments, directory = (
+            locator["executable"],
+            locator["argv"],
+            locator["chdir"],
+        )
+        if (
+            not Path(executable).is_absolute()
+            or not Path(executable).is_file()
+            or len(arguments) != 1
+            or not Path(arguments[0]).is_absolute()
+            or not Path(arguments[0]).is_file()
+            or not Path(directory).is_absolute()
+            or not Path(directory).is_dir()
+            or not locator["user"].isdecimal()
+        ):
+            raise ProductError(category="argument", code="invalid_locator")
+        prefix = [
+            "/usr/bin/env",
+            "-i",
+            "PATH=/usr/bin:/bin",
+            "LC_ALL=C",
+            executable,
+            "-I",
+            "-B",
+            *arguments,
+        ]
+        return execution.Execution(
+            argv=[*prefix, *command],
+            cwd=directory,
+            environment={},
+            validate_effective_environment=safe_environment,
+            host_uid=int(locator["user"]),
+            target_uid=int(locator["user"]),
+            identity_argv=[*prefix, "uid"],
+        )
+
+    def call(
+        self,
+        command: list[str],
+        *,
+        write: bool = False,
+        payload: dict[str, Any] | None = None,
+    ) -> Any:
+        prepared = self.profile.resolve(self.params["exec"], command)
+        stdin = json.dumps(
+            {"credential": self.params["credential"], **(payload or {})}
+        ).encode()
+        try:
+            result = execution.run_bounded(
+                self.module,
+                prepared,
+                profile=execution.TimeoutProfile(kill_after=0.1),
+                deadline=self.deadline,
+                stdin=stdin,
+                max_output_bytes=4096,
+                write=write,
+            )
+        except errors.ApiError as failure:
+            if write:
+                self.write_started = bool(getattr(failure, "write_attempted", False))
+            raise
+        if write:
+            self.write_started = True
+        if result.rc == 11:
+            raise ProductError(category="product", code="unauthenticated")
+        if result.rc == 10 and write:
+            raise ProductError(category="product", code="refused")
+        if result.rc:
+            raise ProductError(
+                category="response" if write else "product",
+                code="command_failed" if write else "read_failed",
+            )
+        try:
+            document = json.loads(result.stdout, object_pairs_hook=unique_object)
+        except (ValueError, UnicodeError):
+            raise ProductError(category="response", code="schema") from None
+        return document
+
+    def version(self) -> tuple[str, str]:
+        if self._version is None:
+            reply = self.call(["version"])
+            if (
+                not isinstance(reply, dict)
+                or set(reply) != {"version"}
+                or not isinstance(reply["version"], str)
+                or re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", reply["version"]) is None
+            ):
+                raise ProductError(category="compatibility", code="version_unknown")
+            release = reply["version"]
+            self._version = (".".join(release.split(".")[:2]), release)
+        return self._version
+
+    def read(self) -> dict[str, Any] | None:
+        reply = self.call(["show", "--", self.params["app"], self.params["key"]])
+        if not isinstance(reply, dict) or set(reply) != {"item"}:
+            raise ProductError(category="response", code="schema")
+        record = reply["item"]
+        if record is None:
+            return None
+        try:
+            if not isinstance(record, dict):
+                raise ValueError("Invalid record")
+            if (
+                record["app"] != self.params["app"]
+                or record["key"] != self.params["key"]
+            ):
+                raise ValueError("Invalid selector")
+            opaque_id(record["id"])
+            if (
+                not isinstance(record["enabled"], bool)
+                or not isinstance(record["limit"], int)
+                or isinstance(record["limit"], bool)
+                or not 0 <= record["limit"] <= 100
+                or not isinstance(record["label"], str)
+                or len(record["label"]) > 96
+            ):
+                raise ValueError("Invalid state")
+        except (KeyError, TypeError, ValueError):
+            raise ProductError(category="response", code="schema") from None
+        if (
+            self.params.get("expected_id")
+            and record["id"] != self.params["expected_id"]
+        ):
+            raise ProductError(category="identity", code="object_identity")
+        return record
+
+    def update(self, identity: str, values: dict[str, Any]) -> None:
+        self.write_started = False
+        reply = self.call(
+            ["update", "--", self.params["app"], self.params["key"]],
+            write=True,
+            payload={"expected_id": identity, "values": values},
+        )
+        if reply != {"updated": True}:
+            raise ProductError(category="response", code="schema")
