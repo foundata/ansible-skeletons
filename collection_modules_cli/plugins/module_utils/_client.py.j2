@@ -103,7 +103,7 @@ def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
 def safe_environment(environment: Mapping[str, str]) -> None:
     if any(
         environment.get(name)
-        for name in ("LD_PRELOAD", "LD_LIBRARY_PATH", "PYTHONHOME")
+        for name in ("LD_PRELOAD", "LD_LIBRARY_PATH", "LD_AUDIT", "PYTHONHOME")
     ):
         raise ProductError(category="argument", code="invalid_environment")
 

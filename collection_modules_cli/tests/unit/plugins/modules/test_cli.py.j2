@@ -73,7 +73,9 @@ def test_stdin_literal_values_and_target_environment(
     assert all("$HOME" not in json.dumps(call["argv"]) for call in calls)
 
 
-@pytest.mark.parametrize("name", ["LD_PRELOAD", "LD_LIBRARY_PATH", "PYTHONHOME"])
+@pytest.mark.parametrize(
+    "name", ["LD_PRELOAD", "LD_LIBRARY_PATH", "LD_AUDIT", "PYTHONHOME"]
+)
 def test_loader_override_refuses_before_commands(
     fake: Lab, run_module: RunModule, monkeypatch: pytest.MonkeyPatch, name: str
 ) -> None:
