@@ -14,6 +14,14 @@ and the project adheres to
 
 ## [Unreleased]
 
+### Changed
+
+- `collection_modules_rest` is the name of the REST module skeleton.
+
+### Removed
+
+- `collection_modules`; render `collection_modules_rest` instead.
+
 ### Fixed
 
 - Both module variants: the loopback fake server stops at its lifetime even

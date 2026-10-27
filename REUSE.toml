@@ -27,7 +27,7 @@ SPDX-License-Identifier = "GPL-3.0-or-later"
 [[annotations]]
 path = [
   "collection_default/**",
-  "collection_modules/**",
+  "collection_modules_rest/**",
   "collection_modules_appliance/**",
   "role_default/**",
 ]

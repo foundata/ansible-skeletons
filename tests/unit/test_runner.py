@@ -557,14 +557,14 @@ def test_exported_sources_use_the_supplied_digest(
         ([], set()),
         (["role_default/tasks/main.yml.j2"], {"lanes", "generated-lint"}),
         (["collection_default/galaxy.yml.j2"], {"lanes", "generated-lint"}),
-        (["collection_modules/noxfile.py.j2"], {"collection_modules"}),
+        (["collection_modules_rest/noxfile.py.j2"], {"collection_modules_rest"}),
         (
             ["collection_modules_appliance/FIXME.md.j2"],
             {"collection_modules_appliance"},
         ),
         (
-            ["collection_modules/galaxy.yml.j2", "role_default/README.md.j2"],
-            {"lanes", "generated-lint", "collection_modules"},
+            ["collection_modules_rest/galaxy.yml.j2", "role_default/README.md.j2"],
+            {"lanes", "generated-lint", "collection_modules_rest"},
         ),
         (["scripts/smoke.py"], {"all"}),
         (["tests/unit/test_runner.py"], {"all"}),
@@ -635,12 +635,12 @@ def test_a_changed_only_run_writes_no_report(
     steps = [
         Step("static", recorder(ran, "static"), check="static"),
         Step("lint", recorder(ran, "lint"), check="generated-lint"),
-        Step("module", recorder(ran, "module"), check="collection_modules"),
+        Step("module", recorder(ran, "module"), check="collection_modules_rest"),
     ]
     monkeypatch.setattr(check_module, "plan", plan_of(steps))
     monkeypatch.setattr(check_module, "source_digest", lambda: "tree")
     monkeypatch.setattr(
-        check_module, "changed_paths", lambda: ["collection_modules/galaxy.yml.j2"]
+        check_module, "changed_paths", lambda: ["collection_modules_rest/galaxy.yml.j2"]
     )
     output = tmp_path / "o"
     check_module.check(output, jobs=1, changed=True)
@@ -675,7 +675,7 @@ def fake_podman(
 
 
 def render_with_store(output: Path, run_root: Path) -> Path:
-    render = output / "collection_modules/module_fixture"
+    render = output / "collection_modules_rest/module_fixture"
     config = render / "home/.config/containers/storage.conf"
     config.parent.mkdir(parents=True)
     config.write_text(f'[storage]\nrunroot = "{run_root}"\n', encoding="utf-8")

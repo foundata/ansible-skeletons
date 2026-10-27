@@ -289,14 +289,14 @@ def test_generated_projects_have_no_repository_tooling(
 SKELETONS = (
     "role_default",
     "collection_default",
-    "collection_modules",
+    "collection_modules_rest",
     "collection_modules_appliance",
 )
 SKELETON_GROUPS = {
     "all": SKELETONS,
     "role_and_collection_default": ("role_default", "collection_default"),
     "collections": SKELETONS[1:],
-    "module_skeletons": ("collection_modules", "collection_modules_appliance"),
+    "module_skeletons": ("collection_modules_rest", "collection_modules_appliance"),
 }
 # Files that must stay identical within a group outside their variant regions,
 # named by their path in collection_default. Explicit paths keep a missing copy
@@ -673,11 +673,11 @@ def test_module_identities_run_alone_or_together(
         "scripts.smoke.module_identity",
         lambda _output, index, **_options: calls.append(index),
     )
-    output = tmp_path / "collection_modules"
+    output = tmp_path / "collection_modules_rest"
     if identity is not None:
         # The other identity's step may have created the directory first.
         output.mkdir()
-    module_smoke(output, profile="collection_modules", identity=identity)
+    module_smoke(output, profile="collection_modules_rest", identity=identity)
     assert calls == {None: ["missing", 0, 1], 0: ["missing", 0], 1: [1]}[identity]
     # The check writes the profile record once both identity steps passed.
     assert (output / "profile.json").exists() == (identity is None)
@@ -695,9 +695,9 @@ def test_an_interrupted_identity_removes_its_containers_and_runtime_directory(
 
     monkeypatch.setattr("scripts.smoke.module_identity", interrupted)
     monkeypatch.setattr("scripts.smoke.remove_render_containers", removed.append)
-    output = tmp_path / "collection_modules"
+    output = tmp_path / "collection_modules_rest"
     with pytest.raises(KeyboardInterrupt):
-        module_smoke(output, profile="collection_modules", identity=1)
+        module_smoke(output, profile="collection_modules_rest", identity=1)
     assert removed == [output / IDENTITIES[1][1]]
     assert runtimes[0].parent == runtime_base
     assert not runtimes[0].exists()
@@ -706,7 +706,11 @@ def test_an_interrupted_identity_removes_its_containers_and_runtime_directory(
 def test_module_render_keeps_its_podman_run_state_to_itself(tmp_path: Path) -> None:
     env = isolated_environment(tmp_path)
     rendered = Rendered(
-        tmp_path, tmp_path / "role", tmp_path / "collection", env, "collection_modules"
+        tmp_path,
+        tmp_path / "role",
+        tmp_path / "collection",
+        env,
+        "collection_modules_rest",
     )
     run_root = tmp_path / "runtime/p0"
     private_podman_store(rendered, run_root)
@@ -851,7 +855,7 @@ def test_newest_released_core_follows_the_matrix(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    "profile", ["collection_modules", "collection_modules_appliance"]
+    "profile", ["collection_modules_rest", "collection_modules_appliance"]
 )
 def test_pinned_utils_release_satisfies_the_skeleton_dependency(profile: str) -> None:
     galaxy = (ROOT / profile / "galaxy.yml.j2").read_text(encoding="utf-8")

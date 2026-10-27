@@ -62,7 +62,7 @@ from scripts.smoke import IDENTITIES, remove_render_containers
 CHANGED_SCOPES = {
     "role_default/": ("lanes", "generated-lint"),
     "collection_default/": ("lanes", "generated-lint"),
-    "collection_modules/": ("collection_modules",),
+    "collection_modules_rest/": ("collection_modules_rest",),
     "collection_modules_appliance/": ("collection_modules_appliance",),
 }
 

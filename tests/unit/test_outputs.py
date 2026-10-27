@@ -15,7 +15,7 @@ from scripts.check import evidence, prune, remove_output
 from scripts.common import ROOT, GateError, digest, write_json
 
 ARCHIVES = (
-    "collection_modules/module_fixture/artifacts/fixture-module_fixture-1.0.0.tar.gz",
+    "collection_modules_rest/module_fixture/artifacts/fixture-module_fixture-1.0.0.tar.gz",
     "generated-lint/explicit/artifacts/skeleton_test-example_app-1.0.0.tar.gz",
 )
 EVIDENCE = {
@@ -82,9 +82,9 @@ def passed(tmp_path: Path) -> Iterator[Path]:
     write(output / "t/0/pymp-leftover/state")
     write(output / "galaxy/collections/containers-podman-1.20.2.tar.gz")
     write(output / "controller-python3.14.8.json")
-    write(output / "collection_modules/profile.json")
-    write(output / "collection_modules/module_fixture/home/.config/storage.conf")
-    write(output / "collection_modules/module_fixture/artifacts/notes.txt")
+    write(output / "collection_modules_rest/profile.json")
+    write(output / "collection_modules_rest/module_fixture/home/.config/storage.conf")
+    write(output / "collection_modules_rest/module_fixture/artifacts/notes.txt")
     write(output / "generated-lint/explicit/nox/docs-check-3-14/pyvenv.cfg")
     (output / "generated-lint/explicit/nox/python").symlink_to("/missing/python")
     # A link out of the output must go without its target.
@@ -123,7 +123,7 @@ def test_a_run_without_a_report_keeps_its_records_and_logs(passed: Path) -> None
 def test_containers_files_go_together_as_namespace_root(
     passed: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    store = passed / "collection_modules/module_fixture/home/.local/share/storage"
+    store = passed / "collection_modules_rest/module_fixture/home/.local/share/storage"
     write(store / "overlay/upper/etc/passwd")
     (store / "overlay/upper/etc").chmod(0o500)
     # Files a container wrote belong to a subordinate user, not to this one.
@@ -132,7 +132,7 @@ def test_containers_files_go_together_as_namespace_root(
     prune(passed, namespace(calls))  # type: ignore[arg-type]
     monkeypatch.undo()
     assert len(calls) == 1
-    assert passed / "collection_modules/module_fixture/home" in calls[0]
+    assert passed / "collection_modules_rest/module_fixture/home" in calls[0]
     assert files(passed) == EVIDENCE
 
 

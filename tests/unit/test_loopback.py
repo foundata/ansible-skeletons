@@ -18,7 +18,7 @@ from scripts.common import ROOT
 
 HELPER = (
     ROOT
-    / "collection_modules/tests/integration/targets/setup_loopback/files/server.py.j2"
+    / "collection_modules_rest/tests/integration/targets/setup_loopback/files/server.py.j2"
 )
 DRIVER = """
 import json
@@ -163,7 +163,7 @@ def test_lifetime_stops_the_listener(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    "variant", ["collection_modules", "collection_modules_appliance"]
+    "variant", ["collection_modules_rest", "collection_modules_appliance"]
 )
 @pytest.mark.parametrize(
     "partial_request",
@@ -194,7 +194,7 @@ def test_lifetime_stops_with_a_stalled_peer(
 
 
 @pytest.mark.parametrize(
-    "variant", ["collection_modules", "collection_modules_appliance"]
+    "variant", ["collection_modules_rest", "collection_modules_appliance"]
 )
 @pytest.mark.parametrize(
     "partial_request",
@@ -232,7 +232,7 @@ def test_lifetime_stops_with_a_trickling_peer(
 
 
 @pytest.mark.parametrize(
-    "variant", ["collection_modules", "collection_modules_appliance"]
+    "variant", ["collection_modules_rest", "collection_modules_appliance"]
 )
 def test_product_routes_remain_serialized(tmp_path: Path, variant: str) -> None:
     driver = """

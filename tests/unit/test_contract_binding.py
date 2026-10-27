@@ -25,7 +25,7 @@ def contract_functions(subject: Any, *names: str) -> dict[str, Any]:
         ("tests/unit/plugins/modules/test_contract.py.j2", {*names, "identity"}),
     )
     for filename, selected in files:
-        path = ROOT / "collection_modules" / filename
+        path = ROOT / "collection_modules_rest" / filename
         source = path.read_text().replace("{{ namespace }}", "example")
         source = source.replace("{{ collection_name }}", "product")
         tree = ast.parse(source)

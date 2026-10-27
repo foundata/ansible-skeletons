@@ -306,7 +306,7 @@ def test_release_check_refuses_a_local_utils_source(
         ),
         (["role_default/molecule/ee/tasks/verify/ee.yml.j2"], ["podman", "ee"]),
         (
-            ["collection_modules/extensions/molecule/default/molecule.yml.j2"],
+            ["collection_modules_rest/extensions/molecule/default/molecule.yml.j2"],
             ["podman"],
         ),
         (

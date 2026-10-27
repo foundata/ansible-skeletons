@@ -48,7 +48,7 @@ The skeletons follow these style guides:
 - [Usage](#usage)
 - [Provided skeletons](#content)
   - [`collection_default`](#collection_default)
-  - [`collection_modules`](#collection_modules)
+  - [`collection_modules_rest`](#collection_modules_rest)
   - [`collection_modules_appliance`](#collection_modules_appliance)
   - [`role_default`](#role_default)
 - [Compatibility](#compatibility)
@@ -192,7 +192,7 @@ a `run` role in an Ansible collection. It includes:
   [integration test targets](https://github.com/orgs/foundata/repositories?q=oci-*-itt).
 
 
-### `collection_modules`<a id="collection_modules"></a>
+### `collection_modules_rest`<a id="collection_modules_rest"></a>
 
 A module-first skeleton for REST products whose writes take effect
 immediately. For an appliance whose configuration carries its own management
@@ -227,7 +227,7 @@ cat > metadata.json <<'EOF'
 }
 EOF
 ansible-galaxy collection init \
-  --collection-skeleton ./collection_modules \
+  --collection-skeleton ./collection_modules_rest \
   --extra-vars @metadata.json \
   --extra-vars "skeleton_revision=$(git describe --tags --always)" \
   --extra-vars '{"product": "Example REST Product"}' namespace.product
@@ -250,7 +250,7 @@ A module-first skeleton for appliances with these traits:
 
 Choose it by those traits, not by the shape of the API. It requires a single
 writer and a recovery path that does not depend on the API, such as a
-console. On top of `collection_modules`, it adds:
+console. On top of `collection_modules_rest`, it adds:
 
 - Act-once activation, for scopes where the product cannot confirm what it
   loaded. It reports `verified: unverifiable`, which does not prove that the

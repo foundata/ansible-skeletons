@@ -993,7 +993,7 @@ def module_identity(
         )
     if index == 0:
         check_short_tmpdir(rendered)
-    if index == 0 and (full or profile == "collection_modules"):
+    if index == 0 and (full or profile == "collection_modules_rest"):
         molecule_with_fake(rendered)
     build_collection(rendered)
     exercise_modules(rendered)

@@ -27,7 +27,7 @@ def test_verbose_fixture_scan_accepts_public_proof() -> None:
 
 
 @pytest.mark.parametrize(
-    "profile", ["collection_modules_appliance", "collection_modules"]
+    "profile", ["collection_modules_appliance", "collection_modules_rest"]
 )
 @pytest.mark.parametrize(
     "product",
@@ -70,7 +70,7 @@ def test_inventory_product_literal_preserves_content_and_formatting(
 
 
 @pytest.mark.parametrize(
-    "profile", ["collection_modules_appliance", "collection_modules"]
+    "profile", ["collection_modules_appliance", "collection_modules_rest"]
 )
 def test_release_gate_runs_unrestricted_sanity_for_every_series(profile: str) -> None:
     # The first identity runs the meta sessions, which cover every series.
@@ -90,7 +90,7 @@ def test_release_gate_runs_unrestricted_sanity_for_every_series(profile: str) ->
 
 
 @pytest.mark.parametrize(
-    "profile", ["collection_modules_appliance", "collection_modules"]
+    "profile", ["collection_modules_appliance", "collection_modules_rest"]
 )
 def test_module_skeleton_layout(profile: str) -> None:
     skeleton = ROOT / profile
@@ -104,7 +104,7 @@ def test_module_skeleton_layout(profile: str) -> None:
 
 
 def test_act_once_is_appliance_only() -> None:
-    for profile in ("collection_modules", "collection_modules_appliance"):
+    for profile in ("collection_modules_rest", "collection_modules_appliance"):
         skeleton = ROOT / profile
         appliance = profile.endswith("_appliance")
         assert (
@@ -119,7 +119,7 @@ def test_act_once_is_appliance_only() -> None:
 
 
 def test_management_guard_is_appliance_only() -> None:
-    for profile in ("collection_modules", "collection_modules_appliance"):
+    for profile in ("collection_modules_rest", "collection_modules_appliance"):
         skeleton = ROOT / profile
         appliance = profile.endswith("_appliance")
         assert (
@@ -150,7 +150,7 @@ def test_recovery_stage_is_appliance_only() -> None:
         "default/tasks/recovery/fixture_nested/files/antilockout.py.j2",
         "default/tasks/side_effect/zz_recovery.yml.j2",
     )
-    for profile in ("collection_modules", "collection_modules_appliance"):
+    for profile in ("collection_modules_rest", "collection_modules_appliance"):
         molecule = ROOT / profile / "extensions/molecule"
         for relative in paths:
             assert (molecule / relative).is_file() is profile.endswith("_appliance")
@@ -164,7 +164,9 @@ def test_recovery_stage_is_appliance_only() -> None:
 
 
 # REUSE-IgnoreStart
-@pytest.mark.parametrize("name", ["collection_modules_appliance", "collection_modules"])
+@pytest.mark.parametrize(
+    "name", ["collection_modules_appliance", "collection_modules_rest"]
+)
 def test_python_templates_carry_the_license_header(name: str) -> None:
     profile = ROOT / name
     holder = (
@@ -190,7 +192,7 @@ def test_python_templates_carry_the_license_header(name: str) -> None:
         "role_default/molecule/default",
         "collection_default/extensions/molecule/default",
         "collection_modules_appliance/extensions/molecule/default",
-        "collection_modules/extensions/molecule/default",
+        "collection_modules_rest/extensions/molecule/default",
     ],
 )
 def test_molecule_inventory_render_name(scenario: str) -> None:
@@ -216,7 +218,7 @@ def test_molecule_inventory_render_name(scenario: str) -> None:
     ],
 )
 @pytest.mark.parametrize(
-    "profile", ["collection_modules_appliance", "collection_modules"]
+    "profile", ["collection_modules_appliance", "collection_modules_rest"]
 )
 def test_module_skeleton_has_standard_documentation(
     filename: str, sections: list[str], profile: str
@@ -227,7 +229,7 @@ def test_module_skeleton_has_standard_documentation(
 
 
 @pytest.mark.parametrize(
-    "profile", ["collection_modules_appliance", "collection_modules"]
+    "profile", ["collection_modules_appliance", "collection_modules_rest"]
 )
 def test_module_render_does_not_require_default_collection(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, profile: str
@@ -250,7 +252,7 @@ def test_module_render_does_not_require_default_collection(
 )
 @pytest.mark.parametrize(
     "profile",
-    ["collection_default", "collection_modules_appliance", "collection_modules"],
+    ["collection_default", "collection_modules_appliance", "collection_modules_rest"],
 )
 def test_render_selects_profile_and_preserves_metadata(
     tmp_path: Path,
@@ -294,7 +296,7 @@ def test_invalid_profile_never_creates_output(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    "profile", ["collection_modules_appliance", "collection_modules"]
+    "profile", ["collection_modules_appliance", "collection_modules_rest"]
 )
 def test_engine_contains_no_protocol_literals(profile: str) -> None:
     source = (ROOT / profile / "plugins/module_utils/_engine.py.j2").read_text()
@@ -373,7 +375,7 @@ def test_engine_contains_no_protocol_literals(profile: str) -> None:
 
 
 def test_rest_fixture_has_no_activation_surface() -> None:
-    root = ROOT / "collection_modules"
+    root = ROOT / "collection_modules_rest"
     assert (root / "plugins/module_utils/_activation.py.j2").is_file()
     assert not list(root.glob("**/*apply*"))
     assert (

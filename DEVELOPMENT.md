@@ -85,7 +85,7 @@ variables. The helper refuses to overwrite an existing directory.
 | `role_default/`                 | Standalone role skeleton |
 | `collection_default/`           | Collection skeleton, including its `run` role |
 | `collection_modules_appliance/` | Management-path appliance module skeleton |
-| `collection_modules/`           | Module skeleton with an immediate-write REST fixture |
+| `collection_modules_rest/`      | Module skeleton with an immediate-write REST fixture |
 | `scripts/render.py`             | Render a role and the selected collection skeleton with Galaxy |
 | `scripts/smoke.py`              | Validate rendering, artifacts and role behavior |
 | `scripts/check.sh`              | Local quality-check entry point |
@@ -102,7 +102,7 @@ instructions and `.yml.example` files are intentional parts of the product.
 Do not reject all remaining Jinja expressions or placeholders as render errors.
 
 Edit each skeleton directly in its own directory.
-`scripts.render --profile collection_modules` or
+`scripts.render --profile collection_modules_rest` or
 `--profile collection_modules_appliance` renders a module skeleton. Their
 rendered `DEVELOPMENT.md` explains the lifecycle base, the binding, the engine
 and the two fixtures. Only the appliance variant carries act-once activation,
