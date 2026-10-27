@@ -224,7 +224,7 @@ class Client:
             )
         try:
             document = json.loads(result.stdout, object_pairs_hook=unique_object)
-        except (ValueError, UnicodeError):
+        except (ValueError, UnicodeError, RecursionError):
             raise ProductError(category="response", code="schema") from None
         return document
 

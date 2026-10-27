@@ -126,6 +126,7 @@ def test_missing_target_refuses(fake: Any, run_module: RunModule, check: bool) -
         "duplicate",
         "oversized",
         "malformed",
+        "deep",
     ],
 )
 def test_bad_reads_never_authorize_absence(
@@ -178,7 +179,7 @@ def test_unsupported_options_and_identity_assertion(
         assert not adapter.records("writes.jsonl")
 
 
-@pytest.mark.parametrize("mode", ["lost", "exit_after_effect", "exit124"])
+@pytest.mark.parametrize("mode", ["lost", "exit_after_effect", "exit124", "deep_ack"])
 def test_uncertain_reply_is_reconciled_without_redispatch(
     fake: Any, run_module: RunModule, mode: str
 ) -> None:

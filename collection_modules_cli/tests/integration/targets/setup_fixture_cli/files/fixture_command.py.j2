@@ -87,6 +87,9 @@ def main() -> None:
             if mode == "oversized":
                 print("x" * 10000)
                 raise SystemExit(0)
+            if mode == "deep":
+                print("[" * 1500 + "0" + "]" * 1500)
+                raise SystemExit(0)
             if mode == "malformed":
                 print(SECRET)
                 raise SystemExit(0)
@@ -137,6 +140,9 @@ def main() -> None:
                 print("{")
                 raise SystemExit(0)
             raise SystemExit(124 if mode == "exit124" else 12)
+        if mode == "deep_ack":
+            print("[" * 1500 + "0" + "]" * 1500)
+            raise SystemExit(0)
         emit({"updated": True})
 
 
