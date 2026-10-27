@@ -4,7 +4,9 @@
 
 from __future__ import annotations
 
+import inspect
 import json
+import os
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -12,9 +14,19 @@ from typing import Any
 import pytest
 from ansible.module_utils.basic import AnsibleModule
 
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils import (
+        _compat,
+    )
+# isort: on
+# fmt: on
+
 from ..conftest import RunModule
 from .contract_subject import SUBJECTS
-from .contracts import Adapter
+from .contracts import Adapter, validate
 
 WRITERS = tuple(subject for subject in SUBJECTS if subject.mode == "existing_only")
 
@@ -334,3 +346,87 @@ def test_subject_declarations_require_real_modes_and_entries() -> None:
         replace(subject, mode="observational", writer=subject.info)
     with pytest.raises(ValueError, match="Incomplete"):
         replace(subject, name="")
+
+
+@pytest.mark.parametrize("check", [False, True])
+def test_compatibility_exclusion_precedes_write_or_prediction(
+    fake: Any, run_module: RunModule, monkeypatch: pytest.MonkeyPatch, check: bool
+) -> None:
+    for subject in WRITERS:
+        adapter = subject.adapter(fake)
+        monkeypatch.setattr(
+            _compat,
+            "EXCLUSIONS",
+            {subject.name: ((adapter.version, "Synthetic excluded build"),)},
+        )
+        result = run_module(
+            subject.writer,
+            **adapter.arguments,
+            **adapter.change,
+            _ansible_check_mode=check,
+        )
+        assert result["failed"] and result["error_code"] == "ineligible"
+        assert not result["changed"] and not adapter.records("writes.jsonl")
+
+
+def test_stdin_literal_values_and_target_environment(
+    fake: Any, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for subject in WRITERS:
+        adapter = subject.adapter(fake)
+        monkeypatch.setenv("CONTRACT_AMBIENT_SECRET", adapter.private[0])
+        result = public(
+            run_module(subject.writer, **adapter.arguments, **adapter.literal),
+            adapter,
+        )
+        for name, value in adapter.literal.items():
+            assert result[adapter.result_key][name] == value
+        calls = adapter.records("calls.jsonl")
+        assert all(secret not in json.dumps(calls) for secret in adapter.private)
+        assert all(
+            "CONTRACT_AMBIENT_SECRET" not in call["environment"] for call in calls
+        )
+        assert all(call["environment"]["LC_ALL"] == "C" for call in calls)
+        assert any(call["argv"][-1] == adapter.identity_command for call in calls)
+        assert all("$HOME" not in json.dumps(call["argv"]) for call in calls)
+
+
+@pytest.mark.parametrize(
+    "name", ["LD_PRELOAD", "LD_LIBRARY_PATH", "LD_AUDIT", "PYTHONHOME"]
+)
+def test_loader_override_refuses_before_commands(
+    fake: Any, run_module: RunModule, monkeypatch: pytest.MonkeyPatch, name: str
+) -> None:
+    for subject in WRITERS:
+        adapter = subject.adapter(fake)
+        monkeypatch.setenv(name, "unqualified-loader-value")
+        result = run_module(subject.writer, **adapter.arguments, **adapter.change)
+        assert result["error_code"] == "invalid_environment" and not result["changed"]
+        assert not adapter.records("calls.jsonl")
+
+
+def test_host_identity_is_checked_before_write(
+    fake: Any, run_module: RunModule
+) -> None:
+    for subject in WRITERS:
+        adapter = subject.adapter(fake)
+        locator = {**adapter.locator, "user": str(os.geteuid() + 1)}
+        result = run_module(
+            subject.writer, **adapter.arguments, exec=locator, **adapter.change
+        )
+        assert result["error_code"] == "host_identity" and not result["changed"]
+        assert not adapter.records("writes.jsonl")
+
+
+def test_inventory_rejects_an_unregistered_first_writer(tmp_path: Path) -> None:
+    # Missing entries fail at collection time through validate(), before cases run.
+    with pytest.raises(ValueError, match="inventory"):
+        validate(
+            tuple(subject for subject in SUBJECTS if subject.writer is None),
+            Path(inspect.getfile(SUBJECTS[0].info)).parent,
+        )
+    with pytest.raises(ValueError, match="Unsupported"):
+        invalid: Any = "unknown"
+        replace(SUBJECTS[0], mode=invalid)
+    with pytest.raises(ValueError, match="Empty or duplicate"):
+        validate((), tmp_path)

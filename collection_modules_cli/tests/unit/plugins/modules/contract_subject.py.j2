@@ -30,10 +30,14 @@ from .contracts import Subject, validate
 
 class FixtureAdapter:
     result_key = "fixture"
+    version = "1.0.0"
+    identity_command = "uid"
     private: tuple[str, ...] = (SECRET, FOREIGN)
 
     def __init__(self, fake: Lab) -> None:
         self.fake = fake
+        self.literal = {"label": "$HOME; ~ ${HOME}"}
+        self.locator = fake.arguments()["exec"]
         self.arguments: dict[str, Any] = {
             "app": "alpha",
             "key": "quota",

@@ -4,10 +4,6 @@
 
 from __future__ import annotations
 
-import json
-import os
-from dataclasses import replace
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -15,10 +11,6 @@ import pytest
 # Preserve wrapping for maximum-length Galaxy identities.
 # fmt: off
 # isort: off
-from ansible_collections.{{ namespace }}.\
-    {{ collection_name }}.plugins.module_utils import (
-        _compat,
-    )
 from ansible_collections.{{ namespace }}.\
     {{ collection_name }}.plugins.modules import (
         fixture,
@@ -28,10 +20,7 @@ from ansible_collections.{{ namespace }}.\
 # fmt: on
 
 from ..conftest import RunModule
-from ..fake_product import FOREIGN, SECRET, Lab
-from .contract_subject import SUBJECTS
-from .contracts import validate
-from .test_contract import public
+from ..fake_product import Lab
 
 
 def arguments(fake: Lab) -> dict[str, Any]:
@@ -40,58 +29,6 @@ def arguments(fake: Lab) -> dict[str, Any]:
         for key, value in fake.arguments().items()
         if key not in {"credential", "exec"}
     }
-
-
-@pytest.mark.parametrize("check", [False, True])
-def test_compatibility_exclusion_precedes_write_or_prediction(
-    fake: Lab, run_module: RunModule, monkeypatch: pytest.MonkeyPatch, check: bool
-) -> None:
-    monkeypatch.setattr(
-        _compat, "EXCLUSIONS", {"fixture": (("1.0.0", "Synthetic excluded build"),)}
-    )
-    result = run_module(
-        fixture.main, **arguments(fake), limit=0, _ansible_check_mode=check
-    )
-    assert result["failed"] and result["error_code"] == "ineligible"
-    assert not result["changed"] and not fake.records("writes.jsonl")
-
-
-def test_stdin_literal_values_and_target_environment(
-    fake: Lab, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("FIXTURE_AMBIENT_SECRET", SECRET)
-    result = public(
-        run_module(fixture.main, **arguments(fake), label="$HOME; ~ ${HOME}"),
-        SUBJECTS[0].adapter(fake),
-    )
-    assert result["fixture"]["label"] == "$HOME; ~ ${HOME}"
-    calls = fake.records("calls.jsonl")
-    assert SECRET not in json.dumps(calls) and FOREIGN not in json.dumps(calls)
-    assert all("FIXTURE_AMBIENT_SECRET" not in call["environment"] for call in calls)
-    assert all(call["environment"]["LC_ALL"] == "C" for call in calls)
-    assert any(call["argv"][-1] == "uid" for call in calls)
-    assert all("$HOME" not in json.dumps(call["argv"]) for call in calls)
-
-
-@pytest.mark.parametrize(
-    "name", ["LD_PRELOAD", "LD_LIBRARY_PATH", "LD_AUDIT", "PYTHONHOME"]
-)
-def test_loader_override_refuses_before_commands(
-    fake: Lab, run_module: RunModule, monkeypatch: pytest.MonkeyPatch, name: str
-) -> None:
-    monkeypatch.setenv(name, "unqualified-loader-value")
-    result = run_module(fixture.main, **arguments(fake), limit=0)
-    assert result["error_code"] == "invalid_environment" and not result["changed"]
-    assert not fake.records("calls.jsonl")
-
-
-def test_host_identity_is_checked_before_write(
-    fake: Lab, run_module: RunModule
-) -> None:
-    locator = {**fake.arguments()["exec"], "user": str(os.geteuid() + 1)}
-    result = run_module(fixture.main, **arguments(fake), exec=locator, limit=0)
-    assert result["error_code"] == "host_identity" and not result["changed"]
-    assert not fake.records("writes.jsonl")
 
 
 @pytest.mark.parametrize(
@@ -116,17 +53,3 @@ def test_plan_has_real_reads_and_no_write(fake: Lab, run_module: RunModule) -> N
     assert result["fixture"]["limit"] == 0 and result["verified"] == "predicted"
     assert fake.read() == before and not fake.records("writes.jsonl")
     assert any(call["argv"][1] == "show" for call in fake.records("calls.jsonl"))
-
-
-def test_inventory_rejects_an_unregistered_first_writer(tmp_path: Path) -> None:
-    # Missing entries fail at collection time through validate(), before cases run.
-    with pytest.raises(ValueError, match="inventory"):
-        validate(
-            tuple(subject for subject in SUBJECTS if subject.writer is None),
-            Path(fixture.__file__).parent,
-        )
-    with pytest.raises(ValueError, match="Unsupported"):
-        invalid: Any = "unknown"
-        replace(SUBJECTS[0], mode=invalid)
-    with pytest.raises(ValueError, match="Empty or duplicate"):
-        validate((), tmp_path)

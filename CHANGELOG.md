@@ -25,6 +25,10 @@ and the project adheres to
 
 ### Changed
 
+- collection_modules_cli: the invariant contract owns compatibility refusal,
+  literal stdin and target environment, loader refusal, host identity and
+  inventory completeness; product locator and planning examples stay local.
+
 - `collection_modules_rest` is the name of the REST module skeleton.
 
 ### Removed

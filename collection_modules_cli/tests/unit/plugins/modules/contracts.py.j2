@@ -24,6 +24,10 @@ class Adapter(Protocol):
     unsupported: tuple[dict[str, Any], ...]
     private: tuple[str, ...]
     result_key: str
+    version: str
+    literal: dict[str, str]
+    locator: dict[str, Any]
+    identity_command: str
 
     def identity(self, row: dict[str, Any]) -> object: ...
     def rows(self) -> dict[str, dict[str, Any]]: ...
