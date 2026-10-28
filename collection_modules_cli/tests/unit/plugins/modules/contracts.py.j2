@@ -102,9 +102,9 @@ class Adapter(Protocol):
     result_key: str
     version: str
     literal: dict[str, str]
-    locator: dict[str, Any]
     identity_command: str
 
+    def inject_host_identity(self) -> None: ...
     def identity(self, row: dict[str, Any]) -> object: ...
     def rows(self) -> dict[str, dict[str, Any]]: ...
     def selected(self) -> dict[str, Any]: ...
@@ -131,6 +131,10 @@ class Subject:
         if not isinstance(getattr(self.adapter, "contract", None), Contract):
             raise ValueError("Adapter requires a typed contract declaration")
         self.adapter.contract.__post_init__()
+        if self.mode == "existing_only" and not callable(
+            getattr(self.adapter, "inject_host_identity", None)
+        ):
+            raise ValueError("Adapter requires prepared host identity injection")
         if self.mode not in {"existing_only", "observational"}:
             raise ValueError("Unsupported contract mode")
         if not self.name or not callable(self.info) or not callable(self.adapter):

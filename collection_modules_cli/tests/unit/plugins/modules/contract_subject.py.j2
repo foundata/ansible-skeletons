@@ -9,8 +9,13 @@ with no writers; no mutable exports are needed by the contract.
 
 from __future__ import annotations
 
+import os
+from collections.abc import Mapping, Sequence
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
+
+from ansible_collections.foundata.utils.plugins.module_utils import exec as execution
 
 # Preserve wrapping for maximum-length Galaxy identities.
 # fmt: off
@@ -49,7 +54,6 @@ class FixtureAdapter:
     def __init__(self, fake: Lab) -> None:
         self.fake = fake
         self.literal = dict(self.contract.literals.accepted)
-        self.locator = fake.arguments()["exec"]
         self.arguments: dict[str, Any] = {
             "app": "alpha",
             "key": "quota",
@@ -70,6 +74,17 @@ class FixtureAdapter:
             {"state": "present"},
             {"unmanaged": "overwrite"},
         )
+
+    def inject_host_identity(self) -> None:
+        prepare = _client.Client.prepare
+
+        def mismatch(
+            client: _client.Client, locator: Mapping[str, Any], command: Sequence[str]
+        ) -> execution.Execution:
+            prepared = prepare(client, locator, command)
+            return replace(prepared, host_uid=os.geteuid() + 1)
+
+        self.fake.monkeypatch.setattr(_client.Client, "prepare", mismatch)
 
     def identity(self, row: dict[str, Any]) -> tuple[str, str, str]:
         return row["app"], row["key"], row["id"]

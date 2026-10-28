@@ -448,12 +448,14 @@ def test_host_identity_is_checked_before_write(
 ) -> None:
     subject = writer
     adapter = subject.adapter(fake)
-    locator = {**adapter.locator, "user": str(os.geteuid() + 1)}
-    result = run_module(
-        subject.writer, **adapter.arguments, exec=locator, **adapter.change
+    before = adapter.rows()
+    adapter.inject_host_identity()
+    result = public(
+        run_module(subject.writer, **adapter.arguments, **adapter.change), adapter
     )
-    assert result["error_code"] == "host_identity" and not result["changed"]
-    assert not adapter.records("writes.jsonl")
+    assert result["failed"] and result["error_code"] == "host_identity"
+    assert not result["changed"] and result["outcome"] == "unchanged"
+    assert adapter.rows() == before and not adapter.records("writes.jsonl")
 
 
 def test_inventory_rejects_an_unregistered_first_writer(tmp_path: Path) -> None:
@@ -522,3 +524,12 @@ def test_unsupported_literal_refuses_before_dispatch(
 def test_invalid_literal_inputs_are_rejected(options: dict[str, Any]) -> None:
     with pytest.raises(ValueError, match="Literal input"):
         LiteralInputs(**options)
+
+
+def test_host_identity_injection_is_required() -> None:
+    class Incomplete:
+        contract = Contract()
+
+    invalid: Any = Incomplete
+    with pytest.raises(ValueError, match="host identity injection"):
+        replace(SUBJECTS[0], adapter=invalid)

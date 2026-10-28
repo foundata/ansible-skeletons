@@ -145,6 +145,13 @@ before dispatch. These cases use their own `transport_command.py` executable
 and require no product adapter or options. Products need no extra free-text
 or secret option to satisfy their literal-input obligations.
 
+The adapter implements `inject_host_identity()` at its prepared execution
+boundary. The fixture changes only the prepared numeric host UID; products
+whose locator derives that identity internally use the same boundary. The
+public locator arguments stay valid. The case requires `host_identity`, an
+unchanged outcome and storage, and no write. Unsupported public locator
+shapes remain separate mandatory product tests in `test_cli.py`.
+
 A multi-step subject belongs to a product operation that actually has
 several steps; independent fields in one command do not declare such an
 operation.
