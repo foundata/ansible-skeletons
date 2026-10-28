@@ -105,6 +105,26 @@ class FixtureAdapter:
 class SetClient(_client.Client):
     write_command = "set"
 
+    def __init__(self, params: dict[str, Any]) -> None:
+        super().__init__(params)
+        self.profile = replace(
+            self.profile,
+            qualification={
+                **self.profile.qualification,
+                "environment": "Neutralize inherited and module updates; env -i and Python -I -B",
+            },
+        )
+
+    def prepare(
+        self, locator: Mapping[str, Any], command: Sequence[str]
+    ) -> execution.Execution:
+        prepared = super().prepare(locator, command)
+        # Per-call updates override inherited and module-level values before start.
+        closed = dict.fromkeys(os.environ, "")
+        closed.update(dict.fromkeys(self.module.run_command_environ_update or {}, ""))
+        closed.update(PATH="/usr/bin:/bin", LC_ALL="C")
+        return replace(prepared, environment=closed)
+
 
 class VocabularyFixture(_fixture.Fixture):
     """An alternate native vocabulary over the same executable backend."""
@@ -121,6 +141,7 @@ class AtomicFixtureAdapter(FixtureAdapter):
 
     contract = Contract(
         granularity="atomic",
+        environment_policy="neutralize",
         write_command=WriteCommand((("set", "--"),)),
         literals=LiteralInputs(
             accepted={"label": "accepted"},

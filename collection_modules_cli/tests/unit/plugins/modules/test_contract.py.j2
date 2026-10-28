@@ -415,7 +415,10 @@ def test_literal_values_and_target_environment(
         assert result[adapter.result_key][name] == value
     calls = adapter.records("calls.jsonl")
     assert all(secret not in json.dumps(calls) for secret in adapter.private)
-    assert all("CONTRACT_AMBIENT_SECRET" not in call["environment"] for call in calls)
+    assert all(
+        call["environment"].get("CONTRACT_AMBIENT_SECRET") in {None, ""}
+        for call in calls
+    )
     assert all(call["environment"]["LC_ALL"] == "C" for call in calls)
     assert any(call["argv"][-1] == adapter.identity_command for call in calls)
     writes = [
@@ -428,19 +431,44 @@ def test_literal_values_and_target_environment(
 @pytest.mark.parametrize(
     "name", ["LD_PRELOAD", "LD_LIBRARY_PATH", "LD_AUDIT", "PYTHONHOME"]
 )
-def test_loader_override_refuses_before_commands(
+def test_loader_policy_precedes_child_start(
     writer: Subject,
     fake: Any,
     run_module: RunModule,
     monkeypatch: pytest.MonkeyPatch,
     name: str,
 ) -> None:
-    subject = writer
-    adapter = subject.adapter(fake)
+    adapter = writer.adapter(fake)
+    before = adapter.rows()
     monkeypatch.setenv(name, "unqualified-loader-value")
-    result = run_module(subject.writer, **adapter.arguments, **adapter.change)
-    assert result["error_code"] == "invalid_environment" and not result["changed"]
-    assert not adapter.records("calls.jsonl")
+    monkeypatch.setenv("CONTRACT_AMBIENT_SECRET", adapter.private[0])
+    original = subprocess.Popen
+    environments: list[dict[str, str]] = []
+
+    def start(args: Any, **kwargs: Any) -> Any:
+        environments.append(dict(kwargs["env"]))
+        return original(args, **kwargs)
+
+    monkeypatch.setattr(subprocess, "Popen", start)
+    result = public(
+        run_module(writer.writer, **adapter.arguments, **adapter.change), adapter
+    )
+    if adapter.contract.environment_policy == "refuse":
+        assert result["failed"] and result["error_code"] == "invalid_environment"
+        assert not result["changed"] and result["outcome"] == "unchanged"
+        assert adapter.rows() == before and not environments
+        assert not adapter.records("calls.jsonl")
+    else:
+        assert not result.get("failed") and result["changed"]
+        assert environments and len(adapter.records("writes.jsonl")) == 1
+        for environment in environments:
+            assert environment.get(name) in {None, ""}
+            assert all(
+                secret not in json.dumps(environment) for secret in adapter.private
+            )
+        calls = adapter.records("calls.jsonl")
+        assert calls and all(call["environment"]["LC_ALL"] == "C" for call in calls)
+        assert all(secret not in json.dumps(calls) for secret in adapter.private)
 
 
 def test_host_identity_is_checked_before_write(
@@ -533,3 +561,9 @@ def test_host_identity_injection_is_required() -> None:
     invalid: Any = Incomplete
     with pytest.raises(ValueError, match="host identity injection"):
         replace(SUBJECTS[0], adapter=invalid)
+
+
+def test_invalid_environment_policy_is_rejected() -> None:
+    invalid: Any = "inherit"
+    with pytest.raises(ValueError, match="environment policy"):
+        Contract(environment_policy=invalid)

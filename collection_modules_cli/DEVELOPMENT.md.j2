@@ -152,6 +152,16 @@ public locator arguments stay valid. The case requires `host_identity`, an
 unchanged outcome and storage, and no write. Unsupported public locator
 shapes remain separate mandatory product tests in `test_cli.py`.
 
+`Contract.environment_policy` defaults to `refuse`: ambient loader values
+must fail with `invalid_environment` before any command. `neutralize` must
+remove or empty those values before `Popen` starts a child. The alternate
+fixture closes both inherited and module-level environment updates, then
+sets its explicit path and locale. Both policies run for every ambient
+loader key. Actual target records must retain the explicit locale and
+exclude secret values; an empty neutralized key is accepted. Document this
+effective environment policy and any separate target inheritance in the
+product locator.
+
 A multi-step subject belongs to a product operation that actually has
 several steps; independent fields in one command do not declare such an
 operation.

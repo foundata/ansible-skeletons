@@ -73,11 +73,14 @@ class LiteralInputs:
 class Contract:
     """Product semantics; defaults describe the executable fixture."""
 
+    environment_policy: Literal["refuse", "neutralize"] = "refuse"
     literals: LiteralInputs = field(default_factory=LiteralInputs)
     write_command: WriteCommand = WriteCommand()
     granularity: Literal["fieldwise", "atomic"] = "fieldwise"
 
     def __post_init__(self) -> None:
+        if self.environment_policy not in {"refuse", "neutralize"}:
+            raise ValueError("Invalid effective environment policy")
         if not isinstance(self.literals, LiteralInputs):
             raise ValueError("Invalid literal declaration")
         self.literals.__post_init__()
