@@ -26,10 +26,28 @@ from ansible_collections.{{ namespace }}.\
 # fmt: on
 
 from ..conftest import RunModule
-from .contract_subject import SUBJECTS
-from .contracts import Adapter, validate
+from .contract_subject import CONFIGURATIONS, SUBJECTS
+from .contracts import Adapter, Contract, Subject, validate
 
-WRITERS = tuple(subject for subject in SUBJECTS if subject.mode == "existing_only")
+CASES = tuple(subject for configuration in CONFIGURATIONS for subject in configuration)
+WRITERS = tuple(subject for subject in CASES if subject.mode == "existing_only")
+
+
+@pytest.fixture(
+    params=CASES,
+    ids=lambda subject: f"{subject.name}-{subject.adapter.contract.granularity}",
+)
+def subject(request: pytest.FixtureRequest) -> Subject:
+    value: Subject = request.param
+    return value
+
+
+@pytest.fixture(
+    params=WRITERS, ids=lambda subject: subject.adapter.contract.granularity
+)
+def writer(request: pytest.FixtureRequest) -> Subject:
+    value: Subject = request.param
+    return value
 
 
 def public(result: dict[str, Any], adapter: Adapter) -> dict[str, Any]:
@@ -41,91 +59,91 @@ def public(result: dict[str, Any], adapter: Adapter) -> dict[str, Any]:
 
 
 def test_every_writer_changes_repeats_predicts_and_preserves(
-    fake: Any, run_module: RunModule
+    writer: Subject, fake: Any, run_module: RunModule
 ) -> None:
-    for subject in WRITERS:
-        adapter = subject.adapter(fake)
-        before = adapter.rows()
-        selected = adapter.selected()
-        prediction = public(
-            run_module(
-                subject.writer,
-                **adapter.arguments,
-                **adapter.change,
-                _ansible_check_mode=True,
-                _ansible_diff=True,
-            ),
-            adapter,
+    subject = writer
+    adapter = subject.adapter(fake)
+    before = adapter.rows()
+    selected = adapter.selected()
+    prediction = public(
+        run_module(
+            subject.writer,
+            **adapter.arguments,
+            **adapter.change,
+            _ansible_check_mode=True,
+            _ansible_diff=True,
+        ),
+        adapter,
+    )
+    assert prediction["changed"] and prediction["verified"] == "predicted"
+    assert adapter.rows() == before and not adapter.records("writes.jsonl")
+    result = public(
+        run_module(
+            subject.writer,
+            **adapter.arguments,
+            **adapter.change,
+            _ansible_diff=True,
+        ),
+        adapter,
+    )
+    assert result["changed"] and result["verified"] == "observed"
+    assert result["changed_fields"] == sorted(adapter.change)
+    assert result["diff"] == {"before": adapter.original, "after": adapter.change}
+    assert adapter.identity(result[adapter.result_key]) == adapter.identity(selected)
+    for name, value in adapter.change.items():
+        assert adapter.selected()[name] == value
+    for key, row in before.items():
+        expected = (
+            {**row, **adapter.change}
+            if adapter.identity(row) == adapter.identity(selected)
+            else row
         )
-        assert prediction["changed"] and prediction["verified"] == "predicted"
-        assert adapter.rows() == before and not adapter.records("writes.jsonl")
-        result = public(
-            run_module(
-                subject.writer,
-                **adapter.arguments,
-                **adapter.change,
-                _ansible_diff=True,
-            ),
-            adapter,
-        )
-        assert result["changed"] and result["verified"] == "observed"
-        assert result["changed_fields"] == sorted(adapter.change)
-        assert result["diff"] == {"before": adapter.original, "after": adapter.change}
-        assert adapter.identity(result[adapter.result_key]) == adapter.identity(
-            selected
-        )
-        for name, value in adapter.change.items():
-            assert adapter.selected()[name] == value
-        for key, row in before.items():
-            expected = (
-                {**row, **adapter.change}
-                if adapter.identity(row) == adapter.identity(selected)
-                else row
-            )
-            assert adapter.rows()[key] == expected
-        repeated = public(
-            run_module(subject.writer, **adapter.arguments, **adapter.change), adapter
-        )
-        assert not repeated["changed"] and repeated["verified"] == "observed"
-        assert len(adapter.records("writes.jsonl")) == 1
+        assert adapter.rows()[key] == expected
+    repeated = public(
+        run_module(subject.writer, **adapter.arguments, **adapter.change), adapter
+    )
+    assert not repeated["changed"] and repeated["verified"] == "observed"
+    assert len(adapter.records("writes.jsonl")) == 1
 
 
 @pytest.mark.parametrize("nulls", [False, True])
 def test_omitted_and_null_fields_are_unmanaged(
-    fake: Any, run_module: RunModule, nulls: bool
+    writer: Subject, fake: Any, run_module: RunModule, nulls: bool
 ) -> None:
-    for subject in WRITERS:
-        adapter = subject.adapter(fake)
-        before = adapter.rows()
-        declaration = dict.fromkeys(adapter.change) if nulls else {}
-        result = public(
-            run_module(subject.writer, **adapter.arguments, **declaration), adapter
-        )
-        assert not result["changed"] and adapter.rows() == before
-        assert not adapter.records("writes.jsonl")
+    subject = writer
+    adapter = subject.adapter(fake)
+    before = adapter.rows()
+    declaration = dict.fromkeys(adapter.change) if nulls else {}
+    result = public(
+        run_module(subject.writer, **adapter.arguments, **declaration), adapter
+    )
+    assert not result["changed"] and adapter.rows() == before
+    assert not adapter.records("writes.jsonl")
 
 
 @pytest.mark.parametrize("check", [False, True])
-def test_missing_target_refuses(fake: Any, run_module: RunModule, check: bool) -> None:
-    for subject in WRITERS:
-        adapter = subject.adapter(fake)
-        result = public(
-            run_module(
-                subject.writer,
-                **{**adapter.arguments, **adapter.missing},
-                **adapter.change,
-                _ansible_check_mode=check,
-            ),
-            adapter,
-        )
-        assert result["failed"] and result["error_code"] == "missing"
-        assert not result["changed"] and result["outcome"] == "unchanged"
-        assert not adapter.records("writes.jsonl")
-        observed = public(
-            run_module(subject.info, **{**adapter.arguments, **adapter.missing}),
-            adapter,
-        )
-        assert observed[adapter.result_key] is None and not observed["changed"]
+def test_missing_target_refuses(
+    writer: Subject, fake: Any, run_module: RunModule, check: bool
+) -> None:
+    subject = writer
+    adapter = subject.adapter(fake)
+    result = public(
+        run_module(
+            subject.writer,
+            **{**adapter.arguments, **adapter.missing},
+            **adapter.change,
+            _ansible_check_mode=check,
+        ),
+        adapter,
+    )
+    assert result["failed"] and result["error_code"] == "missing"
+    assert not result["changed"] and result["outcome"] == "unchanged"
+    assert not adapter.records("writes.jsonl")
+    observed = public(
+        run_module(subject.info, **{**adapter.arguments, **adapter.missing}),
+        adapter,
+    )
+    assert observed[adapter.result_key] is None and not observed["changed"]
 
 
 @pytest.mark.parametrize("check", [False, True])
@@ -143,75 +161,74 @@ def test_missing_target_refuses(fake: Any, run_module: RunModule, check: bool) -
     ],
 )
 def test_bad_reads_never_authorize_absence(
-    fake: Any, run_module: RunModule, mode: str, check: bool
+    subject: Subject, fake: Any, run_module: RunModule, mode: str, check: bool
 ) -> None:
-    for subject in SUBJECTS:
-        adapter = subject.adapter(fake)
-        adapter.control(read=mode)
-        for entry in (subject.info, *([subject.writer] if subject.writer else [])):
-            result = public(
-                run_module(entry, **adapter.arguments, _ansible_check_mode=check),
-                adapter,
-            )
-            assert (
-                result["failed"]
-                and not result["changed"]
-                and result["outcome"] == "unchanged"
-            )
-            assert result["error_code"] != "missing" and result["http_status"] is None
-            assert not adapter.records("writes.jsonl")
+    adapter = subject.adapter(fake)
+    adapter.control(read=mode)
+    for entry in (subject.info, *([subject.writer] if subject.writer else [])):
+        result = public(
+            run_module(entry, **adapter.arguments, _ansible_check_mode=check),
+            adapter,
+        )
+        assert (
+            result["failed"]
+            and not result["changed"]
+            and result["outcome"] == "unchanged"
+        )
+        assert result["error_code"] != "missing" and result["http_status"] is None
+        assert not adapter.records("writes.jsonl")
 
 
 @pytest.mark.parametrize("check", [False, True])
 def test_unsupported_options_and_identity_assertion(
-    fake: Any, run_module: RunModule, check: bool
+    writer: Subject, fake: Any, run_module: RunModule, check: bool
 ) -> None:
-    for subject in WRITERS:
-        adapter = subject.adapter(fake)
-        for options in adapter.unsupported:
-            result = public(
-                run_module(
-                    subject.writer,
-                    **adapter.arguments,
-                    **options,
-                    _ansible_check_mode=check,
-                ),
-                adapter,
-            )
-            assert result["failed"] and not adapter.records("calls.jsonl")
+    subject = writer
+    adapter = subject.adapter(fake)
+    for options in adapter.unsupported:
         result = public(
             run_module(
                 subject.writer,
-                **{**adapter.arguments, **adapter.wrong_identity},
-                **adapter.change,
+                **adapter.arguments,
+                **options,
                 _ansible_check_mode=check,
             ),
             adapter,
         )
-        assert result["error_code"] == "object_identity" and not result["changed"]
-        assert not adapter.records("writes.jsonl")
+        assert result["failed"] and not adapter.records("calls.jsonl")
+    result = public(
+        run_module(
+            subject.writer,
+            **{**adapter.arguments, **adapter.wrong_identity},
+            **adapter.change,
+            _ansible_check_mode=check,
+        ),
+        adapter,
+    )
+    assert result["error_code"] == "object_identity" and not result["changed"]
+    assert not adapter.records("writes.jsonl")
 
 
 @pytest.mark.parametrize("mode", ["lost", "exit_after_effect", "exit124", "deep_ack"])
 def test_uncertain_reply_is_reconciled_without_redispatch(
-    fake: Any, run_module: RunModule, mode: str
+    writer: Subject, fake: Any, run_module: RunModule, mode: str
 ) -> None:
-    for subject in WRITERS:
-        adapter = subject.adapter(fake)
-        adapter.control(update=mode)
-        result = public(
-            run_module(subject.writer, **adapter.arguments, **adapter.change), adapter
-        )
-        assert (
-            not result.get("failed")
-            and result["changed"]
-            and result["verified"] == "observed"
-        )
-        assert len(adapter.records("writes.jsonl")) == 1
-        assert not run_module(subject.writer, **adapter.arguments, **adapter.change)[
-            "changed"
-        ]
-        assert len(adapter.records("writes.jsonl")) == 1
+    subject = writer
+    adapter = subject.adapter(fake)
+    adapter.control(update=mode)
+    result = public(
+        run_module(subject.writer, **adapter.arguments, **adapter.change), adapter
+    )
+    assert (
+        not result.get("failed")
+        and result["changed"]
+        and result["verified"] == "observed"
+    )
+    assert len(adapter.records("writes.jsonl")) == 1
+    assert not run_module(subject.writer, **adapter.arguments, **adapter.change)[
+        "changed"
+    ]
+    assert len(adapter.records("writes.jsonl")) == 1
 
 
 @pytest.mark.parametrize(
@@ -224,52 +241,55 @@ def test_uncertain_reply_is_reconciled_without_redispatch(
     ],
 )
 def test_effect_evidence_controls_outcome(
-    fake: Any, run_module: RunModule, mode: str, code: str, outcome: str
+    writer: Subject,
+    fake: Any,
+    run_module: RunModule,
+    mode: str,
+    code: str,
+    outcome: str,
 ) -> None:
-    for subject in WRITERS:
-        adapter = subject.adapter(fake)
-        before = adapter.selected()
-        adapter.control(update=mode)
-        result = public(
-            run_module(subject.writer, **adapter.arguments, **adapter.change), adapter
-        )
-        assert result["failed"] and result["error_code"] == code
-        assert result["outcome"] == outcome and result["changed"] == (
-            outcome != "unchanged"
-        )
-        assert (
-            result["http_status"] is None and len(adapter.records("writes.jsonl")) == 1
-        )
-        stored = adapter.selected()
-        if mode in {"drop", "reject"}:
-            assert stored == before
-        elif mode == "partial":
-            matches = [stored[key] == value for key, value in adapter.change.items()]
-            assert any(matches) and not all(matches)
-        else:
-            assert all(stored[key] == value for key, value in adapter.change.items())
+    subject = writer
+    adapter = subject.adapter(fake)
+    before = adapter.selected()
+    if mode == "partial" and adapter.contract.granularity == "atomic":
+        mode, code, outcome = "readback_failed", "read_failed", "unknown"
+    adapter.control(update=mode)
+    result = public(
+        run_module(subject.writer, **adapter.arguments, **adapter.change), adapter
+    )
+    assert result["failed"] and result["error_code"] == code
+    assert result["outcome"] == outcome and result["changed"] == (
+        outcome != "unchanged"
+    )
+    assert result["http_status"] is None and len(adapter.records("writes.jsonl")) == 1
+    stored = adapter.selected()
+    if mode in {"drop", "reject"}:
+        assert stored == before
+    elif mode == "partial":
+        matches = [stored[key] == value for key, value in adapter.change.items()]
+        assert any(matches) and not all(matches)
+    else:
+        assert all(stored[key] == value for key, value in adapter.change.items())
 
 
 @pytest.mark.parametrize("mode", ["timeout_before", "timeout_after"])
 def test_expiry_keeps_uncertainty_and_terminates_child(
-    fake: Any, run_module: RunModule, mode: str
+    writer: Subject, fake: Any, run_module: RunModule, mode: str
 ) -> None:
-    for subject in WRITERS:
-        adapter = subject.adapter(fake)
-        before = adapter.selected()
-        adapter.control(update=mode)
-        result = public(
-            run_module(
-                subject.writer, **adapter.arguments, **adapter.change, deadline=3.0
-            ),
-            adapter,
-        )
-        assert result["failed"] and result["changed"] and result["outcome"] == "unknown"
-        assert result["error_code"] == "deadline_exceeded"
-        writes = adapter.records("writes.jsonl")
-        assert len(writes) == 1 and not Path(f"/proc/{writes[0]['pid']}").exists()
-        expected = before if mode == "timeout_before" else {**before, **adapter.change}
-        assert adapter.selected() == expected
+    subject = writer
+    adapter = subject.adapter(fake)
+    before = adapter.selected()
+    adapter.control(update=mode)
+    result = public(
+        run_module(subject.writer, **adapter.arguments, **adapter.change, deadline=3.0),
+        adapter,
+    )
+    assert result["failed"] and result["changed"] and result["outcome"] == "unknown"
+    assert result["error_code"] == "deadline_exceeded"
+    writes = adapter.records("writes.jsonl")
+    assert len(writes) == 1 and not Path(f"/proc/{writes[0]['pid']}").exists()
+    expected = before if mode == "timeout_before" else {**before, **adapter.change}
+    assert adapter.selected() == expected
 
 
 @pytest.mark.parametrize(
@@ -281,21 +301,21 @@ def test_expiry_keeps_uncertainty_and_terminates_child(
     ],
 )
 def test_prewrite_refusal(
-    fake: Any, run_module: RunModule, fault: str, code: str
+    writer: Subject, fake: Any, run_module: RunModule, fault: str, code: str
 ) -> None:
-    for subject in WRITERS:
-        adapter = subject.adapter(fake)
-        adapter.control(**{fault: True})
-        result = public(
-            run_module(subject.writer, **adapter.arguments, **adapter.change), adapter
-        )
-        assert result["failed"] and result["error_code"] == code
-        assert not result["changed"] and result["outcome"] == "unchanged"
-        assert not adapter.records("writes.jsonl")
+    subject = writer
+    adapter = subject.adapter(fake)
+    adapter.control(**{fault: True})
+    result = public(
+        run_module(subject.writer, **adapter.arguments, **adapter.change), adapter
+    )
+    assert result["failed"] and result["error_code"] == code
+    assert not result["changed"] and result["outcome"] == "unchanged"
+    assert not adapter.records("writes.jsonl")
 
 
 def test_failure_before_start_preserves_unchanged(
-    fake: Any, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
+    writer: Subject, fake: Any, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     original = AnsibleModule.run_command
 
@@ -305,38 +325,37 @@ def test_failure_before_start_preserves_unchanged(
         return original(self, args, **kwargs)
 
     monkeypatch.setattr(AnsibleModule, "run_command", refuse)
-    for subject in WRITERS:
-        adapter = subject.adapter(fake)
-        result = public(
-            run_module(subject.writer, **adapter.arguments, **adapter.change), adapter
-        )
-        assert result["failed"] and result["error_code"] == "command_start"
-        assert not result["changed"] and result["outcome"] == "unchanged"
-        assert not adapter.records("writes.jsonl")
+    subject = writer
+    adapter = subject.adapter(fake)
+    result = public(
+        run_module(subject.writer, **adapter.arguments, **adapter.change), adapter
+    )
+    assert result["failed"] and result["error_code"] == "command_start"
+    assert not result["changed"] and result["outcome"] == "unchanged"
+    assert not adapter.records("writes.jsonl")
 
 
 @pytest.mark.parametrize("check", [False, True])
 def test_real_observation_with_no_writes(
-    fake: Any, run_module: RunModule, check: bool
+    subject: Subject, fake: Any, run_module: RunModule, check: bool
 ) -> None:
-    for subject in SUBJECTS:
-        adapter = subject.adapter(fake)
-        before = adapter.rows()
-        calls = len(adapter.records("calls.jsonl"))
-        result = public(
-            run_module(
-                subject.info,
-                **{**adapter.arguments, **(subject.observe_args or {})},
-                _ansible_check_mode=check,
-            ),
-            adapter,
-        )
-        assert not result["changed"] and not result.get("failed")
-        assert adapter.identity(result[adapter.result_key]) == adapter.identity(
-            adapter.selected()
-        )
-        assert len(adapter.records("calls.jsonl")) > calls
-        assert adapter.rows() == before and not adapter.records("writes.jsonl")
+    adapter = subject.adapter(fake)
+    before = adapter.rows()
+    calls = len(adapter.records("calls.jsonl"))
+    result = public(
+        run_module(
+            subject.info,
+            **{**adapter.arguments, **(subject.observe_args or {})},
+            _ansible_check_mode=check,
+        ),
+        adapter,
+    )
+    assert not result["changed"] and not result.get("failed")
+    assert adapter.identity(result[adapter.result_key]) == adapter.identity(
+        adapter.selected()
+    )
+    assert len(adapter.records("calls.jsonl")) > calls
+    assert adapter.rows() == before and not adapter.records("writes.jsonl")
 
 
 def test_subject_declarations_require_real_modes_and_entries() -> None:
@@ -351,72 +370,78 @@ def test_subject_declarations_require_real_modes_and_entries() -> None:
 
 @pytest.mark.parametrize("check", [False, True])
 def test_compatibility_exclusion_precedes_write_or_prediction(
-    fake: Any, run_module: RunModule, monkeypatch: pytest.MonkeyPatch, check: bool
+    writer: Subject,
+    fake: Any,
+    run_module: RunModule,
+    monkeypatch: pytest.MonkeyPatch,
+    check: bool,
 ) -> None:
-    for subject in WRITERS:
-        adapter = subject.adapter(fake)
-        monkeypatch.setattr(
-            _compat,
-            "EXCLUSIONS",
-            {subject.name: ((adapter.version, "Synthetic excluded build"),)},
-        )
-        result = run_module(
-            subject.writer,
-            **adapter.arguments,
-            **adapter.change,
-            _ansible_check_mode=check,
-        )
-        assert result["failed"] and result["error_code"] == "ineligible"
-        assert not result["changed"] and not adapter.records("writes.jsonl")
+    subject = writer
+    adapter = subject.adapter(fake)
+    monkeypatch.setattr(
+        _compat,
+        "EXCLUSIONS",
+        {subject.name: ((adapter.version, "Synthetic excluded build"),)},
+    )
+    result = run_module(
+        subject.writer,
+        **adapter.arguments,
+        **adapter.change,
+        _ansible_check_mode=check,
+    )
+    assert result["failed"] and result["error_code"] == "ineligible"
+    assert not result["changed"] and not adapter.records("writes.jsonl")
 
 
 def test_stdin_literal_values_and_target_environment(
-    fake: Any, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
+    writer: Subject, fake: Any, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    for subject in WRITERS:
-        adapter = subject.adapter(fake)
-        monkeypatch.setenv("CONTRACT_AMBIENT_SECRET", adapter.private[0])
-        result = public(
-            run_module(subject.writer, **adapter.arguments, **adapter.literal),
-            adapter,
-        )
-        for name, value in adapter.literal.items():
-            assert result[adapter.result_key][name] == value
-        calls = adapter.records("calls.jsonl")
-        assert all(secret not in json.dumps(calls) for secret in adapter.private)
-        assert all(
-            "CONTRACT_AMBIENT_SECRET" not in call["environment"] for call in calls
-        )
-        assert all(call["environment"]["LC_ALL"] == "C" for call in calls)
-        assert any(call["argv"][-1] == adapter.identity_command for call in calls)
-        assert all("$HOME" not in json.dumps(call["argv"]) for call in calls)
+    subject = writer
+    adapter = subject.adapter(fake)
+    monkeypatch.setenv("CONTRACT_AMBIENT_SECRET", adapter.private[0])
+    result = public(
+        run_module(subject.writer, **adapter.arguments, **adapter.literal),
+        adapter,
+    )
+    for name, value in adapter.literal.items():
+        assert result[adapter.result_key][name] == value
+    calls = adapter.records("calls.jsonl")
+    assert all(secret not in json.dumps(calls) for secret in adapter.private)
+    assert all("CONTRACT_AMBIENT_SECRET" not in call["environment"] for call in calls)
+    assert all(call["environment"]["LC_ALL"] == "C" for call in calls)
+    assert any(call["argv"][-1] == adapter.identity_command for call in calls)
+    assert all("$HOME" not in json.dumps(call["argv"]) for call in calls)
 
 
 @pytest.mark.parametrize(
     "name", ["LD_PRELOAD", "LD_LIBRARY_PATH", "LD_AUDIT", "PYTHONHOME"]
 )
 def test_loader_override_refuses_before_commands(
-    fake: Any, run_module: RunModule, monkeypatch: pytest.MonkeyPatch, name: str
+    writer: Subject,
+    fake: Any,
+    run_module: RunModule,
+    monkeypatch: pytest.MonkeyPatch,
+    name: str,
 ) -> None:
-    for subject in WRITERS:
-        adapter = subject.adapter(fake)
-        monkeypatch.setenv(name, "unqualified-loader-value")
-        result = run_module(subject.writer, **adapter.arguments, **adapter.change)
-        assert result["error_code"] == "invalid_environment" and not result["changed"]
-        assert not adapter.records("calls.jsonl")
+    subject = writer
+    adapter = subject.adapter(fake)
+    monkeypatch.setenv(name, "unqualified-loader-value")
+    result = run_module(subject.writer, **adapter.arguments, **adapter.change)
+    assert result["error_code"] == "invalid_environment" and not result["changed"]
+    assert not adapter.records("calls.jsonl")
 
 
 def test_host_identity_is_checked_before_write(
-    fake: Any, run_module: RunModule
+    writer: Subject, fake: Any, run_module: RunModule
 ) -> None:
-    for subject in WRITERS:
-        adapter = subject.adapter(fake)
-        locator = {**adapter.locator, "user": str(os.geteuid() + 1)}
-        result = run_module(
-            subject.writer, **adapter.arguments, exec=locator, **adapter.change
-        )
-        assert result["error_code"] == "host_identity" and not result["changed"]
-        assert not adapter.records("writes.jsonl")
+    subject = writer
+    adapter = subject.adapter(fake)
+    locator = {**adapter.locator, "user": str(os.geteuid() + 1)}
+    result = run_module(
+        subject.writer, **adapter.arguments, exec=locator, **adapter.change
+    )
+    assert result["error_code"] == "host_identity" and not result["changed"]
+    assert not adapter.records("writes.jsonl")
 
 
 def test_inventory_rejects_an_unregistered_first_writer(tmp_path: Path) -> None:
@@ -440,3 +465,9 @@ def test_inventory_rejects_an_unregistered_first_writer(tmp_path: Path) -> None:
         replace(SUBJECTS[0], mode=invalid)
     with pytest.raises(ValueError, match="Empty or duplicate"):
         validate((), tmp_path)
+
+
+def test_invalid_granularity_is_rejected() -> None:
+    invalid: Any = "multi_step"
+    with pytest.raises(ValueError, match="granularity"):
+        Contract(granularity=invalid)

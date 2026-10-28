@@ -25,10 +25,11 @@ from ansible_collections.{{ namespace }}.\
 # fmt: on
 
 from ..fake_product import FOREIGN, IDENTITY, SECRET, Lab
-from .contracts import Subject, validate
+from .contracts import Contract, Subject, validate
 
 
 class FixtureAdapter:
+    contract = Contract()
     result_key = "fixture"
     version = "1.0.0"
     identity_command = "uid"
@@ -75,6 +76,17 @@ class FixtureAdapter:
         return self.fake.records(name)
 
 
+class AtomicFixtureAdapter(FixtureAdapter):
+    """Exercise one indivisible field through the same executable."""
+
+    contract = Contract(granularity="atomic")
+
+    def __init__(self, fake: Lab) -> None:
+        super().__init__(fake)
+        self.change = {"limit": 0}
+        self.original = {"limit": 10}
+
+
 SUBJECTS = (
     Subject(
         "fixture", "existing_only", fixture_info.main, FixtureAdapter, fixture.main
@@ -83,3 +95,20 @@ SUBJECTS = (
     Subject("fixture_plan", "observational", fixture_plan.main, FixtureAdapter),
 )
 validate(SUBJECTS, Path(fixture_info.__file__).parent)
+
+CONFIGURATIONS = (
+    SUBJECTS,
+    (
+        Subject(
+            "fixture",
+            "existing_only",
+            fixture_info.main,
+            AtomicFixtureAdapter,
+            fixture.main,
+        ),
+        Subject("fixture_info", "observational", fixture_info.main, FixtureAdapter),
+        Subject("fixture_plan", "observational", fixture_plan.main, FixtureAdapter),
+    ),
+)
+for configuration in CONFIGURATIONS:
+    validate(configuration, Path(fixture_info.__file__).parent)

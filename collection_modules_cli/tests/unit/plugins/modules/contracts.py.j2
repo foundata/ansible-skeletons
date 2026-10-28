@@ -13,9 +13,21 @@ from typing import Any, Literal, Protocol
 Entry = Callable[[], None]
 
 
+@dataclass(frozen=True)
+class Contract:
+    """Product semantics; defaults describe the executable fixture."""
+
+    granularity: Literal["fieldwise", "atomic"] = "fieldwise"
+
+    def __post_init__(self) -> None:
+        if self.granularity not in {"fieldwise", "atomic"}:
+            raise ValueError("Invalid mutation granularity")
+
+
 class Adapter(Protocol):
     """Product-owned observations and declarations for the existing-only cases."""
 
+    contract: Contract
     arguments: dict[str, Any]
     change: dict[str, Any]
     original: dict[str, Any]
@@ -36,16 +48,25 @@ class Adapter(Protocol):
     def records(self, name: str) -> list[dict[str, Any]]: ...
 
 
+class AdapterFactory(Protocol):
+    contract: Contract
+
+    def __call__(self, fake: Any) -> Adapter: ...
+
+
 @dataclass(frozen=True)
 class Subject:
     name: str
     mode: Literal["existing_only", "observational"]
     info: Entry
-    adapter: Callable[[Any], Adapter]
+    adapter: AdapterFactory
     writer: Entry | None = None
     observe_args: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
+        if not isinstance(getattr(self.adapter, "contract", None), Contract):
+            raise ValueError("Adapter requires a typed contract declaration")
+        self.adapter.contract.__post_init__()
         if self.mode not in {"existing_only", "observational"}:
             raise ValueError("Unsupported contract mode")
         if not self.name or not callable(self.info) or not callable(self.adapter):

@@ -113,7 +113,17 @@ registers actual public entry points, one of two explicit modes, and a fake
 adapter. An existing-only subject requires a writer; an observational subject
 forbids one. Both require an information entry point. Incomplete registrations
 fail during collection. Observational-only products import no fabricated mutable
-exports. Every public module must be registered.
+exports. Every public module must be registered. Each configuration registers
+the same inventory and runs every applicable case with a fresh backend.
+
+The adapter's typed `Contract` declares mutation `granularity`. Its default,
+`fieldwise`, requires evidence that some declared fields changed while others
+did not. `atomic` exercises an indivisible change with an unreadable reply and
+checks its complete stored effect and uncertain outcome. The example runs both
+configurations through the same executable, with `limit` alone in the atomic
+configuration. Synthetic lifecycle tests retain partial progress coverage.
+A multi-step subject belongs to a product operation that actually has several
+steps; independent fields in one command do not declare such an operation.
 
 `plugins/module_utils/_binding.py` and `_compat.py` retain their shared
 structure with product policy. The client, hook resource, definitions,
