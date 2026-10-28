@@ -162,6 +162,26 @@ exclude secret values; an empty neutralized key is accepted. Document this
 effective environment policy and any separate target inheritance in the
 product locator.
 
+`Contract.faults` declares a `NativeFault` independently for
+`exit_after_effect`, `exit124` and `reject` in `FaultInterpretation`. The
+first two default to `reconcile`, with no error or pending code. Rejection
+defaults to `proven_refusal` with `refused` and no pending code. A missing
+pending code requires a converged repeat after an observed complete effect.
+The alternate configuration retains `validation_failed` after an observed
+effect and treats a generic rejection as unknown. It persists a pending
+marker and refuses a new invocation with `unsettled_write`, without another
+write. Each native fault declares its own stable error code and optional
+pending code. Incompatible result/effect declarations fail during
+collection.
+
+Every native fault still dispatches at most once, preserves redaction and
+derives its changed or unknown outcome from observed evidence. Only a
+protocol-proven pre-effect refusal reports unchanged after a native
+rejection. Status 124 alone never proves expiry. Real deadline termination
+and transport nondispatch remain mandatory. A declared pending repeat must
+fail unchanged with its stable code and preserve storage and the single
+write count.
+
 A multi-step subject belongs to a product operation that actually has
 several steps; independent fields in one command do not declare such an
 operation.

@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import inspect
+import re
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -70,15 +71,78 @@ class LiteralInputs:
 
 
 @dataclass(frozen=True)
+class NativeFault:
+    """One native response and the permitted result of repeating its request."""
+
+    result: Literal["reconcile", "retain_effect", "proven_refusal", "uncertain"] = (
+        "reconcile"
+    )
+    error_code: str | None = None
+    pending_code: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.result not in {
+            "reconcile",
+            "retain_effect",
+            "proven_refusal",
+            "uncertain",
+        }:
+            raise ValueError("Invalid native fault result")
+        if (self.result == "reconcile") != (self.error_code is None):
+            raise ValueError("Invalid native fault error declaration")
+        if self.result == "reconcile" and self.pending_code is not None:
+            raise ValueError("Invalid native fault pending declaration")
+        for code in (self.error_code, self.pending_code):
+            if code is not None and (
+                not isinstance(code, str)
+                or re.fullmatch(r"[a-z][a-z0-9_]*", code) is None
+                or code == "deadline_exceeded"
+            ):
+                raise ValueError("Invalid native fault error code")
+
+
+@dataclass(frozen=True)
+class FaultInterpretation:
+    exit_after_effect: NativeFault = NativeFault()
+    exit124: NativeFault = NativeFault()
+    reject: NativeFault = NativeFault("proven_refusal", "refused")
+
+    def __post_init__(self) -> None:
+        for name, allowed in (
+            ("exit_after_effect", {"reconcile", "retain_effect"}),
+            ("exit124", {"reconcile", "retain_effect"}),
+            ("reject", {"proven_refusal", "uncertain"}),
+        ):
+            fault = getattr(self, name)
+            if not isinstance(fault, NativeFault) or fault.result not in allowed:
+                raise ValueError("Invalid native fault interpretation")
+            fault.__post_init__()
+
+    def for_mode(self, mode: str) -> NativeFault:
+        faults = {
+            "exit_after_effect": self.exit_after_effect,
+            "exit124": self.exit124,
+            "reject": self.reject,
+        }
+        if mode not in faults:
+            raise ValueError("Unknown native fault")
+        return faults[mode]
+
+
+@dataclass(frozen=True)
 class Contract:
     """Product semantics; defaults describe the executable fixture."""
 
+    faults: FaultInterpretation = FaultInterpretation()
     environment_policy: Literal["refuse", "neutralize"] = "refuse"
     literals: LiteralInputs = field(default_factory=LiteralInputs)
     write_command: WriteCommand = WriteCommand()
     granularity: Literal["fieldwise", "atomic"] = "fieldwise"
 
     def __post_init__(self) -> None:
+        if not isinstance(self.faults, FaultInterpretation):
+            raise ValueError("Invalid native fault declaration")
+        self.faults.__post_init__()
         if self.environment_policy not in {"refuse", "neutralize"}:
             raise ValueError("Invalid effective environment policy")
         if not isinstance(self.literals, LiteralInputs):

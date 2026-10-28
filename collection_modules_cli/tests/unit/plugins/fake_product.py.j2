@@ -23,6 +23,7 @@ ROOT = (
 class Lab:
     def __init__(self, directory: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self.monkeypatch = monkeypatch
+        self.profile_controls: dict[str, Any] = {}
         self.directory = directory.resolve()
         self.directory.chmod(0o700)
         self.seed()
@@ -52,7 +53,9 @@ class Lab:
         self.control()
 
     def control(self, **values: Any) -> None:
-        (self.directory / "controls.json").write_text(json.dumps(values))
+        (self.directory / "controls.json").write_text(
+            json.dumps({**self.profile_controls, **values})
+        )
 
     def read(self) -> dict[str, Any]:
         return json.loads((self.directory / "state.json").read_text())

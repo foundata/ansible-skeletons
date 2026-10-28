@@ -27,7 +27,16 @@ from ansible_collections.{{ namespace }}.\
 
 from ..conftest import RunModule
 from .contract_subject import CONFIGURATIONS, SUBJECTS
-from .contracts import Adapter, Contract, LiteralInputs, Subject, WriteCommand, validate
+from .contracts import (
+    Adapter,
+    Contract,
+    FaultInterpretation,
+    LiteralInputs,
+    NativeFault,
+    Subject,
+    WriteCommand,
+    validate,
+)
 
 CASES = tuple(subject for configuration in CONFIGURATIONS for subject in configuration)
 WRITERS = tuple(subject for subject in CASES if subject.mode == "existing_only")
@@ -219,15 +228,33 @@ def test_uncertain_reply_is_reconciled_without_redispatch(
     result = public(
         run_module(subject.writer, **adapter.arguments, **adapter.change), adapter
     )
-    assert (
-        not result.get("failed")
-        and result["changed"]
-        and result["verified"] == "observed"
+    interpretation = (
+        adapter.contract.faults.for_mode(mode)
+        if mode in {"exit_after_effect", "exit124"}
+        else None
+    )
+    if interpretation and interpretation.result == "retain_effect":
+        assert result["failed"] and result["outcome"] == "changed"
+        assert result["error_code"] == interpretation.error_code
+        assert result["http_status"] is None
+        assert result["error_code"] != "deadline_exceeded"
+    else:
+        assert not result.get("failed") and result["verified"] == "observed"
+    assert result["changed"]
+    assert all(
+        adapter.selected()[key] == value for key, value in adapter.change.items()
     )
     assert len(adapter.records("writes.jsonl")) == 1
-    assert not run_module(subject.writer, **adapter.arguments, **adapter.change)[
-        "changed"
-    ]
+    after = adapter.rows()
+    repeated = public(
+        run_module(subject.writer, **adapter.arguments, **adapter.change), adapter
+    )
+    if interpretation and interpretation.pending_code is not None:
+        assert repeated["failed"] and repeated["outcome"] == "unchanged"
+        assert repeated["error_code"] == interpretation.pending_code
+    else:
+        assert not repeated.get("failed") and repeated["verified"] == "observed"
+    assert not repeated["changed"] and adapter.rows() == after
     assert len(adapter.records("writes.jsonl")) == 1
 
 
@@ -251,6 +278,13 @@ def test_effect_evidence_controls_outcome(
     subject = writer
     adapter = subject.adapter(fake)
     before = adapter.selected()
+    if mode == "reject":
+        interpretation = adapter.contract.faults.reject
+        assert interpretation.error_code is not None
+        code = interpretation.error_code
+        outcome = (
+            "unchanged" if interpretation.result == "proven_refusal" else "unknown"
+        )
     if mode == "partial" and adapter.contract.granularity == "atomic":
         mode, code, outcome = "readback_failed", "read_failed", "unknown"
     adapter.control(update=mode)
@@ -265,6 +299,16 @@ def test_effect_evidence_controls_outcome(
     stored = adapter.selected()
     if mode in {"drop", "reject"}:
         assert stored == before
+        if mode == "reject" and adapter.contract.faults.reject.pending_code is not None:
+            repeated = public(
+                run_module(subject.writer, **adapter.arguments, **adapter.change),
+                adapter,
+            )
+            assert repeated["failed"] and not repeated["changed"]
+            assert repeated["outcome"] == "unchanged"
+            assert repeated["error_code"] == adapter.contract.faults.reject.pending_code
+            assert len(adapter.records("writes.jsonl")) == 1
+            assert adapter.selected() == before
     elif mode == "partial":
         matches = [stored[key] == value for key, value in adapter.change.items()]
         assert any(matches) and not all(matches)
@@ -567,3 +611,40 @@ def test_invalid_environment_policy_is_rejected() -> None:
     invalid: Any = "inherit"
     with pytest.raises(ValueError, match="environment policy"):
         Contract(environment_policy=invalid)
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        {"result": "ignore"},
+        {"result": "retain_effect"},
+        {"result": "proven_refusal", "error_code": ""},
+        {"result": "uncertain", "error_code": "raw message"},
+        {"result": "retain_effect", "error_code": "deadline_exceeded"},
+        {"pending_code": "unsettled_write"},
+        {
+            "result": "uncertain",
+            "error_code": "validation_failed",
+            "pending_code": "raw message",
+        },
+    ],
+)
+def test_invalid_native_faults_are_rejected(options: dict[str, Any]) -> None:
+    with pytest.raises(ValueError, match="native fault"):
+        NativeFault(**options)
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        {"exit_after_effect": NativeFault("uncertain", "validation_failed")},
+        {"exit124": NativeFault("proven_refusal", "refused")},
+        {"reject": NativeFault()},
+        {"reject": None},
+    ],
+)
+def test_native_interpretation_requires_effect_evidence(
+    options: dict[str, Any],
+) -> None:
+    with pytest.raises(ValueError, match="native fault"):
+        FaultInterpretation(**options)

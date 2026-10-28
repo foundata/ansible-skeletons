@@ -41,7 +41,15 @@ from ansible_collections.{{ namespace }}.\
 # fmt: on
 
 from ..fake_product import FOREIGN, IDENTITY, SECRET, Lab
-from .contracts import Contract, LiteralInputs, Subject, WriteCommand, validate
+from .contracts import (
+    Contract,
+    FaultInterpretation,
+    LiteralInputs,
+    NativeFault,
+    Subject,
+    WriteCommand,
+    validate,
+)
 
 
 class FixtureAdapter:
@@ -125,6 +133,21 @@ class SetClient(_client.Client):
         closed.update(PATH="/usr/bin:/bin", LC_ALL="C")
         return replace(prepared, environment=closed)
 
+    @property
+    def pending(self) -> Path:
+        return Path(self.params["exec"]["chdir"]) / "pending.json"
+
+    def validate_exit(self, rc: int, *, write: bool) -> None:
+        if write and rc:
+            self.pending.write_text('{"state": "unsettled"}')
+            raise _client.ProductError(category="product", code="validation_failed")
+        super().validate_exit(rc, write=write)
+
+    def read(self) -> dict[str, Any] | None:
+        if self.pending.exists() and not self.write_started:
+            raise _client.ProductError(category="coordination", code="unsettled_write")
+        return super().read()
+
 
 class VocabularyFixture(_fixture.Fixture):
     """An alternate native vocabulary over the same executable backend."""
@@ -135,6 +158,11 @@ class VocabularyFixture(_fixture.Fixture):
             raise _client.ProductError(category="argument", code="invalid_value")
         return values
 
+    def refusal_may_change(self, failure: Any) -> bool:
+        return bool(
+            failure.category == "product" and failure.code == "validation_failed"
+        )
+
 
 class AtomicFixtureAdapter(FixtureAdapter):
     """Exercise one indivisible field through the same executable."""
@@ -142,6 +170,15 @@ class AtomicFixtureAdapter(FixtureAdapter):
     contract = Contract(
         granularity="atomic",
         environment_policy="neutralize",
+        faults=FaultInterpretation(
+            exit_after_effect=NativeFault(
+                "retain_effect", "validation_failed", "unsettled_write"
+            ),
+            exit124=NativeFault(
+                "retain_effect", "validation_failed", "unsettled_write"
+            ),
+            reject=NativeFault("uncertain", "validation_failed", "unsettled_write"),
+        ),
         write_command=WriteCommand((("set", "--"),)),
         literals=LiteralInputs(
             accepted={"label": "accepted"},
@@ -152,6 +189,8 @@ class AtomicFixtureAdapter(FixtureAdapter):
 
     def __init__(self, fake: Lab) -> None:
         super().__init__(fake)
+        fake.profile_controls = {"generic_reject": True}
+        fake.control()
         fake.monkeypatch.setattr(_fixture, "Client", SetClient)
         fake.monkeypatch.setattr(fixture, "Fixture", VocabularyFixture)
         self.change = {"limit": 0}

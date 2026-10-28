@@ -71,6 +71,7 @@ SCHEMA = errors.ErrorSchema(
                 "validation_failed",
             },
             "identity": {"object_identity"},
+            "coordination": {"unsettled_write"},
             "response": {"schema", "command_failed"},
             "eligibility": {"stale", "referenced"},
             "compatibility": {"version_unknown", "ineligible"},
@@ -215,20 +216,24 @@ class Client:
             raise
         if write:
             self.write_started = True
-        if result.rc == 11:
-            raise ProductError(category="product", code="unauthenticated")
-        if result.rc == 10 and write:
-            raise ProductError(category="product", code="refused")
-        if result.rc:
-            raise ProductError(
-                category="response" if write else "product",
-                code="command_failed" if write else "read_failed",
-            )
+        self.validate_exit(result.rc, write=write)
         try:
             document = json.loads(result.stdout, object_pairs_hook=unique_object)
         except (ValueError, UnicodeError, RecursionError):
             raise ProductError(category="response", code="schema") from None
         return document
+
+    def validate_exit(self, rc: int, *, write: bool) -> None:
+        """Classify the native protocol independently of transport expiry."""
+        if rc == 11:
+            raise ProductError(category="product", code="unauthenticated")
+        if rc == 10 and write:
+            raise ProductError(category="product", code="refused")
+        if rc:
+            raise ProductError(
+                category="response" if write else "product",
+                code="command_failed" if write else "read_failed",
+            )
 
     def version(self) -> tuple[str, str]:
         if self._version is None:

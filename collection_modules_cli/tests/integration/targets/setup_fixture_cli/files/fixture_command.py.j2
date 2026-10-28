@@ -118,6 +118,9 @@ def main() -> None:
             emit({"error": "conflict"}, 10)
         mode = controls.get("update", "")
         if mode == "reject":
+            if controls.get("generic_reject"):
+                print(SECRET, file=sys.stderr)
+                raise SystemExit(12)
             emit({"error": "refused"}, 10)
         if mode == "timeout_before":
             time.sleep(30)
