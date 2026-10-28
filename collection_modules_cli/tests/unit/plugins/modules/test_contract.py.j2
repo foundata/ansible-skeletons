@@ -9,6 +9,7 @@ import json
 import os
 from dataclasses import replace
 from pathlib import Path
+from types import FunctionType
 from typing import Any
 
 import pytest
@@ -419,12 +420,21 @@ def test_host_identity_is_checked_before_write(
 
 
 def test_inventory_rejects_an_unregistered_first_writer(tmp_path: Path) -> None:
-    # Missing entries fail at collection time through validate(), before cases run.
+    # Start with a valid observational inventory, then add its first writer.
+    original = SUBJECTS[0].info
+    source = Path(inspect.getfile(original)).read_bytes()
+    registered = tmp_path / "registered_info.py"
+    registered.write_bytes(source)
+    info = FunctionType(
+        original.__code__.replace(co_filename=str(registered)),
+        original.__globals__,
+        "main",
+    )
+    subjects = (replace(SUBJECTS[0], mode="observational", info=info, writer=None),)
+    validate(subjects, tmp_path)
+    (tmp_path / "unregistered_writer.py").write_bytes(source)
     with pytest.raises(ValueError, match="inventory"):
-        validate(
-            tuple(subject for subject in SUBJECTS if subject.writer is None),
-            Path(inspect.getfile(SUBJECTS[0].info)).parent,
-        )
+        validate(subjects, tmp_path)
     with pytest.raises(ValueError, match="Unsupported"):
         invalid: Any = "unknown"
         replace(SUBJECTS[0], mode=invalid)
