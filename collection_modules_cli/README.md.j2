@@ -9,6 +9,18 @@ Command-line resource modules for
 {{ product | mandatory('Missing required variable: product') }}.
 FIXME Replace the invented fixture after qualifying the first product resource.
 
+## Table of contents<a id="toc"></a>
+
+- [Included content](#content)
+- [Execution and prerequisites](#execution-prerequisites)
+- [Dependencies](#dependencies)
+- [Resource contract](#resource-contract)
+- [Usage](#usage)
+- [Compatibility](#compatibility)
+- [Versioning and deprecation](#versioning-deprecation)
+- [Licensing, copyright](#licensing-copyright)
+- [Author information](#author-information)
+
 ## Included content<a id="content"></a>
 
 |     Module     | Purpose |
@@ -22,7 +34,7 @@ command line on the managed host. The fixture demonstrates an existing-only
 resource. Products that create or delete need fixtures and contract cases for
 those operations before shipping them.
 
-## Execution and prerequisites
+## Execution and prerequisites<a id="execution-prerequisites"></a>
 
 Ansible runs the modules on the managed host, or on an authorized delegate. The
 caller supplies the installed product, credential, interpreter and trusted
@@ -43,7 +55,7 @@ need their own qualification of identity, environment, deadline and cleanup.
 See the utility dependency in [galaxy.yml](galaxy.yml) and any target Python
 dependencies in [requirements.txt](requirements.txt).
 
-## Resource contract
+## Resource contract<a id="resource-contract"></a>
 
 The selector is `(app, key)` and `expected_id` asserts the opaque object
 identity. The module refuses a missing mutable target in normal and check mode.
@@ -73,7 +85,7 @@ The shared compatibility policy probes before a write or prediction, warns once
 for an untested series and refuses recorded exclusions. FIXME Set supported
 series and exclusions from product evidence.
 
-## Usage
+## Usage<a id="usage"></a>
 
 Set execution defaults for the target host. The `api` action group is the shared
 collection configuration name for these options.
@@ -104,7 +116,7 @@ collection configuration name for these options.
         label: ""
 ```
 
-## Compatibility
+## Compatibility<a id="compatibility"></a>
 
 The controller needs ansible-core
 {{ min_ansible_version | default('2.19.0') }} or newer.
