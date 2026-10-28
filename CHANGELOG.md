@@ -16,6 +16,12 @@ and the project adheres to
 
 ### Added
 
+- All three module variants: `Field(kind="secret", readable=True)` compares
+  stored secrets privately, excludes their values from public state, and uses
+  a fixed diff marker. `empty_clears=True` permits an empty declaration to clear
+  the secret. These fields always compare, independently of `update_password`.
+  The REST fixture exercises both options through `access_secret`.
+
 - All three module variants: the engine's `strmap` field kind holds string
   keys and string values, including empty values, with whole-value replacement,
   comparison and diff. Declared keys follow `pattern` and entries are bounded

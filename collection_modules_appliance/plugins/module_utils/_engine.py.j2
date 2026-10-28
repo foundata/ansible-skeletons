@@ -103,7 +103,7 @@ class Reference:
 
 @dataclass(frozen=True)
 class Field:
-    """A public field or write-only secret; wire translation belongs to the client.
+    """A public field or private secret; wire translation belongs to the client.
 
     ``created`` is the value the product stores on creation whatever the
     request says: the creation leaves the field out, and a declared value
@@ -125,6 +125,12 @@ class Field:
     use the whole value. ``maximum_items`` bounds declared entries and
     ``pattern`` validates declared keys only. Stored keys outside the pattern
     stay readable. ``map`` continues to mean names mapped to lists of rights.
+
+    A ``secret`` is write-only unless ``readable`` is true. A readable secret
+    always compares the returned value privately, regardless of
+    ``update_password``; public objects omit it and diffs show only its name
+    with a fixed marker. ``empty_clears`` explicitly permits an empty declared
+    value to clear a readable secret. Both options default to false.
     """
 
     name: str
@@ -146,6 +152,8 @@ class Field:
     minimum: int | None = None
     maximum: int | None = None
     input_only: bool = False
+    readable: bool = False
+    empty_clears: bool = False
 
 
 @dataclass(frozen=True)
@@ -195,7 +203,8 @@ def build_spec(resource: Resource) -> dict[str, Any]:
         ValueError: If an identity key is not a string; the engine matches
             identities as text. Also if ``minimum`` or ``maximum`` is set on
             a kind other than ``int``, or ``input_only`` on a kind other than
-            ``str``, ``choice``, ``set`` and ``names``.
+            ``str``, ``choice``, ``set`` and ``names``. ``readable`` applies
+            only to secrets; ``empty_clears`` requires a readable secret.
     """
     spec = api_argument_spec()
     for key in resource.keys:
@@ -209,6 +218,10 @@ def build_spec(resource: Resource) -> dict[str, Any]:
         if key.choices:
             spec[key.name]["choices"] = list(key.choices)
     for field in resource.fields:
+        if field.readable and field.kind != "secret":
+            raise ValueError("readable applies only to a secret field")
+        if field.empty_clears and not (field.kind == "secret" and field.readable):
+            raise ValueError("empty_clears requires a readable secret field")
         if field.kind != "int" and (field.minimum, field.maximum) != (None, None):
             raise ValueError("minimum and maximum bound an int field")
         if field.input_only and field.kind not in ("str", "choice", "set", "names"):
@@ -231,7 +244,7 @@ def build_spec(resource: Resource) -> dict[str, Any]:
             spec[field.name]["choices"] = list(field.choices)
         if field.kind == "secret":
             spec[field.name]["no_log"] = True
-    if any(field.kind == "secret" for field in resource.fields):
+    if any(field.kind == "secret" and not field.readable for field in resource.fields):
         spec["update_password"] = {
             "type": "str",
             "choices": ["on_create", "always"],
@@ -304,6 +317,8 @@ def normalize(field: Field, raw: Any, *, input_value: bool = False) -> Any:
         if not isinstance(raw, str) or (input_value and len(raw) > field.limit):
             raise invalid
         if field.kind == "secret" and not raw:
+            if field.readable and (not input_value or field.empty_clears):
+                return ""
             raise invalid
         if checked and field.pattern and not re.fullmatch(field.pattern, raw):
             raise invalid
@@ -605,10 +620,65 @@ class Engine(Binding):
         return self.find(self.key)
 
     def managed(self, record: dict[str, Any]) -> dict[str, Any]:
-        return self.project(record)
+        comparable = self.project(record)
+        for field in self.resource.fields:
+            if field.kind == "secret" and field.readable:
+                if field.name not in record:
+                    raise ProductError(
+                        category="response", code="schema", fields=[field.name]
+                    )
+                value = self.client.decode(field, record[field.name])
+                if not isinstance(value, str):
+                    raise ProductError(
+                        category="response", code="schema", fields=[field.name]
+                    )
+                comparable[field.name] = normalize(field, value)
+        return comparable
 
     def secret(self, name: str) -> bool:
-        return self.resource.get_field(name).kind == "secret"
+        field = self.resource.get_field(name)
+        return field.kind == "secret" and not field.readable
+
+    def _public_values(
+        self, values: dict[str, Any], *, marker: bool = False
+    ) -> dict[str, Any]:
+        private = {
+            field.name for field in self.resource.fields if field.kind == "secret"
+        }
+        return {
+            key: "<redacted>" if key in private else value
+            for key, value in values.items()
+            if marker or key not in private
+        }
+
+    def public(self, record: dict[str, Any]) -> dict[str, Any]:
+        value = super().public(record)
+        return (
+            self._public_values(value)
+            if any(f.readable for f in self.resource.fields)
+            else value
+        )
+
+    def predict(self) -> dict[str, Any]:
+        value = super().predict()
+        return (
+            self._public_values(value)
+            if any(f.readable for f in self.resource.fields)
+            else value
+        )
+
+    def diff(self) -> dict[str, Any] | None:
+        result = super().diff()
+        if result is None or not any(f.readable for f in self.resource.fields):
+            return result
+        if self.whole_diff and not self.absent:
+            result["after"] = super().predict()
+        return {
+            side: self._public_values(value, marker=True)
+            if isinstance(value, dict)
+            else value
+            for side, value in result.items()
+        }
 
     def same(self, name: str, current: Any, desired: Any) -> bool:
         return equal(self.resource.get_field(name), current, desired)

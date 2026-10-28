@@ -151,6 +151,52 @@
           - (__fixture_acceptance['content'] | ansible.builtin.from_json)['accepted']
       no_log: true
 
+    - name: "Set the readable secret"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        name: "integration_fixture"
+        access_secret: "SYNTHETIC-readable-fixture-secret"
+        update_password: "on_create"
+      diff: true
+      register: __fixture_readable
+
+    - name: "Repeat the readable secret despite rotation policy"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        name: "integration_fixture"
+        access_secret: "SYNTHETIC-readable-fixture-secret"
+        update_password: "always"
+      register: __fixture_readable_repeat
+
+    - name: "Clear the readable secret"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        name: "integration_fixture"
+        access_secret: ""
+      diff: true
+      register: __fixture_readable_clear
+
+    - name: "Repeat the empty readable secret"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        name: "integration_fixture"
+        access_secret: ""
+      register: __fixture_readable_empty
+
+    - name: "Read the public fixture"
+      {{ namespace }}.{{ collection_name }}.fixture_info:
+        name: "integration_fixture"
+      register: __fixture_readable_info
+
+    - name: "Confirm private comparison and clearing"
+      ansible.builtin.assert:
+        that:
+          - __fixture_readable['changed_fields'] == ['access_secret']
+          - __fixture_readable['verified'] == 'observed'
+          - __fixture_readable['diff']['before']['access_secret'] == '<redacted>'
+          - __fixture_readable['diff']['after']['access_secret'] == '<redacted>'
+          - __fixture_readable['fixture']['access_secret'] is not ansible.builtin.defined
+          - __fixture_readable_repeat is not ansible.builtin.changed
+          - __fixture_readable_clear['changed_fields'] == ['access_secret']
+          - __fixture_readable_empty is not ansible.builtin.changed
+          - __fixture_readable_info['fixture']['access_secret'] is not ansible.builtin.defined
+
     - name: "Create a fixture dependency"
       ansible.builtin.uri:
         url: "{% raw %}{{ fixture_fake_connection['url'] }}{% endraw %}/dependents"

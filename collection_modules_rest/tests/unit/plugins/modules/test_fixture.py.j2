@@ -20,6 +20,7 @@ from ansible_collections.{{ namespace }}.\
 from ansible_collections.{{ namespace }}.\
     {{ collection_name }}.plugins.modules import (
         fixture,
+        fixture_info,
     )
 # isort: on
 # fmt: on
@@ -149,6 +150,7 @@ def test_write_only_password_policy(fake: FakeProduct, run_module: RunModule) ->
             value not in json.dumps(result) for value in (OLD_SECRET, SECRET, secret)
         )
         assert "password" not in result["fixture"]
+        assert "access_secret" not in result["fixture"]
         assert "password" not in result["diff"]["after"]
 
 
@@ -206,3 +208,111 @@ def test_string_variables_replace_repeat_and_clear(
     assert rejected["failed"] and not rejected["changed"]
     assert run_module(fixture.main, name="example", variables={})["changed"]
     assert fake.rows[key]["variables"] == {}
+
+
+@pytest.mark.parametrize("check", [False, True])
+@pytest.mark.parametrize("state", ["present", "absent"])
+@pytest.mark.parametrize("exists", [False, True])
+def test_readable_secret_absence_from_predictions_and_observations(
+    fake: FakeProduct, run_module: RunModule, check: bool, state: str, exists: bool
+) -> None:
+    secret = "SYNTHETIC-REST-READABLE-SECRET"
+    if exists:
+        fake.add(access_secret=OLD_SECRET)
+    result = run_module(
+        fixture.main,
+        name="example",
+        access_secret=secret,
+        state=state,
+        _ansible_check_mode=check,
+        _ansible_diff=True,
+    )
+    assert not result.get("failed")
+    announced = result.pop("_ansible_new_secrets", [])
+    assert set(announced) <= {SECRET, "SYNTHETIC-key", secret}
+    assert all(
+        value not in json.dumps(result) for value in (OLD_SECRET, SECRET, secret)
+    )
+    assert "access_secret" not in (result.get("fixture") or {})
+    info = run_module(fixture_info.main, name="example")
+    announced = info.pop("_ansible_new_secrets", [])
+    assert set(announced) <= {SECRET, "SYNTHETIC-key"}
+    assert all(value not in json.dumps(info) for value in (OLD_SECRET, SECRET, secret))
+    assert "access_secret" not in (info.get("fixture") or {})
+    if exists and state == "present":
+        assert result["changed_fields"] == ["access_secret"]
+        assert result["diff"] == {
+            "before": {"access_secret": "<redacted>"},
+            "after": {"access_secret": "<redacted>"},
+        }
+
+
+@pytest.mark.parametrize("policy", ["on_create", "always"])
+def test_readable_secret_repeats_clears_and_ignores_rotation_policy(
+    fake: FakeProduct, run_module: RunModule, policy: str
+) -> None:
+    secret = "SYNTHETIC-REST-READABLE-SECRET"
+    created = run_module(
+        fixture.main, name="example", access_secret=secret, update_password=policy
+    )
+    assert created["changed"] and created["verified"] == "observed"
+    key = created["fixture"]["id"]
+    assert fake.rows[key]["access_secret"] == secret
+    assert not run_module(
+        fixture.main, name="example", access_secret=secret, update_password=policy
+    )["changed"]
+    assert not run_module(fixture.main, name="example", access_secret=None)["changed"]
+    cleared = run_module(
+        fixture.main, name="example", access_secret="", _ansible_diff=True
+    )
+    assert cleared["changed_fields"] == ["access_secret"]
+    assert fake.rows[key]["access_secret"] == ""
+    assert not run_module(fixture.main, name="example", access_secret="")["changed"]
+    for result, declared in ((created, secret), (cleared, "")):
+        announced = result.pop("_ansible_new_secrets", [])
+        assert set(announced) <= {SECRET, "SYNTHETIC-key", declared}
+        assert all(
+            value not in json.dumps(result) for value in (OLD_SECRET, SECRET, secret)
+        )
+        assert "access_secret" not in result["fixture"]
+
+
+@pytest.mark.parametrize("fault", ["lost", "drop", "refused", "readback", "malformed"])
+def test_readable_secret_failure_and_lost_reply_are_private(
+    fake: FakeProduct, run_module: RunModule, fault: str
+) -> None:
+    secret = "SYNTHETIC-REST-READABLE-SECRET"
+    key = fake.add(access_secret=OLD_SECRET)
+    if fault == "lost":
+        fake.lose_next("update", lost_response)
+    elif fault == "drop":
+        fake.drop_next("update")
+    elif fault == "refused":
+        fake.faults[f"/fixtures/{key}"] = lambda: Response(
+            422, None, raw=secret.encode()
+        )
+    else:
+
+        def after() -> None:
+            if fault == "readback":
+                fake.faults["/fixtures/by-name/example"] = lambda: Response(
+                    500, None, raw=secret.encode()
+                )
+            else:
+                fake.rows[key]["access_secret"] = {"private": secret}
+
+        fake.lose_next("update", after)
+    result = run_module(
+        fixture.main, name="example", access_secret=secret, _ansible_diff=True
+    )
+    announced = result.pop("_ansible_new_secrets", [])
+    assert set(announced) <= {SECRET, "SYNTHETIC-key", secret}
+    assert all(
+        value not in json.dumps(result) for value in (OLD_SECRET, SECRET, secret)
+    )
+    assert len(fake.writes()) == 1
+    if fault == "lost":
+        assert not result.get("failed") and result["verified"] == "observed"
+    else:
+        assert result["failed"] and "exception" in result
+        assert result["outcome"] == ("unchanged" if fault == "refused" else "unknown")

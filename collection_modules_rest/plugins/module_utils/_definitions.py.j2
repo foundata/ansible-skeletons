@@ -57,6 +57,13 @@ FIXTURE = Resource(
             reference=Reference("/parents", "name", IDENTIFIER, wire="parent_id"),
         ),
         Field(
+            "access_secret",
+            "secret",
+            "Returned secret; empty clears",
+            readable=True,
+            empty_clears=True,
+        ),
+        Field(
             "password", "secret", "Write-only password; controlled by update_password"
         ),
     ),

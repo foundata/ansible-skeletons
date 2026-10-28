@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import replace
 from typing import Any, Callable
 
@@ -682,3 +683,222 @@ def test_string_map_replaces_compares_predicts_and_clears(
         "update",
         "update",
     ]
+
+
+READABLE = Field(
+    "access_secret",
+    "secret",
+    "Private readable secret",
+    readable=True,
+    empty_clears=True,
+)
+PRIVATE_OLD = "SYNTHETIC-STORED-ENGINE-SECRET"
+PRIVATE_NEW = "SYNTHETIC-DECLARED-ENGINE-SECRET"
+
+
+def private_result(
+    result: dict[str, Any], *, declared: tuple[str, ...] = (PRIVATE_NEW,)
+) -> dict[str, Any]:
+    result = dict(result)
+    announced = result.pop("_ansible_new_secrets", [])
+    assert set(announced) <= set(declared)
+    assert all(
+        secret not in json.dumps(result)
+        for secret in (PRIVATE_OLD, PRIVATE_NEW, "write-only-value")
+    )
+    assert "access_secret" not in (result.get("synthetic") or {})
+    return result
+
+
+def test_readable_secret_spec_and_explicit_empty_policy() -> None:
+    resource = replace(SYNTHETIC, fields=(READABLE,))
+    spec = build_spec(resource)
+    assert spec["access_secret"] == {"type": "str", "no_log": True}
+    assert "update_password" not in spec
+    assert normalize(READABLE, "", input_value=True) == ""
+    disallow = replace(READABLE, empty_clears=False)
+    assert normalize(disallow, "") == ""
+    with pytest.raises(ProductError):
+        normalize(disallow, "", input_value=True)
+    with pytest.raises(ProductError):
+        normalize(Field("password", "secret", "Write only"), "", input_value=True)
+    for field in (replace(READABLE, kind="str"), replace(READABLE, readable=False)):
+        with pytest.raises(ValueError):
+            build_spec(replace(SYNTHETIC, fields=(field,)))
+
+
+@pytest.mark.parametrize("check", [False, True])
+def test_readable_secret_refuses_empty_without_clearing_policy(
+    synthetic: SyntheticClient, run_module: RunModule, check: bool
+) -> None:
+    synthetic.add(access_secret=PRIVATE_OLD)
+    resource = replace(SYNTHETIC, fields=(replace(READABLE, empty_clears=False),))
+    result = private_result(
+        run_module(
+            entry(resource),
+            label="example",
+            access_secret="",
+            _ansible_check_mode=check,
+            _ansible_diff=True,
+        ),
+        declared=("",),
+    )
+    assert result["failed"] and not result["changed"] and not synthetic.writes
+    assert result["error_code"] == "invalid_field"
+    assert result["fields"] == ["access_secret"]
+
+
+@pytest.mark.parametrize("whole", [False, True])
+@pytest.mark.parametrize("check", [False, True])
+@pytest.mark.parametrize(
+    "operation", ["create", "update", "same", "clear", "delete", "omitted", "null"]
+)
+def test_readable_secret_never_leaves_public_results(
+    synthetic: SyntheticClient,
+    run_module: RunModule,
+    monkeypatch: pytest.MonkeyPatch,
+    whole: bool,
+    check: bool,
+    operation: str,
+) -> None:
+    monkeypatch.setattr(Engine, "whole_diff", whole)
+    resource = replace(SYNTHETIC, fields=(READABLE,))
+    if operation != "create":
+        synthetic.add(access_secret=PRIVATE_NEW if operation == "same" else PRIVATE_OLD)
+    values = (
+        {}
+        if operation == "omitted"
+        else {
+            "access_secret": None
+            if operation == "null"
+            else ""
+            if operation == "clear"
+            else PRIVATE_NEW
+        }
+    )
+    result = private_result(
+        run_module(
+            entry(resource),
+            label="example",
+            state="absent" if operation == "delete" else "present",
+            _ansible_check_mode=check,
+            _ansible_diff=True,
+            **values,
+        ),
+        declared=tuple(value for value in values.values() if isinstance(value, str)),
+    )
+    assert not result.get("failed")
+    changed = operation not in {"same", "omitted", "null"}
+    assert result["changed"] is changed
+    assert len(synthetic.writes) == int(changed and not check)
+    if operation in {"update", "clear"}:
+        assert result["changed_fields"] == ["access_secret"]
+        assert result["diff"]["before"]["access_secret"] == "<redacted>"
+        assert result["diff"]["after"]["access_secret"] == "<redacted>"
+    if changed and not check and operation != "delete":
+        assert synthetic.rows[1]["access_secret"] == (
+            "" if operation == "clear" else PRIVATE_NEW
+        )
+        assert result["verified"] == "observed"
+
+
+@pytest.mark.parametrize("policy", ["on_create", "always"])
+def test_readable_secret_always_compares_alongside_write_only_policy(
+    synthetic: SyntheticClient, run_module: RunModule, policy: str
+) -> None:
+    resource = replace(
+        SYNTHETIC, fields=(READABLE, Field("password", "secret", "Write only"))
+    )
+    key = synthetic.add(access_secret=PRIVATE_OLD)
+    main = entry(resource)
+    result = private_result(
+        run_module(
+            main,
+            label="example",
+            access_secret=PRIVATE_NEW,
+            update_password=policy,
+            _ansible_diff=True,
+        )
+    )
+    assert result["changed_fields"] == ["access_secret"]
+    assert synthetic.rows[key]["access_secret"] == PRIVATE_NEW
+    assert not private_result(
+        run_module(
+            main, label="example", access_secret=PRIVATE_NEW, update_password=policy
+        )
+    )["changed"]
+
+
+@pytest.mark.parametrize("step", ["", "credential"])
+@pytest.mark.parametrize("fault", ["lost", "drop", "refused", "readback", "malformed"])
+def test_readable_secret_verifies_and_sanitizes_failure_paths(
+    synthetic: SyntheticClient,
+    run_module: RunModule,
+    monkeypatch: pytest.MonkeyPatch,
+    fault: str,
+    step: str,
+) -> None:
+    key = synthetic.add(access_secret=PRIVATE_OLD)
+    original = synthetic.update
+
+    def update(resource: Resource, identity: int, values: dict[str, Any]) -> None:
+        if fault == "refused":
+            synthetic.writes.append("update")
+            raise ProductError(code="rejected")
+        if fault == "drop":
+            synthetic.writes.append("update")
+            return
+        original(resource, identity, values)
+        if fault == "readback":
+
+            def unreadable(*args: Any) -> Any:
+                raise ProductError(category="response", code="schema")
+
+            monkeypatch.setattr(synthetic, "get", unreadable)
+        if fault == "malformed":
+            synthetic.rows[key]["access_secret"] = {"private": PRIVATE_NEW}
+        if fault == "lost":
+            raise ProductError(category="response", code="schema")
+
+    monkeypatch.setattr(synthetic, "update", update)
+    result = private_result(
+        run_module(
+            entry(replace(SYNTHETIC, fields=(replace(READABLE, step=step),))),
+            label="example",
+            access_secret=PRIVATE_NEW,
+            _ansible_diff=True,
+        )
+    )
+    assert synthetic.writes == ["update"]
+    if fault == "lost":
+        assert not result.get("failed") and result["verified"] == "observed"
+    else:
+        assert result["failed"] and "exception" in result
+        assert result["outcome"] == ("unchanged" if fault == "refused" else "unknown")
+        assert result["error_code"] == (
+            "not_persisted"
+            if fault == "drop"
+            else "rejected"
+            if fault == "refused"
+            else "schema"
+        )
+
+
+@pytest.mark.parametrize("check", [False, True])
+def test_existing_managed_hook_still_controls_public_projection(
+    synthetic: SyntheticClient, run_module: RunModule, check: bool
+) -> None:
+    class Extended(Engine):
+        def managed(self, record: dict[str, Any]) -> dict[str, Any]:
+            return {**super().managed(record), "derived": "reviewed public value"}
+
+    def main() -> None:
+        module = AnsibleModule(
+            argument_spec=build_spec(SYNTHETIC), supports_check_mode=True
+        )
+        Extended(module, SYNTHETIC).execute()
+
+    synthetic.add(text="before")
+    result = run_module(main, label="example", text="after", _ansible_check_mode=check)
+    assert result["synthetic"]["derived"] == "reviewed public value"
+    assert result["changed"] and result["synthetic"]["text"] == "after"

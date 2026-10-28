@@ -67,6 +67,8 @@ creates another record. The by-name route's documented 404 proves absence.
 Only declared fields are managed. Omitted and null options stay unmanaged;
 empty values clear fields. Parent names resolve before writes. Passwords are
 write-only, set on creation unless `update_password: always` requests rotation.
+The readable `access_secret` compares privately on every declaration, and an
+empty string clears it. Public state omits it; diffs use a fixed marker.
 Deletion refuses referenced records. Coordinate
 writers, including inventory aliases that address the same endpoint.
 

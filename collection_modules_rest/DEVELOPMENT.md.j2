@@ -171,6 +171,16 @@ entries. `pattern` validates declared keys only, so an older stored key
 outside that pattern stays readable. The existing `map` kind holds names
 mapped to lists of rights.
 
+`Field(kind="secret", readable=True)` compares a returned secret privately
+on every declaration. `update_password` applies only to write-only secrets
+and is absent from the argument spec when there are none. A readable secret
+keeps `no_log=True` and is excluded from public state, including information
+reads and predictions. Its changed name appears in `changed_fields`; a diff
+uses the fixed marker `<redacted>` for that name, never a value or hash.
+`empty_clears=True` permits an empty declaration to clear the readable secret.
+Without that explicit policy an empty declaration is invalid. Both options
+default to false, preserving write-only secret behavior.
+
 ## Releases<a id="releases"></a>
 
 Each change users notice adds a fragment to `changelogs/fragments/`;

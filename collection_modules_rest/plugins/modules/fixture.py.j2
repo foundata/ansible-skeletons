@@ -28,7 +28,7 @@ attributes:
     description: Predicts from a real read, without assigning an identifier on creation.
     support: full
   diff_mode:
-    description: Returns only public managed fields that change.
+    description: Returns public managed fields that change and a fixed marker for a changed readable secret.
     support: full
 options:
   name:
@@ -55,11 +55,20 @@ options:
   parent:
     description: Parent name resolved before writes. An empty string clears the reference; omission and null leave it unmanaged.
     type: str
+  access_secret:
+    description: >-
+      Readable secret compared privately on every declaration. An empty string
+      clears it; omission and null leave it unmanaged. Never returned in public
+      state or as a diff value.
+    type: str
   password:
     description: Write-only password. Never returned; successful writes are unverifiable without an independent acceptance probe.
     type: str
   update_password:
-    description: Set the password only on creation, or write it on every invocation. An always write is not idempotent.
+    description: >-
+      Set the write-only O(password) only on creation, or write it on every
+      invocation. An always write is not idempotent. Does not apply to
+      O(access_secret), which always compares privately.
     type: str
     default: on_create
     choices:
