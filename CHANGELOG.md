@@ -25,6 +25,11 @@ and the project adheres to
 
 ### Changed
 
+- collection_default and all three module variants: `helper-lint` includes
+  collection Python below `tests/`, excluding ansible-test's `unit/`,
+  `integration/` and `output/` trees. Development guidance puts pytest suites
+  below `tests/unit/` so ansible-test runs them.
+
 - collection_modules_cli: the invariant contract owns compatibility refusal,
   literal stdin and target environment, loader refusal, host identity and
   inventory completeness; product locator and planning examples stay local.

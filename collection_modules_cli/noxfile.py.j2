@@ -224,7 +224,12 @@ def helper_lint(session: nox.Session) -> None:
         Path("extensions/molecule"),
         Path("tools"),
         Path("scripts"),
-        Path("tests/runtime_check.py"),
+        *sorted(
+            path
+            for path in Path("tests").glob("*")
+            if path.name not in {"unit", "integration", "output"}
+            and (path.is_dir() or path.suffix == ".py")
+        ),
         *sorted(Path("roles").glob("*/files")),
     ]
     roots = [str(candidate) for candidate in candidates if candidate.exists()]

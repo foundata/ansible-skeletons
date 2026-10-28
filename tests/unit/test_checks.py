@@ -1010,6 +1010,7 @@ def test_helper_session_covers_all_roots_without_executing_files(
         "tools/inventory/extract.py",
         "scripts/maintenance.py",
         "tests/runtime_check.py",
+        "tests/regression/test_product.py",
     ]
     for name in paths:
         path = tmp_path / name
@@ -1020,16 +1021,27 @@ def test_helper_session_covers_all_roots_without_executing_files(
     session = HelperSession()
     load_helper_session(helper_project, check_only=True)(session)
     assert len(session.commands) == 3
-    assert set(session.commands[0][-6:]) == {
+    assert set(session.commands[0][-7:]) == {
         "extensions/molecule",
         "tools",
         "scripts",
         "tests/runtime_check.py",
+        "tests/regression",
         "roles/first/files",
         "roles/second/files",
     }
     assert all("--fix" not in command for command in session.commands)
     assert session.commands[-1][:3] == ("ruff", "format", "--check")
+
+
+def test_collection_owned_pytest_outside_ansible_test_is_linted(
+    helper_project: str, tmp_path: Path
+) -> None:
+    path = tmp_path / "tests/regression/test_product.py"
+    path.parent.mkdir(parents=True)
+    path.write_text("print(missing_name)\n", encoding="utf-8")
+    with pytest.raises(subprocess.CalledProcessError):
+        load_helper_session(helper_project, check_only=True)(HelperSession())
 
 
 @pytest.mark.parametrize("empty_directory", [False, True])
@@ -1061,6 +1073,10 @@ def test_helper_session_respects_exclusions_and_python_only_scope(
         "tools/template.py.j2",
         "tools/notebook.ipynb",
         "tools/script.rb",
+        "tests/config.yml",
+        "tests/unit/test_product.py",
+        "tests/integration/targets/example/files/helper.py",
+        "tests/output/temporary.py",
     ):
         path = tmp_path / name
         path.parent.mkdir(parents=True, exist_ok=True)

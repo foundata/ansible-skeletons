@@ -48,8 +48,13 @@ Among the default sessions:
   rules.
 - `helper-lint` checks the Python outside `plugins/` with
   [ruff.toml](ruff.toml): `extensions/molecule/`, the roles' `files/`,
-  `tools/`, `scripts/` and `tests/runtime_check.py`. Add it to CI
-  configurations that list sessions explicitly.
+  `tools/`, `scripts/` and `tests/` apart from `tests/unit/`,
+  `tests/integration/` and `tests/output/`. Add it to CI configurations that
+  list sessions explicitly.
+
+Put the collection's own pytest suites below `tests/unit/` so ansible-test
+runs them. Other Python below `tests/` is linted by `helper-lint` but is not
+run as a test suite.
 
 Session definitions: [noxfile.py](noxfile.py).
 Built-in session settings: [antsibull-nox.toml](antsibull-nox.toml).
