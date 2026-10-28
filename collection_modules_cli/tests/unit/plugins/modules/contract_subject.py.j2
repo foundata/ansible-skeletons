@@ -9,11 +9,12 @@ with no writers; no mutable exports are needed by the contract.
 
 from __future__ import annotations
 
+import json
 import os
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from ansible_collections.foundata.utils.plugins.module_utils import exec as execution
 
@@ -43,6 +44,7 @@ from ansible_collections.{{ namespace }}.\
 from ..fake_product import FOREIGN, IDENTITY, SECRET, Lab
 from .contracts import (
     Contract,
+    Expectations,
     FaultInterpretation,
     LiteralInputs,
     NativeFault,
@@ -51,9 +53,59 @@ from .contracts import (
     validate,
 )
 
+ORIGINAL = {"enabled": True, "limit": 10, "label": "initial"}
+IDENTIFIERS = {"app": "alpha", "key": "quota", "id": IDENTITY}
+
+
+def flat_expectations(
+    state: dict[str, Any],
+    fields: tuple[str, ...],
+    partial: dict[str, Any] | None = None,
+) -> Expectations:
+    return Expectations(
+        managed=state,
+        projection={**IDENTIFIERS, **state},
+        changed_fields=fields,
+        diff={
+            "before": {name: ORIGINAL[name] for name in fields},
+            "after": {name: state[name] for name in fields},
+        },
+        partial=partial,
+    )
+
+
+def source_expectations(state: dict[str, Any], fields: tuple[str, ...]) -> Expectations:
+    origins = {
+        name: {"kind": "local" if name in fields else "default"} for name in state
+    }
+    properties = {
+        name: {"value": value, "source": origins[name]} for name, value in state.items()
+    }
+    return Expectations(
+        managed={**state, "origins": origins},
+        projection={**IDENTIFIERS, "settings": properties},
+        changed_fields=fields,
+        diff={
+            "before": {
+                name: {"value": ORIGINAL[name], "source": {"kind": "default"}}
+                for name in fields
+            },
+            "after": {name: properties[name] for name in fields},
+        },
+    )
+
 
 class FixtureAdapter:
     contract = Contract()
+    expected: ClassVar[Expectations | None] = flat_expectations(
+        {"enabled": False, "limit": 0, "label": ""},
+        ("enabled", "label", "limit"),
+        partial={"enabled": True, "limit": 0, "label": "initial"},
+    )
+    literal_expected: ClassVar[Expectations | None] = flat_expectations(
+        {**ORIGINAL, "label": "$HOME; ~ ${HOME}"},
+        ("label",),
+    )
     result_key = "fixture"
     version = "1.0.0"
     identity_command = "uid"
@@ -68,11 +120,6 @@ class FixtureAdapter:
             "expected_id": IDENTITY,
         }
         self.change: dict[str, Any] = {"enabled": False, "limit": 0, "label": ""}
-        self.original: dict[str, Any] = {
-            "enabled": True,
-            "limit": 10,
-            "label": "initial",
-        }
         self.missing: dict[str, Any] = {"key": "missing"}
         self.wrong_identity: dict[str, Any] = {
             "expected_id": "8a7bf6f9-4965-4718-8dd4-a4fcbbeb845a"
@@ -164,9 +211,79 @@ class VocabularyFixture(_fixture.Fixture):
         )
 
 
+class SourceFixture(VocabularyFixture):
+    """Nested declarations with observed native origins in projection and diff."""
+
+    def declared(self) -> dict[str, Any]:
+        values = {
+            name: value
+            for name, value in (self.params.get("settings") or {}).items()
+            if value is not None
+        }
+        if "limit" in values and not 0 <= values["limit"] <= 100:
+            raise _client.ProductError(category="argument", code="invalid_value")
+        return {"settings": values} if values else {}
+
+    def managed(self, record: Any) -> dict[str, Any]:
+        return {
+            "app": record["app"],
+            "key": record["key"],
+            "id": record["id"],
+            "settings": {
+                name: {"value": record[name], "source": record["origins"][name]}
+                for name in _client.FIELDS
+            },
+        }
+
+    def same(self, name: str, current: Any, desired: Any) -> bool:
+        return all(
+            current.get(key) == {"value": value, "source": {"kind": "local"}}
+            for key, value in desired.items()
+        )
+
+    def predict(self) -> dict[str, Any]:
+        current = self.current or {}
+        settings = dict(current.get("settings", {}))
+        for name, value in self.delta.get("settings", {}).items():
+            settings[name] = {"value": value, "source": {"kind": "local"}}
+        return {**current, "settings": settings}
+
+    def diff(self) -> dict[str, Any]:
+        fields = self.changed_fields()
+        return {
+            "before": {name: self.current["settings"][name] for name in fields},
+            "after": {name: self.predict()["settings"][name] for name in fields},
+        }
+
+    def changed_fields(self) -> list[str]:
+        return sorted(self.delta.get("settings", {}))
+
+    def write(self) -> None:
+        self.client.update(self.record["id"], self.delta["settings"])
+
+
+class SourceInfo(SourceFixture, _fixture.FixtureInfo):
+    pass
+
+
+def source_arguments(*, info: bool = False) -> dict[str, Any]:
+    spec = _fixture.argument_spec(info=info)
+    if not info:
+        options = {name: spec.pop(name) for name in _client.FIELDS}
+        options["label"]["choices"] = ["initial", "accepted"]
+        spec["settings"] = {"type": "dict", "options": options}
+    return spec
+
+
 class AtomicFixtureAdapter(FixtureAdapter):
     """Exercise one indivisible field through the same executable."""
 
+    expected: ClassVar[Expectations | None] = source_expectations(
+        {**ORIGINAL, "limit": 0}, ("limit",)
+    )
+    literal_expected: ClassVar[Expectations | None] = source_expectations(
+        {**ORIGINAL, "label": "accepted"}, ("label",)
+    )
     contract = Contract(
         granularity="atomic",
         environment_policy="neutralize",
@@ -181,9 +298,9 @@ class AtomicFixtureAdapter(FixtureAdapter):
         ),
         write_command=WriteCommand((("set", "--"),)),
         literals=LiteralInputs(
-            accepted={"label": "accepted"},
+            accepted={"settings": {"label": "accepted"}},
             argv=("accepted",),
-            refused=({"label": "$HOME; ~ ${HOME}"},),
+            refused=({"settings": {"label": "$HOME; ~ ${HOME}"}},),
         ),
     )
 
@@ -192,9 +309,15 @@ class AtomicFixtureAdapter(FixtureAdapter):
         fake.profile_controls = {"generic_reject": True}
         fake.control()
         fake.monkeypatch.setattr(_fixture, "Client", SetClient)
-        fake.monkeypatch.setattr(fixture, "Fixture", VocabularyFixture)
-        self.change = {"limit": 0}
-        self.original = {"limit": 10}
+        fake.monkeypatch.setattr(fixture, "Fixture", SourceFixture)
+        fake.monkeypatch.setattr(fixture, "argument_spec", source_arguments)
+        fake.monkeypatch.setattr(fixture_info, "FixtureInfo", SourceInfo)
+        fake.monkeypatch.setattr(fixture_info, "argument_spec", source_arguments)
+        state = fake.read()
+        for row in state["objects"].values():
+            row["origins"] = {name: {"kind": "default"} for name in _client.FIELDS}
+        (fake.directory / "state.json").write_text(json.dumps(state))
+        self.change = {"settings": {"limit": 0}}
 
 
 SUBJECTS = (

@@ -119,31 +119,32 @@ the same inventory and runs every applicable case with a fresh backend.
 
 The adapter's typed `Contract` declares mutation `granularity`. Its default,
 `fieldwise`, requires evidence that some declared fields changed while
-others did not. `atomic` exercises an indivisible change with an unreadable
-reply and checks its complete stored effect and uncertain outcome. The
+others did not. `atomic` exercises an indivisible change with failed
+readback and checks its complete stored effect and uncertain outcome. The
 example runs both configurations through the same executable, with `limit`
 alone in the atomic configuration. Synthetic lifecycle tests retain partial
 progress coverage.
 
-`Contract.write_command` recognizes contiguous native argv tokens. Its
-default is `update --`; the second configuration uses `set --`. Declare
-alternatives for each native write form, such as `set` and `inherit`. Start
-failure is injected at `subprocess.Popen`, after the real transport has
-prepared the command. The case requires one matching start attempt,
-unchanged storage and zero dispatched writes. A fake that bypasses the
-subprocess boundary cannot satisfy this case.
+`Contract.write_command` uses `WriteCommand.alternatives` to recognize
+contiguous native argv tokens. Its default is `update --`; the second
+configuration uses `set --`. Declare alternatives for each native write
+form, such as `set` and `inherit`. Start failure is injected at
+`subprocess.Popen`, after the real transport has prepared the command. The
+case requires one matching start attempt, unchanged storage and zero
+dispatched writes. A fake that bypasses the subprocess boundary cannot
+satisfy this case.
 
-`Contract.literals` holds `LiteralInputs`: accepted module arguments, their
-exact native argv elements and unsupported arguments. Defaults use the
-fixture's shell-shaped label and an overlong refused label. The second
-configuration accepts `accepted` and refuses the shell-shaped string before
-any command, in normal and check mode. Successful values must reach the
-executable literally. The shared executable transport cases in
-`test_transport.py` separately prove raw argv and secret stdin bytes,
-including a stream larger than a pipe buffer. An empty stdin stream refuses
-before dispatch. These cases use their own `transport_command.py` executable
-and require no product adapter or options. Products need no extra free-text
-or secret option to satisfy their literal-input obligations.
+`Contract.literals` holds `LiteralInputs.accepted` module arguments, exact
+native elements in `argv`, and unsupported argument dictionaries in
+`refused`. Defaults use the fixture's shell-shaped label and an overlong
+refused label. The second configuration accepts `accepted` and refuses the
+shell-shaped string before any command, in normal and check mode. Successful
+values must reach the executable literally. The shared executable transport
+cases in `test_transport.py` separately prove raw argv and secret stdin
+bytes, including a stream larger than a pipe buffer. An empty stdin stream
+refuses before dispatch. These cases use their own `transport_command.py`
+executable and require no product adapter or options. Products need no extra
+free-text or secret option to satisfy their literal-input obligations.
 
 The adapter implements `inject_host_identity()` at its prepared execution
 boundary. The fixture changes only the prepared numeric host UID; products
@@ -170,9 +171,11 @@ pending code requires a converged repeat after an observed complete effect.
 The alternate configuration retains `validation_failed` after an observed
 effect and treats a generic rejection as unknown. It persists a pending
 marker and refuses a new invocation with `unsettled_write`, without another
-write. Each native fault declares its own stable error code and optional
-pending code. Incompatible result/effect declarations fail during
-collection.
+write. Set `NativeFault.result` to `retain_effect` for a retained failure
+after an observed effect, or `uncertain` for a generic rejection. Its
+`error_code` declares the stable native failure; `pending_code` declares a
+refused repeat when a durable marker remains. Incompatible result/effect
+declarations fail during collection.
 
 Every native fault still dispatches at most once, preserves redaction and
 derives its changed or unknown outcome from observed evidence. Only a
@@ -181,6 +184,31 @@ rejection. Status 124 alone never proves expiry. Real deadline termination
 and transport nondispatch remain mandatory. A declared pending repeat must
 fail unchanged with its stable code and preserve storage and the single
 write count.
+
+Export `CONFIGURATIONS` as a tuple of complete subject inventories. The
+example includes its default `SUBJECTS` and a second executable
+configuration. A product registers the configurations its own interface
+supports; each one runs every applicable case.
+
+Each writer factory declares `expected` and `literal_expected` as class
+variables typed `ClassVar[Expectations | None]`. Writers require concrete
+`Expectations` instances. Their `managed` field holds exact values after the
+write; `projection` holds the complete public result, `diff` the
+before/after objects, and `changed_fields` the sorted public field names.
+The default fixture declares its flat values explicitly. Its fieldwise
+declaration also supplies the exact `partial` managed state; atomic writers
+leave `partial` unset. Malformed expectations or a granularity mismatch fail
+during collection. Observational factories may leave both expectations
+unset.
+
+The second fixture configuration accepts a nested `settings` declaration and
+publishes each value with its recorded origin. Its expected stored state
+includes the native origin map; its projection and diff retain nested
+`value` and `source` objects. Prediction, normal writes, readback faults,
+timeouts and literal values all use the declared expectations. Storage
+comparisons preserve every unrelated row and undeclared value. Input
+dictionaries and public field names may have different shapes. The adapter's
+`literal` input permits nested values.
 
 A multi-step subject belongs to a product operation that actually has
 several steps; independent fields in one command do not declare such an

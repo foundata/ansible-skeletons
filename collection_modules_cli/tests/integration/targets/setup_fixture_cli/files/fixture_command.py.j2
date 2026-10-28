@@ -140,6 +140,8 @@ def main() -> None:
             for name, value in values.items():
                 if mode != "partial" or name == "limit":
                     record[name] = value
+                    if "origins" in record:
+                        record["origins"][name] = {"kind": "local"}
             save(state)
         if mode == "readback_failed":
             Path("controls.json").write_text(json.dumps({"read": "failed"}))

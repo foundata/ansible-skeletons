@@ -31,9 +31,12 @@ and the project adheres to
 - `collection_modules_cli` for products administered through a command line on
   the managed host. It shares the lifecycle and check scaffolding, with an
   existing-only hook fixture, real information and planning modules, bounded
-  executable transport and its own mandatory CLI contract. The foreground
-  locator and conditional file fixture make no claim about a product's native
-  concurrency guarantees or container wrappers.
+  executable transport and its own mandatory CLI contract. Typed product
+  declarations cover atomic and fieldwise writes, native command recognition,
+  accepted and refused literals, prepared identities, effective environments,
+  native failures and exact state, projection and diff expectations. The
+  foreground locator and conditional file fixture make no claim about a
+  product's native concurrency guarantees or container wrappers.
 
 ### Changed
 
@@ -54,9 +57,13 @@ and the project adheres to
   `integration/` and `output/` trees. Development guidance puts pytest suites
   below `tests/unit/` so ansible-test runs them.
 
-- collection_modules_cli: the invariant contract owns compatibility refusal,
-  literal stdin and target environment, loader refusal, host identity and
-  inventory completeness; product locator and planning examples stay local.
+- collection_modules_cli: the invariant contract keeps compatibility refusal,
+  real information entries, literal argv and pre-dispatch validation, prepared
+  host identity, effective environments, evidence-derived outcomes and no
+  redispatch mandatory. The executable fixture exercises both declared native
+  behaviors, including loader neutralization, retained failures with pending
+  repeats and nested source-aware results. Raw strings and secret stdin have
+  separate transport cases; product locator and planning examples stay local.
 
 - `collection_modules_rest` is the name of the REST module skeleton.
 

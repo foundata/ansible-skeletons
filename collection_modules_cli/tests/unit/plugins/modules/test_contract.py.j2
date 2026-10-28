@@ -30,6 +30,7 @@ from .contract_subject import CONFIGURATIONS, SUBJECTS
 from .contracts import (
     Adapter,
     Contract,
+    Expectations,
     FaultInterpretation,
     LiteralInputs,
     NativeFault,
@@ -67,6 +68,12 @@ def public(result: dict[str, Any], adapter: Adapter) -> dict[str, Any]:
     return result
 
 
+def expectations(adapter: Adapter, *, literal: bool = False) -> Expectations:
+    declaration = adapter.literal_expected if literal else adapter.expected
+    assert declaration is not None
+    return declaration
+
+
 def test_every_writer_changes_repeats_predicts_and_preserves(
     writer: Subject, fake: Any, run_module: RunModule
 ) -> None:
@@ -74,6 +81,7 @@ def test_every_writer_changes_repeats_predicts_and_preserves(
     adapter = subject.adapter(fake)
     before = adapter.rows()
     selected = adapter.selected()
+    want = expectations(adapter)
     prediction = public(
         run_module(
             subject.writer,
@@ -85,6 +93,9 @@ def test_every_writer_changes_repeats_predicts_and_preserves(
         adapter,
     )
     assert prediction["changed"] and prediction["verified"] == "predicted"
+    assert prediction[adapter.result_key] == want.projection
+    assert prediction["changed_fields"] == list(want.changed_fields)
+    assert prediction["diff"] == want.diff
     assert adapter.rows() == before and not adapter.records("writes.jsonl")
     result = public(
         run_module(
@@ -96,14 +107,14 @@ def test_every_writer_changes_repeats_predicts_and_preserves(
         adapter,
     )
     assert result["changed"] and result["verified"] == "observed"
-    assert result["changed_fields"] == sorted(adapter.change)
-    assert result["diff"] == {"before": adapter.original, "after": adapter.change}
+    assert result["changed_fields"] == list(want.changed_fields)
+    assert result["diff"] == want.diff
+    assert result[adapter.result_key] == want.projection
     assert adapter.identity(result[adapter.result_key]) == adapter.identity(selected)
-    for name, value in adapter.change.items():
-        assert adapter.selected()[name] == value
+    assert adapter.selected() == {**selected, **want.managed}
     for key, row in before.items():
         expected = (
-            {**row, **adapter.change}
+            {**row, **want.managed}
             if adapter.identity(row) == adapter.identity(selected)
             else row
         )
@@ -112,6 +123,7 @@ def test_every_writer_changes_repeats_predicts_and_preserves(
         run_module(subject.writer, **adapter.arguments, **adapter.change), adapter
     )
     assert not repeated["changed"] and repeated["verified"] == "observed"
+    assert repeated[adapter.result_key] == want.projection
     assert len(adapter.records("writes.jsonl")) == 1
 
 
@@ -224,6 +236,7 @@ def test_uncertain_reply_is_reconciled_without_redispatch(
 ) -> None:
     subject = writer
     adapter = subject.adapter(fake)
+    before = adapter.selected()
     adapter.control(update=mode)
     result = public(
         run_module(subject.writer, **adapter.arguments, **adapter.change), adapter
@@ -241,9 +254,7 @@ def test_uncertain_reply_is_reconciled_without_redispatch(
     else:
         assert not result.get("failed") and result["verified"] == "observed"
     assert result["changed"]
-    assert all(
-        adapter.selected()[key] == value for key, value in adapter.change.items()
-    )
+    assert adapter.selected() == {**before, **expectations(adapter).managed}
     assert len(adapter.records("writes.jsonl")) == 1
     after = adapter.rows()
     repeated = public(
@@ -310,10 +321,12 @@ def test_effect_evidence_controls_outcome(
             assert len(adapter.records("writes.jsonl")) == 1
             assert adapter.selected() == before
     elif mode == "partial":
-        matches = [stored[key] == value for key, value in adapter.change.items()]
-        assert any(matches) and not all(matches)
+        want = expectations(adapter)
+        assert want.partial is not None
+        assert stored == {**before, **want.partial}
+        assert stored != before and stored != {**before, **want.managed}
     else:
-        assert all(stored[key] == value for key, value in adapter.change.items())
+        assert stored == {**before, **expectations(adapter).managed}
 
 
 @pytest.mark.parametrize("mode", ["timeout_before", "timeout_after"])
@@ -332,8 +345,12 @@ def test_expiry_keeps_uncertainty_and_terminates_child(
     assert result["error_code"] == "deadline_exceeded"
     writes = adapter.records("writes.jsonl")
     assert len(writes) == 1 and not Path(f"/proc/{writes[0]['pid']}").exists()
-    expected = before if mode == "timeout_before" else {**before, **adapter.change}
-    assert adapter.selected() == expected
+    after = (
+        before
+        if mode == "timeout_before"
+        else {**before, **expectations(adapter).managed}
+    )
+    assert adapter.selected() == after
 
 
 @pytest.mark.parametrize(
@@ -448,15 +465,21 @@ def test_literal_values_and_target_environment(
 ) -> None:
     subject = writer
     adapter = subject.adapter(fake)
+    before = adapter.selected()
+    want = expectations(adapter, literal=True)
     monkeypatch.setenv("CONTRACT_AMBIENT_SECRET", adapter.private[0])
     result = public(
-        run_module(subject.writer, **adapter.arguments, **adapter.literal),
+        run_module(
+            subject.writer, **adapter.arguments, **adapter.literal, _ansible_diff=True
+        ),
         adapter,
     )
     assert not result.get("failed") and result["changed"]
     assert len(adapter.records("writes.jsonl")) == 1
-    for name, value in adapter.literal.items():
-        assert result[adapter.result_key][name] == value
+    assert result[adapter.result_key] == want.projection
+    assert result["diff"] == want.diff
+    assert result["changed_fields"] == list(want.changed_fields)
+    assert adapter.selected() == {**before, **want.managed}
     calls = adapter.records("calls.jsonl")
     assert all(secret not in json.dumps(calls) for secret in adapter.private)
     assert all(
@@ -648,3 +671,41 @@ def test_native_interpretation_requires_effect_evidence(
 ) -> None:
     with pytest.raises(ValueError, match="native fault"):
         FaultInterpretation(**options)
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        {"managed": {}},
+        {"projection": {}},
+        {"diff": {}},
+        {"changed_fields": ()},
+        {"changed_fields": ("limit", "limit")},
+        {"partial": {}},
+    ],
+)
+def test_invalid_expectations_are_rejected(options: dict[str, Any]) -> None:
+    original = SUBJECTS[0].adapter.expected
+    assert original is not None
+    with pytest.raises(ValueError, match="Expectations"):
+        replace(original, **options)
+
+
+def test_writer_expectations_match_granularity_at_collection() -> None:
+    class Incomplete:
+        contract = Contract()
+        expected = None
+        literal_expected = None
+
+        def inject_host_identity(self) -> None:
+            pass
+
+    invalid: Any = Incomplete
+    with pytest.raises(ValueError, match="typed expectations"):
+        replace(SUBJECTS[0], adapter=invalid)
+    original = SUBJECTS[0].adapter.expected
+    assert original is not None
+    invalid.expected = replace(original, partial=None)
+    invalid.literal_expected = original
+    with pytest.raises(ValueError, match="mutation granularity"):
+        replace(SUBJECTS[0], adapter=invalid)
