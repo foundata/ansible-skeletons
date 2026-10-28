@@ -25,6 +25,9 @@ and the project adheres to
 
 ### Changed
 
+- Both HTTP module variants: the loopback server module docstring states
+  that threaded connections run product routes one at a time under a lock.
+
 - collection_default and all three module variants: nox allocates a private
   short-path directory per invocation and removes only its own unchanged
   directory. Explicit orphan recovery replaces the PID-based link sweep

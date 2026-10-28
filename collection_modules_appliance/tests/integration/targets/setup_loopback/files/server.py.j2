@@ -1,6 +1,9 @@
 # SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Loopback HTTP lifetime and dispatch for file-only product fixtures."""
+"""Loopback HTTP lifetime and dispatch for file-only product fixtures.
+
+Connections use threads; product routes run one at a time under a lock.
+"""
 
 from __future__ import annotations
 
