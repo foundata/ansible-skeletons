@@ -64,7 +64,9 @@ def public(result: dict[str, Any], adapter: Adapter) -> dict[str, Any]:
     result = dict(result)
     announced = result.pop("_ansible_new_secrets", [])
     assert set(announced) <= set(adapter.private)
-    assert all(secret not in json.dumps(result) for secret in adapter.private)
+    assert all(
+        json.dumps(secret)[1:-1] not in json.dumps(result) for secret in adapter.private
+    )
     return result
 
 
@@ -481,7 +483,9 @@ def test_literal_values_and_target_environment(
     assert result["changed_fields"] == list(want.changed_fields)
     assert adapter.selected() == {**before, **want.managed}
     calls = adapter.records("calls.jsonl")
-    assert all(secret not in json.dumps(calls) for secret in adapter.private)
+    assert all(
+        json.dumps(secret)[1:-1] not in json.dumps(calls) for secret in adapter.private
+    )
     assert all(
         call["environment"].get("CONTRACT_AMBIENT_SECRET") in {None, ""}
         for call in calls
@@ -531,11 +535,15 @@ def test_loader_policy_precedes_child_start(
         for environment in environments:
             assert environment.get(name) in {None, ""}
             assert all(
-                secret not in json.dumps(environment) for secret in adapter.private
+                json.dumps(secret)[1:-1] not in json.dumps(environment)
+                for secret in adapter.private
             )
         calls = adapter.records("calls.jsonl")
         assert calls and all(call["environment"]["LC_ALL"] == "C" for call in calls)
-        assert all(secret not in json.dumps(calls) for secret in adapter.private)
+        assert all(
+            json.dumps(secret)[1:-1] not in json.dumps(calls)
+            for secret in adapter.private
+        )
 
 
 def test_host_identity_is_checked_before_write(
@@ -709,3 +717,15 @@ def test_writer_expectations_match_granularity_at_collection() -> None:
     invalid.literal_expected = original
     with pytest.raises(ValueError, match="mutation granularity"):
         replace(SUBJECTS[0], adapter=invalid)
+
+
+@pytest.mark.parametrize(
+    "secret", ['quoted"value', "slash\\value", "line\nvalue", "nonascii-\u00e9"]
+)
+def test_public_rejects_json_escaped_private_values(secret: str) -> None:
+    class Private:
+        private = (secret,)
+
+    adapter: Any = Private()
+    with pytest.raises(AssertionError):
+        public({"diff": {"before": {}, "after": {"value": secret}}}, adapter)
