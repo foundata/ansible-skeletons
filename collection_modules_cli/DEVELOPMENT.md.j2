@@ -99,8 +99,9 @@ by the frozen resource registry.
 The following files are invariant within collections rendered from this variant:
 
 - `plugins/module_utils/`: `_lifecycle.py`, `_engine.py` and `_activation.py`.
-- `tests/unit/plugins/`: `conftest.py` (including `fake_clock`), and
-  `contracts.py`, `test_contract.py`, `test_engine.py`, `test_activation.py` and
+- `tests/unit/plugins/`: `conftest.py` (including `fake_clock`) and
+  `transport_command.py`; `contracts.py`, `test_contract.py`,
+  `test_transport.py`, `test_engine.py`, `test_activation.py` and
   `test_lifecycle.py` in `modules/`.
 - `extensions/molecule/shared/`: everything.
 
@@ -117,11 +118,12 @@ exports. Every public module must be registered. Each configuration registers
 the same inventory and runs every applicable case with a fresh backend.
 
 The adapter's typed `Contract` declares mutation `granularity`. Its default,
-`fieldwise`, requires evidence that some declared fields changed while others
-did not. `atomic` exercises an indivisible change with an unreadable reply and
-checks its complete stored effect and uncertain outcome. The example runs both
-configurations through the same executable, with `limit` alone in the atomic
-configuration. Synthetic lifecycle tests retain partial progress coverage.
+`fieldwise`, requires evidence that some declared fields changed while
+others did not. `atomic` exercises an indivisible change with an unreadable
+reply and checks its complete stored effect and uncertain outcome. The
+example runs both configurations through the same executable, with `limit`
+alone in the atomic configuration. Synthetic lifecycle tests retain partial
+progress coverage.
 
 `Contract.write_command` recognizes contiguous native argv tokens. Its
 default is `update --`; the second configuration uses `set --`. Declare
@@ -131,8 +133,21 @@ prepared the command. The case requires one matching start attempt,
 unchanged storage and zero dispatched writes. A fake that bypasses the
 subprocess boundary cannot satisfy this case.
 
-A multi-step subject belongs to a product operation that actually has several
-steps; independent fields in one command do not declare such an operation.
+`Contract.literals` holds `LiteralInputs`: accepted module arguments, their
+exact native argv elements and unsupported arguments. Defaults use the
+fixture's shell-shaped label and an overlong refused label. The second
+configuration accepts `accepted` and refuses the shell-shaped string before
+any command, in normal and check mode. Successful values must reach the
+executable literally. The shared executable transport cases in
+`test_transport.py` separately prove raw argv and secret stdin bytes,
+including a stream larger than a pipe buffer. An empty stdin stream refuses
+before dispatch. These cases use their own `transport_command.py` executable
+and require no product adapter or options. Products need no extra free-text
+or secret option to satisfy their literal-input obligations.
+
+A multi-step subject belongs to a product operation that actually has
+several steps; independent fields in one command do not declare such an
+operation.
 
 `plugins/module_utils/_binding.py` and `_compat.py` retain their shared
 structure with product policy. The client, hook resource, definitions,

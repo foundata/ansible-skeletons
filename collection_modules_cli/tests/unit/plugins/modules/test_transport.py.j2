@@ -1,0 +1,106 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Shared executable transport mechanics, independent of product bindings."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import subprocess
+import sys
+from collections.abc import Mapping
+from pathlib import Path
+from typing import Any
+
+import pytest
+from ansible.module_utils import basic
+
+from ansible_collections.foundata.utils.plugins.module_utils import deadline
+from ansible_collections.foundata.utils.plugins.module_utils import exec as execution
+
+SECRET = "SYNTHETIC-TRANSPORT-CREDENTIAL"
+LITERAL = "$HOME; ~ ${HOME} \\ ' \""
+
+
+def validate_environment(environment: Mapping[str, str]) -> None:
+    if environment.get("LC_ALL") != "C" or SECRET in environment.values():
+        raise ValueError("Invalid transport fixture environment")
+
+
+@pytest.fixture
+def transport(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> tuple[basic.AnsibleModule, execution.Execution]:
+    monkeypatch.setenv("CONTRACT_AMBIENT_SECRET", SECRET)
+    arguments = {"_ansible_remote_tmp": str(tmp_path)}
+    monkeypatch.setattr(
+        basic, "_ANSIBLE_ARGS", json.dumps({"ANSIBLE_MODULE_ARGS": arguments}).encode()
+    )
+    if hasattr(basic, "_ANSIBLE_PROFILE"):
+        monkeypatch.setattr(basic, "_ANSIBLE_PROFILE", "legacy")
+    module = basic.AnsibleModule(argument_spec={})
+    command = Path(__file__).resolve().parents[1] / "transport_command.py"
+    prefix = ["/usr/bin/env", "-i", "PATH=/usr/bin:/bin", "LC_ALL=C"]
+    prepared = execution.Execution(
+        argv=[*prefix, sys.executable, "-I", "-B", str(command), LITERAL],
+        cwd=str(tmp_path),
+        environment={
+            **dict.fromkeys(os.environ, ""),
+            "LC_ALL": "C",
+            "PATH": "/usr/bin:/bin",
+        },
+        validate_effective_environment=validate_environment,
+        host_uid=os.geteuid(),
+        target_uid=os.geteuid(),
+        identity_argv=[*prefix, "/usr/bin/id", "-u"],
+    )
+    return module, prepared
+
+
+@pytest.mark.parametrize("size", [1, 4096])
+def test_transport_preserves_literal_argv_and_secret_stdin(
+    transport: tuple[basic.AnsibleModule, execution.Execution], size: int
+) -> None:
+    module, prepared = transport
+    data = (SECRET + LITERAL).encode() * size
+    result = execution.run_bounded(
+        module,
+        prepared,
+        profile=execution.TimeoutProfile(kill_after=0.1),
+        deadline=deadline.Deadline(5),
+        stdin=data,
+        max_output_bytes=4096,
+    )
+    assert result.rc == 0 and result.stderr == b""
+    reply = json.loads(result.stdout)
+    assert reply["length"] == len(data)
+    assert reply["sha256"] == hashlib.sha256(data).hexdigest()
+    assert reply["argv"] == [LITERAL]
+    assert reply["environment"]["LC_ALL"] == "C"
+    assert reply["environment"].get("CONTRACT_AMBIENT_SECRET") in {None, ""}
+    assert SECRET not in json.dumps(reply)
+
+
+def test_transport_refuses_empty_stdin_before_start(
+    transport: tuple[basic.AnsibleModule, execution.Execution],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module, prepared = transport
+    starts: list[Any] = []
+
+    def unexpected(*args: Any, **kwargs: Any) -> Any:
+        starts.append(args)
+        raise AssertionError("Empty input started a child")
+
+    monkeypatch.setattr(subprocess, "Popen", unexpected)
+    with pytest.raises(ValueError, match="Empty stdin"):
+        execution.run_bounded(
+            module,
+            prepared,
+            profile=execution.TimeoutProfile(kill_after=0.1),
+            deadline=deadline.Deadline(5),
+            stdin=b"",
+            max_output_bytes=4096,
+        )
+    assert not starts

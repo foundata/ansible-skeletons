@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
@@ -39,13 +39,48 @@ class WriteCommand:
 
 
 @dataclass(frozen=True)
+class LiteralInputs:
+    """Accepted native argv and unsupported values refused before dispatch."""
+
+    accepted: dict[str, str] = field(
+        default_factory=lambda: {"label": "$HOME; ~ ${HOME}"}
+    )
+    argv: tuple[str, ...] = ("$HOME; ~ ${HOME}",)
+    refused: tuple[dict[str, Any], ...] = field(
+        default_factory=lambda: ({"label": "x" * 97},)
+    )
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.accepted, dict) or not self.accepted:
+            raise ValueError("Literal input requires accepted arguments")
+        if (
+            not isinstance(self.argv, tuple)
+            or not self.argv
+            or any(not isinstance(value, str) for value in self.argv)
+        ):
+            raise ValueError("Literal input requires exact argv elements")
+        if (
+            not isinstance(self.refused, tuple)
+            or not self.refused
+            or any(
+                not isinstance(options, dict) or not options for options in self.refused
+            )
+        ):
+            raise ValueError("Literal input requires refused arguments")
+
+
+@dataclass(frozen=True)
 class Contract:
     """Product semantics; defaults describe the executable fixture."""
 
+    literals: LiteralInputs = field(default_factory=LiteralInputs)
     write_command: WriteCommand = WriteCommand()
     granularity: Literal["fieldwise", "atomic"] = "fieldwise"
 
     def __post_init__(self) -> None:
+        if not isinstance(self.literals, LiteralInputs):
+            raise ValueError("Invalid literal declaration")
+        self.literals.__post_init__()
         if not isinstance(self.write_command, WriteCommand):
             raise ValueError("Invalid write command declaration")
         self.write_command.__post_init__()

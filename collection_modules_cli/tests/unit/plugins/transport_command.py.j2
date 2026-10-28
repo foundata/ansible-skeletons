@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Read an exact stdin stream without publishing its contents."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import sys
+
+
+def main() -> None:
+    data = sys.stdin.buffer.read()
+    print(
+        json.dumps(
+            {
+                "argv": sys.argv[1:],
+                "length": len(data),
+                "sha256": hashlib.sha256(data).hexdigest(),
+                "environment": dict(os.environ),
+            }
+        )
+    )
+
+
+if __name__ == "__main__":
+    main()

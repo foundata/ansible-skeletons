@@ -36,7 +36,7 @@ from ansible_collections.{{ namespace }}.\
 # fmt: on
 
 from ..fake_product import FOREIGN, IDENTITY, SECRET, Lab
-from .contracts import Contract, Subject, WriteCommand, validate
+from .contracts import Contract, LiteralInputs, Subject, WriteCommand, validate
 
 
 class FixtureAdapter:
@@ -48,7 +48,7 @@ class FixtureAdapter:
 
     def __init__(self, fake: Lab) -> None:
         self.fake = fake
-        self.literal = {"label": "$HOME; ~ ${HOME}"}
+        self.literal = dict(self.contract.literals.accepted)
         self.locator = fake.arguments()["exec"]
         self.arguments: dict[str, Any] = {
             "app": "alpha",
@@ -91,16 +91,33 @@ class SetClient(_client.Client):
     write_command = "set"
 
 
+class VocabularyFixture(_fixture.Fixture):
+    """An alternate native vocabulary over the same executable backend."""
+
+    def declared(self) -> dict[str, Any]:
+        values = super().declared()
+        if "label" in values and values["label"] not in {"initial", "accepted"}:
+            raise _client.ProductError(category="argument", code="invalid_value")
+        return values
+
+
 class AtomicFixtureAdapter(FixtureAdapter):
     """Exercise one indivisible field through the same executable."""
 
     contract = Contract(
-        granularity="atomic", write_command=WriteCommand((("set", "--"),))
+        granularity="atomic",
+        write_command=WriteCommand((("set", "--"),)),
+        literals=LiteralInputs(
+            accepted={"label": "accepted"},
+            argv=("accepted",),
+            refused=({"label": "$HOME; ~ ${HOME}"},),
+        ),
     )
 
     def __init__(self, fake: Lab) -> None:
         super().__init__(fake)
         fake.monkeypatch.setattr(_fixture, "Client", SetClient)
+        fake.monkeypatch.setattr(fixture, "Fixture", VocabularyFixture)
         self.change = {"limit": 0}
         self.original = {"limit": 10}
 

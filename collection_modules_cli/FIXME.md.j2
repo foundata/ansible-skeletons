@@ -15,6 +15,10 @@ SPDX-License-Identifier: GPL-3.0-or-later
 - Declare `Contract.write_command` with the native write token sequences.
   The default matches `update --`; the alternate fixture matches `set --`.
   Keep the real subprocess-start injection and unchanged/no-dispatch checks.
+- Declare accepted arguments, their literal argv elements and refused
+  arguments in `Contract.literals`. The default accepts a shell-shaped label
+  and refuses an overlong one. Closed vocabularies declare their real values.
+  Keep pre-dispatch validation and the separate executable transport cases.
 - Keep observational subjects free of writers. Register a first mutator with its
   change, repeat, prediction and uncertainty cases in the same change. Creation
   and deletion require executable fixtures that exercise every new case.

@@ -280,10 +280,10 @@ class Client:
 
     def update(self, identity: str, values: dict[str, Any]) -> None:
         self.write_started = False
-        reply = self.call(
-            [self.write_command, "--", self.params["app"], self.params["key"]],
-            write=True,
-            payload={"expected_id": identity, "values": values},
-        )
+        command = [self.write_command, "--", self.params["app"], self.params["key"]]
+        for name, value in sorted(values.items()):
+            literal = str(value).lower() if isinstance(value, bool) else str(value)
+            command.extend([f"--{name}", literal])
+        reply = self.call(command, write=True, payload={"expected_id": identity})
         if reply != {"updated": True}:
             raise ProductError(category="response", code="schema")

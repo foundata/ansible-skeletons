@@ -55,7 +55,8 @@ def main() -> None:
         controls = json.loads(Path("controls.json").read_text())
         emit({"version": controls.get("version", "1.0.0")})
     if (
-        len(command) != 4
+        len(command) < 4
+        or (len(command) - 4) % 2
         or command[1] != "--"
         or operation not in {"show", "update", "set"}
     ):
@@ -64,7 +65,7 @@ def main() -> None:
     with Path("state.lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         state: dict[str, Any] = json.loads(Path("state.json").read_text())
-        selector = json.dumps(command[2:])
+        selector = json.dumps(command[2:4])
         record = state["objects"].get(selector)
         if operation == "show":
             history = [
@@ -106,7 +107,7 @@ def main() -> None:
         append(
             "writes.jsonl",
             {
-                "selector": command[2:],
+                "selector": command[2:4],
                 "mode": controls.get("update", ""),
                 "pid": os.getpid(),
             },
@@ -120,7 +121,16 @@ def main() -> None:
             emit({"error": "refused"}, 10)
         if mode == "timeout_before":
             time.sleep(30)
-        values = request["values"]
+        values = request.get("values", {})
+        for option, value in zip(command[4::2], command[5::2]):
+            if option == "--enabled" and value in {"true", "false"}:
+                values["enabled"] = value == "true"
+            elif option == "--limit" and value.isdecimal():
+                values["limit"] = int(value)
+            elif option == "--label":
+                values["label"] = value
+            else:
+                emit({"error": "refused"}, 10)
         if not isinstance(values, dict) or set(values) - {"enabled", "limit", "label"}:
             emit({"error": "refused"}, 10)
         if mode != "drop":

@@ -27,7 +27,7 @@ from ansible_collections.{{ namespace }}.\
 
 from ..conftest import RunModule
 from .contract_subject import CONFIGURATIONS, SUBJECTS
-from .contracts import Adapter, Contract, Subject, WriteCommand, validate
+from .contracts import Adapter, Contract, LiteralInputs, Subject, WriteCommand, validate
 
 CASES = tuple(subject for configuration in CONFIGURATIONS for subject in configuration)
 WRITERS = tuple(subject for subject in CASES if subject.mode == "existing_only")
@@ -399,7 +399,7 @@ def test_compatibility_exclusion_precedes_write_or_prediction(
     assert not result["changed"] and not adapter.records("writes.jsonl")
 
 
-def test_stdin_literal_values_and_target_environment(
+def test_literal_values_and_target_environment(
     writer: Subject, fake: Any, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     subject = writer
@@ -409,6 +409,8 @@ def test_stdin_literal_values_and_target_environment(
         run_module(subject.writer, **adapter.arguments, **adapter.literal),
         adapter,
     )
+    assert not result.get("failed") and result["changed"]
+    assert len(adapter.records("writes.jsonl")) == 1
     for name, value in adapter.literal.items():
         assert result[adapter.result_key][name] == value
     calls = adapter.records("calls.jsonl")
@@ -416,7 +418,11 @@ def test_stdin_literal_values_and_target_environment(
     assert all("CONTRACT_AMBIENT_SECRET" not in call["environment"] for call in calls)
     assert all(call["environment"]["LC_ALL"] == "C" for call in calls)
     assert any(call["argv"][-1] == adapter.identity_command for call in calls)
-    assert all("$HOME" not in json.dumps(call["argv"]) for call in calls)
+    writes = [
+        call for call in calls if adapter.contract.write_command.matches(call["argv"])
+    ]
+    assert len(writes) == 1
+    assert all(value in writes[0]["argv"] for value in adapter.contract.literals.argv)
 
 
 @pytest.mark.parametrize(
@@ -483,3 +489,36 @@ def test_invalid_granularity_is_rejected() -> None:
 def test_invalid_write_command_is_rejected(tokens: Any) -> None:
     with pytest.raises(ValueError, match="Write command"):
         WriteCommand(alternatives=tokens)
+
+
+@pytest.mark.parametrize("check", [False, True])
+def test_unsupported_literal_refuses_before_dispatch(
+    writer: Subject, fake: Any, run_module: RunModule, check: bool
+) -> None:
+    adapter = writer.adapter(fake)
+    before = adapter.rows()
+    for options in adapter.contract.literals.refused:
+        result = public(
+            run_module(
+                writer.writer, **adapter.arguments, **options, _ansible_check_mode=check
+            ),
+            adapter,
+        )
+        assert result["failed"] and not result.get("changed", False)
+        assert adapter.rows() == before and not adapter.records("calls.jsonl")
+        assert not adapter.records("writes.jsonl")
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        {"accepted": {}},
+        {"argv": ()},
+        {"argv": (None,)},
+        {"refused": ()},
+        {"refused": ({},)},
+    ],
+)
+def test_invalid_literal_inputs_are_rejected(options: dict[str, Any]) -> None:
+    with pytest.raises(ValueError, match="Literal input"):
+        LiteralInputs(**options)
