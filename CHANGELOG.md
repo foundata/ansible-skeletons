@@ -25,6 +25,10 @@ and the project adheres to
 
 ### Changed
 
+- All skeletons: the Molecule README explains the short real checkout path
+  needed by product tests that refuse symlinks and gives a disk-backed
+  location below `/var/tmp/`.
+
 - Both HTTP module variants: the loopback server module docstring states
   that threaded connections run product routes one at a time under a lock.
 

@@ -14,6 +14,11 @@ redispatch.
 
 ## Requirements
 
+When product tests refuse symlinked paths, keep the checkout below a short
+real path such as `/var/tmp/<owner-directory>` on a disk filesystem, never a
+tmpfs. Nox gives sessions a short link when `TMPDIR` is long, so resolving
+that link exposes the long path again.
+
 The caller supplies an authorized target with Python 3.9+, GNU `timeout`,
 `/usr/bin/env`, the installed collection and `foundata.utils`. The standalone
 process harness also requires a supported ansible-core on that target. Install
