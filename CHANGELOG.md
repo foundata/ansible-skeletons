@@ -25,6 +25,11 @@ and the project adheres to
 
 ### Changed
 
+- collection_default and all three module variants: nox allocates a private
+  short-path directory per invocation and removes only its own unchanged
+  directory. Explicit orphan recovery replaces the PID-based link sweep
+  described in the 3.1.0 Fixed entry.
+
 - collection_default and all three module variants: `helper-lint` includes
   collection Python below `tests/`, excluding ansible-test's `unit/`,
   `integration/` and `output/` trees. Development guidance puts pytest suites

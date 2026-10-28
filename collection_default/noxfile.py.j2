@@ -19,9 +19,13 @@ and are configured in antsibull-nox.toml.
 """
 
 import atexit
+import json
 import os
 import shutil
+import socket
 import sys
+import tempfile
+import time
 from pathlib import Path
 
 import nox
@@ -49,34 +53,27 @@ nox.options.default_venv_backend = "uv|virtualenv"
 # the default from Python 3.14 on), and Linux allows 108 bytes for a socket
 # path. Below a deep checkout the sessions' TMPDIR is too long for that, so the
 # sessions see a short link to the same directory instead, in a private
-# directory below XDG_RUNTIME_DIR (or /tmp). Files stay on disk; the links go
-# when nox ends, or with the next nox run when nox was killed.
+# directory below XDG_RUNTIME_DIR (or /var/tmp). Files stay on disk; the links
+# go when their owning invocation ends. Orphans require explicit recovery.
 TMPDIR_LIMIT = 64
 """Longest TMPDIR that leaves room for the socket names below it."""
-_SHORT: list[Path] = []
+_SHORT: list[tuple[Path, int, int]] = []
 
 
-def _sweep(parent: Path) -> None:
-    """Remove the short-link directories of nox processes that are gone.
-
-    Each is named after its process ID. One named after this process is a
-    dead one's too, because this process has not created its own yet.
-    """
-    for entry in parent.glob("nox.*"):
-        pid = entry.name.removeprefix("nox.")
-        if not pid.isdigit() or entry.is_symlink() or not entry.is_dir():
-            continue
+def _cleanup_short() -> None:
+    """Clean only unchanged private directories allocated by this invocation."""
+    for directory, device, inode in _SHORT:
         try:
-            if entry.lstat().st_uid != os.getuid():
+            metadata = directory.lstat()
+            if directory.is_symlink() or (metadata.st_dev, metadata.st_ino) != (
+                device,
+                inode,
+            ):
                 continue
-            if int(pid) != os.getpid():
-                os.kill(int(pid), 0)
-                continue
-        except ProcessLookupError:
+            shutil.rmtree(directory)
+        except OSError:
             pass
-        except (OSError, OverflowError):
-            continue
-        shutil.rmtree(entry, ignore_errors=True)
+    _SHORT.clear()
 
 
 def _short_path(directory: str) -> str:
@@ -88,13 +85,27 @@ def _short_path(directory: str) -> str:
         if not _SHORT:
             runtime = Path(os.environ.get("XDG_RUNTIME_DIR", ""))
             usable = runtime.is_absolute() and runtime.is_dir()
-            parent = runtime if usable else Path("/tmp")
-            _sweep(parent)
-            short = parent / f"nox.{os.getpid()}"
-            short.mkdir(mode=0o700)
-            _SHORT.append(short)
-            atexit.register(shutil.rmtree, short, True)
-        link = _SHORT[0] / str(len(list(_SHORT[0].iterdir())))
+            parent = runtime if usable else Path("/var/tmp")
+            short = Path(tempfile.mkdtemp(prefix="nox.", dir=parent))
+            metadata = short.lstat()
+            _SHORT.append((short, metadata.st_dev, metadata.st_ino))
+            atexit.register(_cleanup_short)
+            (short / "owner.json").write_text(
+                json.dumps(
+                    {
+                        "path": str(short),
+                        "device": metadata.st_dev,
+                        "inode": metadata.st_ino,
+                        "pid": os.getpid(),
+                        "host": socket.gethostname(),
+                        "created": time.time(),
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+        directory = _SHORT[0][0]
+        link = directory / str(len(list(directory.iterdir())))
         link.symlink_to(target, target_is_directory=True)
     except OSError:
         # Without a writable short directory the long path is all there is.

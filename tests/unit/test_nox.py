@@ -9,10 +9,11 @@ import runpy
 import sys
 import tarfile
 from collections.abc import Callable, Iterator
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from pathlib import Path
-from types import ModuleType, SimpleNamespace
-from typing import cast
+from types import FunctionType, ModuleType, SimpleNamespace
+from typing import Any, cast
 from unittest.mock import MagicMock, Mock
 
 import pytest
@@ -125,6 +126,17 @@ def test_a_deep_temporary_directory_gets_a_short_path(
         link.parent.chmod(0o700)
 
 
+def short_invocation(noxfile: dict[str, object]) -> dict[str, Any]:
+    """Give each simulated invocation its own loaded helper state."""
+    original = cast(FunctionType, noxfile["_short_path"])
+    namespace = {**original.__globals__, "_SHORT": []}
+    assert "_sweep" not in namespace
+    for name in ("_cleanup_short", "_short_path"):
+        function = cast(FunctionType, noxfile[name])
+        namespace[name] = FunctionType(function.__code__, namespace)
+    return namespace
+
+
 @pytest.mark.parametrize(
     "noxfile",
     [
@@ -135,33 +147,104 @@ def test_a_deep_temporary_directory_gets_a_short_path(
     ],
     indirect=True,
 )
-def test_the_short_links_of_a_killed_nox_go_with_the_next_run(
+@pytest.mark.parametrize("pid_name", ["99999999", str(os.getpid()), "1", "00001"])
+def test_pid_and_same_uid_do_not_confer_ownership(
+    noxfile: dict[str, object],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    pid_name: str,
+) -> None:
+    parent = tmp_path / "runtime"
+    parent.mkdir()
+    unrelated = parent / f"nox.{pid_name}"
+    unrelated.mkdir()
+    (unrelated / "keep").write_text("unrelated")
+    symlink = parent / "nox.88888888"
+    symlink.symlink_to(unrelated, target_is_directory=True)
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(parent))
+    target = tmp_path / ("long-target-" * 8)
+    target.mkdir()
+    monkeypatch.setattr("atexit.register", lambda *arguments: None)
+    namespace = short_invocation(noxfile)
+    link = Path(namespace["_short_path"](str(target)))
+    owned = link.parent
+    assert owned != unrelated and owned.stat().st_mode & 0o777 == 0o700
+    owner = json.loads((owned / "owner.json").read_text())
+    assert owner["path"] == str(owned) and owner["pid"] == os.getpid()
+    assert (owner["device"], owner["inode"]) == (
+        owned.stat().st_dev,
+        owned.stat().st_ino,
+    )
+    assert link.resolve() == target
+    namespace["_cleanup_short"]()
+    assert not owned.exists()
+    assert (unrelated / "keep").read_text() == "unrelated"
+    assert symlink.is_symlink() and target.is_dir()
+
+
+@pytest.mark.parametrize(
+    "noxfile",
+    [
+        "collection_default",
+        "collection_modules_rest",
+        "collection_modules_appliance",
+        "collection_modules_cli",
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize("replacement", ["symlink", "directory"])
+def test_replaced_owned_path_is_left_alone(
+    noxfile: dict[str, object],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    replacement: str,
+) -> None:
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path))
+    target = tmp_path / ("long-target-" * 8)
+    target.mkdir()
+    monkeypatch.setattr("atexit.register", lambda *arguments: None)
+    namespace = short_invocation(noxfile)
+    owned = Path(namespace["_short_path"](str(target))).parent
+    retained = owned.with_name(owned.name + "-retained")
+    owned.rename(retained)
+    if replacement == "symlink":
+        owned.symlink_to(target, target_is_directory=True)
+    else:
+        owned.mkdir()
+        (owned / "keep").touch()
+    namespace["_cleanup_short"]()
+    assert owned.exists() and retained.exists() and target.exists()
+
+
+@pytest.mark.parametrize(
+    "noxfile",
+    [
+        "collection_default",
+        "collection_modules_rest",
+        "collection_modules_appliance",
+        "collection_modules_cli",
+    ],
+    indirect=True,
+)
+def test_concurrent_invocations_with_same_pid_own_distinct_paths(
     noxfile: dict[str, object], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    runtime = tmp_path / "run"
-    runtime.mkdir()
-    monkeypatch.setenv("XDG_RUNTIME_DIR", str(runtime))
-    monkeypatch.setattr("atexit.register", lambda *arguments: None)
-    target = tmp_path / ("d" * 70)
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path))
+    target = tmp_path / ("long-target-" * 8)
     target.mkdir()
-    # No process has an ID above pid_max; this process has not made its own yet.
-    gone = int(Path("/proc/sys/kernel/pid_max").read_text(encoding="utf-8")) + 1
-    stale, mine = runtime / f"nox.{gone}", runtime / f"nox.{os.getpid()}"
-    for left in (stale, mine):
-        left.mkdir()
-        (left / "0").symlink_to(target, target_is_directory=True)
-    kept = [
-        runtime / f"nox.{os.getppid()}",
-        runtime / "nox-45wu6fhp",
-        runtime / f"nox.{2**64}",
-    ]
-    for directory in kept:
-        directory.mkdir()
-    short_path = cast(Callable[[str], str], noxfile["_short_path"])
-    link = Path(short_path(str(target)))
-    assert link.parent == mine and link.resolve() == target.resolve()
-    assert not stale.exists() and all(directory.is_dir() for directory in kept)
-    assert target.is_dir()
+    monkeypatch.setattr("atexit.register", lambda *arguments: None)
+    first, second = short_invocation(noxfile), short_invocation(noxfile)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        futures = [
+            pool.submit(namespace["_short_path"], str(target))
+            for namespace in (first, second)
+        ]
+        links = [Path(future.result()) for future in futures]
+    assert links[0].parent != links[1].parent
+    first["_cleanup_short"]()
+    assert not links[0].parent.exists() and links[1].resolve() == target
+    second["_cleanup_short"]()
+    assert not links[1].parent.exists() and target.exists()
 
 
 @pytest.fixture

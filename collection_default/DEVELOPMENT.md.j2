@@ -67,6 +67,18 @@ Below a deep checkout, nox gives each session a short symbolic link as
 `TMPDIR`, because Unix socket paths are limited in length. A test of code that
 refuses symbolic links in a path resolves `TMPDIR` first.
 
+## Troubleshooting<a id="troubleshooting"></a>
+
+Nox removes only the unchanged short-path directory its own invocation
+created. A killed invocation can leave that directory behind. To recover
+one orphan, identify its exact path and read its `owner.json`, which records
+the creator's host, PID and creation time, plus the directory's device and
+inode. Establish that the recorded invocation has ended; a PID may have been
+reused. Verify the directory still has the recorded identity and inspect its
+contents and link targets. Remove only that verified directory, leaving the
+link targets intact. If the path is a symlink, has been replaced, or its
+creator cannot be established, leave it for investigation.
+
 ## Releases<a id="releases"></a>
 
 Each change users notice adds a fragment to `changelogs/fragments/`;
