@@ -52,6 +52,51 @@
           - __fixture_updated['fixture']['value'] == 'second'
           - __fixture_updated['fixture']['password'] is not ansible.builtin.defined
 
+    - name: "Store string variables"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        name: "integration_fixture"
+        variables:
+          rack: "3"
+          empty: ""
+      diff: true
+      register: __fixture_variables
+
+    - name: "Repeat string variables"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        name: "integration_fixture"
+        variables:
+          empty: ""
+          rack: "3"
+      register: __fixture_variables_repeat
+
+    - name: "Replace the whole variable mapping"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        name: "integration_fixture"
+        variables:
+          only: ""
+      register: __fixture_variables_replaced
+
+    - name: "Confirm whole mapping changes and repeat"
+      ansible.builtin.assert:
+        that:
+          - __fixture_variables['changed_fields'] == ['variables']
+          - __fixture_variables['fixture']['variables'] == {'rack':'3', 'empty':''}
+          - __fixture_variables['diff']['before']['variables'] == {}
+          - __fixture_variables_repeat is not ansible.builtin.changed
+          - __fixture_variables_replaced['fixture']['variables'] == {'only':''}
+
+    - name: "Clear the string variables"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        name: "integration_fixture"
+        variables: {}
+      register: __fixture_variables_cleared
+
+    - name: "Confirm empty mapping"
+      ansible.builtin.assert:
+        that:
+          - __fixture_variables_cleared is ansible.builtin.changed
+          - __fixture_variables_cleared['fixture']['variables'] == {}
+
     - name: "Submit invalid input"
       {{ namespace }}.{{ collection_name }}.fixture:
         name: "integration_fixture"

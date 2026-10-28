@@ -119,6 +119,12 @@ class Field:
     stays readable but keeps its type checks. The argument spec of such a
     field lists no ``choices``, so an explicit null stays unmanaged and the
     module documentation names the allowed values in prose.
+
+    ``strmap`` is a dictionary of string keys to string values, including
+    empty values. Writes replace the whole dictionary; comparisons and diffs
+    use the whole value. ``maximum_items`` bounds declared entries and
+    ``pattern`` validates declared keys only. Stored keys outside the pattern
+    stay readable. ``map`` continues to mean names mapped to lists of rights.
     """
 
     name: str
@@ -213,6 +219,7 @@ def build_spec(resource: Resource) -> dict[str, Any]:
             "set": "list",
             "names": "list",
             "map": "dict",
+            "strmap": "dict",
             "ref": "str",
             "choice": "str",
             "secret": "str",
@@ -338,6 +345,20 @@ def normalize(field: Field, raw: Any, *, input_value: bool = False) -> Any:
         ):
             raise invalid
         return list(dict.fromkeys(raw))
+    if field.kind == "strmap":
+        if not isinstance(raw, dict) or (input_value and not within(field, len(raw))):
+            raise invalid
+        if any(
+            not isinstance(k, str) or not isinstance(v, str) for k, v in raw.items()
+        ):
+            raise invalid
+        if (
+            input_value
+            and field.pattern
+            and any(not re.fullmatch(field.pattern, key) for key in raw)
+        ):
+            raise invalid
+        return dict(raw)
     if field.kind == "map":
         if not isinstance(raw, dict) or (input_value and not within(field, len(raw))):
             raise invalid

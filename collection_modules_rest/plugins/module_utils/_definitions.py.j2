@@ -45,6 +45,12 @@ FIXTURE = Resource(
         Field("enabled", "bool", "Whether enabled"),
         Field("labels", "set", "Unordered public labels"),
         Field(
+            "variables",
+            "strmap",
+            "Public string variables; whole-value replacement",
+            pattern=r"[A-Za-z_][A-Za-z0-9_]*",
+        ),
+        Field(
             "parent",
             "ref",
             "Parent name; empty clears",

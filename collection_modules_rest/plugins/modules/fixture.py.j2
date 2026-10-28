@@ -45,6 +45,13 @@ options:
     description: Unordered labels. An empty list clears the labels; omission and null leave them unmanaged.
     type: list
     elements: str
+  variables:
+    description: >-
+      Dictionary of string values, including empty strings. Replaces the whole
+      mapping; an empty dictionary clears it. Declared keys start with a letter
+      or underscore and contain only letters, digits and underscores. At most
+      256 entries. Omission and null leave it unmanaged.
+    type: dict
   parent:
     description: Parent name resolved before writes. An empty string clears the reference; omission and null leave it unmanaged.
     type: str
@@ -104,6 +111,9 @@ fixture:
       description: Unordered labels.
       type: list
       elements: str
+    variables:
+      description: Public string variables, including empty values.
+      type: dict
     parent:
       description: Resolved parent name, or an empty string.
       type: str

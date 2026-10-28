@@ -16,6 +16,12 @@ and the project adheres to
 
 ### Added
 
+- All three module variants: the engine's `strmap` field kind holds string
+  keys and string values, including empty values, with whole-value replacement,
+  comparison and diff. Declared keys follow `pattern` and entries are bounded
+  by `maximum_items`; stored keys outside the pattern stay readable. The REST
+  fixture exercises the kind through its `variables` field.
+
 - `collection_modules_cli` for products administered through a command line on
   the managed host. It shares the lifecycle and check scaffolding, with an
   existing-only hook fixture, real information and planning modules, bounded

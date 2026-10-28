@@ -610,3 +610,75 @@ def test_stored_object_beyond_the_bounds_is_read_compared_and_deleted(
     removed = run_module(entry(), label="example", state="absent")
     assert not removed.get("failed") and removed["changed"]
     assert not synthetic.rows
+
+
+@pytest.mark.parametrize("value", [{"rack": "3", "empty": ""}, {}, {"": "value"}])
+def test_string_map_preserves_string_keys_and_values(value: dict[str, str]) -> None:
+    field = Field("variables", "strmap", "Variables")
+    assert normalize(field, value, input_value=True) == value
+    assert normalize(field, value) == value
+    assert build_spec(replace(SYNTHETIC, fields=(field,)))["variables"] == {
+        "type": "dict"
+    }
+
+
+@pytest.mark.parametrize(
+    "value", [[], "value", {1: "value"}, {"key": 1}, {"key": None}, {"key": []}]
+)
+@pytest.mark.parametrize("declared", [False, True])
+def test_string_map_refuses_non_string_entries(value: Any, declared: bool) -> None:
+    with pytest.raises(ProductError):
+        normalize(
+            Field("variables", "strmap", "Variables"), value, input_value=declared
+        )
+
+
+def test_string_map_bounds_and_key_pattern_apply_only_to_declarations() -> None:
+    field = Field(
+        "variables", "strmap", "Variables", pattern=r"[a-z]+", maximum_items=1
+    )
+    assert normalize(field, {"rack": ""}, input_value=True) == {"rack": ""}
+    for value in ({"legacy-key": ""}, {"one": "1", "two": "2"}):
+        assert normalize(field, value) == value
+        with pytest.raises(ProductError):
+            normalize(field, value, input_value=True)
+    assert normalize(
+        replace(field, maximum_items=None), {"one": "1", "two": "2"}, input_value=True
+    ) == {"one": "1", "two": "2"}
+
+
+def test_string_map_replaces_compares_predicts_and_clears(
+    synthetic: SyntheticClient, run_module: RunModule
+) -> None:
+    field = Field("variables", "strmap", "Variables", pattern=r"[a-z]+")
+    main = entry(replace(SYNTHETIC, fields=(field,)))
+    before = {"legacy-key": "old", "keep": "yes"}
+    key = synthetic.add(variables=before)
+    assert not run_module(main, label="example", variables=None)["changed"]
+    after = {"rack": "3", "empty": ""}
+    predicted = run_module(
+        main,
+        label="example",
+        variables=after,
+        _ansible_check_mode=True,
+        _ansible_diff=True,
+    )
+    assert predicted["diff"] == {
+        "before": {"variables": before},
+        "after": {"variables": after},
+    }
+    assert predicted["synthetic"]["variables"] == after and not synthetic.writes
+    changed = run_module(main, label="example", variables=after, _ansible_diff=True)
+    assert (
+        changed["changed_fields"] == ["variables"]
+        and changed["diff"] == predicted["diff"]
+    )
+    assert synthetic.rows[key]["variables"] == after
+    assert not run_module(main, label="example", variables={"empty": "", "rack": "3"})[
+        "changed"
+    ]
+    assert run_module(main, label="example", variables={})["changed"]
+    assert synthetic.rows[key]["variables"] == {} and synthetic.writes == [
+        "update",
+        "update",
+    ]

@@ -143,6 +143,15 @@ contents and link targets. Remove only that verified directory, leaving the
 link targets intact. If the path is a symlink, has been replaced, or its
 creator cannot be established, leave it for investigation.
 
+## Engine fields<a id="engine-fields"></a>
+
+`Field(kind="strmap")` describes a dictionary of string keys to string values;
+empty strings are values. A write replaces the whole dictionary, and the
+engine compares and diffs it as one field. `maximum_items` bounds declared
+entries. `pattern` validates declared keys only, so an older stored key
+outside that pattern stays readable. The existing `map` kind holds names
+mapped to lists of rights.
+
 ## Releases<a id="releases"></a>
 
 Each change users notice adds a fragment to `changelogs/fragments/`;

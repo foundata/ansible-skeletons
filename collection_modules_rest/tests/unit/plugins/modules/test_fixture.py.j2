@@ -174,3 +174,35 @@ def test_patch_and_bodyless_validation(
     assert (
         result["error_code"] == "validation_failed" and result["outcome"] == "unchanged"
     )
+
+
+def test_string_variables_replace_repeat_and_clear(
+    fake: FakeProduct, run_module: RunModule
+) -> None:
+    before = {"legacy-key": "old"}
+    key = fake.add(variables=before)
+    after = {"rack": "3", "empty": ""}
+    prediction = run_module(
+        fixture.main,
+        name="example",
+        variables=after,
+        _ansible_check_mode=True,
+        _ansible_diff=True,
+    )
+    assert not fake.writes() and fake.rows[key]["variables"] == before
+    result = run_module(
+        fixture.main, name="example", variables=after, _ansible_diff=True
+    )
+    assert result["changed_fields"] == ["variables"]
+    assert (
+        result["diff"]
+        == prediction["diff"]
+        == {"before": {"variables": before}, "after": {"variables": after}}
+    )
+    assert result["fixture"]["variables"] == fake.rows[key]["variables"] == after
+    assert not run_module(fixture.main, name="example", variables=after)["changed"]
+    assert not run_module(fixture.main, name="example", variables=None)["changed"]
+    rejected = run_module(fixture.main, name="example", variables=before)
+    assert rejected["failed"] and not rejected["changed"]
+    assert run_module(fixture.main, name="example", variables={})["changed"]
+    assert fake.rows[key]["variables"] == {}
