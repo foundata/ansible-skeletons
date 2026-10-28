@@ -21,7 +21,8 @@ ROOT = (
 
 
 class Lab:
-    def __init__(self, directory: Path) -> None:
+    def __init__(self, directory: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        self.monkeypatch = monkeypatch
         self.directory = directory.resolve()
         self.directory.chmod(0o700)
         self.seed()
@@ -81,8 +82,8 @@ class Lab:
 
 
 @pytest.fixture
-def fake(tmp_path: Path) -> Lab:
-    return Lab(tmp_path)
+def fake(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Lab:
+    return Lab(tmp_path, monkeypatch)
 
 
 @pytest.fixture

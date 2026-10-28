@@ -128,6 +128,8 @@ def api_argument_spec() -> dict[str, Any]:
 
 
 class Client:
+    write_command = "update"
+
     def __init__(self, params: dict[str, Any]) -> None:
         self.module: Any = None
         self.params = params
@@ -279,7 +281,7 @@ class Client:
     def update(self, identity: str, values: dict[str, Any]) -> None:
         self.write_started = False
         reply = self.call(
-            ["update", "--", self.params["app"], self.params["key"]],
+            [self.write_command, "--", self.params["app"], self.params["key"]],
             write=True,
             payload={"expected_id": identity, "values": values},
         )

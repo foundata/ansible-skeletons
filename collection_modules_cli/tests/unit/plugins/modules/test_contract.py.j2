@@ -7,13 +7,13 @@ from __future__ import annotations
 import inspect
 import json
 import os
+import subprocess
 from dataclasses import replace
 from pathlib import Path
 from types import FunctionType
 from typing import Any
 
 import pytest
-from ansible.module_utils.basic import AnsibleModule
 
 # Preserve wrapping for maximum-length Galaxy identities.
 # fmt: off
@@ -27,7 +27,7 @@ from ansible_collections.{{ namespace }}.\
 
 from ..conftest import RunModule
 from .contract_subject import CONFIGURATIONS, SUBJECTS
-from .contracts import Adapter, Contract, Subject, validate
+from .contracts import Adapter, Contract, Subject, WriteCommand, validate
 
 CASES = tuple(subject for configuration in CONFIGURATIONS for subject in configuration)
 WRITERS = tuple(subject for subject in CASES if subject.mode == "existing_only")
@@ -317,22 +317,28 @@ def test_prewrite_refusal(
 def test_failure_before_start_preserves_unchanged(
     writer: Subject, fake: Any, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    original = AnsibleModule.run_command
-
-    def refuse(self: Any, args: list[str], **kwargs: Any) -> Any:
-        if "update" in args:
-            raise FileNotFoundError("private diagnostic")
-        return original(self, args, **kwargs)
-
-    monkeypatch.setattr(AnsibleModule, "run_command", refuse)
     subject = writer
     adapter = subject.adapter(fake)
+    original = subprocess.Popen
+    refused: list[list[str]] = []
+
+    def refuse(args: list[str | bytes], **kwargs: Any) -> Any:
+        argv = [os.fsdecode(arg) for arg in args]
+        if adapter.contract.write_command.matches(argv):
+            refused.append(argv)
+            raise FileNotFoundError("private diagnostic")
+        return original(args, **kwargs)
+
+    monkeypatch.setattr(subprocess, "Popen", refuse)
+    before = adapter.rows()
     result = public(
         run_module(subject.writer, **adapter.arguments, **adapter.change), adapter
     )
+    assert len(refused) == 1
+    assert "private diagnostic" not in json.dumps(result)
     assert result["failed"] and result["error_code"] == "command_start"
     assert not result["changed"] and result["outcome"] == "unchanged"
-    assert not adapter.records("writes.jsonl")
+    assert adapter.rows() == before and not adapter.records("writes.jsonl")
 
 
 @pytest.mark.parametrize("check", [False, True])
@@ -471,3 +477,9 @@ def test_invalid_granularity_is_rejected() -> None:
     invalid: Any = "multi_step"
     with pytest.raises(ValueError, match="granularity"):
         Contract(granularity=invalid)
+
+
+@pytest.mark.parametrize("tokens", [(), ((),), (("",),), ((None,),)])
+def test_invalid_write_command_is_rejected(tokens: Any) -> None:
+    with pytest.raises(ValueError, match="Write command"):
+        WriteCommand(alternatives=tokens)

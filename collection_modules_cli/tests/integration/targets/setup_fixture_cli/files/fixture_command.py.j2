@@ -54,7 +54,11 @@ def main() -> None:
     if operation == "version":
         controls = json.loads(Path("controls.json").read_text())
         emit({"version": controls.get("version", "1.0.0")})
-    if len(command) != 4 or command[1] != "--" or operation not in {"show", "update"}:
+    if (
+        len(command) != 4
+        or command[1] != "--"
+        or operation not in {"show", "update", "set"}
+    ):
         emit({"error": "unsupported"}, 10)
     controls = json.loads(Path("controls.json").read_text())
     with Path("state.lock").open("a") as lock:

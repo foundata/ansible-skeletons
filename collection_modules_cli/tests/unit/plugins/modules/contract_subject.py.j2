@@ -24,8 +24,19 @@ from ansible_collections.{{ namespace }}.\
 # isort: on
 # fmt: on
 
+# Preserve wrapping for maximum-length Galaxy identities.
+# fmt: off
+# isort: off
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils import (
+        _client,
+        _fixture,
+    )
+# isort: on
+# fmt: on
+
 from ..fake_product import FOREIGN, IDENTITY, SECRET, Lab
-from .contracts import Contract, Subject, validate
+from .contracts import Contract, Subject, WriteCommand, validate
 
 
 class FixtureAdapter:
@@ -76,13 +87,20 @@ class FixtureAdapter:
         return self.fake.records(name)
 
 
+class SetClient(_client.Client):
+    write_command = "set"
+
+
 class AtomicFixtureAdapter(FixtureAdapter):
     """Exercise one indivisible field through the same executable."""
 
-    contract = Contract(granularity="atomic")
+    contract = Contract(
+        granularity="atomic", write_command=WriteCommand((("set", "--"),))
+    )
 
     def __init__(self, fake: Lab) -> None:
         super().__init__(fake)
+        fake.monkeypatch.setattr(_fixture, "Client", SetClient)
         self.change = {"limit": 0}
         self.original = {"limit": 10}
 

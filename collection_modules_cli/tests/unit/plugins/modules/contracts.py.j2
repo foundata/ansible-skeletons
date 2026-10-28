@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import inspect
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, Protocol
@@ -14,12 +14,41 @@ Entry = Callable[[], None]
 
 
 @dataclass(frozen=True)
+class WriteCommand:
+    """Contiguous native command tokens, excluding values and shell syntax."""
+
+    alternatives: tuple[tuple[str, ...], ...] = (("update", "--"),)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.alternatives, tuple) or not self.alternatives:
+            raise ValueError("Write command requires token sequences")
+        for tokens in self.alternatives:
+            if (
+                not isinstance(tokens, tuple)
+                or not tokens
+                or any(not isinstance(token, str) or not token for token in tokens)
+            ):
+                raise ValueError("Write command requires nonempty tokens")
+
+    def matches(self, argv: Sequence[str]) -> bool:
+        return any(
+            tuple(argv[index : index + len(tokens)]) == tokens
+            for tokens in self.alternatives
+            for index in range(len(argv) - len(tokens) + 1)
+        )
+
+
+@dataclass(frozen=True)
 class Contract:
     """Product semantics; defaults describe the executable fixture."""
 
+    write_command: WriteCommand = WriteCommand()
     granularity: Literal["fieldwise", "atomic"] = "fieldwise"
 
     def __post_init__(self) -> None:
+        if not isinstance(self.write_command, WriteCommand):
+            raise ValueError("Invalid write command declaration")
+        self.write_command.__post_init__()
         if self.granularity not in {"fieldwise", "atomic"}:
             raise ValueError("Invalid mutation granularity")
 

@@ -122,6 +122,15 @@ did not. `atomic` exercises an indivisible change with an unreadable reply and
 checks its complete stored effect and uncertain outcome. The example runs both
 configurations through the same executable, with `limit` alone in the atomic
 configuration. Synthetic lifecycle tests retain partial progress coverage.
+
+`Contract.write_command` recognizes contiguous native argv tokens. Its
+default is `update --`; the second configuration uses `set --`. Declare
+alternatives for each native write form, such as `set` and `inherit`. Start
+failure is injected at `subprocess.Popen`, after the real transport has
+prepared the command. The case requires one matching start attempt,
+unchanged storage and zero dispatched writes. A fake that bypasses the
+subprocess boundary cannot satisfy this case.
+
 A multi-step subject belongs to a product operation that actually has several
 steps; independent fields in one command do not declare such an operation.
 
