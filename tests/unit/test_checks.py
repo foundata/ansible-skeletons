@@ -371,6 +371,7 @@ SHARED_FILES = {
         "tests/runtime_check.py.j2",
     ),
     "module_skeletons": (
+        "DEVELOPMENT.md.j2",
         ".mypy.ini.j2",
         "antsibull-nox.toml.j2",
         "noxfile.py.j2",
@@ -386,7 +387,6 @@ SHARED_FILES = {
         "tests/unit/plugins/modules/test_lifecycle.py.j2",
     ),
     "http_module_skeletons": (
-        "DEVELOPMENT.md.j2",
         "extensions/molecule/README.md.j2",
         "extensions/molecule/default/inventory/hosts.yml.j2",
         "extensions/molecule/default/molecule.yml.j2",
@@ -1156,3 +1156,18 @@ def test_helper_local_formatting_is_stable(helper_project: str, tmp_path: Path) 
     helper(HelperSession())
     assert path.read_bytes() == formatted
     load_helper_session(helper_project, check_only=True)(HelperSession())
+
+
+def test_http_development_keeps_shared_variant_contents() -> None:
+    """CLI differences must not weaken the existing HTTP document comparison."""
+    texts = []
+    for skeleton in SKELETON_GROUPS["http_module_skeletons"]:
+        path = ROOT / skeleton / "DEVELOPMENT.md.j2"
+        text = VARIANT_REGION.sub(
+            lambda region: (
+                "" if region["name"] == "appliance-invariants" else region.group()
+            ),
+            path.read_text(encoding="utf-8"),
+        )
+        texts.append(VARIANT_MARKER.sub("", text))
+    assert texts[0] == texts[1]

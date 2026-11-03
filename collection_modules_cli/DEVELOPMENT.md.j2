@@ -89,26 +89,39 @@ polling and timeout examples.
 
 ## Boundaries<a id="boundaries"></a>
 
+{# skeleton-variant: resource-model #}
 The CLI fixture is a hook-based existing-only resource. Its opaque expected
 identity and composite selector are product assertions. The shared lifecycle
 owns sequencing, prediction and reconciliation. `_engine.py` remains available
 for products with a qualified definition model; this variant ships no
 definition-driven CLI example. `_definitions.FIXTURE` names the hook class used
 by the frozen resource registry.
+{# end skeleton-variant #}
 
+{# skeleton-variant: contract-entry #}
 The following files are invariant within collections rendered from this variant:
+{# end skeleton-variant #}
 
 - `plugins/module_utils/`: `_lifecycle.py`, `_engine.py` and `_activation.py`.
+{# skeleton-variant: unit-invariants #}
 - `tests/unit/plugins/`: `conftest.py` (including `fake_clock`) and
   `transport_command.py`; `contracts.py`, `test_contract.py`,
   `test_transport.py`, `test_engine.py`, `test_activation.py` and
+{# end skeleton-variant #}
   `test_lifecycle.py` in `modules/`.
 - `extensions/molecule/shared/`: everything.
+{# skeleton-variant: loopback-invariant #}
+{# end skeleton-variant #}
 
+{# skeleton-variant: updating-invariants #}
 Leave these files unchanged when adapting a product. Propose a change in
 [foundata/ansible-skeletons](https://github.com/foundata/ansible-skeletons) when
 an invariant needs to change.
+{# end skeleton-variant #}
 
+{# skeleton-variant: appliance-invariants #}
+{# end skeleton-variant #}
+{# skeleton-variant: product-binding #}
 `tests/unit/plugins/modules/contract_subject.py` is product-adapted. It
 registers actual public entry points, one of two explicit modes, and a fake
 adapter. An existing-only subject requires a writer; an observational subject
@@ -116,7 +129,9 @@ forbids one. Both require an information entry point. Incomplete registrations
 fail during collection. Observational-only products import no fabricated mutable
 exports. Every public module must be registered. Each configuration registers
 the same inventory and runs every applicable case with a fresh backend.
+{# end skeleton-variant #}
 
+{# skeleton-variant: transport-boundary #}
 The adapter's typed `Contract` declares mutation `granularity`. Its default,
 `fieldwise`, requires evidence that some declared fields changed while
 others did not. `atomic` exercises an indivisible change with failed
@@ -124,7 +139,9 @@ readback and checks its complete stored effect and uncertain outcome. The
 example runs both configurations through the same executable, with `limit`
 alone in the atomic configuration. Synthetic lifecycle tests retain partial
 progress coverage.
+{# end skeleton-variant #}
 
+{# skeleton-variant: loopback-setup #}
 `Contract.write_command` uses `WriteCommand.alternatives` to recognize
 contiguous native argv tokens. Its default is `update --`; the second
 configuration uses `set --`. Declare alternatives for each native write
@@ -133,7 +150,9 @@ form, such as `set` and `inherit`. Start failure is injected at
 case requires one matching start attempt, unchanged storage and zero
 dispatched writes. A fake that bypasses the subprocess boundary cannot
 satisfy this case.
+{# end skeleton-variant #}
 
+{# skeleton-variant: inventory-evidence #}
 `Contract.literals` holds `LiteralInputs.accepted` module arguments, exact
 native elements in `argv`, and unsupported argument dictionaries in
 `refused`. Defaults use the fixture's shell-shaped label and an overlong
@@ -145,7 +164,9 @@ bytes, including a stream larger than a pipe buffer. An empty stdin stream
 refuses before dispatch. These cases use their own `transport_command.py`
 executable and require no product adapter or options. Products need no extra
 free-text or secret option to satisfy their literal-input obligations.
+{# end skeleton-variant #}
 
+{# skeleton-variant: product-rules #}
 The adapter implements `inject_host_identity()` at its prepared execution
 boundary. The fixture changes only the prepared numeric host UID; products
 whose locator derives that identity internally use the same boundary. The
@@ -229,6 +250,7 @@ and locator qualification remain the product's responsibility.
 The REST inventory extractor is omitted. Add a product-specific extractor when a
 versioned CLI reference supplies a useful inventory; keep its output under
 `tools/inventory/`, excluded from collection archives.
+{# end skeleton-variant #}
 
 ## Troubleshooting<a id="troubleshooting"></a>
 

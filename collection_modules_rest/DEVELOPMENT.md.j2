@@ -89,6 +89,7 @@ polling and timeout examples.
 
 ## Boundaries<a id="boundaries"></a>
 
+{# skeleton-variant: resource-model #}
 A resource is one kind of product object and the module that manages it.
 A definition in `_definitions.py` describes a definition-driven resource,
 and `_engine.py` runs it. A hook-based resource needs more than a definition
@@ -97,7 +98,9 @@ lifecycle's hooks. A subsystem is a part of the product that a group of
 modules manages together, such as routes and gateways with their activation.
 Its modules share one module utility, one activation scope where the product
 has one, and usually one Molecule scenario.
+{# end skeleton-variant #}
 
+{# skeleton-variant: contract-entry #}
 `tests/unit/plugins/modules/contract_subject.py` names the product resource,
 fake adapters and entry points the shared contract tests run against.
 A new hook-based resource starts as a
@@ -108,47 +111,64 @@ fake product, so adapting the contract subject needs no change to them.
 
 Some files come from foundata's module skeleton and are the same in every
 collection rendered from it:
+{# end skeleton-variant #}
 
 - `plugins/module_utils/`: `_lifecycle.py`, `_engine.py` and `_activation.py`.
+{# skeleton-variant: unit-invariants #}
 - `tests/unit/plugins/`: `conftest.py` (including `fake_clock`), and
   `test_contract.py`, `test_engine.py`, `test_activation.py` and
+{# end skeleton-variant #}
   `test_lifecycle.py` in `modules/`.
 - `extensions/molecule/shared/`: everything.
+{# skeleton-variant: loopback-invariant #}
 - `tests/integration/targets/setup_loopback/`: everything.
+{# end skeleton-variant #}
 
+{# skeleton-variant: updating-invariants #}
 Leave them unchanged, so that you can update them from a newer render of
 [foundata/ansible-skeletons](https://github.com/foundata/ansible-skeletons);
 a local edit would conflict with that update. When one of them needs a
 change, make it in the skeleton so that every collection receives it.
 [CONTRIBUTING.md](https://github.com/foundata/ansible-skeletons/blob/main/CONTRIBUTING.md)
 explains how to propose one.
+{# end skeleton-variant #}
 
 {# skeleton-variant: appliance-invariants #}
 {# end skeleton-variant #}
+{# skeleton-variant: product-binding #}
 Two files connect the shared code to this product and keep the product's
 values when the skeleton changes: `contract_subject.py` points the shared
 contract tests at a product resource, and `plugins/module_utils/_binding.py`
 gives the lifecycle base this collection's client, error schema and
 compatibility check.
+{# end skeleton-variant #}
 
+{# skeleton-variant: transport-boundary #}
 `foundata.utils` owns byte transport, deadlines, JSON decoding and safe error
 translation. Everything else is product-owned, including the client, the
 definitions, the fake product and the scenario hooks.
+{# end skeleton-variant #}
 
+{# skeleton-variant: loopback-setup #}
 File-only API fixtures use the hidden `setup_loopback` integration target.
 Add it to the product setup target's dependencies, then load
 `setup_loopback/files/server.py` beside that target and call `serve`.
 The product supplies its routes and shutdown authentication; the helper owns
 HTTP dispatch, the loopback listener, the lifetime timer and the port file.
 Its docstring describes the callbacks and configuration.
+{# end skeleton-variant #}
 
+{# skeleton-variant: inventory-evidence #}
 The inventory extractor writes `tools/inventory/<series>.yml` beside itself.
 That inventory is development evidence: it never ships and nothing reads it
 at runtime.
+{# end skeleton-variant #}
 
+{# skeleton-variant: product-rules #}
 FIXME State which resources use hooks rather than definitions and why, and
 which writers and prerequisites the caller supplies. Each enforced rule and
 its reason belong in its utility's docstring.
+{# end skeleton-variant #}
 
 ## Troubleshooting<a id="troubleshooting"></a>
 
