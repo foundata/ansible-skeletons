@@ -40,6 +40,10 @@ and the project adheres to
 
 ### Changed
 
+- All skeletons: shared guide checks cover generic documentation across
+  variants. Module `FIXME.md` checklists provide one ordered fixture replacement
+  path, and shorter guides retain their contracts and testing requirements.
+
 - All skeletons: the Molecule README explains the short real checkout path
   needed by product tests that refuse symlinks and gives a disk-backed
   location below `/var/tmp/`.
