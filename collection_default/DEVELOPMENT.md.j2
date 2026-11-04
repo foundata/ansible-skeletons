@@ -19,8 +19,8 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 ## Checks<a id="checks"></a>
 
-Run the checks from the collection's Git root. With nox installed, `nox`
-replaces `uv run noxfile.py`.
+Run the checks from the collection's Git root. With
+[nox installed](#prerequisites), `nox` replaces `uv run noxfile.py`.
 
 {# skeleton-variant: check-commands #}
 ```bash
@@ -41,7 +41,7 @@ Among the default sessions:
 {# skeleton-variant: runtime-scope #}
   imports, module documentation, and role loading and syntax, then runs the
   unit tests against that installation. Molecule covers how the roles deploy.
-  To check the exact archive of a release:
+  To check the exact archive of a [release](#releases):
 
 {# end skeleton-variant #}
   ```sh
@@ -56,7 +56,7 @@ Among the default sessions:
 {# end skeleton-variant #}
 - `helper-lint` checks the Python outside `plugins/` with
 {# skeleton-variant: helper-role-path #}
-  [ruff.toml](ruff.toml): `extensions/molecule/`, the roles' `files/`,
+  [ruff.toml](./ruff.toml): `extensions/molecule/`, the roles' `files/`,
 {# end skeleton-variant #}
   `tools/`, `scripts/` and `tests/` apart from `tests/unit/`,
   `tests/integration/` and `tests/output/`. Add it to CI configurations that
@@ -66,8 +66,8 @@ Put the collection's own pytest suites below `tests/unit/` so ansible-test
 runs them. Other Python below `tests/` is linted by `helper-lint` but is not
 run as a test suite.
 
-Session definitions: [noxfile.py](noxfile.py).
-Built-in session settings: [antsibull-nox.toml](antsibull-nox.toml).
+Session definitions: [noxfile.py](./noxfile.py).
+Built-in session settings: [antsibull-nox.toml](./antsibull-nox.toml).
 {# skeleton-variant: check-iteration #}
 Run one `molecule` session at a time; two runs at once collide on container
 names. While editing, run the sessions of one ansible-core release, such as
@@ -79,7 +79,7 @@ Below a deep checkout, nox gives each session a short symbolic link as
 `TMPDIR`, because Unix socket paths are limited in length. A test of code that
 refuses symbolic links in a path resolves `TMPDIR` first.
 
-## Troubleshooting<a id="troubleshooting"></a>
+## Troubleshooting
 
 To recover a short-path directory left by a killed Nox invocation, read its
 `owner.json` at the exact path. It records the creator's host, PID and creation

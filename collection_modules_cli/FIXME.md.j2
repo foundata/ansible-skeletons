@@ -12,9 +12,10 @@ fields and required checks used below.
 
 1. Check metadata, licensing, dependencies, runtime floors and author handles.
 2. Replace the invented existing-only fixture with a researched product
-   resource. Keep the invariant files in `DEVELOPMENT.md` unchanged. Adapt the
-   typed declarations in `contract_subject.py` with real information entry
-   points and a fake adapter, and declare its mutation granularity.
+   resource. Keep the invariant files in
+   [DEVELOPMENT.md](./DEVELOPMENT.md#boundaries) unchanged. Adapt the typed
+   declarations in `contract_subject.py` with real information entry points and
+   a fake adapter, and declare its mutation granularity.
 3. Declare native write token sequences in `Contract.write_command`. Preserve
    real subprocess-start injection and unchanged/no-dispatch checks.
 4. Declare accepted arguments, their literal argv elements and refused arguments
@@ -54,7 +55,6 @@ fields and required checks used below.
     and managed-host scenario together. Keep the standalone module-process case
     crossing the actual utils subprocess boundary.
 16. Update the README's execution, ownership, compatibility and usage
-    statements.
-    Replace its fixture qualification with the product builds and locators
-    tested. Run the checks in [DEVELOPMENT.md](./DEVELOPMENT.md), then remove
-    this checklist.
+    statements. Replace its fixture qualification with the product builds and
+    locators tested. Run the checks in
+    [DEVELOPMENT.md](./DEVELOPMENT.md#checks), then remove this checklist.

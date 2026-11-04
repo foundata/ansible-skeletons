@@ -18,8 +18,8 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 ## Checks<a id="checks"></a>
 
-Run the checks from the collection's Git root. With nox installed, `nox`
-replaces `uv run noxfile.py`.
+Run the checks from the collection's Git root. With
+[nox installed](#prerequisites), `nox` replaces `uv run noxfile.py`.
 
 {# skeleton-variant: check-commands #}
 ```bash
@@ -42,7 +42,7 @@ Among the default sessions:
 {# skeleton-variant: runtime-scope #}
   imports, module documentation and the syntax of any roles, then runs the
   unit tests against that installation. To check the exact archive of a
-  release:
+  [release](#releases):
 
 {# end skeleton-variant #}
   ```sh
@@ -53,7 +53,7 @@ Among the default sessions:
 {# end skeleton-variant #}
 - `helper-lint` checks the Python outside `plugins/` with
 {# skeleton-variant: helper-role-path #}
-  [ruff.toml](ruff.toml): `extensions/molecule/`, any role's `files/`,
+  [ruff.toml](./ruff.toml): `extensions/molecule/`, any role's `files/`,
 {# end skeleton-variant #}
   `tools/`, `scripts/` and `tests/` apart from `tests/unit/`,
   `tests/integration/` and `tests/output/`. Add it to CI configurations that
@@ -63,8 +63,8 @@ Put the collection's own pytest suites below `tests/unit/` so ansible-test
 runs them. Other Python below `tests/` is linted by `helper-lint` but is not
 run as a test suite.
 
-Session definitions: [noxfile.py](noxfile.py).
-Built-in session settings: [antsibull-nox.toml](antsibull-nox.toml).
+Session definitions: [noxfile.py](./noxfile.py).
+Built-in session settings: [antsibull-nox.toml](./antsibull-nox.toml).
 {# skeleton-variant: check-iteration #}
 While editing, run the sessions of one ansible-core release, such as
 `uv run noxfile.py -s ansible-test-units-2.21` (`-l` lists them), and the
@@ -75,7 +75,7 @@ Below a deep checkout, nox gives each session a short symbolic link as
 `TMPDIR`, because Unix socket paths are limited in length. A test of code that
 refuses symbolic links in a path resolves `TMPDIR` first.
 
-## Unit-test clocks<a id="unit-test-clocks"></a>
+## Unit-test clocks
 
 Use the opt-in `fake_clock` fixture when a test's expected outcome depends
 on polling or a short deadline. It keeps the real `foundata.utils`
@@ -180,7 +180,7 @@ Each enforced rule and its reason belong in its utility's docstring. The
 [adaptation checklist](./FIXME.md) covers the product-specific boundary notes.
 {# end skeleton-variant #}
 
-## Troubleshooting<a id="troubleshooting"></a>
+## Troubleshooting
 
 To recover a short-path directory left by a killed Nox invocation, read its
 `owner.json` at the exact path. It records the creator's host, PID and creation
@@ -190,7 +190,7 @@ targets. Remove only that directory; keep the link targets. Leave symlinked or
 replaced paths and uncertain creators for investigation. Nox itself removes only
 the unchanged directory its invocation created.
 
-## Engine fields<a id="engine-fields"></a>
+## Engine fields
 
 `Field(kind="strmap")` describes a dictionary of string keys to string values;
 empty strings are values. A write replaces the whole dictionary, and the

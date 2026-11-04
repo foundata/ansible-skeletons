@@ -13,9 +13,10 @@ Complete these steps in order before publishing a product collection.
    `requirements.txt` and the README's prerequisites. Keep `requirements.txt`;
    list Python packages there, or leave it with its comment when there are none.
 3. Replace the fixture definition, modules and tests with a researched resource.
-   Bind it in `tests/unit/plugins/modules/contract_subject.py` and keep
+   Bind it in `tests/unit/plugins/modules/contract_subject.py`. Keep the
+   [invariant files](./DEVELOPMENT.md#boundaries) unchanged, including
    `test_contract.py`, `test_engine.py`, `test_activation.py` and
-   `test_lifecycle.py` unchanged.
+   `test_lifecycle.py`.
    The subject declares valid identities, creation arguments, a mutable field
    and capability flags with skip reasons. Engine invariants use their own
    synthetic definition and fake; do not add fields or guards to the product.
@@ -51,16 +52,16 @@ Complete these steps in order before publishing a product collection.
    recovery and one writer, including pending changes from other clients, as
    caller prerequisites.
 {# end skeleton-variant #}
-5. Copy `plugins/module_utils/_fixture_nested.py` for each resource that a
-   flat definition cannot express. Edit its hooks and their contracts, never the
-   lifecycle sequence. Keep `_lifecycle.py` and the shared tests unchanged.
-   Bind the client, schema and compatibility policy once in `_binding.py`.
-   Copy the `fixture_nested` module, unit test, file-only integration target
-   and default scenario tasks together, and `fixture_nested_info` with its
-   target where the resource needs an information read. Replace the module's
-   notes FIXME, verifier slot and Usage subsection with researched product
-   evidence. Preserve unmanaged nested values and prove lost create, update
-   and delete responses with the shared loss harness.
+5. Copy `plugins/module_utils/_fixture_nested.py` for each resource that a flat
+   definition cannot express. Edit its hooks and their contracts, never the
+   lifecycle sequence. Keep `_lifecycle.py` and the shared tests unchanged. Bind
+   the client, schema and compatibility policy once in `_binding.py`. Copy the
+   `fixture_nested` module, unit test, file-only integration target and default
+   scenario tasks together, and `fixture_nested_info` with its target where the
+   resource needs an information read. Replace the module's notes FIXME,
+   verifier slot and [Usage subsection](./README.md#usage-fixture-nested) with
+   researched product evidence. Preserve unmanaged nested values and prove lost
+   create, update and delete responses with the shared loss harness.
 6. Replace `!UNKNOWN` author handles in module documentation.
 7. Adapt connection options, authentication, version probe, supported series and
    evidence-backed exclusions.
@@ -73,15 +74,16 @@ Complete these steps in order before publishing a product collection.
    login and no version probe; it logs in with its first request, or neither
    setting holds and the contract tests that check it fail.
 9. Update the README contract, module table, compatibility evidence and the
-{# skeleton-variant: http-fixme-2 #}
-   Usage section: one subsection per administration task with the tasks of one
+   Usage section: one subsection per
+   [administration task](./README.md#usage-fixture) with the tasks of one
    runnable example. Use two to four sentences to describe what its modules
+{# skeleton-variant: http-fixme-2 #}
    manage, what they refuse and why, and what the caller prepares. Explain when
    to run the apply module. Put rules enforced by one module in that module's
    documentation. Replace the nested example and module notes with the
-   researched identity, ownership, eligibility and concurrency contract.
-   Replace the compatibility table's fixture row with tested product series and
-   describe what those tests cover.
+   researched identity, ownership, eligibility and concurrency contract. Replace
+   the compatibility table's fixture row with tested product series and describe
+   what those tests cover.
 {# end skeleton-variant #}
 10. Implement the inventory extractor. Put each rule a module utility enforces
     into that file's docstring with its reason, and complete the Boundaries
@@ -92,5 +94,5 @@ Complete these steps in order before publishing a product collection.
     authentication.
 11. Set the Molecule environment names and action-group members for the product.
 12. Check `tests/config.yml`, run the checks in
-    [DEVELOPMENT.md](./DEVELOPMENT.md),
+    [DEVELOPMENT.md](./DEVELOPMENT.md#checks),
     and resolve failures. Adapt the changelog, then remove this checklist.
