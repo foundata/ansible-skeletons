@@ -160,7 +160,6 @@ configuration. Declare each native write form, such as `set` and `inherit`. The
 start-failure case injects at `subprocess.Popen` after the real transport
 prepares the command and requires one matching start attempt, unchanged storage
 and zero dispatched writes. Fakes must cross that subprocess boundary.
-
 {# end skeleton-variant #}
 
 {# skeleton-variant: inventory-evidence #}
@@ -176,7 +175,6 @@ secret stdin bytes, including a stream larger than a pipe buffer; empty stdin
 refuses before dispatch. These shared executable cases need no product adapter
 or options, so products need no extra free-text or secret option to meet
 literal-input obligations.
-
 {# end skeleton-variant #}
 
 {# skeleton-variant: product-rules #}

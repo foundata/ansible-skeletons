@@ -163,9 +163,9 @@ settings, nested virtualization or Podman inside the test target. They boot
 vendor cloud images in the libvirt user session with passt user networking.
 
 Virtual machines need far more resources than containers; use `--platform-name`
-to test one at a time on smaller hosts. The resource guard stops `create` when
-requested memory plus a host reserve exceeds available memory, or the image
-cache is low on disk space.
+to test one platform at a time on smaller hosts. The resource guard stops
+`create` when requested memory plus a host reserve exceeds available memory, or
+the image cache is low on disk space.
 
 The first run caches each cloud image (qcow2, several hundred MiB). You can
 safely delete the cache; missing images download again.

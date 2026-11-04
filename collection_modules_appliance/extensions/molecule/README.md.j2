@@ -161,7 +161,8 @@ result. Cases run hidden because parameters contain credentials. `zz_loss.yml`
 shows credential-free proof for each case, including the executed module file.
 
 The `zz_` prefix runs `zz_loss.yml` after other side-effect files. If they
-remove a required record or service, rename it to run before that removal.
+remove a required record or service, rename `zz_loss.yml` to run before that
+removal.
 
 {# skeleton-variant: recovery-sequence #}
 `zz_recovery.yml` runs the [recovery drill](#usage-recovery) when the
@@ -372,9 +373,9 @@ Virtual machines boot vendor cloud images in the libvirt user session with
 passt user networking.
 
 Virtual machines need far more resources than containers; use `--platform-name`
-to test one at a time on smaller hosts. The resource guard stops `create` when
-requested memory plus a host reserve exceeds available memory, or the image
-cache is low on disk space.
+to test one platform at a time on smaller hosts. The resource guard stops
+`create` when requested memory plus a host reserve exceeds available memory, or
+the image cache is low on disk space.
 
 The first run caches each cloud image (qcow2, several hundred MiB). You can
 safely delete the cache; missing images download again.
