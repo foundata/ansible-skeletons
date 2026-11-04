@@ -10,16 +10,19 @@ SPDX-License-Identifier: GPL-3.0-or-later
 - [uv](https://docs.astral.sh/uv/), or [nox](https://nox.thea.codes/) with
   [antsibull-nox](https://docs.ansible.com/projects/antsibull-nox/) in one
   Python environment.
+{# skeleton-variant: check-platforms #}
 - [Podman](https://podman.io/) for the `ansible-test` sanity sessions and the
   container platforms of Molecule. See
   [`extensions/molecule/README.md`](./extensions/molecule/README.md) for
   virtual machines and the execution environment scenario.
+{# end skeleton-variant #}
 
 ## Checks<a id="checks"></a>
 
 Run the checks from the collection's Git root. With nox installed, `nox`
 replaces `uv run noxfile.py`.
 
+{# skeleton-variant: check-commands #}
 ```bash
 uv run noxfile.py                 # fix, then run default checks
 CI=true uv run noxfile.py         # check only
@@ -29,25 +32,32 @@ uv run noxfile.py -s ansible-test-sanity
 uv run noxfile.py -s molecule
 uv run noxfile.py -s molecule -- test --platform-name molecule-debian13
 ```
+{# end skeleton-variant #}
 
 Among the default sessions:
 
 - `runtime-check` installs the built collection in isolation and keeps only
   what ships: `meta/`, `plugins/`, `roles/` and `playbooks/`. It checks Python
+{# skeleton-variant: runtime-scope #}
   imports, module documentation, and role loading and syntax, then runs the
   unit tests against that installation. Molecule covers how the roles deploy.
   To check the exact archive of a release:
 
+{# end skeleton-variant #}
   ```sh
   uv run noxfile.py -s runtime-check -- --artifact /path/to/collection.tar.gz
   ```
 
+{# skeleton-variant: deployment-lint #}
 - `ansible-lint` runs with foundata's rules from `ansible-lint-foundata`,
   after checking that the rules the configuration enables are active. With
   `nox --no-venv` and the extension missing, it warns and runs only the stock
   rules.
+{# end skeleton-variant #}
 - `helper-lint` checks the Python outside `plugins/` with
+{# skeleton-variant: helper-role-path #}
   [ruff.toml](ruff.toml): `extensions/molecule/`, the roles' `files/`,
+{# end skeleton-variant #}
   `tools/`, `scripts/` and `tests/` apart from `tests/unit/`,
   `tests/integration/` and `tests/output/`. Add it to CI configurations that
   list sessions explicitly.
@@ -58,10 +68,12 @@ run as a test suite.
 
 Session definitions: [noxfile.py](noxfile.py).
 Built-in session settings: [antsibull-nox.toml](antsibull-nox.toml).
+{# skeleton-variant: check-iteration #}
 Run one `molecule` session at a time; two runs at once collide on container
 names. While editing, run the sessions of one ansible-core release, such as
 `uv run noxfile.py -s ansible-test-sanity-2.21` (`-l` lists them), and the
 default sessions before a commit.
+{# end skeleton-variant #}
 
 Below a deep checkout, nox gives each session a short symbolic link as
 `TMPDIR`, because Unix socket paths are limited in length. A test of code that
@@ -97,5 +109,7 @@ python -m pip install -r requirements-dev.txt
 building the archive. Set `repository` in `.releasing.toml` before the first
 release.
 
+{# skeleton-variant: release-qualification #}
 FIXME Describe what a release of this collection consists of and the steps to
 make one.
+{# end skeleton-variant #}

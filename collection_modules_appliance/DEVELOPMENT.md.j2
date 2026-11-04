@@ -10,15 +10,18 @@ SPDX-License-Identifier: GPL-3.0-or-later
 - [uv](https://docs.astral.sh/uv/), or [nox](https://nox.thea.codes/) with
   [antsibull-nox](https://docs.ansible.com/projects/antsibull-nox/) in one
   Python environment.
+{# skeleton-variant: check-platforms #}
 - [Podman](https://podman.io/) for the container-backed `ansible-test` sessions.
 - An authorized lab for each
   [Molecule scenario](./extensions/molecule/README.md).
+{# end skeleton-variant #}
 
 ## Checks<a id="checks"></a>
 
 Run the checks from the collection's Git root. With nox installed, `nox`
 replaces `uv run noxfile.py`.
 
+{# skeleton-variant: check-commands #}
 ```bash
 uv run noxfile.py                 # fix, then run default checks
 CI=true uv run noxfile.py         # check only
@@ -30,21 +33,28 @@ uv run noxfile.py -s ansible-test-units
 uv run noxfile.py -s ansible-test-integration
 uv run noxfile.py -s molecule
 ```
+{# end skeleton-variant #}
 
 Among the default sessions:
 
 - `runtime-check` installs the built collection in isolation and keeps only
   what ships: `meta/`, `plugins/`, `roles/` and `playbooks/`. It checks Python
+{# skeleton-variant: runtime-scope #}
   imports, module documentation and the syntax of any roles, then runs the
   unit tests against that installation. To check the exact archive of a
   release:
 
+{# end skeleton-variant #}
   ```sh
   uv run noxfile.py -s runtime-check -- --artifact /path/to/collection.tar.gz
   ```
 
+{# skeleton-variant: deployment-lint #}
+{# end skeleton-variant #}
 - `helper-lint` checks the Python outside `plugins/` with
+{# skeleton-variant: helper-role-path #}
   [ruff.toml](ruff.toml): `extensions/molecule/`, any role's `files/`,
+{# end skeleton-variant #}
   `tools/`, `scripts/` and `tests/` apart from `tests/unit/`,
   `tests/integration/` and `tests/output/`. Add it to CI configurations that
   list sessions explicitly.
@@ -55,9 +65,11 @@ run as a test suite.
 
 Session definitions: [noxfile.py](noxfile.py).
 Built-in session settings: [antsibull-nox.toml](antsibull-nox.toml).
+{# skeleton-variant: check-iteration #}
 While editing, run the sessions of one ansible-core release, such as
 `uv run noxfile.py -s ansible-test-units-2.21` (`-l` lists them), and the
 default sessions before a commit.
+{# end skeleton-variant #}
 
 Below a deep checkout, nox gives each session a short symbolic link as
 `TMPDIR`, because Unix socket paths are limited in length. A test of code that
@@ -232,5 +244,7 @@ python -m pip install -r requirements-dev.txt
 building the archive. Set `repository` in `.releasing.toml` before the first
 release.
 
+{# skeleton-variant: release-qualification #}
 FIXME Describe what a release of this collection consists of, its product
 qualification and the steps to make one.
+{# end skeleton-variant #}

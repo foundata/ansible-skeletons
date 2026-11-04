@@ -6,20 +6,26 @@ SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
 A (maybe incomplete but hopefully useful) list of things to do after creating a
+{# skeleton-variant: deployment-checklist-1 #}
 new collection based on the skeleton, especially before releasing anything:
+{# end skeleton-variant #}
 
 1. **Check licensing information and metadata**
    - [`REUSE.toml`](./REUSE.toml) → Especially `SPDX-PackageDownloadLocation`,
      `SPDX-PackageSupplier`, and `SPDX-FileCopyrightText`
+{# skeleton-variant: deployment-checklist-2 #}
    - [`roles/run/meta/main.yml`](./roles/run/meta/main.yml) in general.
+{# end skeleton-variant #}
    - The "[`README.md`: Licensing, copyright](./README.md#licensing-copyright)"
      section
    - The "[`README.md`: Author Information](./README.md#author-information)"
      section
 
 2. **Check requirements information**
+{# skeleton-variant: deployment-checklist-3 #}
    - In the
      "[`roles/run/README.md`: External requirements](./roles/run/README.md#requirements)"
+{# end skeleton-variant #}
      section, list any prerequisites that may not be covered by Ansible itself,
      e.g.:
      - DNS names to configure, firewall ports to open
@@ -31,8 +37,11 @@ new collection based on the skeleton, especially before releasing anything:
      packages (if any). Keep the file with a comment when none are needed.
 
 3. **Check dependency information**
+{# skeleton-variant: deployment-checklist-4 #}
    - [`galaxy.yml`](./galaxy.yml) → `dependencies:`
+{# end skeleton-variant #}
    - In the "[`README.md`: Dependencies](./README.md#dependencies)" section:
+{# skeleton-variant: deployment-checklist-5 #}
      - A list of other collections hosted on Galaxy should go here
      - Plus any details regarding parameters that may need to be set for other
        collections or variables that are used from other collections or roles.
@@ -40,24 +49,32 @@ new collection based on the skeleton, especially before releasing anything:
    - In the
      "[`roles/run/README.md`: Dependencies](./roles/run/README.md#dependencies)"
      section:
+{# end skeleton-variant #}
      - A list of other roles hosted on Galaxy should go here
      - Plus any details regarding parameters that may need to be set for other
+{# skeleton-variant: deployment-checklist-6 #}
        roles or variables that are used from other collections or roles.
+{# end skeleton-variant #}
 
 4. **Check compatibility information**
+{# skeleton-variant: deployment-checklist-7 #}
    - In the
      "[`roles/run/README.md`: Compatibility](./roles/run/README.md#compatibility)"
      section:
+{# end skeleton-variant #}
      - Maybe you want to mention the main platform/first-class citizens.
      - Or if things were tested on container/VM/bare metal
+{# skeleton-variant: deployment-checklist-8 #}
    - [`roles/run/vars/main.yml`](./roles/run/vars/main.yml) →
      `__run_{{ collection_name }}_supported_platforms:`
+{# end skeleton-variant #}
      - Sadly,
        [there is no complete list of platforms anymore](https://github.com/foundata/ansible-skeletons/issues/4).
        But the
        [module_utils source code](https://github.com/ansible/ansible/blob/devel/lib/ansible/module_utils/facts/system/distribution.py)
        might give you some hints.
 
+{# skeleton-variant: deployment-checklist-9 #}
 5. **Check the test configuration**
    - [`tests/config.yml`](./tests/config.yml) → `python_requires`: the Python
      versions module code supports on managed nodes.
@@ -65,3 +82,4 @@ new collection based on the skeleton, especially before releasing anything:
      there and resolve what they report.
 
 6. **Search for FIXME** in all files (e.g., via `grep "FIXME" -r ./`).
+{# end skeleton-variant #}

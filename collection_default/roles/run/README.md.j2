@@ -188,9 +188,11 @@ See `dependencies` in [`meta/main.yml`](./meta/main.yml).
 The role needs at least the ansible-core version set as `min_ansible_version`
 in [`meta/main.yml`](./meta/main.yml).
 
+{# skeleton-variant: supported-platforms #}
 FIXME List the supported platforms. Keep the list in line with
 `__run_{{ collection_name }}_supported_platforms`
 in [`vars/main.yml`](./vars/main.yml).
+{# end skeleton-variant #}
 
 The role stops on a platform that a non-empty list does not name.
 

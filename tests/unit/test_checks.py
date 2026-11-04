@@ -297,6 +297,7 @@ SKELETON_GROUPS = {
     "all": SKELETONS,
     "role_and_collection_default": ("role_default", "collection_default"),
     "collections": SKELETONS[1:],
+    "provisioning_skeletons": SKELETONS[:-1],
     "module_skeletons": (
         "collection_modules_rest",
         "collection_modules_appliance",
@@ -340,6 +341,7 @@ SHARED_FILES = {
         "requirements.txt.j2",
     ),
     "role_and_collection_default": (
+        "FIXME.md.j2",
         ".ansible-docsmith.toml.j2",
         "extensions/molecule/README.md.j2",
         "extensions/molecule/default/inventory/hosts.yml.j2",
@@ -387,6 +389,8 @@ SHARED_FILES = {
         "tests/unit/plugins/modules/test_lifecycle.py.j2",
     ),
     "http_module_skeletons": (
+        "README.md.j2",
+        "FIXME.md.j2",
         "extensions/molecule/README.md.j2",
         "extensions/molecule/default/inventory/hosts.yml.j2",
         "extensions/molecule/default/molecule.yml.j2",
@@ -433,6 +437,8 @@ VARIANT_MARKER = re.compile(r"^\{# (end )?skeleton-variant\b.*#\}\n", re.MULTILI
 
 def shared_path(skeleton: str, name: str) -> Path:
     """Path of the shared file ``name`` (as in collection_default) in a skeleton."""
+    if skeleton == "role_default" and name == "roles/run/README.md.j2":
+        name = "README.md.j2"
     if skeleton == "role_default" and name.startswith("extensions/molecule/"):
         name = name.removeprefix("extensions/")
     if skeleton in SKELETON_GROUPS["module_skeletons"] and (
@@ -450,6 +456,104 @@ def shared_text(path: Path) -> str:
     )
     assert "skeleton-variant" not in text, f"Unbalanced variant marker in {path}"
     return text
+
+
+# A mixed guide can share a section or paragraph with a wider group than its
+# complete file. Bounds must match once; variant regions work as for SHARED_FILES.
+# Keep the existing whole-file comparisons, including their narrower protection.
+SHARED_PASSAGES = (
+    *(
+        (
+            "role_and_collection_default",
+            "roles/run/README.md.j2",
+            rf"^## {section}.*\n",
+            r"^## |\Z",
+        )
+        for section in ("Dependencies", "Compatibility", "External requirements")
+    ),
+    *(
+        ("collections", "DEVELOPMENT.md.j2", rf"^## {section}.*\n", r"^## |\Z")
+        for section in ("Prerequisites", "Checks", "Troubleshooting", "Releases")
+    ),
+    *(
+        ("all", "README.md.j2", rf"^## {section}.*\n", r"^## |\Z")
+        for section in (
+            "Versioning and deprecation",
+            "Licensing, copyright",
+            "Author information",
+        )
+    ),
+    ("all", "extensions/molecule/README.md.j2", r"^When product tests", r"\n\n"),
+    *(
+        ("provisioning_skeletons", "extensions/molecule/README.md.j2", start, end)
+        for start, end in (
+            (r"^Container platforms need", r"\n\n"),
+            (r"^Virtual machine platforms need:", r"(?=\n\n\n|^Virtual machines boot)"),
+            (r"^Virtual machines need far more", r"\n\n"),
+            (r"^The first run downloads", r"\n\n"),
+            (
+                r"^\| +Variable +\| +Default +\| Purpose \|\n(?=\|[^\n]+\n\| `MOLECULE_VM_LIBVIRT_URI`)",
+                r"\n\n",
+            ),
+            (r"^If an instance does not come up:", r"(?=\n\n\n)"),
+            (r"^`molecule login` opens", r"(?=\n\n\n)"),
+            (r"^### Container: `inotify_init1", r"^### |\Z"),
+            (r"^### VMs: Instance-to-instance networking", r"^### |\Z"),
+        )
+    ),
+)
+
+
+def shared_passage(path: Path, start: str, end: str) -> str:
+    """Select one bounded passage, keeping named variant placeholders."""
+    text = shared_text(path)
+    starts = list(re.finditer(start, text, re.MULTILINE))
+    assert len(starts) == 1, (path, start)
+    first = starts[0]
+    last = re.search(end, text[first.end() :], re.MULTILINE)
+    assert last is not None, (path, end)
+    return text[first.start() : first.end() + last.start()].strip()
+
+
+@pytest.mark.parametrize(("group", "name", "start", "end"), SHARED_PASSAGES)
+def test_shared_document_passages_are_identical(
+    group: str, name: str, start: str, end: str
+) -> None:
+    reference, *others = SKELETON_GROUPS[group]
+    expected = shared_passage(shared_path(reference, name), start, end)
+    for skeleton in others:
+        assert shared_passage(shared_path(skeleton, name), start, end) == expected, (
+            skeleton,
+            name,
+            start,
+        )
+
+
+@pytest.mark.parametrize(
+    "name",
+    (
+        "check-platforms",
+        "check-commands",
+        "runtime-scope",
+        "deployment-lint",
+        "helper-role-path",
+        "check-iteration",
+        "release-qualification",
+    ),
+)
+def test_module_development_keeps_shared_collection_regions(name: str) -> None:
+    """Wider collection sharing must retain equality of module-only guidance."""
+    contents = []
+    for skeleton in SKELETON_GROUPS["module_skeletons"]:
+        text = (ROOT / skeleton / "DEVELOPMENT.md.j2").read_text(encoding="utf-8")
+        matches = [
+            region.group()
+            for region in VARIANT_REGION.finditer(text)
+            if region["name"] == name
+        ]
+        assert len(matches) == 1, (skeleton, name)
+        contents.append(matches[0])
+    assert len(set(contents)) == 1, name
 
 
 def source_yaml(path: Path) -> Any:
