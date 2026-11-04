@@ -1101,6 +1101,45 @@ def test_a_failing_stage_keeps_the_progress_of_earlier_ones(
     assert (result["error_code"], result["operation"]) == expected
 
 
+class AtomicCreation(Staged):
+    """Stores the object and its secret in one request under a reserved identity.
+
+    The found object then proves the secret, so a lost reply settles by read-back.
+    """
+
+    def stages(self) -> list[Stage]:
+        if self.absent or self.record is not None:
+            return super().stages()
+        key, value = self.key, self.want.get("value")
+        stored = {"name": key, "value": value, "active": True}
+        return [
+            (
+                "create",
+                self.want,
+                False,
+                self.request("create", lambda rows: rows.update({key: stored})),
+                False,
+            )
+        ]
+
+
+def atomic_main() -> None:
+    module = AnsibleModule(argument_spec=spec(), supports_check_mode=True)
+    AtomicCreation(module).execute()
+
+
+def test_a_lost_atomic_creation_settles_by_read_back(
+    store: Store, run_module: RunModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(Staged, "connect", lambda self: store)
+    store.after = lose
+    result = run_module(atomic_main, name="a", value="1", secret="s1")
+    assert store.writes == ["create"] and store.rows["a"]["active"]
+    assert result["changed"] and not result.get("failed")
+    assert result["verified"] == "unverifiable"
+    assert "error_code" not in result
+
+
 @pytest.mark.parametrize("lost", ["create", "enable"])
 def test_a_lost_stage_settles_by_read_back_unless_it_sends_the_secret(
     store: Store,

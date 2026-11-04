@@ -28,6 +28,10 @@ and the project adheres to
   by `maximum_items`; stored keys outside the pattern stay readable. The REST
   fixture exercises the kind through its `variables` field.
 
+- All three module variants: the shared lifecycle tests prove that a lost reply
+  to a creation storing the object and its secret in one request settles by
+  read-back.
+
 - `collection_modules_cli` for products administered through a command line on
   the managed host. It shares the lifecycle and check scaffolding, with an
   existing-only hook fixture, real information and planning modules, bounded
