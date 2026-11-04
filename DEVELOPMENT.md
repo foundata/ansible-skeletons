@@ -132,6 +132,13 @@ Every copy declares the same regions in the same order; a region may be empty.
 Galaxy renders the marker lines to nothing. Change the shared text in every
 copy at once.
 
+A document that shares only part of its text with a group lists that section
+or paragraph in `SHARED_PASSAGES`, with regular expressions that bound it. Each
+bound must match once in every copy, and variant regions work as they do in a
+shared file. A passage can span a wider group than the file's own: the
+module-region test then keeps the regions a passage needs identical within the
+module skeletons.
+
 
 ## Development standards<a id="development-standards"></a>
 
