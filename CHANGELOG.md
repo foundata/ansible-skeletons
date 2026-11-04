@@ -40,6 +40,9 @@ and the project adheres to
 
 ### Changed
 
+- `collection_modules` is now `collection_modules_rest`. Render
+  `collection_modules_rest` wherever you rendered `collection_modules`.
+
 - All skeletons: shared guide checks cover generic documentation across
   variants. Module `FIXME.md` checklists provide one ordered fixture replacement
   path, and shorter guides retain their contracts and testing requirements.
@@ -68,8 +71,6 @@ and the project adheres to
   behaviors, including loader neutralization, retained failures with pending
   repeats and nested source-aware results. Raw strings and secret stdin have
   separate transport cases; product locator and planning examples stay local.
-
-- `collection_modules_rest` is the name of the REST module skeleton.
 
 ### Removed
 
