@@ -4,11 +4,19 @@
 
 import argparse
 import re
+import shutil
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from scripts.common import ROOT, GateError, isolated_environment, run, write_json
+from scripts.common import (
+    ROOT,
+    GateError,
+    isolated_environment,
+    run,
+    skeleton_files,
+    write_json,
+)
 
 MODULE_PROFILES = (
     "collection_modules_appliance",
@@ -32,6 +40,22 @@ class Rendered:
     collection: Path
     env: dict[str, str]
     profile: str = "collection_default"
+
+
+def stage_skeleton(source: Path, name: str, destination: Path) -> Path:
+    """Copy a skeleton's files, so that an ignored one reaches no render.
+
+    ansible-galaxy renders whatever a skeleton directory holds, while the source
+    digest and --changed see only the sources. A stray cache or helper would
+    otherwise pass a check and be missing from the release.
+    """
+    skeleton = source / name
+    staged = destination / name
+    staged.mkdir(parents=True)
+    for relative in skeleton_files(skeleton):
+        (staged / relative).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(skeleton / relative, staged / relative, follow_symlinks=False)
+    return staged
 
 
 def render(
@@ -60,6 +84,9 @@ def render(
             raise GateError(f"Missing skeleton directory: {source / skeleton}")
     output.mkdir(parents=True, exist_ok=False)
     env = isolated_environment(output)
+    staging = output / "skeletons"
+    role_skeleton = stage_skeleton(source, "role_default", staging)
+    collection_skeleton = stage_skeleton(source, profile, staging)
     roles = output / "roles"
     collections = output / "source-collections"
     roles.mkdir()
@@ -75,7 +102,7 @@ def render(
             "role",
             "init",
             "--role-skeleton",
-            str(source / "role_default"),
+            str(role_skeleton),
             "--init-path",
             str(roles),
             *extras,
@@ -90,7 +117,7 @@ def render(
             "collection",
             "init",
             "--collection-skeleton",
-            str(source / profile),
+            str(collection_skeleton),
             "--init-path",
             str(collections),
             *extras,
@@ -99,6 +126,7 @@ def render(
         cwd=output,
         env=env,
     )
+    shutil.rmtree(staging)
     return Rendered(
         output,
         roles / role_name,

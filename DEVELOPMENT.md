@@ -263,6 +263,9 @@ interrupted ansible-test left in a module render's own Podman store are
 removed first. A resumed run that passes prunes its output like any passing
 run, and a pruned output cannot be resumed.
 
+Renders read the same files as that digest, so an ignored file below a skeleton
+reaches no generated project.
+
 A quick or matrix run fails when the sources change while it runs: its steps
 did not all test the same files, so no result stands for the current tree.
 `--changed` only warns, because it serves editing and writes no report.

@@ -11,8 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from scripts.common import ROOT, GateError
-from scripts.render import example_metadata, render
+from scripts.common import ROOT, GateError, skeleton_files
+from scripts.render import example_metadata, render, stage_skeleton
 from scripts.smoke import identity_sessions, scan_credentials
 
 
@@ -328,7 +328,9 @@ def test_render_selects_profile_and_preserves_metadata(
         metadata=metadata,
     )
     assert rendered.profile == profile
-    assert calls[1][calls[1].index("--collection-skeleton") + 1] == str(ROOT / profile)
+    assert calls[1][calls[1].index("--collection-skeleton") + 1] == str(
+        tmp_path / "render/skeletons" / profile
+    )
     assert calls[1][-1] == f"{namespace}.{name}"
     assert calls[0][-1] == role
     assert json.loads((rendered.work / "extra-vars.json").read_text()) == metadata
@@ -432,3 +434,48 @@ def test_rest_fixture_has_no_activation_surface() -> None:
     assert (
         "only where saved and active state differ" in (root / "FIXME.md.j2").read_text()
     )
+
+
+@pytest.fixture
+def checkout(tmp_path: Path) -> Path:
+    """A repository whose skeleton holds each kind of file a checkout can hold."""
+    root = tmp_path / "repository"
+    skeleton = root / "role_default"
+    (skeleton / "lib").mkdir(parents=True)
+    (root / ".gitignore").write_text("lib/\n__pycache__/\n")
+    (skeleton / "tracked.j2").write_text("tracked\n")
+    (skeleton / "deleted.j2").write_text("deleted\n")
+    tool = skeleton / "tool.sh.j2"
+    tool.write_text("#!/bin/sh\n")
+    tool.chmod(0o755)
+    (skeleton / "link.j2").symlink_to("tracked.j2")
+    subprocess.run(["git", "init", "-q"], cwd=root, check=True, timeout=30)
+    subprocess.run(["git", "add", "."], cwd=root, check=True, timeout=30)
+    (skeleton / "deleted.j2").unlink()
+    (skeleton / "untracked.j2").write_text("untracked\n")
+    (skeleton / "lib/helper.py").write_text("ignored\n")
+    return root
+
+
+def test_a_checkouts_skeleton_lists_the_sources_only(checkout: Path) -> None:
+    assert sorted(map(str, skeleton_files(checkout / "role_default"))) == [
+        "link.j2",
+        "tool.sh.j2",
+        "tracked.j2",
+        "untracked.j2",
+    ]
+
+
+def test_an_exports_skeleton_lists_all_its_files(checkout: Path) -> None:
+    (checkout / ".git").rename(checkout / "git")
+    assert Path("lib/helper.py") in skeleton_files(checkout / "role_default")
+
+
+def test_a_staged_skeleton_keeps_modes_and_links_and_drops_ignored_files(
+    checkout: Path, tmp_path: Path
+) -> None:
+    staged = stage_skeleton(checkout, "role_default", tmp_path / "staged")
+    assert not (staged / "lib").exists() and not (staged / "deleted.j2").exists()
+    assert (staged / "tool.sh.j2").stat().st_mode & 0o100
+    assert (staged / "link.j2").is_symlink()
+    assert (staged / "untracked.j2").read_text() == "untracked\n"

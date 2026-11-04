@@ -29,6 +29,7 @@ from scripts.common import (
     matrix,
     run,
     run_process,
+    skeleton_files,
     uv_command,
     write_json,
 )
@@ -47,10 +48,7 @@ def check_tree(source: Path, destination: Path) -> None:
     for name in ("scripts", "pyproject.toml"):
         if (destination / name).exists():
             raise GateError(f"Generated project contains repository tooling: {name}")
-    for original in source.rglob("*"):
-        if not original.is_file():
-            continue
-        relative = original.relative_to(source)
+    for relative in skeleton_files(source):
         target = destination / str(relative).removesuffix(".j2")
         if not target.is_file():
             raise GateError(f"Rendering omitted {relative}")

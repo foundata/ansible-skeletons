@@ -288,6 +288,39 @@ def digest(path: Path) -> str:
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
+def source_files(root: Path = ROOT) -> list[bytes]:
+    """List a checkout's sources: tracked files and untracked ones Git keeps."""
+    listing = subprocess.run(
+        ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        timeout=60,
+    ).stdout
+    return sorted(set(listing.split(b"\0")) - {b""})
+
+
+def skeleton_files(skeleton: Path) -> list[Path]:
+    """List a skeleton's files as a render sees them, relative to the skeleton.
+
+    In a checkout, those are the sources; an ignored file is none. An exported
+    release holds nothing else.
+    """
+    root = skeleton.parent
+    if not (root / ".git").exists():
+        return sorted(
+            path.relative_to(skeleton)
+            for path in skeleton.rglob("*")
+            if path.is_file() or path.is_symlink()
+        )
+    paths = [root / os.fsdecode(name) for name in source_files(root)]
+    return [
+        path.relative_to(skeleton)
+        for path in paths
+        if path.is_relative_to(skeleton) and (path.exists() or path.is_symlink())
+    ]
+
+
 def source_digest(root: Path = ROOT) -> str:
     """Digest the sources a check reads: each file's path, mode and content.
 
@@ -301,15 +334,8 @@ def source_digest(root: Path = ROOT) -> str:
         if not re.fullmatch(r"[0-9a-f]{64}", supplied):
             raise GateError("Cannot identify the sources outside a Git checkout")
         return supplied
-    listing = subprocess.run(
-        ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
-        cwd=root,
-        check=True,
-        capture_output=True,
-        timeout=60,
-    ).stdout
     total = hashlib.sha256()
-    for name in sorted(set(listing.split(b"\0")) - {b""}):
+    for name in source_files(root):
         path = root / os.fsdecode(name)
         if path.is_symlink():
             kind, content = b"link", os.fsencode(path.readlink())
