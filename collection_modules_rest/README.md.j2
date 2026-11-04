@@ -5,8 +5,10 @@ SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' 
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
-Resource modules for {{ product | mandatory('Missing required variable: product') }}. FIXME Replace the
-invented fixture contract below after qualifying the first product resource.
+Resource modules for {{ product | mandatory('Missing required variable: product') }}.
+
+The examples use an invented fixture. Follow [FIXME.md](./FIXME.md) to qualify
+a product resource and replace the fixture.
 
 
 
@@ -110,10 +112,8 @@ including secrets returned in listings.
 
 ### Version check
 
-FIXME: Keep one of the next two sentences to match `_binding.py`.
-A read-only probe precedes writes.
-Every module checks the product version before its first request, including
-unchanged and read-only runs.
+A read-only probe precedes writes. See [FIXME.md](./FIXME.md) to select and
+document a different version-check policy.
 
 An untested product series produces one warning and the module proceeds.
 Operations known to fail on a particular product build fail before they write.
@@ -144,12 +144,10 @@ endpoint's variables:
 
 ### FIXME Name the administration task<a id="usage-fixture"></a>
 
-FIXME Two to four sentences: what the task's modules manage, what they refuse
 {# skeleton-variant: http-readme-7 #}
-and why, and what the caller prepares. A rule a single module enforces
-belongs in that module's documentation, not here. Write one section per
-administration task.
+The fixture tasks save a record.
 {# end skeleton-variant #}
+See [FIXME.md](./FIXME.md) to replace this example with a product task.
 
 ```yaml
 - name: "Save the record"
@@ -166,9 +164,8 @@ Modules: `fixture`, `fixture_info`.
 
 ### FIXME Name the nested resource task<a id="usage-fixture-nested"></a>
 
-FIXME Replace this scaffold example and the module's notes with the researched
-resource's identity, ownership, eligibility and concurrency contract. Copy the
-resource utility and edit hooks, never the shared lifecycle sequence.
+This example manages a nested resource through lifecycle hooks. See
+[FIXME.md](./FIXME.md) for product qualification and replacement.
 
 ```yaml
 - name: "Manage one nested resource"
@@ -195,9 +192,9 @@ trust.
 {% set core_floor = min_ansible_version | default('2.19.0') %}
 | {{ initial_version.ljust(18) }} | Invented fixture 1.0 (1.0.0)    | {{ ('>=' ~ core_floor).ljust(12) }} |
 
-FIXME Replace the fixture row with the product series you tested, and this
-paragraph with what that testing covers. The fixture tests make no support
-claim for a real product; see [development](DEVELOPMENT.md).
+The fixture tests make no support claim for a real product. See
+[FIXME.md](./FIXME.md) for product qualification and
+[development](./DEVELOPMENT.md) for the checks.
 
 
 

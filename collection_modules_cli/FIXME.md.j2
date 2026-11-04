@@ -5,57 +5,64 @@ SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' 
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
-- Check metadata, licensing, dependencies, runtime floors and author handles.
-- Replace the invented existing-only fixture with a researched product resource.
-  Keep the invariant files in `DEVELOPMENT.md` unchanged and adapt the typed
-  declarations in `contract_subject.py` with real information entry points and a
-  fake adapter. Declare mutation granularity in the adapter's `Contract`:
-  `fieldwise` is the default; use `atomic` for an indivisible write. Keep the
-  complete effect, uncertainty and no-redispatch checks for either declaration.
-- Declare `Contract.write_command` with the native write token sequences.
-  The default matches `update --`; the alternate fixture matches `set --`.
-  Keep the real subprocess-start injection and unchanged/no-dispatch checks.
-- Declare accepted arguments, their literal argv elements and refused
-  arguments in `Contract.literals`. The default accepts a shell-shaped label
-  and refuses an overlong one. Closed vocabularies declare their real values.
-  Keep pre-dispatch validation and the separate executable transport cases.
-- Implement `inject_host_identity()` by changing the prepared host identity.
-  The fixture substitutes a mismatched numeric UID. Keep the public locator
-  valid and retain the separate tests for unsupported locator options.
-- Declare `Contract.environment_policy`: `refuse` by default, or
-  `neutralize` with observed removal or empty values before child start.
-  Document inherited, module-level and target environments. Preserve explicit
-  locale and secret-value checks for both policies.
-- Declare each native fault in `Contract.faults` independently. Defaults
-  reconcile matching effects and recognize a protocol-proven `refused` exit.
-  A `NativeFault` may retain an effect or an uncertain rejection, with its own
-  stable error and optional pending code. Retain effect evidence,
-  redaction, no redispatch, actual deadlines and transport nondispatch.
-- Declare `expected` and `literal_expected` using `Expectations`: exact
-  managed state, complete public projection, before/after diff and changed
-  field names. The default fixture is flat; the second configuration preserves
-  nested values and native origins. Fieldwise writes also declare exact
-  partial state. Keep preservation and every readback assertion exact.
-- Keep observational subjects free of writers. Register a first mutator with its
-  change, repeat, prediction and uncertainty cases in the same change. Creation
-  and deletion require executable fixtures that exercise every new case.
-- Qualify the product's locator, including application identity, effective
-  environment, one shared deadline and descendant cleanup. The example supports
-  a trusted foreground program only.
-- State the native identity and concurrency guarantees. The fixture's
-  conditional update under a file lock supplies no guarantee for a different
-  product.
-- Set the compatibility series and exclusions from tested builds. Select the
-  binding's compatibility policy and document it.
-- The engine remains shared for products with qualified definitions. This
-  variant has no definition-driven CLI example. Its resource registry binds
-  `FIXTURE` to the hook class; replace that registration with the product's
-  resources.
-- The HTTP inventory extractor is dropped. Add a CLI inventory extractor only
-  when a versioned product interface supplies the source, and retain source
-  revision and extraction hashes beside its development output.
-- Adapt the real executable, seeded integration targets, process-fault inputs
-  and managed-host scenario together. Keep the standalone module-process case
-  crossing the actual utils subprocess boundary.
-- Update the README's execution, ownership, compatibility and usage statements,
-  then remove this checklist.
+Complete these steps in order before publishing a product collection.
+
+1. Check metadata, licensing, dependencies, runtime floors and author handles.
+2. Replace the invented existing-only fixture with a researched product
+   resource. Keep the invariant files in `DEVELOPMENT.md` unchanged and adapt
+   the typed declarations in `contract_subject.py` with real information entry
+   points and a fake adapter. Declare mutation granularity in the adapter's
+   `Contract`: `fieldwise` is the default; use `atomic` for an indivisible
+   write. Keep the complete effect, uncertainty and no-redispatch checks for
+   either declaration.
+3. Declare `Contract.write_command` with the native write token sequences.
+   The default matches `update --`; the alternate fixture matches `set --`.
+   Keep the real subprocess-start injection and unchanged/no-dispatch checks.
+4. Declare accepted arguments, their literal argv elements and refused
+   arguments in `Contract.literals`. The default accepts a shell-shaped label
+   and refuses an overlong one. Closed vocabularies declare their real values.
+   Keep pre-dispatch validation and the separate executable transport cases.
+5. Implement `inject_host_identity()` by changing the prepared host identity.
+   The fixture substitutes a mismatched numeric UID. Keep the public locator
+   valid and retain the separate tests for unsupported locator options.
+6. Declare `Contract.environment_policy`: `refuse` by default, or
+   `neutralize` with observed removal or empty values before child start.
+   Document inherited, module-level and target environments. Preserve explicit
+   locale and secret-value checks for both policies.
+7. Declare each native fault in `Contract.faults` independently. Defaults
+   reconcile matching effects and recognize a protocol-proven `refused` exit.
+   A `NativeFault` may retain an effect or an uncertain rejection, with its own
+   stable error and optional pending code. Retain effect evidence,
+   redaction, no redispatch, actual deadlines and transport nondispatch.
+8. Declare `expected` and `literal_expected` using `Expectations`: exact
+   managed state, complete public projection, before/after diff and changed
+   field names. The default fixture is flat; the second configuration preserves
+   nested values and native origins. Fieldwise writes also declare exact
+   partial state. Keep preservation and every readback assertion exact.
+9. Keep observational subjects free of writers. Register a first mutator with
+   its change, repeat, prediction and uncertainty cases in the same change.
+   Creation and deletion require executable fixtures that exercise every new
+   case.
+10. Qualify the product's locator, including application identity, effective
+    environment, one shared deadline and descendant cleanup. The example
+    supports a trusted foreground program only.
+11. State the native identity and concurrency guarantees. The fixture's
+    conditional update under a file lock supplies no guarantee for a different
+    product.
+12. Set the compatibility series and exclusions from tested builds. Select the
+    binding's compatibility policy and document it.
+13. The engine remains shared for products with qualified definitions. This
+    variant has no definition-driven CLI example. Its resource registry binds
+    `FIXTURE` to the hook class; replace that registration with the product's
+    resources.
+14. The HTTP inventory extractor is dropped. Add a CLI inventory extractor only
+    when a versioned product interface supplies the source, and retain source
+    revision and extraction hashes beside its development output.
+15. Adapt the real executable, seeded integration targets, process-fault inputs
+    and managed-host scenario together. Keep the standalone module-process case
+    crossing the actual utils subprocess boundary.
+16. Update the README's execution, ownership, compatibility and usage
+    statements.
+    Replace its fixture qualification with the product builds and locators
+    tested. Run the checks in [DEVELOPMENT.md](./DEVELOPMENT.md), then remove
+    this checklist.
