@@ -20,6 +20,10 @@ Complete these steps in order before publishing a product collection.
    The subject declares valid identities, creation arguments, a mutable field
    and capability flags with skip reasons. Engine invariants use their own
    synthetic definition and fake; do not add fields or guards to the product.
+   Bind the client, schema and compatibility policy once in `_binding.py`. For
+   file-only API fixtures, depend on `setup_loopback`, load
+   `setup_loopback/files/server.py` beside the product setup target and call
+   `serve` with product routes and shutdown authentication.
 {# skeleton-variant: http-fixme-1 #}
    The fixture uses REST with integer identifiers, by-name 404 absence,
    native JSON and immediate writes. Replace the client, fake transport and
@@ -30,14 +34,13 @@ Complete these steps in order before publishing a product collection.
 {# end skeleton-variant #}
 5. Copy `plugins/module_utils/_fixture_nested.py` for each resource that a flat
    definition cannot express. Edit its hooks and their contracts, never the
-   lifecycle sequence. Keep `_lifecycle.py` and the shared tests unchanged. Bind
-   the client, schema and compatibility policy once in `_binding.py`. Copy the
-   `fixture_nested` module, unit test, file-only integration target and default
-   scenario tasks together, and `fixture_nested_info` with its target where the
-   resource needs an information read. Replace the module's notes FIXME,
-   verifier slot and [Usage subsection](./README.md#usage-fixture-nested) with
-   researched product evidence. Preserve unmanaged nested values and prove lost
-   create, update and delete responses with the shared loss harness.
+   lifecycle sequence. Keep `_lifecycle.py` and the shared tests unchanged. Copy
+   the `fixture_nested` module, unit test, file-only integration target and
+   default scenario tasks together, and `fixture_nested_info` with its target
+   where the resource needs an information read. Replace the module's notes
+   FIXME, verifier slot and [Usage subsection](./README.md#usage-fixture-nested)
+   with researched product evidence. Preserve unmanaged nested values and prove
+   lost create, update and delete responses with the shared loss harness.
 6. Replace `!UNKNOWN` author handles in module documentation.
 7. Adapt connection options, authentication, version probe, supported series and
    evidence-backed exclusions.
@@ -61,11 +64,13 @@ Complete these steps in order before publishing a product collection.
 10. Implement the inventory extractor. Put each rule a module utility enforces
     into that file's docstring with its reason, and complete the Boundaries
     section of `DEVELOPMENT.md`: which resources need hooks and why, and which
-    writers and prerequisites the caller supplies. For file-only API fixtures,
-    depend on `setup_loopback`, load `setup_loopback/files/server.py` beside the
-    product setup target and call `serve` with product routes and shutdown
-    authentication.
+    writers and prerequisites the caller supplies.
 11. Set the Molecule environment names and action-group members for the product.
+    Delete what remains of the fixture: `_fixture_nested.py`, the
+    `fixture_nested` and `fixture_nested_info` modules with their unit test,
+    integration targets and scenario tasks, the `setup_fixture_fake` target, and
+    the fixture cases in `extensions/molecule/default/tasks/cleanup/loss.yml`
+    and `extensions/molecule/default/tasks/side_effect/zz_loss.yml`.
 12. Check `tests/config.yml`, run the checks in
     [DEVELOPMENT.md](./DEVELOPMENT.md#checks),
     and resolve failures. Adapt the changelog.
