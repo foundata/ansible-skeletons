@@ -318,6 +318,12 @@ def validate_report(
         checks_path
     ) != raw.get("checks_sha256"):
         raise GateError("Release evidence was modified after validation")
+    # The archive carries its commit: only the validated revision reproduces it.
+    with tempfile.TemporaryDirectory(prefix="ansible-skeletons-report-") as temporary:
+        exported = Path(temporary) / "source.tar"
+        git("archive", "--format=tar", f"--output={exported}", revision, root=root)
+        if digest(exported) != raw.get("source_sha256"):
+            raise GateError("The release evidence belongs to another commit")
     checks = json.loads(checks_path.read_text(encoding="utf-8"))
     if not isinstance(checks, dict) or checks.get("checks") != required_checks(
         full=True, backends=backends

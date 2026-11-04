@@ -138,6 +138,20 @@ def test_report_for_previous_commit_cannot_authorize_tag(
     assert not git("tag", "--list", "v1.1.0", root=repository)
 
 
+def test_a_report_moved_to_another_commit_cannot_authorize_tag(
+    repository: Path, report: Path
+) -> None:
+    (repository / "content.txt").write_text("unchecked\n", encoding="utf-8")
+    git("add", ".", root=repository)
+    git("commit", "-m", "test: change the content", root=repository)
+    raw = json.loads(report.read_text(encoding="utf-8"))
+    raw["revision"] = git("rev-parse", "HEAD", root=repository)
+    write_json(report, raw)
+    with pytest.raises(GateError, match="another commit"):
+        create_tag(report, repository)
+    assert not git("tag", "--list", "v1.1.0", root=repository)
+
+
 def test_report_with_missing_checks_is_rejected(repository: Path, report: Path) -> None:
     checks_file = report.parent / "checks/checks.json"
     checks = json.loads(checks_file.read_text(encoding="utf-8"))
