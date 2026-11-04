@@ -21,6 +21,10 @@ STOP_GRACE = 15.0
 """Seconds a stopped command has to exit before it is killed."""
 CLEANUP_GRACE = 900.0
 """Seconds a stopped infrastructure tier has to destroy its targets."""
+VM_RECORD = "vms.json"
+"""The file below a libvirt tier's output that names the VMs it created."""
+VM_NAME = re.compile(r"skeleton-gate-[0-9a-f]{12}-debian")
+"""The only form a recorded VM name can take."""
 
 
 class GateError(RuntimeError):
@@ -199,6 +203,33 @@ def run(
             print(output, file=log, flush=True)
         raise GateError(f"{command[0]} failed with exit status {status}")
     return output
+
+
+def remove_recorded_vms(output: Path, log: TextIO | None = None) -> None:
+    """Remove the session VMs that a tier killed outright recorded in ``output``.
+
+    A stopped tier destroys its VMs itself. The session is the user's own and
+    holds their VMs too, so only names this tier recorded qualify, and only in
+    the form it gives them; nothing is matched by pattern.
+    """
+    record = output / VM_RECORD
+    if not record.is_file():
+        return
+    names = json.loads(record.read_text(encoding="utf-8"))
+    if not isinstance(names, list) or not all(
+        isinstance(name, str) and VM_NAME.fullmatch(name) for name in names
+    ):
+        raise GateError(f"Refusing the VM names recorded in {record}")
+    for name in names:
+        for action in ("destroy", "undefine"):
+            # Both fail once the tier has removed the VM itself.
+            run(
+                ["virsh", "--connect", "qemu:///session", action, name],
+                timeout=120,
+                allowed_exit_codes=(0, 1),
+                capture=True,
+                log=log,
+            )
 
 
 def remove_in_user_namespace(paths: Sequence[Path]) -> None:

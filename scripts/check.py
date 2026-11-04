@@ -33,6 +33,7 @@ from scripts.common import (
     isolated_environment,
     matrix,
     remove_in_user_namespace,
+    remove_recorded_vms,
     remove_tree,
     require_tools,
     run,
@@ -405,6 +406,7 @@ def integration_tier(
         timeout=7200,
         env=context.env,
         log=context.log,
+        grace=CLEANUP_GRACE,
     )
 
 
@@ -585,6 +587,7 @@ def remove_earlier(path: Path, output: Path, log: TextIO) -> None:
         path.unlink()
         return
     remove_render_containers(path, log)
+    remove_recorded_vms(path, log)
     # Podman stores below a render hold files of subordinate users.
     remove_tree(path)
 
@@ -686,6 +689,8 @@ def remove_output(
         )
     ):
         raise GateError(f"{path} holds no run.json of a check or release gate")
+    for tier in (path, path / "checks"):
+        remove_recorded_vms(tier / "integration-libvirt")
     remove_tree(path, as_root)
     print(f"Removed {path}")
 

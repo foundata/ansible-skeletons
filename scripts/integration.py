@@ -7,6 +7,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import socket
 import sys
 import tomllib
@@ -15,7 +16,14 @@ from pathlib import Path
 
 import yaml
 
-from scripts.common import ROOT, GateError, require_tools, run, write_json
+from scripts.common import (
+    ROOT,
+    VM_RECORD,
+    GateError,
+    require_tools,
+    run,
+    write_json,
+)
 from scripts.controller import (
     PODMAN_LAYOUT,
     PODMAN_RUNTIME,
@@ -71,6 +79,11 @@ def fixture_tasks(project: Path, molecule: Path, *, collection: bool) -> None:
     write_yaml(molecule / "default/tasks/verify/gate.yml", [uninstall, assertion])
 
 
+def vm_name(identity: str) -> str:
+    """Name the libvirt platform of one generated project."""
+    return f"skeleton-gate-{identity}-debian"
+
+
 def configure_scenario(
     project: Path, molecule: Path, backend: str, identity: str
 ) -> None:
@@ -83,7 +96,7 @@ def configure_scenario(
             port = listener.getsockname()[1]
         config["platforms"] = [
             {
-                "name": f"skeleton-gate-{identity}-debian",
+                "name": vm_name(identity),
                 "type": "libvirt",
                 "image": os.environ.get(
                     "SKELETONS_VM_IMAGE",
@@ -364,13 +377,19 @@ def tier(
         env=env,
     )
     evidence: list[dict[str, object]] = []
+    vms: list[str] = []
     try:
         for project, relative in (
             (rendered.role, "molecule"),
             (rendered.collection, "extensions/molecule"),
         ):
             molecule = project / relative
-            configure_scenario(project, molecule, backend, uuid.uuid4().hex[:12])
+            identity = uuid.uuid4().hex[:12]
+            configure_scenario(project, molecule, backend, identity)
+            if backend == "libvirt":
+                # Written first: a tier killed outright destroys nothing itself.
+                vms.append(vm_name(identity))
+                write_json(output / VM_RECORD, vms)
             if backend == "ee" and project == rendered.role:
                 shutil.copyfile(
                     ROOT / "tests/fixtures/ee-negative.yml",
@@ -437,5 +456,11 @@ def main() -> int:
     return 0
 
 
+def leave(_signal: int, _frame: object) -> None:
+    """Turn a stop into an exit, so that the tier still destroys its targets."""
+    raise SystemExit(143)
+
+
 if __name__ == "__main__":
+    signal.signal(signal.SIGTERM, leave)
     raise SystemExit(main())

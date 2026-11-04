@@ -263,6 +263,14 @@ interrupted ansible-test left in a module render's own Podman store are
 removed first. A resumed run that passes prunes its output like any passing
 run, and a pruned output cannot be resumed.
 
+A command that exceeds its timeout stops with everything it started: SIGTERM
+first, then SIGKILL for what is left 15 seconds later. An infrastructure tier
+gets 15 minutes, because it destroys its VMs and containers before it exits.
+`kill` on a running check stops its steps the same way. A tier killed outright
+cannot clean up, so it records the VMs it creates in `vms.json` below its
+output. `--resume` and `--remove` destroy exactly those VMs and no other VM of
+your session.
+
 To delete an output you no longer need:
 
 ```sh

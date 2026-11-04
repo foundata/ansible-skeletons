@@ -16,12 +16,16 @@ import pytest
 from scripts import check as check_module
 from scripts.common import (
     CLEANUP_GRACE,
+    VM_RECORD,
     GateError,
     processes,
+    remove_recorded_vms,
     run,
     run_process,
     stop_processes,
+    write_json,
 )
+from scripts.integration import leave, vm_name
 
 # A shell that starts a long grandchild, reports its PID and waits for it.
 TREE = 'sleep 300 & echo $! > "$1"; wait'
@@ -156,3 +160,86 @@ def test_a_terminated_check_stops_its_steps_first(
     with pytest.raises(KeyboardInterrupt):
         check_module.stop_on_signal(signal.SIGTERM, None)
     assert stopped == [(os.getpid(), CLEANUP_GRACE)]
+
+
+def test_a_stopped_tier_still_destroys_its_targets(tmp_path: Path) -> None:
+    """The SIGTERM of a stop runs the tier's finally block, not a sudden death."""
+    started, destroyed = tmp_path / "started", tmp_path / "destroyed"
+    script = (
+        "import signal, sys\n"
+        "from pathlib import Path\n"
+        "from scripts.common import run\n"
+        "from scripts.integration import leave\n"
+        "signal.signal(signal.SIGTERM, leave)\n"
+        "try:\n"
+        f"    run(['sh', '-c', 'touch {started}; sleep 300'], timeout=120)\n"
+        "finally:\n"
+        f"    run(['sh', '-c', 'sleep 1; touch {destroyed}'], timeout=30)\n"
+    )
+    process = subprocess.Popen([sys.executable, "-c", script])
+    wait_for(started.is_file)
+    stop_processes(process.pid, 30)
+    assert process.wait(timeout=10) == 143
+    assert destroyed.is_file()
+
+
+def test_leaving_on_a_signal_is_an_exit_with_its_status() -> None:
+    with pytest.raises(SystemExit) as stopped:
+        leave(signal.SIGTERM, None)
+    assert stopped.value.code == 143
+
+
+@pytest.fixture
+def virsh(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Stand in for virsh, which fails for a domain that no longer exists."""
+    tools = tmp_path / "tools"
+    tools.mkdir()
+    calls = tmp_path / "virsh-calls"
+    script = tools / "virsh"
+    script.write_text(f'#!/bin/sh\necho "$@" >> {calls}\nexit "${{VIRSH_EXIT:-0}}"\n')
+    script.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{tools}:{os.environ['PATH']}")
+    return calls
+
+
+def test_a_killed_tiers_vms_are_removed_by_their_recorded_names(
+    tmp_path: Path, virsh: Path
+) -> None:
+    name = vm_name("0123456789ab")
+    write_json(tmp_path / VM_RECORD, [name])
+    remove_recorded_vms(tmp_path)
+    assert virsh.read_text().splitlines() == [
+        f"--connect qemu:///session destroy {name}",
+        f"--connect qemu:///session undefine {name}",
+    ]
+
+
+def test_a_vm_the_tier_removed_itself_is_no_failure(
+    tmp_path: Path, virsh: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("VIRSH_EXIT", "1")
+    write_json(tmp_path / VM_RECORD, [vm_name("0123456789ab")])
+    remove_recorded_vms(tmp_path)
+    assert len(virsh.read_text().splitlines()) == 2
+
+
+@pytest.mark.parametrize(
+    "recorded",
+    [
+        ["work-vm"],
+        ["skeleton-gate-0123456789ab-debian", "work-vm"],
+        ["skeleton-gate-0123456789ab-debian; reboot"],
+        "skeleton-gate-0123456789ab-debian",
+    ],
+)
+def test_no_other_vm_of_the_session_can_be_named(
+    tmp_path: Path, virsh: Path, recorded: object
+) -> None:
+    write_json(tmp_path / VM_RECORD, recorded)
+    with pytest.raises(GateError, match="Refusing the VM names"):
+        remove_recorded_vms(tmp_path)
+    assert not virsh.exists()
+
+
+def test_an_output_without_a_record_needs_no_virsh(tmp_path: Path) -> None:
+    remove_recorded_vms(tmp_path)
