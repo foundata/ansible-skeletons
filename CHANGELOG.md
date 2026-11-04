@@ -76,6 +76,9 @@ and the project adheres to
 
 - `collection_modules`; render `collection_modules_rest` instead.
 
+- Collection READMEs: the `toc` anchor of the table of contents; link to
+  `#table-of-contents` instead.
+
 ### Fixed
 
 - Both HTTP module variants: the loopback fake server stops at its lifetime even
