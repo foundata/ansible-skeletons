@@ -509,7 +509,7 @@ def plan(
                 name,
                 serial=True,
                 owns=(name, f"controller-checks/{name}"),
-                inputs=wheels,
+                inputs=json.dumps({"pythons": pythons, "wheels": wheels}),
             )
         )
     known: set[str] = set()

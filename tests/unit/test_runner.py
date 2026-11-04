@@ -350,6 +350,14 @@ def test_records_of_other_sources_or_inputs_are_not_reused(
     assert ran == ["a", "a"]
 
 
+def test_a_tier_with_other_controller_pythons_is_not_reused() -> None:
+    def tier(*, full: bool) -> Step:
+        steps = plan(full=full, backends=["podman"], packages=[], utils_source=None)
+        return next(step for step in steps if step.name == "integration-podman")
+
+    assert tier(full=False).inputs != tier(full=True).inputs
+
+
 def plan_of(steps: list[Step]) -> Callable[..., list[Step]]:
     def fake(**_options: object) -> list[Step]:
         return steps
