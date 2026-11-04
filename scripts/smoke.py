@@ -30,7 +30,6 @@ from scripts.render import (
     Rendered,
     example_metadata,
     render,
-    skeleton_revision,
 )
 
 
@@ -987,7 +986,6 @@ def module_identity(
     else:
         metadata["version"] = "2.3.0"
         metadata["min_ansible_version"] = "2.19.1"
-    metadata["skeleton_revision"] = skeleton_revision()
     rendered = render(
         output / name,
         namespace=namespace,

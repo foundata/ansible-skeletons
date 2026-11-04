@@ -223,7 +223,6 @@ def check_release(
                 "RUFF_NO_CACHE": "true",
                 "MYPY_CACHE_DIR": str(Path(temporary) / "mypy-cache"),
                 "UV_LINK_MODE": "copy",
-                "SKELETONS_REVISION": revision,
                 # The export has no Git metadata to identify its sources.
                 "SKELETONS_SOURCE_DIGEST": str(gate["source"]),
             }

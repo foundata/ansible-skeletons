@@ -230,7 +230,6 @@ EOF
 ansible-galaxy collection init \
   --collection-skeleton ./collection_modules_rest \
   --extra-vars @metadata.json \
-  --extra-vars "skeleton_revision=$(git describe --tags --always)" \
   --extra-vars '{"product": "Example REST Product"}' namespace.product
 ```
 
@@ -261,7 +260,6 @@ Using the metadata file above:
 ansible-galaxy collection init \
   --collection-skeleton ./collection_modules_cli \
   --extra-vars @metadata.json \
-  --extra-vars "skeleton_revision=$(git describe --tags --always)" \
   --extra-vars '{"product": "Example CLI Product"}' namespace.product
 ```
 
@@ -301,7 +299,6 @@ no deployment role. Render it with the same `metadata.json`:
 ansible-galaxy collection init \
   --collection-skeleton ./collection_modules_appliance \
   --extra-vars @metadata.json \
-  --extra-vars "skeleton_revision=$(git describe --tags --always)" \
   --extra-vars '{"product": "Example Grid"}' namespace.product
 ```
 

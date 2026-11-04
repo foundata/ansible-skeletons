@@ -3,7 +3,6 @@
 """Render both skeletons into a new directory using ansible-galaxy."""
 
 import argparse
-import os
 import re
 import sys
 from dataclasses import dataclass
@@ -22,15 +21,6 @@ PRODUCTS = {
     "collection_modules_cli": "Example CLI Product",
 }
 """Product display names of the example renders of each module profile."""
-
-
-def skeleton_revision() -> str:
-    """Revision a render records: SKELETONS_REVISION, git describe or a marker."""
-    return os.environ.get("SKELETONS_REVISION") or (
-        run(["git", "describe", "--tags", "--always"], capture=True).strip()
-        if (ROOT / ".git").exists()
-        else "source archive"
-    )
 
 
 @dataclass(frozen=True)
@@ -158,7 +148,6 @@ def main() -> int:
     metadata = None if args.defaults else example_metadata()
     if metadata is not None and args.profile in PRODUCTS:
         metadata["product"] = PRODUCTS[args.profile]
-        metadata["skeleton_revision"] = skeleton_revision()
     try:
         rendered = render(
             args.output,

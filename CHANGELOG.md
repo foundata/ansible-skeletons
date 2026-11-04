@@ -79,6 +79,9 @@ and the project adheres to
 - Collection READMEs: the `toc` anchor of the table of contents; link to
   `#table-of-contents` instead.
 
+- The `skeleton_revision` render input. No template has read it since 2.10.0,
+  and passing it has no effect.
+
 ### Fixed
 
 - Both HTTP module variants: the loopback fake server stops at its lifetime even
