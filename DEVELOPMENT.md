@@ -287,9 +287,10 @@ a separate locked environment; no lane upgrades dependencies during a run.
 
 For the module skeletons, the matrix adds:
 
-- The first identity's sanity, unit and integration sessions on every core,
-  and its Molecule scenario against the skeleton's own fake product,
-  including the lost replies.
+- The first identity's sanity, unit and integration sessions on every core.
+- The appliance skeleton's Molecule scenario against its own fake product,
+  including the lost replies. The REST and CLI scenarios already run in the
+  quick check.
 - The second identity's sanity session, once, on the newest released core.
   This identity renders maximum-length names and a quoted product, and sanity
   is the only ansible-test lane that reads those names.
@@ -469,9 +470,10 @@ skeleton-specific gate (`scripts/release.py check`).
 
    The helper checks that the remote holds the tag and that the forge reports
    it as latest, then clones the tag anonymously and runs the render, build,
-   installation and smoke tests on that clone, including the module
-   skeletons' Molecule scenarios against their fake products. It starts no
-   container or VM but takes several minutes.
+   installation and smoke tests on that clone, including the REST and CLI
+   skeletons' Molecule scenarios against their fake products. The appliance
+   scenario runs only in the matrix. The helper starts no container or VM but
+   takes several minutes.
 9. Unless you archive the evidence, remove it:
 
    ```sh
