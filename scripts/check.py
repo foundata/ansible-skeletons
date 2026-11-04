@@ -7,6 +7,7 @@ import importlib.metadata
 import json
 import os
 import platform
+import signal
 import subprocess
 import sys
 import tempfile
@@ -23,6 +24,7 @@ from pathlib import Path
 from typing import TextIO
 
 from scripts.common import (
+    CLEANUP_GRACE,
     ROOT,
     GateError,
     Lane,
@@ -35,6 +37,7 @@ from scripts.common import (
     require_tools,
     run,
     source_digest,
+    stop_processes,
     uv_command,
     write_json,
 )
@@ -1116,5 +1119,12 @@ def main() -> int:
     return 0
 
 
+def stop_on_signal(_signal: int, _frame: object) -> None:
+    """Stop every running step, so that a stopped check leaves no writer behind."""
+    stop_processes(os.getpid(), CLEANUP_GRACE)
+    raise KeyboardInterrupt
+
+
 if __name__ == "__main__":
+    signal.signal(signal.SIGTERM, stop_on_signal)
     raise SystemExit(main())

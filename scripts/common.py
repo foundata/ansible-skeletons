@@ -7,7 +7,9 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
+import time
 import tomllib
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
@@ -15,6 +17,10 @@ from pathlib import Path
 from typing import Any, TextIO
 
 ROOT = Path(__file__).resolve().parents[1]
+STOP_GRACE = 15.0
+"""Seconds a stopped command has to exit before it is killed."""
+CLEANUP_GRACE = 900.0
+"""Seconds a stopped infrastructure tier has to destroy its targets."""
 
 
 class GateError(RuntimeError):
@@ -59,6 +65,110 @@ def matrix(root: Path = ROOT) -> list[Lane]:
     return lanes
 
 
+def processes() -> dict[int, tuple[int, str]]:
+    """Map each running process to its parent and start time, as /proc shows them."""
+    table: dict[int, tuple[int, str]] = {}
+    for entry in Path("/proc").iterdir():
+        if not entry.name.isdigit():
+            continue
+        try:
+            stat = (entry / "stat").read_bytes()
+        except OSError:
+            continue
+        # The command name may hold spaces and parentheses.
+        state, parent, *rest = stat.rpartition(b")")[2].split()
+        if state != b"Z":
+            table[int(entry.name)] = (int(parent), rest[17].decode())
+    return table
+
+
+def stop_processes(root: int, grace: float = STOP_GRACE) -> None:
+    """Stop a process and all it started, or all this process started.
+
+    Everything running now gets SIGTERM and has ``grace`` seconds to clean up;
+    what a cleanup starts is followed too, and whatever is left gets SIGKILL.
+    The tree comes from /proc rather than a process group, so a command stays
+    in the terminal's group, where Ctrl-C reaches it directly, and nested
+    commands need no signal forwarding. A process that detaches, such as a
+    container's conmon, leaves the tree: its owner removes it.
+    """
+    tracked: dict[int, str] = {}
+
+    def survey() -> None:
+        table = processes()
+        for pid, started in list(tracked.items()):
+            if table.get(pid, (0, ""))[1] != started:
+                del tracked[pid]
+        pending = [root, *tracked]
+        while pending:
+            parent = pending.pop()
+            for pid, (ancestor, started) in table.items():
+                if ancestor == parent and pid not in tracked:
+                    tracked[pid] = started
+                    pending.append(pid)
+
+    def send(number: signal.Signals) -> None:
+        for pid in tracked:
+            try:
+                os.kill(pid, number)
+            except (ProcessLookupError, PermissionError):
+                pass
+
+    table = processes()
+    if root != os.getpid() and root in table:
+        tracked[root] = table[root][1]
+    survey()
+    send(signal.SIGTERM)
+    deadline = time.monotonic() + grace
+    while tracked and time.monotonic() < deadline:
+        time.sleep(0.1)
+        survey()
+    send(signal.SIGKILL)
+
+
+def run_process(
+    command: Sequence[str],
+    *,
+    cwd: Path = ROOT,
+    env: Mapping[str, str] | None = None,
+    timeout: int = 600,
+    capture: bool = False,
+    log: TextIO | None = None,
+    grace: float = STOP_GRACE,
+) -> tuple[int, str]:
+    """Run a bounded command and return its exit status and captured output.
+
+    At its timeout the command stops with everything it started, and what it
+    wrote until then is kept for the diagnosis.
+    """
+    print(f"+ {' '.join(command)}", file=log, flush=True)
+    with subprocess.Popen(
+        command,
+        cwd=cwd,
+        env=env,
+        text=True,
+        encoding="utf-8",
+        stdout=subprocess.PIPE if capture else log,
+        stderr=subprocess.STDOUT if capture or log else None,
+    ) as process:
+        try:
+            output, _ = process.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired as exc:
+            stop_processes(process.pid, grace)
+            try:
+                partial, _ = process.communicate(timeout=10)
+            except subprocess.TimeoutExpired:
+                # A detached process keeps the pipe open.
+                partial = None
+            if partial:
+                print(partial, file=log, flush=True)
+            raise GateError(f"{command[0]} exceeded its {timeout}s timeout") from exc
+        except BaseException:
+            stop_processes(process.pid)
+            raise
+    return process.returncode, output or ""
+
+
 def run(
     command: Sequence[str],
     *,
@@ -68,38 +178,27 @@ def run(
     capture: bool = False,
     allowed_exit_codes: tuple[int, ...] = (0,),
     log: TextIO | None = None,
+    grace: float = STOP_GRACE,
 ) -> str:
     """Run a bounded command, raising on failure and preserving its diagnostics.
 
     With ``log``, the command line and its output go to that stream instead of
     the inherited standard output and error.
     """
-    print(f"+ {' '.join(command)}", file=log, flush=True)
-    try:
-        result = subprocess.run(
-            command,
-            cwd=cwd,
-            env=env,
-            check=False,
-            timeout=timeout,
-            text=True,
-            encoding="utf-8",
-            stdout=subprocess.PIPE if capture else log,
-            stderr=subprocess.STDOUT if capture or log else None,
-        )
-        if result.returncode not in allowed_exit_codes:
-            raise subprocess.CalledProcessError(
-                result.returncode, command, output=result.stdout
-            )
-    except subprocess.CalledProcessError as exc:
-        if exc.stdout:
-            print(exc.stdout, file=log, flush=True)
-        raise GateError(
-            f"{command[0]} failed with exit status {exc.returncode}"
-        ) from exc
-    except subprocess.TimeoutExpired as exc:
-        raise GateError(f"{command[0]} exceeded its {timeout}s timeout") from exc
-    return result.stdout or ""
+    status, output = run_process(
+        command,
+        cwd=cwd,
+        env=env,
+        timeout=timeout,
+        capture=capture,
+        log=log,
+        grace=grace,
+    )
+    if status not in allowed_exit_codes:
+        if output:
+            print(output, file=log, flush=True)
+        raise GateError(f"{command[0]} failed with exit status {status}")
+    return output
 
 
 def remove_in_user_namespace(paths: Sequence[Path]) -> None:

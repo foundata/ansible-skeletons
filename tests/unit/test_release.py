@@ -3,14 +3,16 @@
 """Exercise release refusals using real disposable Git repositories."""
 
 import json
-import subprocess
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 import pytest
 
+from scripts import release
 from scripts.check import GATE_FIELDS, prune, required_checks
 from scripts.common import GateError, digest, write_json
+from scripts.common import run as run_command
 from scripts.release import (
     REPOSITORY,
     check_release,
@@ -359,18 +361,17 @@ def fake_inner_check(
     monkeypatch: pytest.MonkeyPatch, outcomes: list[bool]
 ) -> list[list[str]]:
     """Stand in for scripts.check, passing or failing in the given order."""
-    real = subprocess.run
     calls: list[list[str]] = []
 
-    def run(command: Sequence[str], *args: object, **kwargs: object) -> object:
+    def run(command: Sequence[str], **options: Any) -> str:
         if "scripts.check" not in command:
-            return real(command, *args, **kwargs)  # type: ignore[call-overload]
+            return run_command(command, **options)
         calls.append(list(command))
         flag = "--resume" if "--resume" in command else "--output"
         checks = Path(command[list(command).index(flag) + 1])
         checks.mkdir(exist_ok=True)
         if not outcomes.pop(0):
-            raise subprocess.CalledProcessError(1, command)
+            raise GateError("uv failed with exit status 1")
         artifact = checks / "collection.tar.gz"
         artifact.write_bytes(b"retained test artifact")
         backends = json.loads((checks.parent / "gate.json").read_text())["backends"]
@@ -381,9 +382,9 @@ def fake_inner_check(
                 "artifacts": {artifact.name: digest(artifact)},
             },
         )
-        return subprocess.CompletedProcess(command, 0)
+        return ""
 
-    monkeypatch.setattr(subprocess, "run", run)
+    monkeypatch.setattr(release, "run", run)
     return calls
 
 

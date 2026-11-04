@@ -22,7 +22,16 @@ from typing import TextIO
 
 import yaml
 
-from scripts.common import ROOT, GateError, Lane, matrix, run, uv_command, write_json
+from scripts.common import (
+    ROOT,
+    GateError,
+    Lane,
+    matrix,
+    run,
+    run_process,
+    uv_command,
+    write_json,
+)
 from scripts.controller import NOX_LINK, linked, runtime_directory
 from scripts.render import (
     MODULE_PROFILES,
@@ -1252,23 +1261,16 @@ def exercise_role(rendered: Rendered, *, collection: bool) -> None:
         )
     invalid = rendered.work / f"{prefix}-invalid.json"
     write_json(invalid, {f"{prefix}_state": "invalid-state"})
-    result = subprocess.run(
+    status, output = run_process(
         [*command, "--extra-vars", f"@{invalid}"],
         cwd=rendered.work,
         env=env,
-        check=False,
         timeout=120,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
+        capture=True,
     )
-    if (
-        result.returncode == 0
-        or "invalid-state" not in result.stdout
-        or "argument" not in result.stdout.lower()
-    ):
+    if status == 0 or "invalid-state" not in output or "argument" not in output.lower():
         raise GateError(
-            f"{name}: invalid role arguments were not rejected as expected\n{result.stdout}\n{result.stderr}"
+            f"{name}: invalid role arguments were not rejected as expected\n{output}"
         )
 
 

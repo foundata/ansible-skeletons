@@ -15,6 +15,7 @@ from pathlib import Path
 
 from scripts.check import check_socket_budget, default_lane, required_checks
 from scripts.common import (
+    CLEANUP_GRACE,
     ROOT,
     GateError,
     digest,
@@ -234,16 +235,15 @@ def check_release(
         )
         with log.open("a" if resume else "w", encoding="utf-8") as stream:
             try:
-                subprocess.run(
+                run(
                     command,
                     cwd=source,
                     env=env,
-                    stdout=stream,
-                    stderr=subprocess.STDOUT,
-                    check=True,
                     timeout=21600,
+                    log=stream,
+                    grace=CLEANUP_GRACE,
                 )
-            except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+            except GateError as exc:
                 raise GateError(
                     f"Release checks failed; inspect {log}. No passing report was created"
                 ) from exc
