@@ -149,11 +149,12 @@ explains how to propose one.
 {# skeleton-variant: appliance-invariants #}
 {# end skeleton-variant #}
 {# skeleton-variant: product-binding #}
-Two files connect the shared code to this product and keep the product's
+Three files connect the shared code to this product and keep the product's
 values when the skeleton changes: `contract_subject.py` points the shared
-contract tests at a product resource, and `plugins/module_utils/_binding.py`
+contract tests at a product resource, `plugins/module_utils/_binding.py`
 gives the lifecycle base this collection's client, error schema and
-compatibility check.
+compatibility check, and `plugins/module_utils/_compat.py` holds the supported
+series and exclusions.
 {# end skeleton-variant #}
 
 {# skeleton-variant: transport-boundary #}
