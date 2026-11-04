@@ -324,6 +324,19 @@ def test_changes_require_affected_backend_tests(
     assert required_backends(paths) == expected
 
 
+def test_a_rename_requires_the_backends_of_its_old_path(repository: Path) -> None:
+    old = "collection_default/extensions/molecule/shared/playbooks/prepare.yml.j2"
+    source = repository / old
+    source.parent.mkdir(parents=True)
+    source.write_text("".join(f"line {i}\n" for i in range(50)), encoding="utf-8")
+    git("add", ".", root=repository)
+    git("commit", "-m", "test: add a shared playbook", root=repository)
+    git("tag", "-a", "v1.0.1", "-m", "version 1.0.1", root=repository)
+    git("mv", old, "collection_default/extensions/prepare.yml.j2", root=repository)
+    git("commit", "-m", "test: move the shared playbook", root=repository)
+    assert release_inputs("1.1.0", repository)[2] == ["podman", "libvirt", "ee"]
+
+
 def test_first_release_requires_all_backends() -> None:
     assert required_backends([], initial=True) == ["podman", "libvirt", "ee"]
 

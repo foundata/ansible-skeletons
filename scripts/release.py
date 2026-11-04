@@ -82,6 +82,12 @@ def previous_release(version: str, root: Path = ROOT) -> str | None:
     return max(candidates, key=lambda tag: versions[tag]) if candidates else None
 
 
+def changed_paths(base: str, revision: str, root: Path = ROOT) -> list[str]:
+    """List the paths two revisions differ in; a rename counts as both of its."""
+    diff = git("diff", "--name-only", "--no-renames", f"{base}..{revision}", root=root)
+    return diff.splitlines()
+
+
 def required_backends(changed: list[str], *, initial: bool = False) -> list[str]:
     """Require infrastructure tests conservatively when shared inputs change."""
     backends = {"podman"}
@@ -116,11 +122,7 @@ def release_inputs(
     # all of that and that this version is the newest section.
     releasing("version", "check", "--expect", version, root=root)
     base = previous_release(version, root)
-    changed = (
-        git("diff", "--name-only", f"{base}..{revision}", root=root).splitlines()
-        if base
-        else []
-    )
+    changed = changed_paths(base, revision, root) if base else []
     return revision, base, required_backends(changed, initial=base is None)
 
 
@@ -302,11 +304,7 @@ def validate_report(
         base = raw.get("base")
         if base is not None and not isinstance(base, str):
             raise GateError("Invalid report base")
-        changed = (
-            git("diff", "--name-only", f"{base}..{revision}", root=root).splitlines()
-            if base
-            else []
-        )
+        changed = changed_paths(base, revision, root) if base else []
         backends = required_backends(changed, initial=base is None)
     else:
         _, base, backends = release_inputs(version, root)
