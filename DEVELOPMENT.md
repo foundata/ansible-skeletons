@@ -103,6 +103,11 @@ Galaxy consumes one `.j2` suffix when creating a project. Files named
 instructions and `.yml.example` files are intentional parts of the product.
 Do not reject all remaining Jinja expressions or placeholders as render errors.
 
+`FIXME.md` is a setup file: its last step removes it, and fleet backports never
+carry it forward. A document that outlives setup keeps its own facts and marks
+a setup step with `FIXME` text, which the checklist replaces. It never links
+to `FIXME.md`.
+
 Edit each skeleton directly in its own directory.
 `scripts.render --profile collection_modules_rest` or
 `--profile collection_modules_appliance` or `--profile collection_modules_cli`

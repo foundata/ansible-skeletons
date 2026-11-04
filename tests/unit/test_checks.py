@@ -19,9 +19,9 @@ import yaml
 from packaging.requirements import Requirement
 from packaging.specifiers import SpecifierSet
 
-from scripts.check import check, require_complete_tests
+from scripts.check import check, default_lane, require_complete_tests
 from scripts.common import ROOT, GateError, Lane, isolated_environment, run, uv_command
-from scripts.render import Rendered, render
+from scripts.render import MODULE_PROFILES, Rendered, render
 from scripts.smoke import (
     IDENTITIES,
     check_fix_stability,
@@ -561,6 +561,38 @@ def test_module_development_keeps_shared_collection_regions(name: str) -> None:
         assert len(matches) == 1, (skeleton, name)
         contents.append(matches[0])
     assert len(set(contents)) == 1, name
+
+
+@pytest.mark.parametrize("profile", ("collection_default", *MODULE_PROFILES))
+def test_lasting_documents_outlive_the_checklist(tmp_path: Path, profile: str) -> None:
+    """A finished product has removed FIXME.md; nothing it keeps may need the file."""
+    output = tmp_path / "render"
+    # Galaxy comes from the default lane: the helper tests run without ansible-core.
+    run(
+        uv_command(
+            default_lane(),
+            "python",
+            "-m",
+            "scripts.render",
+            "--output",
+            str(output),
+            "--profile",
+            profile,
+        ),
+        capture=True,
+    )
+    for project in (
+        *(output / "roles").iterdir(),
+        *(output / "source-collections").glob("*/*"),
+    ):
+        (project / "FIXME.md").unlink()
+        run(["rumdl", "check", "--no-cache", "."], cwd=project, capture=True)
+        mentions = [
+            path
+            for path in project.rglob("*")
+            if path.is_file() and b"FIXME.md" in path.read_bytes()
+        ]
+        assert not mentions
 
 
 def source_yaml(path: Path) -> Any:

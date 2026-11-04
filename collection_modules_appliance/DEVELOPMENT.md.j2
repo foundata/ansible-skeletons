@@ -100,7 +100,7 @@ fake products; real I/O, background workers and event loops are excluded. See
 
 ## Boundaries<a id="boundaries"></a>
 
-Follow [FIXME.md](./FIXME.md) to replace the example resources.
+FIXME Replace the example resources, then delete this paragraph.
 
 {# skeleton-variant: resource-model #}
 A resource is one kind of product object and the module that manages it.
@@ -116,8 +116,10 @@ has one, and usually one Molecule scenario.
 {# skeleton-variant: contract-entry #}
 `tests/unit/plugins/modules/contract_subject.py` names the product resource,
 fake adapters and entry points the shared contract tests run against.
-The base owns the lifecycle sequence; product hooks implement each step.
-The shared base and engine tests bring their own synthetic resource and
+A new hook-based resource starts as a
+copy of the skeleton's `_fixture_nested.py` with its module and tests and
+changes only the hook methods; the order of the lifecycle steps belongs to the
+base. The shared base and engine tests bring their own synthetic resource and
 fake product, so adapting the contract subject needs no change to them.
 
 Some files come from foundata's module skeleton and are the same in every
@@ -175,8 +177,8 @@ definitions, the fake product and the scenario hooks.
 
 {# skeleton-variant: loopback-setup #}
 File-only API fixtures use the hidden `setup_loopback` integration target.
-The product setup target loads the helper's `server.py` and calls `serve`; the
-[adaptation checklist](./FIXME.md) describes the dependency and file layout.
+Add it to the product setup target's dependencies, then load
+`setup_loopback/files/server.py` beside that target and call `serve`.
 The product supplies its routes and shutdown authentication; the helper owns
 HTTP dispatch, the loopback listener, the lifetime timer and the port file.
 Its docstring describes the callbacks and configuration.
@@ -189,8 +191,9 @@ at runtime.
 {# end skeleton-variant #}
 
 {# skeleton-variant: product-rules #}
-Each enforced rule and its reason belong in its utility's docstring. The
-[adaptation checklist](./FIXME.md) covers the product-specific boundary notes.
+FIXME State which resources use hooks rather than definitions and why, and
+which writers and prerequisites the caller supplies. Each enforced rule and
+its reason belong in its utility's docstring.
 {# end skeleton-variant #}
 
 ## Troubleshooting

@@ -272,10 +272,12 @@ task files of a directory under `default/tasks/`, in alphabetical order:
 | `tasks/cleanup/`     | Remove the fixture records. It also runs first, so absence is not an error. |
 
 `fixture.yml` tests the definition-driven resource; `fixture_nested.yml` tests
-hooks. Follow [FIXME.md](../../FIXME.md) to copy each new hook resource's tasks,
-utility and module together. Replace the verifier FIXME in
-`tasks/verify/fixture_nested.yml` with an independent product check and add the
-module to `zz_loss.yml`. Keep `shared/files/loss.py` unchanged.
+hooks. For each new hook-based resource, copy the nested fixture's task files
+along with its utility and module, as
+[`DEVELOPMENT.md`](../../DEVELOPMENT.md#boundaries) describes. Replace the FIXME
+in the copy of `tasks/verify/fixture_nested.yml` with an independent product
+check and add the module to `zz_loss.yml`. Keep `shared/files/loss.py`
+unchanged.
 
 If the product cannot delete test data, put a per-run test id in every record
 identity through converge, verify, side effects and cleanup. This prevents
