@@ -674,6 +674,114 @@ def test_shared_files_are_declared_once_per_skeleton() -> None:
             seen |= pairs
 
 
+# Invariant files the module skeletons share by path but not by content.
+DELIBERATE_VARIANTS = {
+    "extensions/molecule/shared/files/loss.py.j2": (
+        "HTTP drops a completed reply at the client; a command has no reply to "
+        "drop, so the CLI harness injects faults into a real process"
+    ),
+    "tests/unit/plugins/modules/test_contract.py.j2": (
+        "the CLI contract proves argv, stdin, locator and native-fault "
+        "obligations that have no HTTP counterpart"
+    ),
+}
+# Files that collections replace byte for byte and that still hold variant
+# regions; their render is identical within one variant.
+INVARIANT_WITH_REGIONS = frozenset(("tests/unit/plugins/modules/test_lifecycle.py.j2",))
+BOUNDARY_ITEM = re.compile(
+    r"^- `(?P<prefix>[^`]+/)`: (?P<rest>.+(?:\n  .+)*)", re.MULTILINE
+)
+
+
+def template(skeleton: str, path: str) -> str:
+    """The template of a rendered path, relative to its skeleton."""
+    name = f"{path}.j2"
+    return name if (ROOT / skeleton / name).is_file() else path
+
+
+def boundary_invariants(skeleton: str) -> set[str]:
+    """Templates of the files a module skeleton's Boundaries list names."""
+    text = VARIANT_MARKER.sub(
+        "", (ROOT / skeleton / "DEVELOPMENT.md.j2").read_text(encoding="utf-8")
+    )
+    section = text.split("\n## Boundaries", 1)[1].split("\n## ", 1)[0]
+    found: set[str] = set()
+    for item in BOUNDARY_ITEM.finditer(section):
+        prefix, rest = item["prefix"], " ".join(item["rest"].split())
+        if rest.lower().startswith("everything"):
+            root = ROOT / skeleton
+            found.update(
+                str(path.relative_to(root))
+                for path in (root / prefix).rglob("*")
+                if path.is_file()
+            )
+            continue
+        tokens = re.findall(r"`([^`]+)`", rest)
+        folders = ["", *(token for token in tokens if token.endswith("/"))]
+        for name in (token for token in tokens if "." in token):
+            matches = [
+                candidate
+                for folder in folders
+                if (
+                    ROOT
+                    / skeleton
+                    / (candidate := template(skeleton, prefix + folder + name))
+                ).is_file()
+            ]
+            assert len(matches) == 1, (skeleton, name, matches)
+            found.add(matches[0])
+    for paragraph in re.findall(
+        r"^The same holds for[^\n]*(?:\n[^\n]+)*", section, re.MULTILINE
+    ):
+        found.update(
+            template(skeleton, token)
+            for token in re.findall(r"`([^`]+)`", paragraph)
+            if "/" in token and not token.endswith("/")
+        )
+    return found
+
+
+def test_boundary_lists_name_their_files() -> None:
+    for skeleton in SKELETON_GROUPS["module_skeletons"]:
+        assert {
+            "plugins/module_utils/_lifecycle.py.j2",
+            "tests/unit/plugins/conftest.py.j2",
+            "extensions/molecule/shared/playbooks/create.yml.j2",
+        } <= boundary_invariants(skeleton)
+
+
+def test_shared_invariants_are_protected_or_explained() -> None:
+    owners: dict[str, set[str]] = {}
+    for skeleton in SKELETON_GROUPS["module_skeletons"]:
+        for name in boundary_invariants(skeleton):
+            owners.setdefault(name, set()).add(skeleton)
+    protected = {
+        name: set(SKELETON_GROUPS[group])
+        for group, names in SHARED_FILES.items()
+        for name in names
+    }
+    for name, skeletons in sorted(owners.items()):
+        if len(skeletons) < 2:
+            continue
+        # A static file gains a template suffix in the module skeletons only.
+        covered = protected.get(name, protected.get(name.removesuffix(".j2"), set()))
+        if name in DELIBERATE_VARIANTS:
+            contents = {(ROOT / item / name).read_bytes() for item in skeletons}
+            assert len(contents) > 1, f"{name} no longer differs"
+        else:
+            assert skeletons <= covered, f"{name} has no shared group: {skeletons}"
+
+
+def test_invariant_variant_regions_stay_declared() -> None:
+    found = set()
+    for skeleton in SKELETON_GROUPS["module_skeletons"]:
+        for name in boundary_invariants(skeleton):
+            path = ROOT / skeleton / name
+            if b"skeleton-variant" in path.read_bytes():
+                found.add(name)
+    assert found == INVARIANT_WITH_REGIONS
+
+
 def readme_closing_sections(skeleton: str) -> str:
     """The README from the licensing section to the end."""
     text = (ROOT / skeleton / "README.md.j2").read_text(encoding="utf-8")
