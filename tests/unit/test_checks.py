@@ -39,6 +39,7 @@ from scripts.smoke import (
     pinned_archives,
     pinned_utils_version,
     private_podman_store,
+    require_executed,
 )
 
 
@@ -987,6 +988,13 @@ def test_the_scenario_collections_come_from_the_run_downloads(
     requirements.write_text('collections:\n  - "ansible.posix"\n', encoding="utf-8")
     with pytest.raises(GateError, match=r"tests/requirements.yml: ansible\.posix"):
         install_scenario_collections(rendered, downloads)
+
+
+def test_an_ansible_test_session_without_targets_is_not_a_pass() -> None:
+    sessions = ["ansible-test-integration"]
+    require_executed("Running fixture integration test role\n", sessions)
+    with pytest.raises(GateError, match="ran nothing in ansible-test-integration"):
+        require_executed("WARNING: All targets skipped.\n", sessions)
 
 
 def test_newest_released_core_follows_the_matrix(tmp_path: Path) -> None:

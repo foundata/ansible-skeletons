@@ -819,6 +819,12 @@ def identity_sessions(index: int, *, full: bool) -> list[list[str]]:
     return [[], [f"ansible-test-sanity-{newest_released_core()}"]]
 
 
+def require_executed(output: str, sessions: list[str]) -> None:
+    """Refuse an ansible-test session that exited 0 with nothing to run."""
+    if "All targets skipped" in output:
+        raise GateError(f"ansible-test ran nothing in {', '.join(sessions)}")
+
+
 def user_image_store() -> str | None:
     """Return the graph root of the user's own Podman store, if Podman runs."""
     if shutil.which("podman") is None:
@@ -1046,7 +1052,7 @@ def module_identity(
     run(["git", "init", "--quiet"], cwd=rendered.collection)
     run(["git", "add", "."], cwd=rendered.collection)
     for sessions in identity_sessions(index, full=full):
-        run(
+        logged = run(
             [
                 "uv",
                 "run",
@@ -1058,7 +1064,10 @@ def module_identity(
             cwd=rendered.collection,
             env={**rendered.env, "CI": "true"},
             timeout=7200,
+            capture=bool(sessions),
         )
+        print(logged, end="", flush=True)
+        require_executed(logged, sessions)
     if index == 0:
         check_short_tmpdir(rendered)
     if index == 0 and (
