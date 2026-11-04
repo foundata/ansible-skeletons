@@ -89,15 +89,14 @@ fake_clock.patch(_activation)
 `fake_clock.sleep(seconds)` advances virtual time immediately.
 `fake_clock.advance(seconds)` models work in a fake handler, and
 `fake_clock.now` exposes elapsed time. Budget the deadline for these
-deliberate advances, not for host speed. Tests that do not request the
+deliberate advances independently of host speed. Tests that do not request the
 fixture keep real time; pytest restores all patches after each test.
 
-`patch(module)` replaces that module's `time` reference, not Python's
-global time functions. Modules that import a clock function directly or
-capture it in a default argument need explicit injection instead.
-Use this fixture only with synchronous fake products, not real I/O,
-background workers or event loops. See `test_activation.py` for complete
-polling and timeout examples.
+`patch(module)` replaces only that module's `time` reference; Python's global
+time functions stay unchanged. Direct clock imports and clocks captured in
+default arguments need explicit injection. The fixture supports only synchronous
+fake products; real I/O, background workers and event loops are excluded. See
+`test_activation.py` for complete polling and timeout examples.
 
 ## Boundaries<a id="boundaries"></a>
 
@@ -183,15 +182,13 @@ Each enforced rule and its reason belong in its utility's docstring. The
 
 ## Troubleshooting<a id="troubleshooting"></a>
 
-Nox removes only the unchanged short-path directory its own invocation
-created. A killed invocation can leave that directory behind. To recover
-one orphan, identify its exact path and read its `owner.json`, which records
-the creator's host, PID and creation time, plus the directory's device and
-inode. Establish that the recorded invocation has ended; a PID may have been
-reused. Verify the directory still has the recorded identity and inspect its
-contents and link targets. Remove only that verified directory, leaving the
-link targets intact. If the path is a symlink, has been replaced, or its
-creator cannot be established, leave it for investigation.
+To recover a short-path directory left by a killed Nox invocation, read its
+`owner.json` at the exact path. It records the creator's host, PID and creation
+time and the directory's device and inode. Confirm the invocation ended,
+allowing for PID reuse, and verify the directory's identity, contents and link
+targets. Remove only that directory; keep the link targets. Leave symlinked or
+replaced paths and uncertain creators for investigation. Nox itself removes only
+the unchanged directory its invocation created.
 
 ## Engine fields<a id="engine-fields"></a>
 

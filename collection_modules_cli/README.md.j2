@@ -53,8 +53,12 @@ need their own qualification of identity, environment, deadline and cleanup.
 
 ## Dependencies<a id="dependencies"></a>
 
-See the utility dependency in [galaxy.yml](galaxy.yml) and any target Python
-dependencies in [requirements.txt](requirements.txt).
+Collection dependencies are under `dependencies` in
+[`galaxy.yml`](./galaxy.yml); additional Python packages are in
+[`requirements.txt`](./requirements.txt).
+
+The collection requires the shared utility dependency listed there; Python
+requirements apply to the execution host.
 
 ## Resource contract<a id="resource-contract"></a>
 

@@ -11,7 +11,6 @@ The examples use an invented fixture. Follow [FIXME.md](./FIXME.md) to qualify
 a product resource and replace the fixture.
 
 
-
 ## Table of contents<a id="toc"></a>
 
 - [Included content](#content)
@@ -24,7 +23,6 @@ a product resource and replace the fixture.
 - [Versioning and deprecation](#versioning-deprecation)
 - [Licensing, copyright](#licensing-copyright)
 - [Author information](#author-information)
-
 
 
 ## Included content<a id="content"></a>
@@ -44,15 +42,15 @@ This table is maintained by hand. Module documentation is authoritative:
 `ansible-doc {{ namespace }}.{{ collection_name }}.fixture`.
 
 
-
 ## Dependencies<a id="dependencies"></a>
 
-See `dependencies` in [`galaxy.yml`](./galaxy.yml).
+Collection dependencies are under `dependencies` in
+[`galaxy.yml`](./galaxy.yml); additional Python packages are in
+[`requirements.txt`](./requirements.txt).
 
 The fixture uses `foundata.utils >=1.0.0`. Python packages that the execution
 host needs are listed in [`requirements.txt`](./requirements.txt); the fixture
 needs none.
-
 
 
 ## Collection contract
@@ -117,7 +115,6 @@ document a different version-check policy.
 
 An untested product series produces one warning and the module proceeds.
 Operations known to fail on a particular product build fail before they write.
-
 
 
 ## Usage<a id="usage"></a>
@@ -195,7 +192,6 @@ trust.
 The fixture tests make no support claim for a real product. See
 [FIXME.md](./FIXME.md) for product qualification and
 [development](./DEVELOPMENT.md) for the checks.
-
 
 
 ## Versioning and deprecation<a id="versioning-deprecation"></a>

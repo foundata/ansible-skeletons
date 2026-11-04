@@ -462,6 +462,13 @@ def shared_text(path: Path) -> str:
 # complete file. Bounds must match once; variant regions work as for SHARED_FILES.
 # Keep the existing whole-file comparisons, including their narrower protection.
 SHARED_PASSAGES = (
+    ("collections", "README.md.j2", r"^Collection dependencies", r"\n\n"),
+    (
+        "provisioning_skeletons",
+        "extensions/molecule/README.md.j2",
+        r"^When you run Molecule directly",
+        r"^### |\Z",
+    ),
     *(
         (
             "role_and_collection_default",
@@ -490,7 +497,7 @@ SHARED_PASSAGES = (
             (r"^Container platforms need", r"\n\n"),
             (r"^Virtual machine platforms need:", r"(?=\n\n\n|^Virtual machines boot)"),
             (r"^Virtual machines need far more", r"\n\n"),
-            (r"^The first run downloads", r"\n\n"),
+            (r"^The first run caches", r"\n\n"),
             (
                 r"^\| +Variable +\| +Default +\| Purpose \|\n(?=\|[^\n]+\n\| `MOLECULE_VM_LIBVIRT_URI`)",
                 r"\n\n",

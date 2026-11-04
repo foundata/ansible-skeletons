@@ -10,7 +10,6 @@ SPDX-License-Identifier: GPL-3.0-or-later
 {% endfilter %}{{ '' }}
 
 
-
 ## Table of contents<a id="toc"></a>
 
 - [Included content](#content)
@@ -20,13 +19,12 @@ SPDX-License-Identifier: GPL-3.0-or-later
 - [Author information](#author-information)
 
 
-
 ## Included content<a id="content"></a>
 
 ### Role: `{{ namespace }}.{{ collection_name }}.run`
 
-The primary role in this collection. [Its `README.md`](./roles/run/README.md)
-covers configuration, usage examples, and more.
+The collection's primary role. [Its `README.md`](./roles/run/README.md) covers
+configuration and usage examples.
 
 <!-- ANSIBLE DOCSMITH TOC-FULL run START -->
 - [Ansible role: `{{ namespace }}.{{ collection_name }}.run`](./roles/run/README.md#ansible-role-{{ namespace }}{{ collection_name }}run)
@@ -43,11 +41,11 @@ covers configuration, usage examples, and more.
 <!-- ANSIBLE DOCSMITH TOC-FULL run END -->
 
 
-
 ## Dependencies<a id="dependencies"></a>
 
-See `dependencies` in [`galaxy.yml`](./galaxy.yml).
-
+Collection dependencies are under `dependencies` in
+[`galaxy.yml`](./galaxy.yml); additional Python packages are in
+[`requirements.txt`](./requirements.txt).
 
 
 ## Versioning and deprecation<a id="versioning-deprecation"></a>

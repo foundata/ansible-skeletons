@@ -5,9 +5,8 @@ SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' 
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
-This directory contains the
-[Molecule](https://docs.ansible.com/projects/molecule/) scenarios of this
-project:
+[Molecule](https://docs.ansible.com/projects/molecule/) tests this project with
+two scenarios:
 
 - `default` tests the project on several Linux distributions, in Podman
   containers or QEMU/KVM virtual machines.
@@ -18,7 +17,6 @@ project:
   and checks that the image contains the project.
 
 Paths are relative to this directory unless stated otherwise.
-
 
 
 ## Table of contents
@@ -43,19 +41,16 @@ Paths are relative to this directory unless stated otherwise.
   - [VMs: Instance-to-instance networking](#faq-vm-multi-node)
 
 
-
 ## Requirements<a id="requirements"></a>
 
-When product tests refuse symlinked paths, keep the checkout below a short
-real path such as `/var/tmp/<owner-directory>` on a disk filesystem, never a
-tmpfs. Nox gives sessions a short link when `TMPDIR` is long, so resolving
-that link exposes the long path again.
+When product tests refuse symlinked paths, use a short real checkout path such
+as `/var/tmp/<owner-directory>` on disk, never tmpfs. Resolving the short link
+Nox supplies for a long `TMPDIR` exposes the long path again.
 
 Install [Molecule](https://docs.ansible.com/projects/molecule/installation/).
 The scenarios use Molecule's `default` driver with their own create and destroy
 playbooks, so they need no Molecule driver plugin. Before each run, Molecule
 installs the collections a scenario needs from `<scenario>/requirements.yml`.
-
 
 
 ### Scenario `default`<a id="requirements-scenario-default"></a>
@@ -102,7 +97,6 @@ Virtual machine platforms need:
    ```
 
 
-
 ### Scenario `ee`<a id="requirements-scenario-ee"></a>
 
 The `ee` scenario needs [Podman](https://podman.io/docs/installation) and
@@ -116,7 +110,6 @@ uv pip install "ansible-builder"
 ```
 
 
-
 ## Usage<a id="usage"></a>
 
 Run Molecule from the project's root directory with `MOLECULE_GLOB` set; the
@@ -127,7 +120,6 @@ two commands:
 cd "/path/to/project"
 export MOLECULE_GLOB="./{extensions/molecule,molecule}/*/molecule.yml"
 ```
-
 
 
 ### Run tests<a id="usage-testing"></a>
@@ -164,21 +156,19 @@ molecule destroy
 ```
 
 
-
 #### VM platforms (`type: "libvirt"`)<a id="usage-testing-vm"></a>
 
 Use virtual machines for tests that containers cannot cover, such as kernel
 settings, nested virtualization or Podman inside the test target. They boot
 vendor cloud images in the libvirt user session with passt user networking.
 
-Virtual machines need far more resources than containers. On smaller machines,
-test one platform at a time with `--platform-name`. A resource guard stops the
-`create` step early when the requested memory plus a host reserve exceeds the
-available memory, or when the image cache runs low on disk space.
+Virtual machines need far more resources than containers; use `--platform-name`
+to test one at a time on smaller hosts. The resource guard stops `create` when
+requested memory plus a host reserve exceeds available memory, or the image
+cache is low on disk space.
 
-The first run downloads each cloud image (qcow2, several hundred MiB) into the
-image cache. Deleting the cache is safe; the scenario downloads missing images
-again.
+The first run caches each cloud image (qcow2, several hundred MiB). You can
+safely delete the cache; missing images download again.
 
 |            Variable            |                  Default                   | Purpose |
 | ------------------------------ | ------------------------------------------ | ------- |
@@ -198,7 +188,6 @@ If an instance does not come up:
   [`virt-manager`](https://virt-manager.org/), connected to `qemu:///session`.
 
 
-
 #### Scenario `ee`<a id="usage-testing-ee"></a>
 
 ```bash
@@ -206,17 +195,15 @@ molecule test --scenario-name "ee"
 ```
 
 
-
 ### Access instance terminal<a id="usage-instance-access"></a>
 
-`molecule login` opens a shell in a running instance, for example one kept with
-`--destroy="never"`. It works for containers and virtual machines:
+`molecule login` opens a shell in a running container or VM, including one kept
+with `--destroy="never"`:
 
 ```bash
 molecule list
 molecule login --host "<name>"
 ```
-
 
 
 ### Write tests<a id="usage-add-tests"></a>
@@ -238,39 +225,35 @@ alphabetical order:
 The `*.yml.example` files in `default/tasks/` show how to apply the project.
 Rename one to `*.yml` to use it.
 
-Project-specific tests stay in these directories. You can therefore update the
-rest of this directory from a newer rendered skeleton of
+Keep project tests in these task directories so updates to the rest of this
+directory from
 [foundata/ansible-skeletons](https://github.com/foundata/ansible-skeletons)
-without losing them.
-
+preserve them.
 
 
 ## FAQ, troubleshooting<a id="faq"></a>
 
 ### Molecule does not find the scenarios<a id="faq-role-path-detection"></a>
 
-When you run Molecule directly and it finds no scenario, or does not install
-the current version of the project on each run, set `MOLECULE_GLOB` and run
-`molecule` from the project's root directory, as [Usage](#usage) shows. For
-one command only:
+When you run Molecule directly, set `MOLECULE_GLOB` and run from the project
+root if it misses scenarios or fails to install the current project on each run.
+[Usage](#usage) shows the setup; for one command:
 
 ```bash
 MOLECULE_GLOB="./{extensions/molecule,molecule}/*/molecule.yml" molecule list
 ```
 
-Without the variable, Molecule looks for `molecule/*/molecule.yml` in the
-working directory. Recent releases use `extensions/molecule/*/molecule.yml`
-instead when the working directory contains a valid `galaxy.yml`. The pattern
-above matches both layouts. Further reading:
+Without the variable, Molecule searches `molecule/*/molecule.yml` in the working
+directory. Recent releases instead search `extensions/molecule/*/molecule.yml`
+when a valid `galaxy.yml` is present. The pattern covers both layouts.
 
-- Source:
-  [`molecule/command/base.py`](https://github.com/ansible/molecule/blob/main/src/molecule/command/base.py)
-- Issues: [4015](https://github.com/ansible/molecule/issues/4015),
-  [4017](https://github.com/ansible/molecule/issues/4017),
-  [4040](https://github.com/ansible/molecule/issues/4040),
-  [4061](https://github.com/ansible/molecule/issues/4061)
-- Pull requests: [4177](https://github.com/ansible/molecule/pull/4177)
-
+See
+[`molecule/command/base.py`](https://github.com/ansible/molecule/blob/main/src/molecule/command/base.py),
+issues [4015](https://github.com/ansible/molecule/issues/4015),
+[4017](https://github.com/ansible/molecule/issues/4017),
+[4040](https://github.com/ansible/molecule/issues/4040),
+[4061](https://github.com/ansible/molecule/issues/4061) and pull request
+[4177](https://github.com/ansible/molecule/pull/4177).
 
 
 ### Air-gapped environments<a id="faq-air-gapped"></a>
@@ -308,11 +291,10 @@ repositories. If your network provides mirrors:
    instead of using `when:` conditions in `all.yml`.
 
 
-
 ### Container: `inotify_init1(): Too many open files`<a id="faq-inotify"></a>
 
-Starting many containers at once can exceed the inotify limits. Start fewer
-at once with `--platform-name`, or raise the limits:
+Use `--platform-name` to start fewer containers at once, or raise the inotify
+limits that concurrent starts can exceed:
 
 ```bash
 # Inspect
@@ -342,17 +324,14 @@ podman --log-level debug start <container-id>
 ```
 
 
-
 ### VMs: Instance-to-instance networking<a id="faq-vm-multi-node"></a>
 
-Virtual machine instances cannot reach each other. [passt](https://passt.top/)
-gives every instance its own isolated user-space network stack, and the host
-reaches the instances through SSH port forwards. The shared playbooks do not
-support traffic between instances.
+VM instances cannot reach each other: [passt](https://passt.top/) isolates their
+user-space network stacks, and the shared playbooks support no inter-instance
+traffic. The host reaches them through SSH port forwards.
 
-A scenario that needs it would have to change the domain template to bridged
-networking through the setuid `qemu-bridge-helper`, which keeps the privilege
-in one small helper binary. Fedora ships the helper setuid with a
-`/etc/qemu/bridge.conf` that allows `virbr0`. Debian and Ubuntu ship it without
-setuid and without that file on purpose; enabling it changes the system's
-security posture.
+Inter-instance traffic requires changing the domain template to bridged
+networking through setuid `qemu-bridge-helper`, confining privilege to one small
+helper binary. Fedora ships it setuid and allows `virbr0` in
+`/etc/qemu/bridge.conf`. Debian and Ubuntu deliberately omit setuid and that
+file; enabling them changes the system's security posture.

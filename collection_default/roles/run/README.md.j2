@@ -10,7 +10,6 @@ The `{{ namespace }}.{{ collection_name }}.run` Ansible role (part of the `{{ na
 {% endfilter %}{{ '' }}
 
 
-
 ## Table of contents<a id="toc"></a>
 
 - [Example playbooks, using this role](#examples)
@@ -23,7 +22,6 @@ The `{{ namespace }}.{{ collection_name }}.run` Ansible role (part of the `{{ na
 - [Dependencies](#dependencies)
 - [Compatibility](#compatibility)
 - [External requirements](#requirements)
-
 
 
 ## Example playbooks, using this role<a id="examples"></a>
@@ -61,7 +59,6 @@ Uninstall:
       vars:
         run_{{ collection_name }}_state: "absent"
 ```
-
 
 
 ## Supported tags<a id="tags"></a>
@@ -182,7 +179,6 @@ The defined status applies to all services if the role manages several.
 See `dependencies` in [`meta/main.yml`](./meta/main.yml).
 
 
-
 ## Compatibility<a id="compatibility"></a>
 
 The role needs at least the ansible-core version set as `min_ansible_version`
@@ -195,7 +191,6 @@ in [`vars/main.yml`](./vars/main.yml).
 {# end skeleton-variant #}
 
 The role stops on a platform that a non-empty list does not name.
-
 
 
 ## External requirements<a id="requirements"></a>

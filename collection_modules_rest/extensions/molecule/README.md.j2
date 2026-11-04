@@ -5,15 +5,13 @@ SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' 
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
-This directory contains the
-[Molecule](https://docs.ansible.com/projects/molecule/) scenario of this
-collection. `default` runs the modules on the control node against an API
-endpoint you provide. It creates and changes only records whose names start with
-`molecule_fixture_`, and removes them again. It provisions nothing: the
-endpoint, its automation account and its recovery are yours.
+The [Molecule](https://docs.ansible.com/projects/molecule/) `default` scenario
+runs this collection's modules on the control node against your API endpoint. It
+creates, changes and removes only records prefixed `molecule_fixture_`. You
+supply the endpoint, automation account and recovery; the scenario provisions
+nothing.
 
 Paths are relative to this directory unless stated otherwise.
-
 
 
 ## Table of contents
@@ -41,13 +39,11 @@ Paths are relative to this directory unless stated otherwise.
   - [VMs: Instance-to-instance networking](#faq-vm-multi-node)
 
 
-
 ## Requirements<a id="requirements"></a>
 
-When product tests refuse symlinked paths, keep the checkout below a short
-real path such as `/var/tmp/<owner-directory>` on a disk filesystem, never a
-tmpfs. Nox gives sessions a short link when `TMPDIR` is long, so resolving
-that link exposes the long path again.
+When product tests refuse symlinked paths, use a short real checkout path such
+as `/var/tmp/<owner-directory>` on disk, never tmpfs. Resolving the short link
+Nox supplies for a long `TMPDIR` exposes the long path again.
 
 - [Molecule](https://docs.ansible.com/projects/molecule/installation/). The nox
   session installs it; a direct run needs it in your Python environment.
@@ -77,7 +73,6 @@ then add their variables to the inventory and the table.
 | `MOLECULE_PRODUCT_VALIDATE_CERTS` | `true`  | `false` disables TLS certificate validation; see the [FAQ](#faq-tls) |
 
 
-
 ## Usage<a id="usage"></a>
 
 ### Run tests<a id="usage-testing"></a>
@@ -96,7 +91,6 @@ Then it runs the complete [test sequence](#usage-sequence). Arguments after
 `--` go to Molecule, for example `uv run noxfile.py -s molecule -- converge`.
 With nox installed, `nox` replaces `uv run noxfile.py`. See
 [`DEVELOPMENT.md`](../../DEVELOPMENT.md) for the other checks.
-
 
 
 #### With Molecule directly<a id="usage-molecule"></a>
@@ -119,7 +113,6 @@ molecule cleanup
 
 Give parallel runs their own `ANSIBLE_HOME`, `XDG_CACHE_HOME` and collections
 path, so that they do not share installed collections or caches.
-
 
 
 ### Test sequence<a id="usage-sequence"></a>
@@ -149,18 +142,15 @@ through, replaces the reply with a timeout and then requires:
   `verified: observed`.
 - A second run with the same arguments reports no change and writes nothing.
 
-Each case names a module, a record and the parameters to declare. Its
-`options` adapt the check to modules that write in stages, send writes through
-another method than `_client.Client.write` or act on every run. A lost reply
-that cannot end in an observed success, such as one to a write that sends a
-secret, states the result it must give in `expect`. The docstring of `loss.py`
-describes each option. The cases run hidden because their
-parameters contain the credentials. `zz_loss.yml` then shows each case's
-proof, which contains no credentials and names the module file that ran.
+Each case names its module, record and declared parameters. `options` supports
+staged writes, write methods other than `_client.Client.write`, and modules that
+act on every run; `loss.py` documents each option. For lost replies that cannot
+yield observed success, including secret writes, `expect` declares the required
+result. Cases run hidden because parameters contain credentials. `zz_loss.yml`
+shows credential-free proof for each case, including the executed module file.
 
-The cases need the records and services they use. The `zz_` prefix runs the
-file after the other side-effect files; if one of those removes something the
-cases need, rename `zz_loss.yml` so that it runs before that file.
+The `zz_` prefix runs `zz_loss.yml` after other side-effect files. If they
+remove a required record or service, rename it to run before that removal.
 
 {# skeleton-variant: recovery-sequence #}
 {# end skeleton-variant #}
@@ -180,19 +170,17 @@ task files of a directory under `default/tasks/`, in alphabetical order:
 | `tasks/side_effect/` | Change the fixtures and assert the reported change. |
 | `tasks/cleanup/`     | Remove the fixture records. It also runs first, so absence is not an error. |
 
-The `fixture.yml` files exercise the definition-driven resource and
-`fixture_nested.yml` the hook-based one. For each new hook-based resource,
-copy the nested fixture's task files along with its utility and module, as
-[`DEVELOPMENT.md`](../../DEVELOPMENT.md#boundaries) describes. Replace the
-FIXME in the copy of `tasks/verify/fixture_nested.yml` with an independent
-check of the product, and add the module to `zz_loss.yml`; keep
-`shared/files/loss.py` unchanged.
+`fixture.yml` tests the definition-driven resource; `fixture_nested.yml` tests
+hooks. Follow [FIXME.md](../../FIXME.md) to copy each new hook resource's tasks,
+utility and module together. Replace the verifier FIXME in
+`tasks/verify/fixture_nested.yml` with an independent product check and add the
+module to `zz_loss.yml`. Keep `shared/files/loss.py` unchanged.
 
-If the product cannot remove test data, include a per-run test id in every
-record identity. Carry that id through converge, verify, side effects and
-cleanup, so parallel and later runs cannot reuse retained records. Cleanup
-unlists records where it cannot delete them. Document which data remains and
-how to find it; do not claim that cleanup leaves the endpoint empty.
+If the product cannot delete test data, put a per-run test id in every record
+identity through converge, verify, side effects and cleanup. This prevents
+parallel or later runs reusing retained records. Cleanup unlists records it
+cannot delete; document the remaining data and how to find it. Do not claim
+cleanup leaves the endpoint empty.
 
 Set the connection once per block with `module_defaults` for the
 `{{ namespace }}.{{ collection_name }}.api`
@@ -204,11 +192,9 @@ action group and the `product_connection` inventory variable. When adding tests:
 - Tag a task `molecule-idempotence-notest` only when it acts on every call by
   design; Molecule then skips it in the `idempotence` step.
 
-Project-specific tests stay in `default/tasks/`. You can therefore update the
-rest of this directory from a newer rendered skeleton of
-[foundata/ansible-skeletons](https://github.com/foundata/ansible-skeletons)
-without losing them.
-
+Keep project tests in `default/tasks/` so updates to the rest of this directory
+from [foundata/ansible-skeletons](https://github.com/foundata/ansible-skeletons)
+preserve them.
 
 
 ### Provision your own target<a id="usage-owned-target"></a>
@@ -238,14 +224,12 @@ molecule destroy
 ```
 
 
-
 #### Container platforms (`type: "podman"`)<a id="usage-owned-podman"></a>
 
 Container platforms need [Podman](https://podman.io/docs/installation). Set
 `MOLECULE_PODMAN_EXECUTABLE` to use another Podman binary than `podman`.
 Molecule names each container after its platform, so two runs of a scenario
 at the same time collide.
-
 
 
 #### VM platforms (`type: "libvirt"`)<a id="usage-owned-vm"></a>
@@ -283,14 +267,13 @@ Virtual machine platforms need:
 Virtual machines boot vendor cloud images in the libvirt user session with
 passt user networking.
 
-Virtual machines need far more resources than containers. On smaller machines,
-test one platform at a time with `--platform-name`. A resource guard stops the
-`create` step early when the requested memory plus a host reserve exceeds the
-available memory, or when the image cache runs low on disk space.
+Virtual machines need far more resources than containers; use `--platform-name`
+to test one at a time on smaller hosts. The resource guard stops `create` when
+requested memory plus a host reserve exceeds available memory, or the image
+cache is low on disk space.
 
-The first run downloads each cloud image (qcow2, several hundred MiB) into the
-image cache. Deleting the cache is safe; the scenario downloads missing images
-again.
+The first run caches each cloud image (qcow2, several hundred MiB). You can
+safely delete the cache; missing images download again.
 
 |            Variable            |                  Default                   | Purpose |
 | ------------------------------ | ------------------------------------------ | ------- |
@@ -310,11 +293,10 @@ If an instance does not come up:
   [`virt-manager`](https://virt-manager.org/), connected to `qemu:///session`.
 
 
-
 #### Access instance terminal<a id="usage-instance-access"></a>
 
-`molecule login` opens a shell in a running instance, for example one kept with
-`--destroy="never"`. It works for containers and virtual machines:
+`molecule login` opens a shell in a running container or VM, including one kept
+with `--destroy="never"`:
 
 ```bash
 molecule list
@@ -322,29 +304,29 @@ molecule login --host "<name>"
 ```
 
 
-
 ## FAQ, troubleshooting<a id="faq"></a>
 
 ### Molecule does not find the scenario<a id="faq-role-path-detection"></a>
 
-Without `MOLECULE_GLOB`, Molecule looks for `molecule/*/molecule.yml` in the
-working directory. Recent releases use `extensions/molecule/*/molecule.yml`
-instead when the working directory contains a valid `galaxy.yml`. Setting the
-variable and running from the collection's root works with both, and lets
-Molecule install the current version of the collection on each run:
+When you run Molecule directly, set `MOLECULE_GLOB` and run from the project
+root if it misses scenarios or fails to install the current project on each run.
+[Usage](#usage) shows the setup; for one command:
 
 ```bash
 MOLECULE_GLOB="./{extensions/molecule,molecule}/*/molecule.yml" molecule list
 ```
 
-Further reading:
+Without the variable, Molecule searches `molecule/*/molecule.yml` in the working
+directory. Recent releases instead search `extensions/molecule/*/molecule.yml`
+when a valid `galaxy.yml` is present. The pattern covers both layouts.
+
+See
 [`molecule/command/base.py`](https://github.com/ansible/molecule/blob/main/src/molecule/command/base.py),
 issues [4015](https://github.com/ansible/molecule/issues/4015),
 [4017](https://github.com/ansible/molecule/issues/4017),
 [4040](https://github.com/ansible/molecule/issues/4040),
 [4061](https://github.com/ansible/molecule/issues/4061) and pull request
 [4177](https://github.com/ansible/molecule/pull/4177).
-
 
 
 ### An aborted run left records behind<a id="faq-leftovers"></a>
@@ -355,7 +337,6 @@ them without testing, run `molecule cleanup`. Records without the
 changed on the endpoint is for you to inspect.
 
 
-
 ### Certificate validation fails<a id="faq-tls"></a>
 
 The control node must trust the endpoint's certificate. Add your private
@@ -364,11 +345,10 @@ certificate authority to the system trust store of the control node. Set
 network you control: the credentials then travel to an unverified peer.
 
 
-
 ### Container: `inotify_init1(): Too many open files`<a id="faq-inotify"></a>
 
-Starting many containers at once can exceed the inotify limits. Start fewer
-at once with `--platform-name`, or raise the limits:
+Use `--platform-name` to start fewer containers at once, or raise the inotify
+limits that concurrent starts can exceed:
 
 ```bash
 # Inspect
@@ -398,17 +378,14 @@ podman --log-level debug start <container-id>
 ```
 
 
-
 ### VMs: Instance-to-instance networking<a id="faq-vm-multi-node"></a>
 
-Virtual machine instances cannot reach each other. [passt](https://passt.top/)
-gives every instance its own isolated user-space network stack, and the host
-reaches the instances through SSH port forwards. The shared playbooks do not
-support traffic between instances.
+VM instances cannot reach each other: [passt](https://passt.top/) isolates their
+user-space network stacks, and the shared playbooks support no inter-instance
+traffic. The host reaches them through SSH port forwards.
 
-A scenario that needs it would have to change the domain template to bridged
-networking through the setuid `qemu-bridge-helper`, which keeps the privilege
-in one small helper binary. Fedora ships the helper setuid with a
-`/etc/qemu/bridge.conf` that allows `virbr0`. Debian and Ubuntu ship it without
-setuid and without that file on purpose; enabling it changes the system's
-security posture.
+Inter-instance traffic requires changing the domain template to bridged
+networking through setuid `qemu-bridge-helper`, confining privilege to one small
+helper binary. Fedora ships it setuid and allows `virbr0` in
+`/etc/qemu/bridge.conf`. Debian and Ubuntu deliberately omit setuid and that
+file; enabling them changes the system's security posture.

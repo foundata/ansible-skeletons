@@ -89,15 +89,14 @@ fake_clock.patch(_activation)
 `fake_clock.sleep(seconds)` advances virtual time immediately.
 `fake_clock.advance(seconds)` models work in a fake handler, and
 `fake_clock.now` exposes elapsed time. Budget the deadline for these
-deliberate advances, not for host speed. Tests that do not request the
+deliberate advances independently of host speed. Tests that do not request the
 fixture keep real time; pytest restores all patches after each test.
 
-`patch(module)` replaces that module's `time` reference, not Python's
-global time functions. Modules that import a clock function directly or
-capture it in a default argument need explicit injection instead.
-Use this fixture only with synchronous fake products, not real I/O,
-background workers or event loops. See `test_activation.py` for complete
-polling and timeout examples.
+`patch(module)` replaces only that module's `time` reference; Python's global
+time functions stay unchanged. Direct clock imports and clocks captured in
+default arguments need explicit injection. The fixture supports only synchronous
+fake products; real I/O, background workers and event loops are excluded. See
+`test_activation.py` for complete polling and timeout examples.
 
 ## Boundaries<a id="boundaries"></a>
 
@@ -146,104 +145,97 @@ the same inventory and runs every applicable case with a fresh backend.
 {# end skeleton-variant #}
 
 {# skeleton-variant: transport-boundary #}
-The adapter's typed `Contract` declares mutation `granularity`. Its default,
-`fieldwise`, requires evidence that some declared fields changed while
-others did not. `atomic` exercises an indivisible change with failed
-readback and checks its complete stored effect and uncertain outcome. The
-example runs both configurations through the same executable, with `limit`
-alone in the atomic configuration. Synthetic lifecycle tests retain partial
-progress coverage.
+`Contract.granularity` defaults to `fieldwise`, which requires evidence of both
+changed and unchanged declared fields. `atomic` tests an indivisible write with
+failed readback, its complete stored effect and uncertain outcome. The fixture
+runs both through the same executable, using only `limit` for the atomic case.
+Synthetic lifecycle tests retain partial progress coverage.
+
 {# end skeleton-variant #}
 
 {# skeleton-variant: loopback-setup #}
-`Contract.write_command` uses `WriteCommand.alternatives` to recognize
-contiguous native argv tokens. Its default is `update --`; the second
-configuration uses `set --`. Declare alternatives for each native write
-form, such as `set` and `inherit`. Start failure is injected at
-`subprocess.Popen`, after the real transport has prepared the command. The
-case requires one matching start attempt, unchanged storage and zero
-dispatched writes. A fake that bypasses the subprocess boundary cannot
-satisfy this case.
+`Contract.write_command` recognizes contiguous native argv tokens through
+`WriteCommand.alternatives`: `update --` by default, `set --` in the second
+configuration. Declare each native write form, such as `set` and `inherit`. The
+start-failure case injects at `subprocess.Popen` after the real transport
+prepares the command and requires one matching start attempt, unchanged storage
+and zero dispatched writes. Fakes must cross that subprocess boundary.
+
 {# end skeleton-variant #}
 
 {# skeleton-variant: inventory-evidence #}
-`Contract.literals` holds `LiteralInputs.accepted` module arguments, exact
-native elements in `argv`, and unsupported argument dictionaries in
-`refused`. Defaults use the fixture's shell-shaped label and an overlong
-refused label. The second configuration accepts `accepted` and refuses the
-shell-shaped string before any command, in normal and check mode. Successful
-values must reach the executable literally. The shared executable transport
-cases in `test_transport.py` separately prove raw argv and secret stdin
-bytes, including a stream larger than a pipe buffer. An empty stdin stream
-refuses before dispatch. These cases use their own `transport_command.py`
-executable and require no product adapter or options. Products need no extra
-free-text or secret option to satisfy their literal-input obligations.
+`Contract.literals` holds `LiteralInputs.accepted` module arguments, their exact
+native `argv` elements and unsupported argument dictionaries in `refused`.
+Defaults accept a shell-shaped label and refuse an overlong one. The second
+configuration accepts `accepted` and refuses the shell-shaped string before any
+command in normal and check mode. Accepted values reach the executable
+literally.
+
+`test_transport.py` uses its own `transport_command.py` to prove raw argv and
+secret stdin bytes, including a stream larger than a pipe buffer; empty stdin
+refuses before dispatch. These shared executable cases need no product adapter
+or options, so products need no extra free-text or secret option to meet
+literal-input obligations.
+
 {# end skeleton-variant #}
 
 {# skeleton-variant: product-rules #}
-The adapter implements `inject_host_identity()` at its prepared execution
-boundary. The fixture changes only the prepared numeric host UID; products
-whose locator derives that identity internally use the same boundary. The
-public locator arguments stay valid. The case requires `host_identity`, an
-unchanged outcome and storage, and no write. Unsupported public locator
-shapes remain separate mandatory product tests in `test_cli.py`.
+`inject_host_identity()` changes the prepared execution identity; the fixture
+substitutes only the numeric host UID. Products whose locator derives identity
+internally use the same boundary. Public locator arguments stay valid. The case
+requires `host_identity`, unchanged outcome and storage, and no write.
+Unsupported public locator shapes have separate mandatory product tests in
+`test_cli.py`.
 
-`Contract.environment_policy` defaults to `refuse`: ambient loader values
-must fail with `invalid_environment` before any command. `neutralize` must
-remove or empty those values before `Popen` starts a child. The alternate
-fixture closes both inherited and module-level environment updates, then
-sets its explicit path and locale. Both policies run for every ambient
-loader key. Actual target records must retain the explicit locale and
-exclude secret values; an empty neutralized key is accepted. Document this
-effective environment policy and any separate target inheritance in the
-product locator.
+`Contract.environment_policy` defaults to `refuse`: ambient loader values fail
+with `invalid_environment` before any command. `neutralize` removes or empties
+them before `Popen` starts a child. The alternate fixture closes inherited and
+module-level updates and sets explicit path and locale. Both policies test every
+ambient loader key. Target records retain that locale and exclude secrets;
+neutralized empty values are accepted. Document the effective policy and any
+separate target inheritance in the product locator.
 
-`Contract.faults` declares a `NativeFault` independently for
-`exit_after_effect`, `exit124` and `reject` in `FaultInterpretation`. The
-first two default to `reconcile`, with no error or pending code. Rejection
-defaults to `proven_refusal` with `refused` and no pending code. A missing
-pending code requires a converged repeat after an observed complete effect.
-The alternate configuration retains `validation_failed` after an observed
-effect and treats a generic rejection as unknown. It persists a pending
-marker and refuses a new invocation with `unsettled_write`, without another
-write. Set `NativeFault.result` to `retain_effect` for a retained failure
-after an observed effect, or `uncertain` for a generic rejection. Its
-`error_code` declares the stable native failure; `pending_code` declares a
-refused repeat when a durable marker remains. Incompatible result/effect
-declarations fail during collection.
+`Contract.faults` uses `FaultInterpretation` with an independent `NativeFault`
+for `exit_after_effect`, `exit124` and `reject`. The first two default to
+`reconcile` without error or pending codes; rejection defaults to
+`proven_refusal` with `refused` and no pending code. Without a pending code, an
+observed complete effect requires a converged repeat.
 
-Every native fault still dispatches at most once, preserves redaction and
-derives its changed or unknown outcome from observed evidence. Only a
-protocol-proven pre-effect refusal reports unchanged after a native
-rejection. Status 124 alone never proves expiry. Real deadline termination
-and transport nondispatch remain mandatory. A declared pending repeat must
-fail unchanged with its stable code and preserve storage and the single
-write count.
+The alternate configuration retains `validation_failed` after observed effects
+and treats generic rejection as unknown. Its durable pending marker refuses
+repeats with `unsettled_write` and no further write. `NativeFault.result` is
+`retain_effect` for retained failure after an observed effect, or `uncertain`
+for generic rejection. `error_code` names the stable native failure;
+`pending_code` names refusal while the marker remains. Incompatible
+result/effect declarations fail during collection.
 
-Export `CONFIGURATIONS` as a tuple of complete subject inventories. The
-example includes its default `SUBJECTS` and a second executable
-configuration. A product registers the configurations its own interface
-supports; each one runs every applicable case.
+Native faults dispatch at most once, preserve redaction and derive changed or
+unknown outcomes from observed evidence. Only protocol-proven pre-effect refusal
+reports unchanged after native rejection. Status 124 alone cannot prove expiry;
+real deadline termination and transport nondispatch remain mandatory. A declared
+pending repeat fails unchanged with its stable code, preserved storage and the
+same single-write count.
 
-Each writer factory declares `expected` and `literal_expected` as class
-variables typed `ClassVar[Expectations | None]`. Writers require concrete
-`Expectations` instances. Their `managed` field holds exact values after the
-write; `projection` holds the complete public result, `diff` the
-before/after objects, and `changed_fields` the sorted public field names.
-The default fixture declares its flat values explicitly. Its fieldwise
-declaration also supplies the exact `partial` managed state; atomic writers
-leave `partial` unset. Malformed expectations or a granularity mismatch fail
-during collection. Observational factories may leave both expectations
-unset.
+`CONFIGURATIONS` exports a tuple of complete subject inventories: the example's
+default `SUBJECTS` and its second executable configuration. Register the
+configurations the product supports; each runs every applicable case.
 
-The second fixture configuration accepts a nested `settings` declaration and
-publishes each value with its recorded origin. Its expected stored state
-includes the native origin map; its projection and diff retain nested
-`value` and `source` objects. Prediction, normal writes, readback faults,
-timeouts and literal values all use the declared expectations. Storage
-comparisons preserve every unrelated row and undeclared value. Input
-dictionaries and public field names may have different shapes. The adapter's
-`literal` input permits nested values.
+Writer factories declare `expected` and `literal_expected` as
+`ClassVar[Expectations | None]`, with concrete `Expectations`: `managed` holds
+exact post-write values, `projection` the complete public result, `diff` the
+before/after objects and `changed_fields` sorted public field names. The default
+fixture declares flat values. Fieldwise writers also declare exact `partial`
+managed state; atomic writers leave it unset. Malformed expectations and
+granularity mismatches fail collection. Observational factories may leave both
+expectations unset.
+
+The second configuration accepts nested `settings` and publishes values with
+their recorded origins. Expected storage includes the native origin map;
+projection and diff retain nested `value` and `source` objects. Prediction,
+normal writes, readback faults, timeouts and literals all use those
+expectations. Storage comparisons preserve unrelated rows and undeclared values.
+Input and public field shapes may differ; the adapter's `literal` input accepts
+nested values.
 
 A multi-step subject belongs to a product operation that actually has
 several steps; independent fields in one command do not declare such an
@@ -268,15 +260,13 @@ versioned CLI reference supplies a useful inventory; keep its output under
 
 ## Troubleshooting<a id="troubleshooting"></a>
 
-Nox removes only the unchanged short-path directory its own invocation
-created. A killed invocation can leave that directory behind. To recover
-one orphan, identify its exact path and read its `owner.json`, which records
-the creator's host, PID and creation time, plus the directory's device and
-inode. Establish that the recorded invocation has ended; a PID may have been
-reused. Verify the directory still has the recorded identity and inspect its
-contents and link targets. Remove only that verified directory, leaving the
-link targets intact. If the path is a symlink, has been replaced, or its
-creator cannot be established, leave it for investigation.
+To recover a short-path directory left by a killed Nox invocation, read its
+`owner.json` at the exact path. It records the creator's host, PID and creation
+time and the directory's device and inode. Confirm the invocation ended,
+allowing for PID reuse, and verify the directory's identity, contents and link
+targets. Remove only that directory; keep the link targets. Leave symlinked or
+replaced paths and uncertain creators for investigation. Nox itself removes only
+the unchanged directory its invocation created.
 
 ## Engine fields<a id="engine-fields"></a>
 

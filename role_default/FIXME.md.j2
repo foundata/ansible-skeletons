@@ -5,10 +5,10 @@ SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' 
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
-A (maybe incomplete but hopefully useful) list of things to do after creating a
 {# skeleton-variant: deployment-checklist-1 #}
-new role based on the skeleton, especially before releasing anything:
+After creating the role, complete this checklist before a release. It may
 {# end skeleton-variant #}
+not cover every product requirement.
 
 1. **Check licensing information and metadata**
    - [`REUSE.toml`](./REUSE.toml) → Especially `SPDX-PackageDownloadLocation`,
@@ -28,10 +28,9 @@ new role based on the skeleton, especially before releasing anything:
      section, list any prerequisites that may not be covered by Ansible itself,
      e.g.:
      - DNS names to configure, firewall ports to open
-     - [SELinux](https://en.wikipedia.org/wiki/Security-Enhanced_Linux)
-       - has to be disabled.
-       - is supported in "Permissive" mode only.
-       - is supported in "Enforcing" as well as in "Permissive" mode.
+     - [SELinux](https://en.wikipedia.org/wiki/Security-Enhanced_Linux): whether
+       it must be disabled, supports only Permissive mode, or supports both
+       Enforcing and Permissive modes.
    - In [`requirements.txt`](./requirements.txt): Additionally needed Python
      packages (if any). Keep the file with a comment when none are needed.
 
@@ -52,17 +51,16 @@ new role based on the skeleton, especially before releasing anything:
 {# skeleton-variant: deployment-checklist-7 #}
    - In the "[`README.md`: Compatibility](./README.md#compatibility)" section:
 {# end skeleton-variant #}
-     - Maybe you want to mention the main platform/first-class citizens.
-     - Or if things were tested on container/VM/bare metal
+     - Consider documenting the primary platform and whether tests ran in
+       containers, virtual machines or on bare metal.
 {# skeleton-variant: deployment-checklist-8 #}
    - [`vars/main.yml`](./vars/main.yml) →
      `__{{ role_name }}_supported_platforms:`
 {# end skeleton-variant #}
-     - Sadly,
-       [there is no complete list of platforms anymore](https://github.com/foundata/ansible-skeletons/issues/4).
-       But the
-       [module_utils source code](https://github.com/ansible/ansible/blob/devel/lib/ansible/module_utils/facts/system/distribution.py)
-       might give you some hints.
+     - [No complete platform list exists](https://github.com/foundata/ansible-skeletons/issues/4);
+       consult the
+       [distribution facts source](https://github.com/ansible/ansible/blob/devel/lib/ansible/module_utils/facts/system/distribution.py)
+       for hints.
 
 {# skeleton-variant: deployment-checklist-9 #}
 5. **Search for FIXME** in all files (e.g., via `grep "FIXME" -r ./`).
