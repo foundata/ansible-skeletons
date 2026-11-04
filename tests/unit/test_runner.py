@@ -522,8 +522,45 @@ def test_sources_changed_during_a_run_cannot_be_resumed(
     )
     monkeypatch.setattr(check_module, "required_checks", lambda **_options: ["a"])
     output = tmp_path / "o"
-    check_module.check(output, jobs=1)
+    with pytest.raises(GateError, match="sources changed while this check ran"):
+        check_module.check(output, jobs=1)
     assert json.loads((output / "run.json").read_text())["source"] is None
+    assert not (output / "checks.json").exists()
+
+
+@pytest.mark.usefixtures("unbudgeted")
+def test_a_failed_run_whose_sources_changed_reports_the_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    def fail(_context: Context) -> None:
+        raise GateError("broken")
+
+    digests = iter(["before", "after"])
+    monkeypatch.setattr(check_module, "source_digest", lambda: next(digests))
+    monkeypatch.setattr(check_module, "plan", plan_of([Step("a", fail, check="a")]))
+    with pytest.raises(GateError, match="Failed: a"):
+        check_module.check(tmp_path / "o", jobs=1)
+    assert "sources changed while this check ran" in capsys.readouterr().err
+
+
+@pytest.mark.usefixtures("unbudgeted")
+def test_a_changed_only_run_may_see_the_sources_change(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """--changed serves editing and writes no report, so it only warns."""
+    digests = iter(["before", "after"])
+    steps = [Step("a", recorder([], "a"), check="collection_modules_rest")]
+    monkeypatch.setattr(check_module, "source_digest", lambda: next(digests))
+    monkeypatch.setattr(check_module, "plan", plan_of(steps))
+    monkeypatch.setattr(
+        check_module, "changed_paths", lambda: ["collection_modules_rest/galaxy.yml.j2"]
+    )
+    check_module.check(tmp_path / "o", jobs=1, changed=True)
+    assert "sources changed while this check ran" in capsys.readouterr().err
 
 
 def test_source_digest_follows_content_mode_and_untracked_files(

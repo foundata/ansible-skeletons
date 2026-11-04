@@ -263,6 +263,10 @@ interrupted ansible-test left in a module render's own Podman store are
 removed first. A resumed run that passes prunes its output like any passing
 run, and a pruned output cannot be resumed.
 
+A quick or matrix run fails when the sources change while it runs: its steps
+did not all test the same files, so no result stands for the current tree.
+`--changed` only warns, because it serves editing and writes no report.
+
 A command that exceeds its timeout stops with everything it started: SIGTERM
 first, then SIGKILL for what is left 15 seconds later. An infrastructure tier
 gets 15 minutes, because it destroys its VMs and containers before it exits.

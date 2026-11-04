@@ -592,6 +592,11 @@ def remove_earlier(path: Path, output: Path, log: TextIO) -> None:
     remove_tree(path)
 
 
+SOURCES_MOVED = (
+    "The sources changed while this check ran, so its steps did not all test the "
+    "same files and no result stands for the current tree. Finish editing and run "
+    "the check again; --resume cannot continue this run."
+)
 # What a passed run keeps below its output: its identity, the step records and
 # logs, the JUnit results and the report. The report's collection archives stay
 # too; with the report, they are what the release helper reads.
@@ -951,6 +956,7 @@ def check(
             f"logs in {output / 'logs'}",
             flush=True,
         )
+        moved = False
         try:
             status = Runner(
                 output, steps, jobs=jobs, runtime=runtime, source=source
@@ -958,15 +964,18 @@ def check(
         finally:
             if source_digest() != source:
                 # Records no longer say which sources their steps checked.
+                moved = True
                 record["source"] = None
                 write_json(output / "run.json", record)
-                print(
-                    "warning: the sources changed during the run; it cannot be resumed",
-                    file=sys.stderr,
-                )
         failed = [name for name, outcome in status.items() if outcome == "failed"]
         if failed:
+            if moved:
+                print(f"warning: {SOURCES_MOVED}", file=sys.stderr)
             raise GateError(f"Failed: {', '.join(failed)}; logs in {output / 'logs'}")
+        if moved and not changed:
+            raise GateError(SOURCES_MOVED)
+        if moved:
+            print(f"warning: {SOURCES_MOVED}", file=sys.stderr)
         checks = completed_checks(steps, status)
         if changed:
             # A partial run never writes a passing report.
