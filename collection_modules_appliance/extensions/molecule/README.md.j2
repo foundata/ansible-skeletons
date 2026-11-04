@@ -217,10 +217,11 @@ Before the drill can run:
    refer to, to the credentials file:
    - `console`: `argv` runs commands in the appliance's root shell. The drill
      sends `{"label": "...", "commands": ["..."]}` on stdin, records the
-     required single JSON output line and requires exit status 0. Commands run
-     in a POSIX shell; an endpoint with another root shell, such as csh, uses
-     `/bin/sh`. It must accept up to 32 commands of up to 200 printable bytes
-     per request. Upload a helper first for steps exceeding those limits.
+     required single JSON output line and requires exit status 0. The endpoint
+     must run the commands in a POSIX shell; with another root shell, such as
+     csh, it runs them through `/bin/sh`. It must accept up to 32 commands of up
+     to 200 printable bytes per request. Upload a helper first for steps
+     exceeding those limits.
    - `dns`: `host` and `port` of a TCP DNS server that reaches the
      appliance's resolver over the management path, and the management
      `name`.

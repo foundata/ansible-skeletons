@@ -149,8 +149,8 @@ the same inventory and runs every applicable case with a fresh backend.
 changed and unchanged declared fields. `atomic` tests an indivisible write with
 failed readback, its complete stored effect and uncertain outcome. The fixture
 runs both through the same executable, using only `limit` for the atomic case.
-Synthetic lifecycle tests retain partial progress coverage.
-
+Either declaration keeps the complete effect, uncertainty and no-redispatch
+checks. Synthetic lifecycle tests retain partial progress coverage.
 {# end skeleton-variant #}
 
 {# skeleton-variant: loopback-setup #}
@@ -168,7 +168,7 @@ and zero dispatched writes. Fakes must cross that subprocess boundary.
 native `argv` elements and unsupported argument dictionaries in `refused`.
 Defaults accept a shell-shaped label and refuse an overlong one. The second
 configuration accepts `accepted` and refuses the shell-shaped string before any
-command in normal and check mode. Accepted values reach the executable
+command in normal and check mode. Accepted values must reach the executable
 literally.
 
 `test_transport.py` uses its own `transport_command.py` to prove raw argv and
@@ -180,20 +180,21 @@ literal-input obligations.
 {# end skeleton-variant #}
 
 {# skeleton-variant: product-rules #}
-`inject_host_identity()` changes the prepared execution identity; the fixture
-substitutes only the numeric host UID. Products whose locator derives identity
-internally use the same boundary. Public locator arguments stay valid. The case
-requires `host_identity`, unchanged outcome and storage, and no write.
+The adapter implements `inject_host_identity()` at its prepared execution
+boundary; the fixture substitutes only the numeric host UID. Products whose
+locator derives identity internally use the same boundary. Public locator
+arguments stay valid. The case requires `host_identity`, unchanged outcome and
+storage, and no write.
 Unsupported public locator shapes have separate mandatory product tests in
 `test_cli.py`.
 
-`Contract.environment_policy` defaults to `refuse`: ambient loader values fail
-with `invalid_environment` before any command. `neutralize` removes or empties
-them before `Popen` starts a child. The alternate fixture closes inherited and
-module-level updates and sets explicit path and locale. Both policies test every
-ambient loader key. Target records retain that locale and exclude secrets;
-neutralized empty values are accepted. Document the effective policy and any
-separate target inheritance in the product locator.
+`Contract.environment_policy` defaults to `refuse`: ambient loader values must
+fail with `invalid_environment` before any command. `neutralize` must remove or
+empty them before `Popen` starts a child. The alternate fixture closes inherited
+and module-level environment updates, then sets its explicit path and locale.
+Both policies test every ambient loader key. Target records must retain that
+locale and exclude secrets; neutralized empty values are accepted. Document the
+effective policy and any separate target inheritance in the product locator.
 
 `Contract.faults` uses `FaultInterpretation` with an independent `NativeFault`
 for `exit_after_effect`, `exit124` and `reject`. The first two default to
@@ -203,7 +204,7 @@ observed complete effect requires a converged repeat.
 
 The alternate configuration retains `validation_failed` after observed effects
 and treats generic rejection as unknown. Its durable pending marker refuses
-repeats with `unsettled_write` and no further write. `NativeFault.result` is
+repeats with `unsettled_write` and no further write. Set `NativeFault.result` to
 `retain_effect` for retained failure after an observed effect, or `uncertain`
 for generic rejection. `error_code` names the stable native failure;
 `pending_code` names refusal while the marker remains. Incompatible
@@ -213,12 +214,12 @@ Native faults dispatch at most once, preserve redaction and derive changed or
 unknown outcomes from observed evidence. Only protocol-proven pre-effect refusal
 reports unchanged after native rejection. Status 124 alone cannot prove expiry;
 real deadline termination and transport nondispatch remain mandatory. A declared
-pending repeat fails unchanged with its stable code, preserved storage and the
-same single-write count.
+pending repeat must fail unchanged with its stable code and preserve storage and
+the single write count.
 
-`CONFIGURATIONS` exports a tuple of complete subject inventories: the example's
-default `SUBJECTS` and its second executable configuration. Register the
-configurations the product supports; each runs every applicable case.
+Export `CONFIGURATIONS` as a tuple of complete subject inventories: the
+example's default `SUBJECTS` and its second executable configuration. Register
+the configurations the product supports; each runs every applicable case.
 
 Writer factories declare `expected` and `literal_expected` as
 `ClassVar[Expectations | None]`, with concrete `Expectations`: `managed` holds
