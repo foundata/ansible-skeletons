@@ -462,7 +462,7 @@ def shared_text(path: Path) -> str:
 # complete file. Bounds must match once; variant regions work as for SHARED_FILES.
 # Keep the existing whole-file comparisons, including their narrower protection.
 SHARED_PASSAGES = (
-    ("collections", "README.md.j2", r"^Collection dependencies", r"\n\n"),
+    ("collections", "README.md.j2", r"^See `dependencies` in", r"\n\n"),
     (
         "provisioning_skeletons",
         "extensions/molecule/README.md.j2",
