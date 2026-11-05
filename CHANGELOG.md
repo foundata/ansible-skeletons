@@ -21,6 +21,11 @@ and the project adheres to
   guides require for scripts. `validate-modules` still checks the interpreter
   line of modules.
 
+- All collection skeletons: `antsibull-nox.toml` states the lane rule. No
+  session sets `max_version`, so every series antsibull-nox knows runs as soon
+  as it knows it. An incompatible series goes into `except_versions` with its
+  reason.
+
 
 ## [4.0.0] - 2026-11-05
 

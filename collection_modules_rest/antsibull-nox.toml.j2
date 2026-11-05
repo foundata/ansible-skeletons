@@ -52,6 +52,8 @@ run_galaxy_importer = false
 
 # The ansible-lint session is defined in noxfile.py.
 
+# No max_version: test every series antsibull-nox knows, as soon as it knows
+# it. An incompatible series goes into except_versions with its reason.
 [sessions.ansible_test_sanity]
 include_devel = true
 # changelog: changelogs/fragments also holds the fragment template and the
@@ -79,8 +81,6 @@ yamllint_config_plugins_examples = ".yamllint"
 run_mypy = true
 mypy_config = ".mypy.ini"
 
-# max_version can omit the next series: antsibull-nox knows it before PyPI
-# publishes it and installs its lanes from the stable GitHub branch.
 [sessions.ansible_test_units]
 include_devel = true
 split_by_python_version = true

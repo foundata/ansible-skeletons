@@ -97,6 +97,22 @@ def test_release_gate_runs_unrestricted_sanity_for_every_series(profile: str) ->
 @pytest.mark.parametrize(
     "profile",
     [
+        "collection_default",
+        "collection_modules_appliance",
+        "collection_modules_rest",
+        "collection_modules_cli",
+    ],
+)
+def test_no_session_caps_the_ansible_core_series(profile: str) -> None:
+    with (ROOT / profile / "antsibull-nox.toml.j2").open("rb") as stream:
+        sessions = tomllib.load(stream)["sessions"]
+    capped = [name for name, values in sessions.items() if "max_version" in values]
+    assert capped == []
+
+
+@pytest.mark.parametrize(
+    "profile",
+    [
         "collection_modules_appliance",
         "collection_modules_rest",
         "collection_modules_cli",

@@ -41,6 +41,8 @@ run_galaxy_importer = true
 
 # The ansible-lint session is defined in noxfile.py.
 
+# No max_version: test every series antsibull-nox knows, as soon as it knows
+# it. An incompatible series goes into except_versions with its reason.
 [sessions.ansible_test_sanity]
 include_devel = true
 # changelog: changelogs/fragments also holds the fragment template and the
