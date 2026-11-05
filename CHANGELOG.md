@@ -14,7 +14,12 @@ and the project adheres to
 
 ## [Unreleased]
 
-- Nothing worth mentioning right now.
+### Changed
+
+- All collection skeletons: sanity skips the `shebang` test. Its fixed list
+  rejects `#!/usr/bin/env sh` and `#!/usr/bin/env python3`, which foundata's
+  guides require for scripts. `validate-modules` still checks the interpreter
+  line of modules.
 
 
 ## [4.0.0] - 2026-11-05

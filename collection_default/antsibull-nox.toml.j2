@@ -46,6 +46,7 @@ include_devel = true
 # changelog: changelogs/fragments also holds the fragment template and the
 # archive, which this test rejects. Use "antsibull-changelog lint" instead.
 # no-smart-quotes: the license text in LICENSES/ uses typographic quotes.
-skip_tests = ["changelog", "no-smart-quotes"]
+# shebang: its fixed list rejects portable lines such as "#!/usr/bin/env sh".
+skip_tests = ["changelog", "no-smart-quotes", "shebang"]
 
 # The molecule session is defined in noxfile.py.

@@ -88,7 +88,7 @@ def test_release_gate_runs_unrestricted_sanity_for_every_series(profile: str) ->
         config = tomllib.load(stream)
     sanity = config["sessions"]["ansible_test_sanity"]
     assert sanity == {
-        "skip_tests": ["changelog", "no-smart-quotes"],
+        "skip_tests": ["changelog", "no-smart-quotes", "shebang"],
         "include_devel": True,
     }
     assert config["collection"] == {"min_python_version": "ansible-test-config"}
