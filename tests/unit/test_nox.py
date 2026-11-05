@@ -6,6 +6,7 @@ import io
 import json
 import os
 import runpy
+import signal
 import sys
 import tarfile
 from collections.abc import Callable, Iterator
@@ -67,6 +68,8 @@ def noxfile(
     monkeypatch.chdir(tmp_path)
     # Loading shortens an inherited TMPDIR; keep the test process's own.
     monkeypatch.delenv("TMPDIR", raising=False)
+    # The handler a noxfile installs stays out of the test process.
+    monkeypatch.setattr("signal.signal", Mock())
     profile = getattr(request, "param", "collection_default")
     loaded = runpy.run_path(str(ROOT / profile / "noxfile.py.j2"))
     assert ["ansible-lint-foundata"] in installed_packages
@@ -226,6 +229,16 @@ def test_replaced_owned_path_is_left_alone(
     ],
     indirect=True,
 )
+def test_a_terminated_nox_still_runs_its_cleanup(
+    noxfile: dict[str, object],
+) -> None:
+    leave = cast(Callable[[int, object], None], noxfile["_leave"])
+    cast(Mock, signal.signal).assert_called_with(signal.SIGTERM, leave)
+    with pytest.raises(SystemExit) as stopped:
+        leave(signal.SIGTERM, None)
+    assert stopped.value.code == 143
+
+
 def test_concurrent_invocations_with_same_pid_own_distinct_paths(
     noxfile: dict[str, object], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -22,6 +22,7 @@ import atexit
 import json
 import os
 import shutil
+import signal
 import socket
 import sys
 import tempfile
@@ -58,6 +59,14 @@ nox.options.default_venv_backend = "uv|virtualenv"
 TMPDIR_LIMIT = 64
 """Longest TMPDIR that leaves room for the socket names below it."""
 _SHORT: list[tuple[Path, int, int]] = []
+
+
+def _leave(_signal: int, _frame: object) -> None:
+    """Turn SIGTERM into an exit, so that the exit handlers still run."""
+    sys.exit(143)
+
+
+signal.signal(signal.SIGTERM, _leave)
 
 
 def _cleanup_short() -> None:
