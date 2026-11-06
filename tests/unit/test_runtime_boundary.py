@@ -207,7 +207,9 @@ def test_real_import_probe_detects_a_removed_runtime_dependency(
         assert "Imported 1 Python files" in result.stdout
 
 
-@pytest.mark.parametrize("case", ["pass", "namespace", "skipped", "missing-file"])
+@pytest.mark.parametrize(
+    "case", ["pass", "namespace", "skipped", "missing-file", "plugin-free"]
+)
 def test_unit_runner_requires_executed_runtime_tests(
     tmp_path: Path, checker: dict[str, Any], case: str
 ) -> None:
@@ -227,6 +229,9 @@ def test_unit_runner_requires_executed_runtime_tests(
     tests.mkdir(parents=True)
     if case == "namespace":
         code = "import ansible_collections.test.subject\ndef test_ok(): pass\n"
+    elif case == "plugin-free":
+        shutil.rmtree(subject / "plugins")
+        code = "def test_role_files(): pass\n"
     else:
         code = "from ansible_collections.test.subject.plugins.module_utils import example\n"
         if case == "skipped":
@@ -255,7 +260,8 @@ def test_unit_runner_requires_executed_runtime_tests(
         text=True,
         capture_output=True,
     )
-    assert (result.returncode == 0) is (case == "pass"), result.stdout + result.stderr
+    passes = case in {"pass", "plugin-free"}
+    assert (result.returncode == 0) is passes, result.stdout + result.stderr
     if case == "namespace":
         assert "Unit tests imported no code" in result.stderr
     elif case == "skipped":

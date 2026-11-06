@@ -14,7 +14,11 @@ and the project adheres to
 
 ## [Unreleased]
 
-- Nothing worth mentioning right now.
+### Fixed
+
+- All collection skeletons: `runtime-check` accepts unit tests of a collection
+  without plugin Python, which have no collection code to import. A collection
+  with plugins must still import its code from the stripped artifact.
 
 
 ## [4.1.0] - 2026-11-06

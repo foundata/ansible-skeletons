@@ -174,7 +174,8 @@ def unit_tests(collection: Path, fqcn: str, harness: Path) -> None:
     )
     if result:
         raise RuntimeError(f"Installed-artifact unit tests failed: {result}")
-    if not check_origins(collection, fqcn):
+    imported = check_origins(collection, fqcn)
+    if not imported and any((collection / "plugins").rglob("*.py")):
         raise ValueError("Unit tests imported no code from the stripped artifact")
     suites = list(ET.parse(report).getroot().iter("testsuite"))
     if sum(int(s.get("tests", "0")) - int(s.get("skipped", "0")) for s in suites) <= 0:
