@@ -14,6 +14,11 @@ and the project adheres to
 
 ## [Unreleased]
 
+- Nothing worth mentioning right now.
+
+
+## [4.1.1] - 2026-11-06
+
 ### Fixed
 
 - All collection skeletons: `runtime-check` accepts unit tests of a collection
@@ -752,7 +757,8 @@ and the project adheres to
 - All functionality and files, `role_default`
 
 
-[unreleased]: https://github.com/foundata/ansible-skeletons/compare/v4.1.0...HEAD
+[unreleased]: https://github.com/foundata/ansible-skeletons/compare/v4.1.1...HEAD
+[4.1.1]: https://github.com/foundata/ansible-skeletons/releases/tag/v4.1.1
 [4.1.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v4.1.0
 [4.0.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v4.0.0
 [3.1.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v3.1.0
