@@ -14,6 +14,11 @@ and the project adheres to
 
 ## [Unreleased]
 
+### Changed
+
+- Checks: the appliance skeleton's Molecule scenario runs in the quick check,
+  like those of the REST and CLI skeletons.
+
 ### Fixed
 
 - Release gate: `kill` stops the check and its steps, and the gate continues

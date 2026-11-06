@@ -1075,9 +1075,7 @@ def module_identity(
         require_executed(logged, sessions)
     if index == 0:
         check_short_tmpdir(rendered)
-    if index == 0 and (
-        full or profile in ("collection_modules_rest", "collection_modules_cli")
-    ):
+    if index == 0:
         molecule_with_fake(rendered)
     build_collection(rendered)
     exercise_modules(rendered)
