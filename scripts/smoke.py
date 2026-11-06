@@ -1375,6 +1375,19 @@ def check_molecule_contract(rendered: Rendered) -> None:
             raise GateError("Domain template lost platform settings")
 
 
+def consumer_smoke(output: Path) -> None:
+    """Render, build and install each collection skeleton, as a consumer does.
+
+    It proves that a public clone works. Everything else about the same commit
+    is the release gate's: this needs no container and no Galaxy.
+    """
+    output.mkdir(parents=True, exist_ok=False)
+    for profile in ("collection_default", *MODULE_PROFILES):
+        build_collection(
+            render(output / profile, metadata=example_metadata(), profile=profile)
+        )
+
+
 def smoke(output: Path, *, lint: bool = False, collections: Path | None = None) -> None:
     """Run a complete rendering and consumer smoke test in the current lane."""
     output.mkdir(parents=True, exist_ok=False)
@@ -1665,6 +1678,11 @@ def main() -> int:
     )
     parser.add_argument("--ansible-tests", action="store_true")
     parser.add_argument(
+        "--consumer",
+        action="store_true",
+        help="Only render, build and install each collection skeleton",
+    )
+    parser.add_argument(
         "--collections",
         type=Path,
         help="The run's downloads of the pinned Galaxy collections",
@@ -1677,7 +1695,9 @@ def main() -> int:
     )
     args = parser.parse_args()
     try:
-        if args.profile in MODULE_PROFILES:
+        if args.consumer:
+            consumer_smoke(args.output.resolve())
+        elif args.profile in MODULE_PROFILES:
             module_smoke(
                 args.output.resolve(),
                 utils_source=args.utils_source.resolve() if args.utils_source else None,

@@ -462,3 +462,39 @@ def test_an_interrupted_gate_says_how_to_continue(
     assert release.main() == 130
     assert "--resume" in capsys.readouterr().err
 
+
+@pytest.fixture
+def published(monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
+    """A report that validates; returns the commands verification runs."""
+    commands: list[list[str]] = []
+    monkeypatch.setattr(
+        release,
+        "validate_report",
+        lambda *_a, **_k: {"version": "1.2.3", "revision": "abc"},
+    )
+    monkeypatch.setattr(release, "releasing", lambda *_a, **_k: None)
+    monkeypatch.setattr(release, "git", lambda *_a, **_k: "abc")
+    monkeypatch.setattr(
+        release, "run", lambda command, **_options: commands.append(list(command))
+    )
+    return commands
+
+
+def test_verification_builds_the_public_clone_and_repeats_no_gate_step(
+    published: list[list[str]], tmp_path: Path
+) -> None:
+    release.verify_publication(tmp_path / "report.json")
+    clone, consumer = published
+    assert clone[:2] == ["git", "clone"]
+    assert "--consumer" in consumer
+    assert "--profile" not in consumer
+    assert "--ansible-tests" not in consumer
+
+
+def test_verification_refuses_a_clone_of_another_commit(
+    published: list[list[str]], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(release, "git", lambda *_a, **_k: "other")
+    with pytest.raises(GateError, match="different release revision"):
+        release.verify_publication(tmp_path / "report.json")
+    assert len(published) == 1

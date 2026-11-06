@@ -27,6 +27,7 @@ from scripts.smoke import (
     check_fix_stability,
     check_nox_gate,
     check_tree,
+    consumer_smoke,
     default_sessions,
     identity_sessions,
     install_scenario_collections,
@@ -966,6 +967,18 @@ def test_an_interrupted_identity_removes_its_containers_and_runtime_directory(
     assert removed == [output / IDENTITIES[1][1]]
     assert runtimes[0].parent == runtime_base
     assert not runtimes[0].exists()
+
+
+def test_the_consumer_smoke_builds_every_collection_skeleton(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    built: list[str] = []
+    monkeypatch.setattr(
+        "scripts.smoke.render", lambda _output, *, profile, **_options: profile
+    )
+    monkeypatch.setattr("scripts.smoke.build_collection", built.append)
+    consumer_smoke(tmp_path / "consumer")
+    assert built == ["collection_default", *MODULE_PROFILES]
 
 
 def test_module_render_keeps_its_podman_run_state_to_itself(tmp_path: Path) -> None:

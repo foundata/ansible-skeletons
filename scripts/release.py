@@ -26,7 +26,6 @@ from scripts.common import (
     uv_command,
     write_json,
 )
-from scripts.render import MODULE_PROFILES
 
 REPOSITORY = "foundata/ansible-skeletons"
 VERSION = re.compile(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)")
@@ -391,7 +390,11 @@ def create_tag(path: Path, root: Path = ROOT) -> None:
 
 
 def verify_publication(path: Path, root: Path = ROOT) -> None:
-    """Check the remote tag, forge release and fresh clone's consumer workflow."""
+    """Check the remote tag, forge release and what a public clone delivers.
+
+    The clone's HEAD proves it holds the commit the gate tested, so only what
+    the gate cannot show runs here: that a consumer of the clone gets a build.
+    """
     report = validate_report(path, root, tagged=True)
     version, revision = str(report["version"]), str(report["revision"])
     # The remote must hold the release tag and the forge must report it as its
@@ -422,27 +425,13 @@ def verify_publication(path: Path, root: Path = ROOT) -> None:
                 "python",
                 "-m",
                 "scripts.smoke",
+                "--consumer",
                 "--output",
-                str(Path(temporary) / "smoke"),
+                str(Path(temporary) / "consumer"),
             ),
             cwd=source,
             timeout=1800,
         )
-        for profile in MODULE_PROFILES:
-            run(
-                uv_command(
-                    default_lane(),
-                    "python",
-                    "-m",
-                    "scripts.smoke",
-                    "--profile",
-                    profile,
-                    "--output",
-                    str(Path(temporary) / profile),
-                ),
-                cwd=source,
-                timeout=1800,
-            )
     print(f"Published v{version} verified")
 
 

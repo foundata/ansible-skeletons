@@ -16,6 +16,11 @@ and the project adheres to
 
 ### Changed
 
+- Release verification checks the remote tag, the forge and that a public clone
+  holds the commit the gate tested, then renders, builds and installs each
+  collection skeleton from it. It no longer repeats the gate's tests on the same
+  commit, so it needs no Galaxy and takes less time.
+
 - Checks: the appliance skeleton's Molecule scenario runs in the quick check,
   like those of the REST and CLI skeletons.
 
