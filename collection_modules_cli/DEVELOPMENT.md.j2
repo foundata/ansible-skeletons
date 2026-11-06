@@ -51,17 +51,19 @@ Among the default sessions:
 
 {# skeleton-variant: deployment-lint #}
 {# end skeleton-variant #}
+{# skeleton-variant: helper-scope #}
 - `helper-lint` checks the Python outside `plugins/` with
-{# skeleton-variant: helper-role-path #}
   [ruff.toml](./ruff.toml): `extensions/molecule/`, any role's `files/`,
-{# end skeleton-variant #}
   `tools/`, `scripts/` and `tests/` apart from `tests/unit/`,
   `tests/integration/` and `tests/output/`. Add it to CI configurations that
   list sessions explicitly.
+{# end skeleton-variant #}
 
+{# skeleton-variant: pytest-runner #}
 Put the collection's own pytest suites below `tests/unit/` so ansible-test
 runs them. Other Python below `tests/` is linted by `helper-lint` but is not
 run as a test suite.
+{# end skeleton-variant #}
 
 Session definitions: [noxfile.py](./noxfile.py).
 Built-in session settings: [antsibull-nox.toml](./antsibull-nox.toml).

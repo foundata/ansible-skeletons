@@ -544,7 +544,8 @@ def test_shared_document_passages_are_identical(
         "check-commands",
         "runtime-scope",
         "deployment-lint",
-        "helper-role-path",
+        "helper-scope",
+        "pytest-runner",
         "check-iteration",
         "release-qualification",
     ),
@@ -1242,20 +1243,43 @@ def helper_project(
     return profile
 
 
-def test_helper_sessions_are_identical() -> None:
+def test_helper_sessions_differ_only_in_their_scope() -> None:
     functions = []
     for profile in SKELETON_GROUPS["collections"]:
         tree = ast.parse((ROOT / profile / "noxfile.py.j2").read_text(encoding="utf-8"))
-        functions.append(
-            ast.dump(
-                next(
-                    node
-                    for node in tree.body
-                    if isinstance(node, ast.FunctionDef) and node.name == "helper_lint"
-                )
-            )
+        function = next(
+            node
+            for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "helper_lint"
         )
+        function.body = [
+            node
+            for node in function.body
+            if not (
+                isinstance(node, ast.Assign)
+                and ast.unparse(node.targets[0]) == "candidates"
+            )
+        ]
+        functions.append(ast.dump(function))
     assert len(set(functions)) == 1
+
+
+def test_helper_session_covers_what_no_lint_session_covers(
+    helper_project: str, tmp_path: Path
+) -> None:
+    with (ROOT / helper_project / "antsibull-nox.toml.j2").open("rb") as stream:
+        has_lint_session = "lint" in tomllib.load(stream)["sessions"]
+    for name in (
+        "plugins/filter/example.py",
+        "tests/unit/test_product.py",
+        "tests/integration/targets/example/files/helper.py",
+    ):
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("print(missing_name)\n", encoding="utf-8")
+    expected = HelperSkip if has_lint_session else subprocess.CalledProcessError
+    with pytest.raises(expected):
+        load_helper_session(helper_project, check_only=True)(HelperSession())
 
 
 def test_helper_session_covers_all_roots_without_executing_files(
@@ -1325,7 +1349,7 @@ def test_helper_session_respects_exclusions_and_python_only_scope(
         encoding="utf-8",
     )
     (tmp_path / ".gitignore").write_text("tools/ignored.py\n", encoding="utf-8")
-    for name in (
+    names = [
         "tools/ignored.py",
         "tools/vendor/invalid.py",
         "tools/.venv/invalid.py",
@@ -1333,10 +1357,14 @@ def test_helper_session_respects_exclusions_and_python_only_scope(
         "tools/notebook.ipynb",
         "tools/script.rb",
         "tests/config.yml",
-        "tests/unit/test_product.py",
-        "tests/integration/targets/example/files/helper.py",
         "tests/output/temporary.py",
-    ):
+    ]
+    if helper_project != "collection_default":
+        names += [
+            "tests/unit/test_product.py",
+            "tests/integration/targets/example/files/helper.py",
+        ]
+    for name in names:
         path = tmp_path / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("invalid python !\n", encoding="utf-8")

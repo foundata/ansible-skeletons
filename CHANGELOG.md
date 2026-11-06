@@ -20,6 +20,10 @@ and the project adheres to
   without plugin Python, which have no collection code to import. A collection
   with plugins must still import its code from the stripped artifact.
 
+- collection_default: `helper-lint` covers `plugins/`, `tests/unit/` and
+  `tests/integration/`, because this variant has no lint session that does. The
+  development guide names `runtime-check` as the runner of pytest suites.
+
 
 ## [4.1.0] - 2026-11-06
 

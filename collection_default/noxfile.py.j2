@@ -251,15 +251,16 @@ def helper_lint(session: nox.Session) -> None:
     """Ruff for Python helpers; fix imports and format unless CI=true."""
     if session.posargs:
         session.error("helper-lint has a fixed scope and accepts no arguments")
+    # This variant has no antsibull-nox lint session, so all Python is covered here.
     candidates = [
+        Path("plugins"),
         Path("extensions/molecule"),
         Path("tools"),
         Path("scripts"),
         *sorted(
             path
             for path in Path("tests").glob("*")
-            if path.name not in {"unit", "integration", "output"}
-            and (path.is_dir() or path.suffix == ".py")
+            if path.name != "output" and (path.is_dir() or path.suffix == ".py")
         ),
         *sorted(Path("roles").glob("*/files")),
     ]
