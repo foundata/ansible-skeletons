@@ -766,6 +766,136 @@ def test_a_rerun_leaves_a_store_alone_whose_run_root_is_gone(
     assert not (output / "runtime/sk-gone").exists()
 
 
+def tier_with_store(output: Path, run_root: Path) -> Path:
+    tier = output / "integration-podman"
+    store = tier / "podman"
+    store.mkdir(parents=True)
+    (store / "storage.conf").write_text(
+        f'[storage]\nrunroot = "{run_root}"\n', encoding="utf-8"
+    )
+    return tier
+
+
+def test_a_rerun_resets_a_killed_tiers_private_store(
+    output: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    state = output / "runtime/r"
+    (state / "run").mkdir(parents=True)
+    tier = tier_with_store(output, state / "run")
+    calls: list[list[str]] = []
+    envs: list[dict[str, str]] = []
+    checked: list[tuple[Path, Path]] = []
+
+    def check(path: Path, runtime: Path, env: dict[str, str]) -> None:
+        checked.append((path, runtime))
+        envs.append(env)
+
+    def record(command: list[str], **_options: Any) -> str:
+        calls.append(command)
+        return ""
+
+    monkeypatch.setattr("scripts.integration.check_podman_paths", check)
+    monkeypatch.setattr("scripts.integration.run", record)
+    monkeypatch.setenv("CONTAINERS_STORAGE_CONF", "/user/storage.conf")
+    remove_earlier(tier, output.resolve(), io.StringIO())
+    assert checked == [(tier, state.parent)]
+    assert calls == [["podman", "--remote=false", "system", "reset", "--force"]]
+    env = envs[0]
+    assert env["XDG_RUNTIME_DIR"] == str(state)
+    assert env["CONTAINERS_STORAGE_CONF"] == str(tier / "podman/storage.conf")
+    assert not tier.exists()
+
+
+def test_a_killed_tiers_store_stays_when_its_paths_are_not_private(
+    output: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A reset with a shared runtime directory reaches the user's own store.
+    state = output / "runtime/r"
+    (state / "run").mkdir(parents=True)
+    tier = tier_with_store(output, state / "run")
+
+    def refuse(*_arguments: object) -> None:
+        raise GateError("Podman runtime path is outside this run")
+
+    def fail(*_arguments: object, **_options: object) -> str:
+        raise AssertionError("no reset without the path check")
+
+    monkeypatch.setattr("scripts.integration.check_podman_paths", refuse)
+    monkeypatch.setattr("scripts.integration.run", fail)
+    with pytest.raises(GateError, match="outside this run"):
+        remove_earlier(tier, output.resolve(), io.StringIO())
+    assert tier.exists()
+
+
+def test_a_rerun_leaves_a_tier_store_alone_whose_run_state_is_gone(
+    output: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    tier = tier_with_store(output, output / "runtime/gone/r/run")
+
+    def fail(*_arguments: object, **_options: object) -> str:
+        raise AssertionError("Podman would create the run state again")
+
+    monkeypatch.setattr("scripts.integration.run", fail)
+    remove_earlier(tier, output.resolve(), io.StringIO())
+    assert not tier.exists()
+
+
+@pytest.fixture
+def cleared(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Record which paths the step cleanup reaches."""
+    seen: list[str] = []
+
+    def record(path: Path, _log: object = None) -> None:
+        seen.append(path.name)
+
+    monkeypatch.setattr("scripts.check.remove_render_containers", record)
+    monkeypatch.setattr("scripts.check.remove_tier_containers", record)
+    return seen
+
+
+def test_a_failed_step_removes_what_it_left_running(
+    output: Path, cleared: list[str]
+) -> None:
+    # The run removes its runtime directory at the end, and Podman reaches no
+    # container without its run state: neither --resume nor --remove could.
+    def fail(context: Context) -> None:
+        (context.output / "tier").mkdir()
+        raise GateError("killed")
+
+    steps = [Step("tier", fail, owns=("tier",))]
+    assert runner(output, steps, jobs=1).execute() == {"tier": "failed"}
+    assert cleared == ["tier", "tier"]
+
+
+def test_a_passed_step_leaves_its_stores_alone(
+    output: Path, cleared: list[str]
+) -> None:
+    def create(context: Context) -> None:
+        (context.output / "tier").mkdir()
+
+    steps = [Step("tier", create, owns=("tier",))]
+    assert runner(output, steps, jobs=1).execute() == {"tier": "passed"}
+    assert cleared == []
+
+
+def test_a_failing_cleanup_keeps_the_steps_own_failure(
+    output: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def refuse(_path: Path, _log: object = None) -> None:
+        raise GateError("cleanup refused")
+
+    def fail(context: Context) -> None:
+        (context.output / "tier").mkdir()
+        raise GateError("broken")
+
+    monkeypatch.setattr("scripts.check.remove_render_containers", refuse)
+    steps = [Step("tier", fail, owns=("tier",))]
+    assert runner(output, steps, jobs=1).execute() == {"tier": "failed"}
+    log = (output / "logs/tier.log").read_text(encoding="utf-8")
+    assert "broken" in log
+    assert "cleanup refused" in log
+
+
 def test_a_rerun_never_removes_containers_from_another_store(
     output: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -21,6 +21,11 @@ and the project adheres to
   evidence. Only the check gets the signal, because a second SIGTERM can end a
   tier's cleanup.
 
+- Checks: a failed or stopped step removes the containers it left running, and
+  `--resume` and `--remove` remove those of a killed check. Containers used to
+  outlive their run state, where nothing could reach them, and `--remove` then
+  deleted their Podman stores under them.
+
 
 ## [4.1.1] - 2026-11-06
 

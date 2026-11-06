@@ -13,6 +13,7 @@ import sys
 import tomllib
 import uuid
 from pathlib import Path
+from typing import TextIO
 
 import yaml
 
@@ -280,12 +281,49 @@ def check_podman_paths(output: Path, runtime: Path, env: dict[str, str]) -> None
             raise GateError(f"Podman selected another {label}")
 
 
-def reset_podman(output: Path, runtime: Path, env: dict[str, str]) -> None:
+def reset_podman(
+    output: Path, runtime: Path, env: dict[str, str], log: TextIO | None = None
+) -> None:
     """Recheck the effective paths immediately before destructive cleanup."""
     check_podman_paths(output, runtime, env)
     run(
-        ["podman", "--remote=false", "system", "reset", "--force"], env=env, timeout=180
+        ["podman", "--remote=false", "system", "reset", "--force"],
+        env=env,
+        timeout=180,
+        log=log,
     )
+
+
+def remove_tier_containers(tier: Path, log: TextIO | None = None) -> None:
+    """Remove what a tier killed outright left running in its own Podman store.
+
+    A stopped tier resets its store itself. A store whose run state is gone
+    has nothing running; calling Podman would only create that state again.
+    """
+    store = tier / "podman"
+    config = store / "storage.conf"
+    if not config.is_file():
+        return
+    run_root = tomllib.loads(config.read_text(encoding="utf-8")).get("storage", {})
+    run_root = run_root.get("runroot")
+    if not isinstance(run_root, str) or not Path(run_root).is_absolute():
+        raise GateError(f"The tier's Podman store names no absolute run root: {tier}")
+    state = Path(run_root).parent
+    if not state.exists():
+        return
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if not key.startswith("CONTAINER")
+    }
+    env.update(
+        CONTAINERS_STORAGE_CONF=str(config),
+        CONTAINERS_CONF=str(store / "containers.conf"),
+        XDG_CONFIG_HOME=str(store / "config"),
+        XDG_RUNTIME_DIR=str(state),
+        TMPDIR=str(store / "tmp"),
+    )
+    reset_podman(tier, state.parent, env, log)
 
 
 def lint_molecule(molecule: Path, rendered: Rendered) -> None:

@@ -56,6 +56,7 @@ from scripts.controller import (
     runtime_base,
     temporary_environment,
 )
+from scripts.integration import remove_tier_containers
 from scripts.render import MODULE_PROFILES
 from scripts.smoke import IDENTITIES, remove_render_containers
 
@@ -587,6 +588,7 @@ def remove_earlier(path: Path, output: Path, log: TextIO) -> None:
         path.unlink()
         return
     remove_render_containers(path, log)
+    remove_tier_containers(path, log)
     remove_recorded_vms(path, log)
     # Podman stores below a render hold files of subordinate users.
     remove_tree(path)
@@ -666,6 +668,15 @@ def written_here(path: Path, fields: frozenset[str], optional: frozenset[str]) -
     return isinstance(data, dict) and fields <= set(data) <= fields | optional
 
 
+def remove_left_containers(output: Path) -> None:
+    """Remove what a stopped run left running, before its stores go with it."""
+    for profile in MODULE_PROFILES:
+        for _namespace, name in IDENTITIES:
+            remove_render_containers(output / profile / name)
+    for backend in ("podman", "ee"):
+        remove_tier_containers(output / f"integration-{backend}")
+
+
 def remove_output(
     path: Path,
     as_root: Callable[[Sequence[Path]], None] = remove_in_user_namespace,
@@ -696,6 +707,7 @@ def remove_output(
         raise GateError(f"{path} holds no run.json of a check or release gate")
     for tier in (path, path / "checks"):
         remove_recorded_vms(tier / "integration-libvirt")
+        remove_left_containers(tier)
     remove_tree(path, as_root)
     print(f"Removed {path}")
 
@@ -759,6 +771,21 @@ class Runner:
         with self.lock:
             print(f"{time.strftime('%H:%M:%S')} {message}", flush=True)
 
+    def remove_left_containers(self, step: Step, log: TextIO) -> None:
+        """Remove what a failed or stopped step left running.
+
+        This run removes its runtime directory at the end, and Podman reaches
+        no container without its run state. A store's Podman calls fail alone:
+        the step's own failure stays the one that counts.
+        """
+        for pattern in step.owns:
+            for path in sorted(self.output.glob(pattern)):
+                try:
+                    remove_render_containers(path, log)
+                    remove_tier_containers(path, log)
+                except (GateError, OSError, ValueError) as exc:
+                    print(f"error: {exc}", file=log, flush=True)
+
     def run_step(self, step: Step) -> bool:
         """Run one step with its own log and TMPDIR; record its outcome."""
         log_path = self.output / "logs" / f"{step.name}.log"
@@ -788,6 +815,8 @@ class Runner:
                     traceback.print_exc(file=log)
                 print(f"error: {exc}", file=log, flush=True)
                 passed = False
+            if not passed:
+                self.remove_left_containers(step, log)
         seconds = time.monotonic() - began
         write_json(
             self.record(step),

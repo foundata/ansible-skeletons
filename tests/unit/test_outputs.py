@@ -186,6 +186,26 @@ def test_remove_deletes_release_evidence(tmp_path: Path) -> None:
     assert not evidence.exists()
 
 
+def test_remove_stops_what_a_stopped_run_left_before_its_stores_go(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A store removed under a running container leaves it running for good.
+    evidence = gate(tmp_path / "evidence")
+    seen: list[tuple[str, bool]] = []
+
+    def record(path: Path, _log: object = None) -> None:
+        seen.append((str(path.relative_to(evidence)), evidence.exists()))
+
+    monkeypatch.setattr("scripts.check.remove_render_containers", record)
+    monkeypatch.setattr("scripts.check.remove_tier_containers", record)
+    remove_output(evidence, unavailable)
+    assert not evidence.exists()
+    assert ("checks/collection_modules_rest/module_fixture", True) in seen
+    assert ("checks/collection_modules_appliance/module_fixture", True) in seen
+    assert ("checks/integration-podman", True) in seen
+    assert ("checks/integration-ee", True) in seen
+
+
 def test_remove_hands_containers_files_to_the_namespace(
     passed: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
