@@ -13,8 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts import check as check_module
-from scripts import release as release_module
+from scripts import common
 from scripts.common import (
     CLEANUP_GRACE,
     VM_RECORD,
@@ -23,6 +22,7 @@ from scripts.common import (
     remove_recorded_vms,
     run,
     run_process,
+    stop_on_signal,
     stop_processes,
     write_json,
 )
@@ -149,29 +149,62 @@ def test_ctrl_c_still_reaches_commands_through_the_terminals_group(
     wait_for(lambda: not alive(grandchild))
 
 
-def test_a_terminated_check_stops_its_steps_first(
+def test_a_stop_ends_what_runs_and_hears_no_second_stop(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     stopped: list[tuple[int, float]] = []
+    handlers: list[tuple[int, object]] = []
 
     def record(root: int, grace: float) -> None:
         stopped.append((root, grace))
 
-    monkeypatch.setattr(check_module, "stop_processes", record)
+    monkeypatch.setattr(common, "stop_processes", record)
+    monkeypatch.setattr(
+        "signal.signal", lambda number, handler: handlers.append((number, handler))
+    )
     with pytest.raises(KeyboardInterrupt):
-        check_module.stop_on_signal(signal.SIGTERM, None)
+        stop_on_signal(signal.SIGTERM, None)
     assert stopped == [(os.getpid(), CLEANUP_GRACE)]
+    assert handlers == [
+        (signal.SIGINT, signal.SIG_IGN),
+        (signal.SIGTERM, signal.SIG_IGN),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("module", "handler"),
+    [
+        ("scripts.check", "stop_on_signal"),
+        ("scripts.release", "stop_on_signal"),
+        ("scripts.integration", "leave"),
+    ],
+)
+def test_ctrl_c_and_sigterm_reach_each_commands_handler(
+    module: str, handler: str
+) -> None:
+    script = (
+        "import runpy, signal, sys\n"
+        "sys.argv = ['command', '--help']\n"
+        "try:\n"
+        f"    runpy.run_module({module!r}, run_name='__main__')\n"
+        "except SystemExit:\n"
+        "    pass\n"
+        "for number in signal.SIGINT, signal.SIGTERM:\n"
+        "    print(signal.getsignal(number).__name__)\n"
+    )
+    output = subprocess.run(
+        [sys.executable, "-c", script], check=True, capture_output=True, text=True
+    ).stdout
+    assert output.splitlines()[-2:] == [handler, handler]
 
 
 def test_a_stopped_tier_still_destroys_its_targets(tmp_path: Path) -> None:
     """The SIGTERM of a stop runs the tier's finally block, not a sudden death."""
     started, destroyed = tmp_path / "started", tmp_path / "destroyed"
     script = (
-        "import signal, sys\n"
-        "from pathlib import Path\n"
-        "from scripts.common import run\n"
+        "from scripts.common import handle_stops, run\n"
         "from scripts.integration import leave\n"
-        "signal.signal(signal.SIGTERM, leave)\n"
+        "handle_stops(leave)\n"
         "try:\n"
         f"    run(['sh', '-c', 'touch {started}; sleep 300'], timeout=120)\n"
         "finally:\n"
@@ -184,44 +217,38 @@ def test_a_stopped_tier_still_destroys_its_targets(tmp_path: Path) -> None:
     assert destroyed.is_file()
 
 
-def stopped_gate(directory: Path) -> list[str]:
+def stopped_gate(directory: Path, timeout: int = 120) -> list[str]:
     """A release gate over a check over a tier, each with its real handler.
 
-    The check's handler is late, as on a busy host, so a second SIGTERM would
-    reach the tier during its cleanup instead of before it.
+    The check's handler is late, as on a busy host, so its stop reaches the
+    tier during the cleanup instead of before it.
     """
     tier = (
-        "import signal, sys\n"
-        "from pathlib import Path\n"
-        "from scripts.common import run\n"
+        "from scripts.common import handle_stops, run\n"
         "from scripts.integration import leave\n"
-        "def count(number, frame):\n"
-        f"    with open({str(directory / 'signals')!r}, 'a') as stream:\n"
-        "        stream.write('x')\n"
-        "    leave(number, frame)\n"
-        "signal.signal(signal.SIGTERM, count)\n"
+        "handle_stops(leave)\n"
         "try:\n"
         f"    run(['sh', '-c', 'touch {directory / 'started'}; sleep 300'], timeout=120)\n"
         "finally:\n"
         f"    run(['sh', '-c', 'sleep 2; touch {directory / 'destroyed'}'], timeout=30)\n"
     )
     check = (
-        "import signal, sys, time\n"
-        "from scripts.check import stop_on_signal\n"
-        "from scripts.common import run\n"
+        "import sys, time\n"
+        "from scripts.common import handle_stops, run, stop_on_signal\n"
         "def late(number, frame):\n"
         "    time.sleep(0.6)\n"
         "    stop_on_signal(number, frame)\n"
-        "signal.signal(signal.SIGTERM, late)\n"
+        "handle_stops(late)\n"
         f"run([sys.executable, '-c', {tier!r}], timeout=120)\n"
     )
     gate = (
-        "import signal, sys\n"
-        "from scripts.common import run\n"
-        "from scripts.release import stop_on_signal\n"
-        "signal.signal(signal.SIGTERM, stop_on_signal)\n"
+        "import sys\n"
+        "from scripts.common import GateError, handle_stops, run, stop_on_signal\n"
+        "handle_stops(stop_on_signal)\n"
         "try:\n"
-        f"    run([sys.executable, '-c', {check!r}], timeout=120)\n"
+        f"    run([sys.executable, '-c', {check!r}], timeout={timeout}, grace=30)\n"
+        "except GateError:\n"
+        "    raise SystemExit(1)\n"
         "except KeyboardInterrupt:\n"
         "    raise SystemExit(130)\n"
     )
@@ -229,72 +256,41 @@ def stopped_gate(directory: Path) -> list[str]:
 
 
 def test_a_stopped_gate_lets_its_tier_finish_the_cleanup(tmp_path: Path) -> None:
-    """Stopping both the check and its steps would end the tier's cleanup."""
     process = subprocess.Popen(stopped_gate(tmp_path))
     wait_for((tmp_path / "started").is_file)
     process.terminate()
     assert process.wait(timeout=30) == 130
     assert (tmp_path / "destroyed").is_file()
-    assert (tmp_path / "signals").read_text(encoding="utf-8") == "x"
 
 
-def test_a_stopped_gate_stops_its_command_first(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    stopped: list[tuple[int, float, bool]] = []
-
-    def record(root: int, grace: float, *, delegate: bool) -> None:
-        stopped.append((root, grace, delegate))
-
-    handlers: list[tuple[int, object]] = []
-    monkeypatch.setattr(release_module, "stop_processes", record)
-    monkeypatch.setattr(
-        "signal.signal", lambda number, handler: handlers.append((number, handler))
-    )
-    with pytest.raises(KeyboardInterrupt):
-        release_module.stop_on_signal(signal.SIGTERM, None)
-    assert stopped == [(os.getpid(), CLEANUP_GRACE, True)]
-    # A second kill must not send the steps a second stop either.
-    assert handlers == [(signal.SIGTERM, signal.SIG_IGN)]
+def test_ctrl_c_on_a_gate_lets_its_tier_finish_the_cleanup(tmp_path: Path) -> None:
+    """The terminal signals the whole group, then each level stops its own."""
+    process = subprocess.Popen(stopped_gate(tmp_path), start_new_session=True)
+    wait_for((tmp_path / "started").is_file)
+    os.killpg(process.pid, signal.SIGINT)
+    assert process.wait(timeout=30) == 130
+    assert (tmp_path / "destroyed").is_file()
 
 
-def test_a_delegated_stop_reaches_what_a_child_leaves_behind_after_it(
+def test_a_gate_past_its_timeout_lets_its_tier_finish_the_cleanup(
     tmp_path: Path,
 ) -> None:
-    """A smoke test has no handler: it dies at once and leaves its commands."""
-    order, ready = tmp_path / "order", tmp_path / "ready"
-    grandchild = (
-        f"trap 'echo grandchild >> {order}; exit 0' TERM; "
-        f"touch {ready}; sleep 300 & wait"
-    )
-    child = (
-        "import signal, subprocess, sys, time\n"
-        "def finish(_number, _frame):\n"
-        "    time.sleep(0.5)\n"
-        f"    with open({str(order)!r}, 'a') as stream:\n"
-        "        stream.write('child\\n')\n"
-        "    raise SystemExit(0)\n"
-        "signal.signal(signal.SIGTERM, finish)\n"
-        f"subprocess.Popen(['sh', '-c', {grandchild!r}])\n"
-        "signal.pause()\n"
-    )
-    script = (
-        "import os, subprocess, sys, time\n"
-        "from pathlib import Path\n"
-        "from scripts.common import stop_processes\n"
-        f"process = subprocess.Popen([sys.executable, '-c', {child!r}])\n"
-        f"while not Path({str(ready)!r}).exists():\n"
-        "    time.sleep(0.05)\n"
-        "stop_processes(os.getpid(), 30, delegate=True)\n"
-    )
-    subprocess.run([sys.executable, "-c", script], check=True, timeout=60)
-    assert order.read_text(encoding="utf-8").split() == ["child", "grandchild"]
+    process = subprocess.Popen(stopped_gate(tmp_path, timeout=6))
+    assert process.wait(timeout=30) == 1
+    assert (tmp_path / "started").is_file()
+    assert (tmp_path / "destroyed").is_file()
 
 
-def test_leaving_on_a_signal_is_an_exit_with_its_status() -> None:
+@pytest.mark.parametrize(
+    ("number", "status"), [(signal.SIGINT, 130), (signal.SIGTERM, 143)]
+)
+def test_leaving_on_a_signal_is_an_exit_with_its_status(
+    number: signal.Signals, status: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("scripts.integration.ignore_stops", lambda: None)
     with pytest.raises(SystemExit) as stopped:
-        leave(signal.SIGTERM, None)
-    assert stopped.value.code == 143
+        leave(number, None)
+    assert stopped.value.code == status
 
 
 @pytest.fixture

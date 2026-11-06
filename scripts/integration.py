@@ -7,7 +7,6 @@ import json
 import os
 import re
 import shutil
-import signal
 import socket
 import sys
 import tomllib
@@ -21,6 +20,8 @@ from scripts.common import (
     ROOT,
     VM_RECORD,
     GateError,
+    handle_stops,
+    ignore_stops,
     require_tools,
     run,
     write_json,
@@ -494,11 +495,12 @@ def main() -> int:
     return 0
 
 
-def leave(_signal: int, _frame: object) -> None:
+def leave(number: int, _frame: object) -> None:
     """Turn a stop into an exit, so that the tier still destroys its targets."""
-    raise SystemExit(143)
+    ignore_stops()
+    raise SystemExit(128 + number)
 
 
 if __name__ == "__main__":
-    signal.signal(signal.SIGTERM, leave)
+    handle_stops(leave)
     raise SystemExit(main())

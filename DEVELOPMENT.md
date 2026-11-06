@@ -506,9 +506,10 @@ validated commit and rerun publication verification when complete.
   below `XDG_RUNTIME_DIR`, and a killed release gate its
   `ansible-skeletons-release-*` source below `TMPDIR`. Delete those yourself,
   with `podman unshare rm -rf`, because Podman's run state holds files of
-  subordinate users. `kill` stops a check or release gate cleanly. A command
-  past its timeout gets SIGTERM and, 15 seconds later, SIGKILL; an
-  infrastructure tier gets 15 minutes, because it destroys its VMs and
+  subordinate users. Ctrl-C and `kill` stop a check or release gate cleanly,
+  and it ignores any further stop while it cleans up, for up to 15 minutes. A
+  command past its timeout gets SIGTERM and, 15 seconds later, SIGKILL; an
+  infrastructure tier gets those 15 minutes, because it destroys its VMs and
   containers before it exits.
 - **A step failed:** its log is `logs/<step>.log` below the output, or
   `checks/logs/<step>.log` in release evidence. A failed run also keeps the

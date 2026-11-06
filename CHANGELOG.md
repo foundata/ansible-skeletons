@@ -31,8 +31,12 @@ and the project adheres to
 
 - Release gate: `kill` stops the check and its steps, and the gate continues
   with `--resume`. It used to die alone and leave them writing into its
-  evidence. Only the check gets the signal, because a second SIGTERM can end a
-  tier's cleanup.
+  evidence.
+
+- Release gate and checks: Ctrl-C, `kill` and a timeout let an infrastructure
+  tier finish its cleanup. A stop reaches a tier more than once, and the repeat
+  used to end the cleanup; Ctrl-C on the gate also killed the tier after 15
+  seconds.
 
 - Checks: a failed or stopped step removes the containers it left running, and
   `--resume` and `--remove` remove those of a killed check. Containers used to

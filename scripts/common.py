@@ -11,9 +11,10 @@ import signal
 import subprocess
 import time
 import tomllib
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from types import FrameType
 from typing import Any, TextIO
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -86,9 +87,7 @@ def processes() -> dict[int, tuple[int, str]]:
     return table
 
 
-def stop_processes(
-    root: int, grace: float = STOP_GRACE, *, delegate: bool = False
-) -> None:
+def stop_processes(root: int, grace: float = STOP_GRACE) -> None:
     """Stop a process and all it started, or all this process started.
 
     Everything running now gets SIGTERM and has ``grace`` seconds to clean up;
@@ -97,10 +96,6 @@ def stop_processes(
     in the terminal's group, where Ctrl-C reaches it directly, and nested
     commands need no signal forwarding. A process that detaches, such as a
     container's conmon, leaves the tree: its owner removes it.
-
-    With ``delegate``, the direct children stop what they started themselves,
-    so only they get the first SIGTERM: a second one can end a cleanup that the
-    first one started. What they leave behind gets its SIGTERM after them.
     """
     tracked: dict[int, str] = {}
 
@@ -117,8 +112,8 @@ def stop_processes(
                     tracked[pid] = started
                     pending.append(pid)
 
-    def send(number: signal.Signals, targets: Iterable[int] | None = None) -> None:
-        for pid in tracked if targets is None else targets:
+    def send(number: signal.Signals) -> None:
+        for pid in tracked:
             try:
                 os.kill(pid, number)
             except (ProcessLookupError, PermissionError):
@@ -128,18 +123,38 @@ def stop_processes(
     if root != os.getpid() and root in table:
         tracked[root] = table[root][1]
     survey()
-    deadline = time.monotonic() + grace
-    if delegate:
-        children = [pid for pid, (parent, _) in table.items() if parent == root]
-        send(signal.SIGTERM, children)
-        while tracked.keys() & set(children) and time.monotonic() < deadline:
-            time.sleep(0.1)
-            survey()
     send(signal.SIGTERM)
+    deadline = time.monotonic() + grace
     while tracked and time.monotonic() < deadline:
         time.sleep(0.1)
         survey()
     send(signal.SIGKILL)
+
+
+def handle_stops(
+    handler: Callable[[int, FrameType | None], object] | signal.Handlers,
+) -> None:
+    """Answer Ctrl-C and SIGTERM alike."""
+    signal.signal(signal.SIGINT, handler)
+    signal.signal(signal.SIGTERM, handler)
+
+
+def ignore_stops() -> None:
+    """Hear no further stop, here and in whatever starts from now on.
+
+    One stop arrives several times: Ctrl-C reaches the terminal's whole group,
+    every level of a run stops all it started, and ``uv run`` forwards what it
+    gets. A repeat would end the cleanup that the first one began, so from here
+    on only the SIGKILL after the grace ends it.
+    """
+    handle_stops(signal.SIG_IGN)
+
+
+def stop_on_signal(_signal: int, _frame: object) -> None:
+    """Stop all that runs, so that a stopped run leaves no writer behind."""
+    ignore_stops()
+    stop_processes(os.getpid(), CLEANUP_GRACE)
+    raise KeyboardInterrupt
 
 
 def run_process(
