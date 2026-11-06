@@ -24,6 +24,9 @@ and the project adheres to
 - Checks: the appliance skeleton's Molecule scenario runs in the quick check,
   like those of the REST and CLI skeletons.
 
+- `DEVELOPMENT.md` opens its testing section with an overview of the checks and
+  explains each by what it answers.
+
 ### Fixed
 
 - Release gate: `kill` stops the check and its steps, and the gate continues
