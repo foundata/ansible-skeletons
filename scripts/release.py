@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 import re
+import signal
 import subprocess
 import sys
 import tarfile
@@ -21,6 +22,7 @@ from scripts.common import (
     digest,
     run,
     source_digest,
+    stop_processes,
     uv_command,
     write_json,
 )
@@ -474,8 +476,23 @@ def main() -> int:
     except (GateError, OSError, ValueError, subprocess.TimeoutExpired) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
+    except KeyboardInterrupt:
+        print("Interrupted. A release check continues with --resume.", file=sys.stderr)
+        return 130
     return 0
 
 
+def stop_on_signal(_signal: int, _frame: object) -> None:
+    """Stop the running command, so that a stopped gate leaves no writer behind.
+
+    The check stops its own steps. Each must hear the stop once, because a
+    second SIGTERM can end the cleanup of an infrastructure tier.
+    """
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+    stop_processes(os.getpid(), CLEANUP_GRACE, delegate=True)
+    raise KeyboardInterrupt
+
+
 if __name__ == "__main__":
+    signal.signal(signal.SIGTERM, stop_on_signal)
     raise SystemExit(main())

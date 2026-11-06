@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 from scripts import check as check_module
+from scripts import release as release_module
 from scripts.common import (
     CLEANUP_GRACE,
     VM_RECORD,
@@ -181,6 +182,113 @@ def test_a_stopped_tier_still_destroys_its_targets(tmp_path: Path) -> None:
     stop_processes(process.pid, 30)
     assert process.wait(timeout=10) == 143
     assert destroyed.is_file()
+
+
+def stopped_gate(directory: Path) -> list[str]:
+    """A release gate over a check over a tier, each with its real handler.
+
+    The check's handler is late, as on a busy host, so a second SIGTERM would
+    reach the tier during its cleanup instead of before it.
+    """
+    tier = (
+        "import signal, sys\n"
+        "from pathlib import Path\n"
+        "from scripts.common import run\n"
+        "from scripts.integration import leave\n"
+        "def count(number, frame):\n"
+        f"    with open({str(directory / 'signals')!r}, 'a') as stream:\n"
+        "        stream.write('x')\n"
+        "    leave(number, frame)\n"
+        "signal.signal(signal.SIGTERM, count)\n"
+        "try:\n"
+        f"    run(['sh', '-c', 'touch {directory / 'started'}; sleep 300'], timeout=120)\n"
+        "finally:\n"
+        f"    run(['sh', '-c', 'sleep 2; touch {directory / 'destroyed'}'], timeout=30)\n"
+    )
+    check = (
+        "import signal, sys, time\n"
+        "from scripts.check import stop_on_signal\n"
+        "from scripts.common import run\n"
+        "def late(number, frame):\n"
+        "    time.sleep(0.6)\n"
+        "    stop_on_signal(number, frame)\n"
+        "signal.signal(signal.SIGTERM, late)\n"
+        f"run([sys.executable, '-c', {tier!r}], timeout=120)\n"
+    )
+    gate = (
+        "import signal, sys\n"
+        "from scripts.common import run\n"
+        "from scripts.release import stop_on_signal\n"
+        "signal.signal(signal.SIGTERM, stop_on_signal)\n"
+        "try:\n"
+        f"    run([sys.executable, '-c', {check!r}], timeout=120)\n"
+        "except KeyboardInterrupt:\n"
+        "    raise SystemExit(130)\n"
+    )
+    return [sys.executable, "-c", gate]
+
+
+def test_a_stopped_gate_lets_its_tier_finish_the_cleanup(tmp_path: Path) -> None:
+    """Stopping both the check and its steps would end the tier's cleanup."""
+    process = subprocess.Popen(stopped_gate(tmp_path))
+    wait_for((tmp_path / "started").is_file)
+    process.terminate()
+    assert process.wait(timeout=30) == 130
+    assert (tmp_path / "destroyed").is_file()
+    assert (tmp_path / "signals").read_text(encoding="utf-8") == "x"
+
+
+def test_a_stopped_gate_stops_its_command_first(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stopped: list[tuple[int, float, bool]] = []
+
+    def record(root: int, grace: float, *, delegate: bool) -> None:
+        stopped.append((root, grace, delegate))
+
+    handlers: list[tuple[int, object]] = []
+    monkeypatch.setattr(release_module, "stop_processes", record)
+    monkeypatch.setattr(
+        "signal.signal", lambda number, handler: handlers.append((number, handler))
+    )
+    with pytest.raises(KeyboardInterrupt):
+        release_module.stop_on_signal(signal.SIGTERM, None)
+    assert stopped == [(os.getpid(), CLEANUP_GRACE, True)]
+    # A second kill must not send the steps a second stop either.
+    assert handlers == [(signal.SIGTERM, signal.SIG_IGN)]
+
+
+def test_a_delegated_stop_reaches_what_a_child_leaves_behind_after_it(
+    tmp_path: Path,
+) -> None:
+    """A smoke test has no handler: it dies at once and leaves its commands."""
+    order, ready = tmp_path / "order", tmp_path / "ready"
+    grandchild = (
+        f"trap 'echo grandchild >> {order}; exit 0' TERM; "
+        f"touch {ready}; sleep 300 & wait"
+    )
+    child = (
+        "import signal, subprocess, sys, time\n"
+        "def finish(_number, _frame):\n"
+        "    time.sleep(0.5)\n"
+        f"    with open({str(order)!r}, 'a') as stream:\n"
+        "        stream.write('child\\n')\n"
+        "    raise SystemExit(0)\n"
+        "signal.signal(signal.SIGTERM, finish)\n"
+        f"subprocess.Popen(['sh', '-c', {grandchild!r}])\n"
+        "signal.pause()\n"
+    )
+    script = (
+        "import os, subprocess, sys, time\n"
+        "from pathlib import Path\n"
+        "from scripts.common import stop_processes\n"
+        f"process = subprocess.Popen([sys.executable, '-c', {child!r}])\n"
+        f"while not Path({str(ready)!r}).exists():\n"
+        "    time.sleep(0.05)\n"
+        "stop_processes(os.getpid(), 30, delegate=True)\n"
+    )
+    subprocess.run([sys.executable, "-c", script], check=True, timeout=60)
+    assert order.read_text(encoding="utf-8").split() == ["child", "grandchild"]
 
 
 def test_leaving_on_a_signal_is_an_exit_with_its_status() -> None:

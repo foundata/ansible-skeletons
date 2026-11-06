@@ -14,7 +14,12 @@ and the project adheres to
 
 ## [Unreleased]
 
-- Nothing worth mentioning right now.
+### Fixed
+
+- Release gate: `kill` stops the check and its steps, and the gate continues
+  with `--resume`. It used to die alone and leave them writing into its
+  evidence. Only the check gets the signal, because a second SIGTERM can end a
+  tier's cleanup.
 
 
 ## [4.1.1] - 2026-11-06

@@ -11,7 +11,7 @@ import signal
 import subprocess
 import time
 import tomllib
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TextIO
@@ -86,7 +86,9 @@ def processes() -> dict[int, tuple[int, str]]:
     return table
 
 
-def stop_processes(root: int, grace: float = STOP_GRACE) -> None:
+def stop_processes(
+    root: int, grace: float = STOP_GRACE, *, delegate: bool = False
+) -> None:
     """Stop a process and all it started, or all this process started.
 
     Everything running now gets SIGTERM and has ``grace`` seconds to clean up;
@@ -95,6 +97,10 @@ def stop_processes(root: int, grace: float = STOP_GRACE) -> None:
     in the terminal's group, where Ctrl-C reaches it directly, and nested
     commands need no signal forwarding. A process that detaches, such as a
     container's conmon, leaves the tree: its owner removes it.
+
+    With ``delegate``, the direct children stop what they started themselves,
+    so only they get the first SIGTERM: a second one can end a cleanup that the
+    first one started. What they leave behind gets its SIGTERM after them.
     """
     tracked: dict[int, str] = {}
 
@@ -111,8 +117,8 @@ def stop_processes(root: int, grace: float = STOP_GRACE) -> None:
                     tracked[pid] = started
                     pending.append(pid)
 
-    def send(number: signal.Signals) -> None:
-        for pid in tracked:
+    def send(number: signal.Signals, targets: Iterable[int] | None = None) -> None:
+        for pid in tracked if targets is None else targets:
             try:
                 os.kill(pid, number)
             except (ProcessLookupError, PermissionError):
@@ -122,8 +128,14 @@ def stop_processes(root: int, grace: float = STOP_GRACE) -> None:
     if root != os.getpid() and root in table:
         tracked[root] = table[root][1]
     survey()
-    send(signal.SIGTERM)
     deadline = time.monotonic() + grace
+    if delegate:
+        children = [pid for pid, (parent, _) in table.items() if parent == root]
+        send(signal.SIGTERM, children)
+        while tracked.keys() & set(children) and time.monotonic() < deadline:
+            time.sleep(0.1)
+            survey()
+    send(signal.SIGTERM)
     while tracked and time.monotonic() < deadline:
         time.sleep(0.1)
         survey()

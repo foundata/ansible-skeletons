@@ -3,6 +3,7 @@
 """Exercise release refusals using real disposable Git repositories."""
 
 import json
+import sys
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
@@ -446,3 +447,18 @@ def test_a_passed_release_check_is_not_resumed(
     check_release("1.1.0", tmp_path / "evidence", repository)
     with pytest.raises(GateError, match="already passed"):
         check_release("1.1.0", tmp_path / "evidence", repository, resume=True)
+
+
+def test_an_interrupted_gate_says_how_to_continue(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def interrupt(*_arguments: object, **_options: object) -> None:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(release, "check_release", interrupt)
+    monkeypatch.setattr(
+        sys, "argv", ["release", "check", "1.2.3", "--output", "/unused"]
+    )
+    assert release.main() == 130
+    assert "--resume" in capsys.readouterr().err
+
