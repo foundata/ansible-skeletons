@@ -1578,7 +1578,7 @@ def check_nox_gate(rendered: Rendered) -> None:
             capture=True,
         )
         print(output, end="")
-        if "Verified discovery and execution of 17 foundata rules." not in output:
+        if "Verified discovery and execution of 18 foundata rules." not in output:
             raise GateError("Nox session did not verify the adopted foundata rules")
         run(
             [

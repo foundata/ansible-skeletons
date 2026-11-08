@@ -27,6 +27,9 @@ and the project adheres to
 - `DEVELOPMENT.md` opens its testing section with an overview of the checks and
   explains each by what it answers.
 
+- All skeletons: `.ansible-lint` enables `foundata-no-flush-handlers`, and the
+  `ansible-lint` session requires ansible-lint-foundata 1.2.0 or newer.
+
 ### Fixed
 
 - Release gate: `kill` stops the check and its steps, and the gate continues

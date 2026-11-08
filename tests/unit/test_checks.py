@@ -224,7 +224,7 @@ def test_nox_gate_isolates_stock_passthrough(
                 "docs",
             ]
             assert env["PIP_CONSTRAINT"] == str(tmp_path / "lint-constraints.txt")
-            return "Verified discovery and execution of 17 foundata rules.\n"
+            return "Verified discovery and execution of 18 foundata rules.\n"
         if command[:3] == [str(tmp_path / "stock-lint/bin/python"), "-m", "nox"]:
             nox_runs.append(command)
             assert "--no-venv" in command
@@ -866,7 +866,7 @@ def test_skeletons_enable_the_same_foundata_rules() -> None:
     assert len(reference) == len(set(reference))
     # The verify command only rejects unknown rules; this count keeps every rule
     # that ansible-lint-foundata ships enabled.
-    assert len(reference) == 17
+    assert len(reference) == 18
     assert {"foundata-string-quotes", "foundata-parameter-order"} <= set(reference)
     assert all(rules == reference for rules in enabled.values()), enabled
 

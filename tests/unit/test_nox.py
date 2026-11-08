@@ -72,7 +72,7 @@ def noxfile(
     monkeypatch.setattr("signal.signal", Mock())
     profile = getattr(request, "param", "collection_default")
     loaded = runpy.run_path(str(ROOT / profile / "noxfile.py.j2"))
-    assert ["ansible-lint-foundata"] in installed_packages
+    assert ["ansible-lint-foundata>=1.2.0"] in installed_packages
     return loaded
 
 

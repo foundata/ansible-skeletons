@@ -188,7 +188,7 @@ def runtime_check(session: nox.Session) -> None:
 
 
 @nox.session(name="ansible-lint", default=True)
-@antsibull_nox.sessions.install_packages(packages=["ansible-lint-foundata"])
+@antsibull_nox.sessions.install_packages(packages=["ansible-lint-foundata>=1.2.0"])
 def ansible_lint(session: nox.Session) -> None:
     """ansible-lint with the foundata rules; fixes what it can unless CI=true."""
     env = _prepare(session) if session.virtualenv.is_sandboxed else {}
