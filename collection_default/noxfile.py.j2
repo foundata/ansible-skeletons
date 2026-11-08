@@ -332,7 +332,8 @@ def _platforms() -> list[tuple[str, str]]:
 
 
 @nox.session(name="molecule", default=False)
-@antsibull_nox.sessions.install_packages(packages=["molecule"])
+# pycdlib: cloud-init seed images of the libvirt platforms (iso_create)
+@antsibull_nox.sessions.install_packages(packages=["molecule", "pycdlib"])
 def molecule(session: nox.Session) -> None:
     """Molecule: full "default" scenario, or any Molecule command after "--"."""
     env = _prepare(session)

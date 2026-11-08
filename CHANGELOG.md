@@ -43,6 +43,9 @@ and the project adheres to
   outlive their run state, where nothing could reach them, and `--remove` then
   deleted their Podman stores under them.
 
+- Collection skeletons: the `molecule` session installs `pycdlib`, which the
+  libvirt platforms need for their cloud-init seed images.
+
 
 ## [4.1.1] - 2026-11-06
 
