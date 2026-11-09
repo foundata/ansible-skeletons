@@ -161,6 +161,23 @@ uv run --locked ruff check scripts tests
 uv run --locked mypy scripts tests
 ```
 
+Write template text for maximum-length names. The checks also render every
+skeleton with a namespace, a collection name and a role name of 64 characters
+each, and the generated project must pass its own linters there:
+
+- **Markdown:** rumdl accepts a line of more than 80 characters only in a
+  paragraph that is already wrapped as its formatter would wrap it. A paragraph
+  in a `*.md.j2` that contains a Jinja name therefore needs rumdl's line breaks
+  at the rendered length. To get them, copy the paragraph into a scratch file,
+  replace each name with a 64-character word, run
+  `uv run --locked rumdl fmt --config .rumdl.toml` on the copy and take over
+  its line breaks. With short names the lines stay below the limit, and rumdl
+  leaves such a paragraph alone.
+- **YAML:** yamllint allows 160 characters, in the documentation of a module
+  too. A line that holds `M({{ namespace }}.{{ collection_name }}.<module>)`
+  beside other text can exceed that. Fold the item with `>-` and give the
+  reference a line of its own.
+
 Commit messages use one scoped subject, for example
 `tests: verify generated collection installation`. Do not add attribution
 trailers. Review the diff and stage only changes intended for the commit.
@@ -350,6 +367,14 @@ Review lock changes before committing. Galaxy pins live in
 `tests/requirements.yml`; update them together with infrastructure validation.
 The module renders' Molecule scenarios install only from these pins, so the
 file must list every collection those scenarios require.
+
+The templates carry tool minimums of their own: `antsibull_docs_package` in
+`antsibull-nox.toml.j2`, and the packages that the sessions in `noxfile.py.j2`
+install, such as `ansible-lint-foundata>=1.2.0`. The checks run a generated
+project's default sessions with their packages constrained to the versions
+installed from `uv.lock`, so a minimum above the locked version cannot be
+resolved. Raise a minimum in the templates and in the matching dependency group
+of `pyproject.toml`, regenerate the lock, and commit them together.
 
 
 ## Releases<a id="releases"></a>
