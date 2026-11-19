@@ -31,6 +31,11 @@ and the project adheres to
   that a tool minimum in a template changes together with `pyproject.toml` and
   the lock.
 
+- All skeletons: `.rumdl.toml` accepts a tight list with an item that holds a
+  code block or a further paragraph, as the Markdown guide's configuration
+  does. rumdl 0.3 reports such a list under `MD076` otherwise, which fails
+  the `markdown` session of a rendered collection. The repository's own
+  `.rumdl.toml` does the same.
 - All skeletons: `.rumdl.toml` switches off rumdl's cache, as the Markdown
   guide's configuration does, so rumdl writes no `.rumdl_cache/` directory and
   `.gitignore` no longer lists it. The repository's own `.rumdl.toml` does the

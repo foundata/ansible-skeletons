@@ -54,6 +54,9 @@ key-order = [
   "tags", "author",
 ]
 
+[MD076]
+allow-loose-continuation = true
+
 [MD080]
 levels = [1, 2]
 
