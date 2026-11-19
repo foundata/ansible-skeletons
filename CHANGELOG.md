@@ -31,6 +31,11 @@ and the project adheres to
   that a tool minimum in a template changes together with `pyproject.toml` and
   the lock.
 
+- All skeletons: `.rumdl.toml` switches off rumdl's cache, as the Markdown
+  guide's configuration does, so rumdl writes no `.rumdl_cache/` directory and
+  `.gitignore` no longer lists it. The repository's own `.rumdl.toml` does the
+  same.
+
 - All skeletons: `.ansible-lint` enables `foundata-no-flush-handlers`, and the
   `ansible-lint` session requires ansible-lint-foundata 1.2.0 or newer.
 
