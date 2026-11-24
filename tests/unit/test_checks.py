@@ -852,6 +852,29 @@ def test_scenario_state_defaults_cover_a_missing_state_file(skeleton: str) -> No
 
 
 @pytest.mark.parametrize("skeleton", SKELETONS)
+def test_scenario_state_is_persisted_in_its_declared_order(skeleton: str) -> None:
+    # A role run from restored state must see dictionaries in the order the
+    # scenario declared them; sorted keys make some roles rewrite their files.
+    molecule = (
+        ROOT
+        / skeleton
+        / ("molecule" if skeleton == "role_default" else "extensions/molecule")
+    )
+    writes = [
+        match
+        for path in sorted(molecule.rglob("*.j2"))
+        for match in re.findall(
+            r"__testing_state \| ansible\.builtin\.to_\w*yaml\S*",
+            path.read_text(encoding="utf-8"),
+        )
+    ]
+    assert len(writes) == 8
+    assert set(writes) == {
+        "__testing_state | ansible.builtin.to_nice_yaml(sort_keys=false)"
+    }
+
+
+@pytest.mark.parametrize("skeleton", SKELETONS)
 def test_skeletons_ship_no_repository_tooling(skeleton: str) -> None:
     assert not (ROOT / skeleton / "pyproject.toml").exists()
     assert not (ROOT / skeleton / "scripts").exists()

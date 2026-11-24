@@ -101,6 +101,11 @@ and the project adheres to
   shares. They used to put the collection copies of `ansible-test` below
   `/tmp`, often a small tmpfs, where `ansible-test` failed.
 
+- All skeletons: the shared Molecule playbooks persist `__testing_state` with
+  its keys in the order the scenario declared them. `to_nice_yaml` used to sort
+  them, so a role run from the restored state saw its dictionaries in another
+  order and could rewrite its files.
+
 - Collection skeletons: the `molecule` session installs `pycdlib`, which the
   libvirt platforms need for their cloud-init seed images.
 
