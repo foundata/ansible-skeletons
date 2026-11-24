@@ -98,8 +98,9 @@ def check_static(log: TextIO | None = None, env: dict[str, str] | None = None) -
         "collection_default/noxfile.py.j2",
         *[f"{profile}/noxfile.py.j2" for profile in MODULE_PROFILES],
         *[
-            f"{profile}/tests/runtime_check.py.j2"
+            f"{profile}/tests/{helper}.py.j2"
             for profile in ("collection_default", *MODULE_PROFILES)
+            for helper in ("examples_lint", "runtime_check")
         ],
     ]
     checked = partial(run, log=log, env=env)

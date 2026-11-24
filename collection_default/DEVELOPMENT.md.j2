@@ -61,6 +61,14 @@ Among the default sessions:
   `nox --no-venv` and the extension missing, it warns and runs only the stock
   rules.
 {# end skeleton-variant #}
+- `ansible-lint` also checks the examples: each fenced `yaml` or `yml` block of
+  `README.md` and the roles' READMEs that holds a list of plays or tasks, and
+  each module's `EXAMPLES`. It lists the other blocks, such as variables or
+  inventories, as skipped. It lints a copy of each example in
+  `.nox/ansible-lint/tmp/examples/`, named after its source and the line that
+  opens it; a finding's line is the source's. Nothing fixes the copies, so
+  correct the source; `# noqa` works in an example as anywhere. With
+  `nox --no-venv` the examples are not linted.
 {# skeleton-variant: helper-scope #}
 - `helper-lint` checks the collection's Python with [ruff.toml](./ruff.toml):
   `plugins/`, `extensions/molecule/`, the roles' `files/`, `tools/`, `scripts/`

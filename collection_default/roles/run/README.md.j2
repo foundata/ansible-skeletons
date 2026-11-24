@@ -31,12 +31,12 @@ Installation with automatic upgrade:
 ```yaml
 ---
 
-- name: "Initialize the {{ namespace }}.{{ collection_name }}.run role"
+- name: "Initialize the run role"
   hosts: localhost
   gather_facts: false
   tasks:
 
-    - name: "Trigger invocation of the {{ namespace }}.{{ collection_name }}.run role"
+    - name: "Trigger invocation of the run role"
       ansible.builtin.include_role:
         name: "{{ namespace }}.{{ collection_name }}.run"
       vars:
@@ -48,12 +48,12 @@ Uninstall:
 ```yaml
 ---
 
-- name: "Initialize the {{ namespace }}.{{ collection_name }}.run role"
+- name: "Initialize the run role"
   hosts: localhost
   gather_facts: false
   tasks:
 
-    - name: "Trigger invocation of the {{ namespace }}.{{ collection_name }}.run role"
+    - name: "Trigger invocation of the run role"
       ansible.builtin.include_role:
         name: "{{ namespace }}.{{ collection_name }}.run"
       vars:

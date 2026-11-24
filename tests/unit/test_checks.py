@@ -373,6 +373,7 @@ SHARED_FILES = {
         "requirements-dev.txt.j2",
         "ruff.toml.j2",
         "tests/config.yml.j2",
+        "tests/examples_lint.py.j2",
         "tests/runtime_check.py.j2",
     ),
     "module_skeletons": (

@@ -510,6 +510,7 @@ def test_optional_extension_runs_in_the_lint_environment(
     session.posargs = ["--fix"]
     session.virtualenv.is_sandboxed = managed
     session.run.return_value = f"{installed}\n"
+    session.create_tmp.return_value = str(tmp_path / "tmp")
     lint_session(session)
     calls = session.run.call_args_list
     assert calls[0].args[:2] == ("python", "-c")
@@ -519,6 +520,22 @@ def test_optional_extension_runs_in_the_lint_environment(
     assert all(call.kwargs["env"] == env for call in calls)
     prepare = vars(sys.modules["antsibull_nox.sessions"])["prepare_collections"]
     assert prepare.call_count == int(managed)
+    # The examples need the prepared tree; without it the session says so.
+    warnings = (
+        []
+        if installed
+        else ["ansible-lint-foundata is not installed; running stock rules only."]
+    )
+    if managed:
+        examples = calls.pop()
+        assert examples.args == (
+            "python",
+            "tests/examples_lint.py",
+            str(tmp_path / "tmp/examples"),
+        )
+    else:
+        warnings.append("Without a prepared collection tree, examples are not linted.")
+    assert [call.args[0] for call in session.warn.call_args_list] == warnings
     assert calls[-1].args == (
         "python",
         "-m",
@@ -536,13 +553,45 @@ def test_optional_extension_runs_in_the_lint_environment(
             "--project-dir",
             ".",
         )
-        session.warn.assert_not_called()
         assert len(calls) == 3
     else:
-        session.warn.assert_called_once_with(
-            "ansible-lint-foundata is not installed; running stock rules only."
-        )
         assert len(calls) == 2
+
+
+@pytest.mark.parametrize(
+    "noxfile",
+    [
+        "collection_default",
+        "collection_modules_rest",
+        "collection_modules_appliance",
+        "collection_modules_cli",
+    ],
+    indirect=True,
+)
+def test_examples_are_linted_in_a_fresh_directory_after_the_project(
+    tmp_path: Path, lint_session: Callable[[Mock], None]
+) -> None:
+    stale = tmp_path / "tmp/examples/tasks/README.md-3.yml"
+    stale.parent.mkdir(parents=True)
+    stale.touch()
+    session = Mock()
+    session.posargs = []
+    session.virtualenv.is_sandboxed = True
+    session.run.return_value = "True\n"
+    session.create_tmp.return_value = str(tmp_path / "tmp")
+    lint_session(session)
+    *project, examples = session.run.call_args_list
+    assert project[-1].args[:3] == ("python", "-m", "ansiblelint")
+    assert examples.args == (
+        "python",
+        "tests/examples_lint.py",
+        str(tmp_path / "tmp/examples"),
+    )
+    assert examples.kwargs == {
+        "env": {"ANSIBLE_COLLECTIONS_PATH": str(tmp_path / "collections")}
+    }
+    assert not stale.parent.parent.exists()
+    session.warn.assert_not_called()
 
 
 @pytest.mark.parametrize("stage", ["detection", "verification", "lint"])

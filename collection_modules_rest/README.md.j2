@@ -126,7 +126,7 @@ endpoint's variables:
 
 ```yaml
 ---
-- name: "Configure {{ product | default('Example Product') }}"
+- name: {{ ('Configure ' ~ product | default('Example Product')) | to_json(ensure_ascii=False) }}
   hosts: "product_api"
   connection: "local"
   gather_facts: false

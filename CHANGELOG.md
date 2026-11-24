@@ -14,6 +14,17 @@ and the project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- Collection skeletons: the `ansible-lint` session also lints the examples with
+  the project's configuration: each fenced `yaml` or `yml` block of `README.md`
+  and the role READMEs that holds a list of plays or tasks, and each module's
+  `EXAMPLES`. The new `tests/examples_lint.py` extracts them, and a finding
+  names the source file and its line. Two examples it found are fixed: the
+  default skeleton's role README exceeded the line length with long names, and
+  the REST and appliance READMEs broke the play's YAML with a product name in
+  double quotes.
+
 ### Changed
 
 - Release verification checks the remote tag, the forge and that a public clone

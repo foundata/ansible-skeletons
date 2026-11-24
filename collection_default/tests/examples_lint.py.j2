@@ -1,0 +1,244 @@
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Lint the documented examples with the project's ansible-lint configuration.
+
+The examples are the fenced yaml or yml blocks of README.md and roles/*/README.md
+and the EXAMPLES of the modules. A block is linted when it is a list of plays or
+a list of tasks; others, such as variables, inventories or fragments that do not
+parse, are listed and skipped. Each linted block becomes a file named after its
+source and the line that opens it, with the source's line numbers.
+"""
+
+from __future__ import annotations
+
+import argparse
+import ast
+import re
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+import yaml
+
+FENCE = re.compile(r"^(?P<indent> *)(?P<fence>`{3,}|~{3,})(?P<info>.*)$")
+DOCUMENT_START = re.compile(r"^---(\s|$)")
+# ansible-lint reads these from the directory it lints.
+CONFIGURATION = (
+    ".ansible-lint",
+    ".ansible-lint.yml",
+    ".ansible-lint.yaml",
+    ".config/ansible-lint.yml",
+    ".config/ansible-lint.yaml",
+    ".yamllint",
+    ".yamllint.yml",
+    ".yamllint.yaml",
+)
+PLAY_KEYS = frozenset(("hosts", "import_playbook", "ansible.builtin.import_playbook"))
+# Task keywords; any other key of a task names its action.
+TASK_KEYWORDS = frozenset(
+    (
+        "any_errors_fatal",
+        "args",
+        "async",
+        "become",
+        "become_exe",
+        "become_flags",
+        "become_method",
+        "become_user",
+        "changed_when",
+        "check_mode",
+        "collections",
+        "connection",
+        "debugger",
+        "delay",
+        "delegate_facts",
+        "delegate_to",
+        "diff",
+        "environment",
+        "failed_when",
+        "ignore_errors",
+        "ignore_unreachable",
+        "listen",
+        "loop",
+        "loop_control",
+        "module_defaults",
+        "name",
+        "no_log",
+        "notify",
+        "poll",
+        "port",
+        "register",
+        "remote_user",
+        "retries",
+        "run_once",
+        "tags",
+        "throttle",
+        "timeout",
+        "until",
+        "vars",
+        "when",
+    )
+)
+
+
+class Loader(yaml.SafeLoader):
+    """Safe YAML loading that accepts Ansible's tags, such as !vault."""
+
+
+Loader.add_multi_constructor("!", lambda loader, suffix, node: None)
+
+
+def markdown_blocks(text: str) -> list[tuple[int, list[str]]]:
+    """Return the opening line and the lines of each fenced yaml or yml block."""
+    blocks = []
+    lines = text.splitlines()
+    index = 0
+    while index < len(lines):
+        opening = FENCE.match(lines[index])
+        index += 1
+        if not opening or ("`" in opening["info"] and opening["fence"][0] == "`"):
+            continue
+        line_number, indent, fence = index, len(opening["indent"]), opening["fence"]
+        content = []
+        while index < len(lines):
+            line = lines[index]
+            index += 1
+            stripped = line.strip()
+            if stripped.startswith(fence) and not stripped.strip(fence[0]):
+                break
+            content.append(line[min(indent, len(line) - len(line.lstrip(" "))) :])
+        language = (opening["info"].split() or [""])[0].lower()
+        if language in ("yaml", "yml"):
+            blocks.append((line_number, content))
+    return blocks
+
+
+def module_examples(source: str) -> list[tuple[int, list[str]]]:
+    """Return the line and the lines of a module's EXAMPLES, without running it."""
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return []
+    return [
+        (node.value.lineno, node.value.value.splitlines())
+        for node in tree.body
+        if isinstance(node, ast.Assign)
+        and any(isinstance(t, ast.Name) and t.id == "EXAMPLES" for t in node.targets)
+        and isinstance(node.value, ast.Constant)
+        and isinstance(node.value.value, str)
+    ]
+
+
+def is_task(item: dict[object, object]) -> bool:
+    """Whether a mapping is a block or has exactly one action."""
+    keys = [str(key) for key in item]
+    if "block" in keys:
+        return True
+    actions = [
+        key for key in keys if key not in TASK_KEYWORDS and not key.startswith("with_")
+    ]
+    return len(actions) == 1
+
+
+def kind(lines: list[str]) -> str | None:
+    """Return "playbooks" for a list of plays, "tasks" for a list of tasks."""
+    try:
+        data = yaml.load("\n".join(lines), Loader=Loader)
+    except yaml.YAMLError:
+        return None
+    if not isinstance(data, list) or not data:
+        return None
+    if not all(isinstance(item, dict) for item in data):
+        return None
+    if all(PLAY_KEYS & {str(key) for key in item} for item in data):
+        return "playbooks"
+    if all(is_task(item) for item in data):
+        return "tasks"
+    return None
+
+
+def numbered(lines: list[str], first: int) -> str:
+    """Write a block so that its line numbers are those of its source.
+
+    ``first`` is the source line of the block's first line. Comment lines stand
+    in for the source above the block; a block without a document start gets
+    one on the line above it, where its fence or EXAMPLES opens it.
+    """
+    while lines and not lines[0].strip():
+        lines, first = lines[1:], first + 1
+    while lines and not lines[-1].strip():
+        lines = lines[:-1]
+    head = ["#"] * (first - 1)
+    if head and not any(DOCUMENT_START.match(line) for line in lines):
+        head[-1] = "---"
+    return "\n".join([*head, *lines]) + "\n"
+
+
+def examples(project: Path) -> list[tuple[Path, int, list[str], int]]:
+    """Return each block's source, opening line, lines and first line."""
+    found = []
+    for path in [project / "README.md", *sorted(project.glob("roles/*/README.md"))]:
+        if path.is_file():
+            for opening, lines in markdown_blocks(path.read_text(encoding="utf-8")):
+                found.append((path, opening, lines, opening + 1))
+    for path in sorted(project.glob("plugins/modules/**/*.py")):
+        for opening, lines in module_examples(path.read_text(encoding="utf-8")):
+            found.append((path, opening, lines, opening))
+    return found
+
+
+def extract(project: Path, output: Path) -> list[str]:
+    """Write each example that is a list of plays or tasks below ``output``.
+
+    Returns the written files relative to ``output``, which also receives the
+    project's lint configuration.
+    """
+    output.mkdir(parents=True)
+    for name in CONFIGURATION:
+        if (project / name).is_file():
+            (output / name).parent.mkdir(exist_ok=True)
+            shutil.copyfile(project / name, output / name)
+    written = []
+    for path, opening, lines, first in examples(project):
+        source = path.relative_to(project).as_posix()
+        found = kind(lines)
+        if found is None:
+            print(
+                f"{source}:{opening}: skipped, not a list of plays or tasks", flush=True
+            )
+            continue
+        relative = f"{found}/{source.replace('/', '-')}-{opening}.yml"
+        (output / found).mkdir(exist_ok=True)
+        (output / relative).write_text(numbered(lines, first), encoding="utf-8")
+        print(f"{source}:{opening}: linted as {relative}", flush=True)
+        written.append(relative)
+    return written
+
+
+def main() -> None:
+    """Extract the examples into a new directory and lint them there."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("output", type=Path, help="new directory for the examples")
+    args = parser.parse_args()
+    project = Path(__file__).resolve().parents[1]
+    output = args.output.resolve()
+    files = extract(project, output)
+    if not files:
+        print("No example is a list of plays or tasks")
+        return
+    print(
+        "Findings name the example's file; their line numbers are the source's",
+        flush=True,
+    )
+    # ansible-lint --offline --strict <files>, never --fix: these are copies.
+    result = subprocess.run(
+        [sys.executable, "-m", "ansiblelint", "--offline", "--strict", *files],
+        cwd=output,
+        check=False,
+    )
+    sys.exit(result.returncode)
+
+
+if __name__ == "__main__":
+    main()
