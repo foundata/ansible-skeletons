@@ -53,16 +53,16 @@ host needs are listed in [`requirements.txt`](./requirements.txt); the fixture
 needs none.
 
 
-## Collection contract
+## Collection contract<a id="collection-contract"></a>
 
-### Execution
+### Execution<a id="execution"></a>
 
 Modules run on the execution host against an existing API endpoint. Use
 `connection: local` or an authorized delegate. Installation, bootstrap,
 credentials and TLS trust are caller prerequisites.
 
 {# skeleton-variant: http-readme-3 #}
-### Management path and recovery
+### Management path and recovery<a id="management-recovery"></a>
 
 The managed configuration carries the management path, so a change can cut
 off the API that the modules use. Activation applies every pending change in
@@ -71,14 +71,14 @@ subsystem's first write that can affect the management path.
 [Requirements](#requirements) lists what this asks of you.
 
 {# end skeleton-variant #}
-### Identity
+### Identity<a id="identity"></a>
 
 {# skeleton-variant: http-readme-4 #}
 An exact immutable name identifies one record. A rename creates another record;
 duplicate and internal identities fail. Absence requires a complete listing.
 {# end skeleton-variant #}
 
-### Ownership
+### Ownership<a id="ownership"></a>
 
 Only declared fields are managed. Omitted and null options stay unmanaged;
 {# skeleton-variant: http-readme-5 #}
@@ -86,7 +86,7 @@ empty values clear fields. Deletion removes only the named object. Coordinate
 {# end skeleton-variant #}
 writers, including inventory aliases that address the same endpoint.
 
-### Activation
+### Activation<a id="activation"></a>
 
 {# skeleton-variant: http-readme-6 #}
 Resource writes save state. Run `fixture_apply` with `activate: auto` and a
@@ -106,14 +106,14 @@ subsystem's activation scope, probe limits and recovery prerequisites, or
 delete this paragraph if every subsystem has a probe.
 {# end skeleton-variant #}
 
-### Check and diff mode
+### Check and diff mode<a id="check-diff-mode"></a>
 
 Check mode performs reads with zero writes. It returns `verified: predicted`
 where a write would follow and `verified: observed` where nothing would
 change; the info module always reports observed state. Predicted creations
 have no identifier. Diffs contain public managed fields only, on request.
 
-### Failures
+### Failures<a id="failures"></a>
 
 A failure reports:
 
@@ -126,7 +126,7 @@ After a lost response, a module reads the record back by its identity; it
 never retries a creation blindly. Results and errors exclude secrets,
 including secrets returned in listings.
 
-### Version check
+### Version check<a id="version-check"></a>
 
 FIXME: Keep one of the next two sentences to match `_binding.py`.
 A read-only probe precedes writes.

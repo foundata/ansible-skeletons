@@ -12,7 +12,14 @@ process-fault helper runs the public module in another process, injects lost
 replies and nonzero exits, and verifies failed readback remains unknown without
 redispatch.
 
-## Requirements
+## Table of contents<a id="toc"></a>
+
+- [Requirements](#requirements)
+- [Run the scenario](#run)
+- [Adapt the scenario](#adapt)
+- [Troubleshooting](#troubleshooting)
+
+## Requirements<a id="requirements"></a>
 
 The caller supplies an authorized target with Python 3.9+, GNU `timeout`,
 `/usr/bin/env`, the installed collection and `foundata.utils`. The standalone
@@ -29,7 +36,7 @@ never command-line arguments. Replace the inventory's local connection with the
 authorized host connection when testing remotely. Installation and target
 provisioning remain caller prerequisites.
 
-## Run the scenario
+## Run the scenario<a id="run"></a>
 
 ```sh
 uv run noxfile.py -s molecule -- test
@@ -46,7 +53,7 @@ is set, and prints that path when it starts. Runs from different directories,
 such as a second clone or a Git worktree, can therefore test at the same time;
 the `molecule` session in `noxfile.py` explains the workspace.
 
-## Adapt the scenario
+## Adapt the scenario<a id="adapt"></a>
 
 Replace the fixture commands and seeded state from product evidence. Keep lost
 replies, immediate status 124, observed effects and unavailable readback

@@ -5,6 +5,16 @@ SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' 
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
+## Table of contents<a id="toc"></a>
+
+- [Prerequisites](#prerequisites)
+- [Checks](#checks)
+- [Unit-test clocks](#test-clocks)
+- [Boundaries](#boundaries)
+- [Troubleshooting](#troubleshooting)
+- [Engine fields](#engine-fields)
+- [Releases](#releases)
+
 ## Prerequisites<a id="prerequisites"></a>
 
 - [uv](https://docs.astral.sh/uv/), or [nox](https://nox.thea.codes/) with
@@ -84,7 +94,7 @@ Below a deep checkout, nox gives each session a short symbolic link as
 `TMPDIR`, because Unix socket paths are limited in length. A test of code that
 refuses symbolic links in a path resolves `TMPDIR` first.
 
-## Unit-test clocks
+## Unit-test clocks<a id="test-clocks"></a>
 
 Use the opt-in `fake_clock` fixture when a test's expected outcome depends
 on polling or a short deadline. It keeps the real `foundata.utils`
@@ -266,7 +276,7 @@ versioned CLI reference supplies a useful inventory; keep its output under
 `tools/inventory/`, excluded from collection archives.
 {# end skeleton-variant #}
 
-## Troubleshooting
+## Troubleshooting<a id="troubleshooting"></a>
 
 To recover a short-path directory left by a killed Nox invocation, find it as
 `nox.*` below `XDG_RUNTIME_DIR`, or below `/var/tmp` without one;
@@ -282,7 +292,7 @@ with `rmdir`. Leave symlinked or replaced paths and uncertain creators for
 investigation. Nox itself removes only the unchanged directory its invocation
 created.
 
-## Engine fields
+## Engine fields<a id="engine-fields"></a>
 
 `Field(kind="strmap")` describes a dictionary of string keys to string values;
 empty strings are values. A write replaces the whole dictionary, and the

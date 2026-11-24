@@ -51,9 +51,9 @@ host needs are listed in [`requirements.txt`](./requirements.txt); the fixture
 needs none.
 
 
-## Collection contract
+## Collection contract<a id="collection-contract"></a>
 
-### Execution
+### Execution<a id="execution"></a>
 
 Modules run on the execution host against an existing API endpoint. Use
 `connection: local` or an authorized delegate. Installation, bootstrap,
@@ -61,14 +61,14 @@ credentials and TLS trust are caller prerequisites.
 
 {# skeleton-variant: http-readme-3 #}
 {# end skeleton-variant #}
-### Identity
+### Identity<a id="identity"></a>
 
 {# skeleton-variant: http-readme-4 #}
 Names match ignoring case; the server assigns integer identifiers. A rename
 creates another record. The by-name route's documented 404 proves absence.
 {# end skeleton-variant #}
 
-### Ownership
+### Ownership<a id="ownership"></a>
 
 Only declared fields are managed. Omitted and null options stay unmanaged;
 {# skeleton-variant: http-readme-5 #}
@@ -80,20 +80,20 @@ Deletion refuses referenced records. Coordinate
 {# end skeleton-variant #}
 writers, including inventory aliases that address the same endpoint.
 
-### Activation
+### Activation<a id="activation"></a>
 
 {# skeleton-variant: http-readme-6 #}
 REST writes take effect immediately. No apply module is provided.
 {# end skeleton-variant #}
 
-### Check and diff mode
+### Check and diff mode<a id="check-diff-mode"></a>
 
 Check mode performs reads with zero writes. It returns `verified: predicted`
 where a write would follow and `verified: observed` where nothing would
 change; the info module always reports observed state. Predicted creations
 have no identifier. Diffs contain public managed fields only, on request.
 
-### Failures
+### Failures<a id="failures"></a>
 
 A failure reports:
 
@@ -106,7 +106,7 @@ After a lost response, a module reads the record back by its identity; it
 never retries a creation blindly. Results and errors exclude secrets,
 including secrets returned in listings.
 
-### Version check
+### Version check<a id="version-check"></a>
 
 FIXME: Keep one of the next two sentences to match `_binding.py`.
 A read-only probe precedes writes.

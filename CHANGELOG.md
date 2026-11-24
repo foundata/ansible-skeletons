@@ -57,6 +57,12 @@ and the project adheres to
 - All skeletons: every "Table of contents" heading carries the anchor `toc`
   again. The collection READMEs had lost it in 4.0.0, and the Molecule READMEs
   now have it as well.
+- Collection skeletons: `DEVELOPMENT.md` and the CLI skeleton's Molecule README
+  have a table of contents, and every heading written in a template has an
+  explicit anchor, as the Markdown guide asks. New anchors: `troubleshooting`,
+  `test-clocks` and `engine-fields` in `DEVELOPMENT.md`, `role-run` in the
+  default collection README, and the sections of "Collection contract" in the
+  REST and appliance READMEs.
 - Collection skeletons: the `molecule` session keeps the state of each scenario
   in `~/.ansible/tmp/molecule.<workspace>/<scenario>/` and prints the workspace,
   the state directory and the instance names. A call names one scenario at
