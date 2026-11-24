@@ -360,10 +360,32 @@ def _scenario(arguments: list[str]) -> str | None:
     return names.pop() if names else "default"
 
 
-def _instances(scenario: str) -> list[str]:
+def _platform(arguments: list[str]) -> str | None:
+    """The platform that Molecule arguments or MOLECULE_PLATFORM_NAME name, if any.
+
+    As in Molecule, the last --platform-name wins over the environment.
+    """
+    name = None
+    remaining = iter(arguments)
+    for argument in remaining:
+        if argument == "--":
+            break
+        if argument in ("-p", "--platform-name"):
+            name = next(remaining, "")
+        elif argument.startswith("--platform-name="):
+            name = argument.partition("=")[2]
+        elif argument.startswith("-p") and not argument.startswith("--"):
+            name = argument[2:]
+    if name is None:
+        name = os.environ.get("MOLECULE_PLATFORM_NAME")
+    return name or None
+
+
+def _instances(scenario: str, platform: str | None) -> list[str]:
     """Platform names of a scenario whose instances the shared create makes.
 
-    A scenario with a create playbook of its own names what it creates itself.
+    Only ``platform`` when one is named. A scenario with a create playbook of
+    its own names what it creates itself.
     """
     path = MOLECULE_PROJECT / "molecule" / scenario / "molecule.yml"
     if not path.is_file():
@@ -374,7 +396,11 @@ def _instances(scenario: str) -> list[str]:
     playbooks = (data.get("provisioner") or {}).get("playbooks") or {}
     if "shared/playbooks/" not in str(playbooks.get("create") or ""):
         return []
-    return [platform["name"] for platform in data.get("platforms") or []]
+    return [
+        item["name"]
+        for item in data.get("platforms") or []
+        if platform in (None, item["name"])
+    ]
 
 
 @nox.session(name="molecule", default=False)
@@ -409,7 +435,8 @@ def molecule(session: nox.Session) -> None:
         "MOLECULE_EPHEMERAL_DIRECTORY": state,
     }
     session.log(f"Molecule workspace {key}, state directory {state}")
-    instances = [f"{name}-{key}" for name in _instances(scenario)]
+    platform = _platform(session.posargs)
+    instances = [f"{name}-{key}" for name in _instances(scenario, platform)]
     if instances:
         session.log(f"Instance names: {', '.join(instances)}")
     with session.chdir("extensions"):

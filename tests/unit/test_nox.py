@@ -636,6 +636,7 @@ def molecule_run(
         "MOLECULE_WORKSPACE",
         "MOLECULE_EPHEMERAL_DIRECTORY",
         "MOLECULE_SERIAL",
+        "MOLECULE_PLATFORM_NAME",
     ):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("ANSIBLE_HOME", str(tmp_path / "ansible-home"))
@@ -685,6 +686,77 @@ def test_molecule_state_and_names_follow_the_directory(
     session, _lab = molecule_run(["test", "--scenario-name", "lab"])
     logged = " ".join(str(call.args[0]) for call in session.log.call_args_list)
     assert "Instance names" not in logged
+
+
+@pytest.mark.parametrize(
+    ("posargs", "environment", "expected"),
+    [
+        ([], None, None),
+        (["converge"], None, None),
+        (["test", "--platform-name", "molecule-debian12"], None, "molecule-debian12"),
+        (["test", "--platform-name=molecule-debian12"], None, "molecule-debian12"),
+        (["test", "-p", "molecule-debian12"], None, "molecule-debian12"),
+        (["test", "-pmolecule-debian12"], None, "molecule-debian12"),
+        (["test", "-p", "a", "--platform-name=b"], None, "b"),
+        ([], "molecule-debian13", "molecule-debian13"),
+        (["test", "-p", "molecule-debian12"], "molecule-debian13", "molecule-debian12"),
+        ([], "", None),
+        (["test", "--", "--platform-name", "other"], None, None),
+        (["test", "-s", "ee", "--scenario-name=ee"], None, None),
+    ],
+)
+def test_molecule_arguments_or_environment_name_one_platform(
+    noxfile: dict[str, object],
+    monkeypatch: pytest.MonkeyPatch,
+    posargs: list[str],
+    environment: str | None,
+    expected: str | None,
+) -> None:
+    monkeypatch.delenv("MOLECULE_PLATFORM_NAME", raising=False)
+    if environment is not None:
+        monkeypatch.setenv("MOLECULE_PLATFORM_NAME", environment)
+    platform = cast(Callable[[list[str]], str | None], noxfile["_platform"])
+    assert platform(posargs) == expected
+
+
+@pytest.mark.parametrize(
+    "noxfile",
+    [
+        "collection_default",
+        "collection_modules_rest",
+        "collection_modules_appliance",
+        "collection_modules_cli",
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
+    ("posargs", "environment", "expected"),
+    [
+        ([], None, ["molecule-debian13", "molecule-debian12"]),
+        (["test", "--platform-name", "molecule-debian12"], None, ["molecule-debian12"]),
+        (["test", "--platform-name=molecule-debian13"], None, ["molecule-debian13"]),
+        (["converge"], "molecule-debian12", ["molecule-debian12"]),
+        (["test", "--platform-name", "unknown"], None, []),
+    ],
+)
+def test_molecule_instance_names_follow_the_platform_name(
+    monkeypatch: pytest.MonkeyPatch,
+    molecule_run: Callable[[list[str]], tuple[MagicMock, dict[str, str]]],
+    posargs: list[str],
+    environment: str | None,
+    expected: list[str],
+) -> None:
+    if environment is not None:
+        monkeypatch.setenv("MOLECULE_PLATFORM_NAME", environment)
+    session, env = molecule_run(posargs)
+    key = env["MOLECULE_WORKSPACE"]
+    logged = [
+        str(call.args[0])
+        for call in session.log.call_args_list
+        if str(call.args[0]).startswith("Instance names")
+    ]
+    names = ", ".join(f"{name}-{key}" for name in expected)
+    assert logged == ([f"Instance names: {names}"] if expected else [])
 
 
 def test_molecule_key_and_state_can_be_set(

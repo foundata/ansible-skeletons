@@ -92,6 +92,10 @@ and the project adheres to
   outlive their run state, where nothing could reach them, and `--remove` then
   deleted their Podman stores under them.
 
+- Collection skeletons: the `molecule` session's "Instance names" line lists
+  only the platform that `--platform-name` or `MOLECULE_PLATFORM_NAME` names.
+  It used to list every platform of the scenario.
+
 - Collection skeletons: the `molecule` session installs `pycdlib`, which the
   libvirt platforms need for their cloud-init seed images.
 
