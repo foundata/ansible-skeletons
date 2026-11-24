@@ -241,6 +241,7 @@ def build_collection(rendered: Rendered) -> Path:
                 name
                 in (
                     *excluded,
+                    ".ansible-docsmith.toml",
                     ".rumdl.toml",
                     ".ansible-lint",
                     ".yamllint",
@@ -1034,7 +1035,6 @@ def module_identity(
     for removed in (
         "roles",
         "meta/execution-environment.yml",
-        ".ansible-docsmith.toml",
         "extensions/molecule/ee",
     ):
         if (rendered.collection / removed).exists():

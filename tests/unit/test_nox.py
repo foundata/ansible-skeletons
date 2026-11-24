@@ -29,12 +29,16 @@ def noxfile(
 ) -> dict[str, object]:
     """Load the generated noxfile with nox and antsibull-nox replaced by stubs."""
     installed_packages: list[object] = []
+    # The keyword arguments of each nox.session declaration, by session name.
+    declared: dict[str, dict[str, object]] = {}
 
     def decorator(
         **kwargs: object,
     ) -> Callable[[Callable[[Mock], None]], Callable[[Mock], None]]:
         if "packages" in kwargs:
             installed_packages.append(kwargs["packages"])
+        if "name" in kwargs:
+            declared[str(kwargs["name"])] = kwargs
         if kwargs.get("name") == "runtime-check":
             assert kwargs["default"] is True
         return lambda function: function
@@ -54,6 +58,7 @@ def noxfile(
     nox = ModuleType("nox")
     nox.options = SimpleNamespace()  # type: ignore[attr-defined]
     nox.session = decorator  # type: ignore[attr-defined]
+    nox.declared = declared  # type: ignore[attr-defined]
     nox.Session = Session  # type: ignore[attr-defined]
     antsibull = ModuleType("antsibull_nox")
     sessions = ModuleType("antsibull_nox.sessions")
@@ -391,6 +396,100 @@ def test_runtime_check_passes_prepared_dependencies_and_artifact(
         "--artifact",
         "/release/collection.tar.gz",
     )
+
+
+class SessionSkip(Exception):
+    """Stand in for the exception nox.Session.skip raises."""
+
+
+@pytest.mark.parametrize(
+    "noxfile",
+    [
+        "collection_default",
+        "collection_modules_rest",
+        "collection_modules_appliance",
+        "collection_modules_cli",
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
+    ("path", "documented"),
+    [
+        (None, False),
+        ("roles/run/meta/main.yml", False),
+        ("meta/argument_specs.yml", False),
+        ("roles/run/meta/argument_specs.yml", True),
+        ("roles/run/meta/argument_specs.yaml", True),
+    ],
+)
+def test_docs_is_a_default_session_while_a_role_has_an_argument_spec(
+    noxfile: dict[str, object], tmp_path: Path, path: str | None, documented: bool
+) -> None:
+    if path:
+        (tmp_path / path).parent.mkdir(parents=True)
+        (tmp_path / path).touch()
+    # Nox loads the noxfile in the collection root whenever it runs, so the
+    # tree at that moment decides; a role added after rendering counts.
+    runpy.run_path(str(noxfile["__file__"]))
+    declared = cast(Any, noxfile["nox"]).declared
+    assert declared["docs"]["default"] is documented
+
+
+@pytest.mark.parametrize(
+    "noxfile",
+    [
+        "collection_default",
+        "collection_modules_rest",
+        "collection_modules_appliance",
+        "collection_modules_cli",
+    ],
+    indirect=True,
+)
+def test_docs_without_a_documented_role_says_so_and_runs_nothing(
+    noxfile: dict[str, object], tmp_path: Path
+) -> None:
+    (tmp_path / "roles/run/meta").mkdir(parents=True)
+    (tmp_path / "roles/run/meta/main.yml").touch()
+    session = MagicMock()
+    session.skip.side_effect = SessionSkip
+    docs = cast(Callable[[Mock], None], noxfile["docs"])
+    with pytest.raises(SessionSkip):
+        docs(session)
+    session.skip.assert_called_once_with(
+        "No role has meta/argument_specs.yml; nothing to document"
+    )
+    session.run.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "noxfile",
+    [
+        "collection_default",
+        "collection_modules_rest",
+        "collection_modules_appliance",
+        "collection_modules_cli",
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize("check_only", [False, True])
+def test_docs_validates_then_regenerates_or_checks_role_documentation(
+    noxfile: dict[str, object],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    check_only: bool,
+) -> None:
+    spec = tmp_path / "roles/run/meta/argument_specs.yml"
+    spec.parent.mkdir(parents=True)
+    spec.touch()
+    docs = cast(Callable[[Mock], None], noxfile["docs"])
+    monkeypatch.setitem(docs.__globals__, "CHECK_ONLY", check_only)
+    session = MagicMock()
+    docs(session)
+    session.skip.assert_not_called()
+    assert [call.args for call in session.run.call_args_list] == [
+        ("ansible-docsmith", "validate", "."),
+        ("ansible-docsmith", "generate", ".", *(["--check"] if check_only else [])),
+    ]
 
 
 @pytest.mark.parametrize(

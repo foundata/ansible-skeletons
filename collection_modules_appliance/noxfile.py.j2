@@ -282,6 +282,31 @@ def ansible_lint(session: nox.Session) -> None:
     session.run("python", "tests/examples_lint.py", str(examples), env=env)
 
 
+def _role_specs() -> list[Path]:
+    """The roles' argument specs, which DocSmith documents."""
+    return sorted(
+        path
+        for name in ("argument_specs.yml", "argument_specs.yaml")
+        for path in Path("roles").glob(f"*/meta/{name}")
+    )
+
+
+# A default session only while a role has an argument spec. Nox reads the tree
+# whenever it loads this file, so a role added later is documented and checked.
+@nox.session(name="docs", default=bool(_role_specs()))
+@antsibull_nox.sessions.install_packages(packages=["ansible-docsmith>=2.4.0", "rumdl"])
+def docs(session: nox.Session) -> None:
+    """Role documentation with DocSmith; regenerates it unless CI=true."""
+    if not _role_specs():
+        session.skip("No role has meta/argument_specs.yml; nothing to document")
+    # ansible-docsmith validate .; ansible-docsmith generate . [--check]
+    # .ansible-docsmith.toml formats the READMEs with rumdl before comparing.
+    session.run("ansible-docsmith", "validate", ".")
+    session.run(
+        "ansible-docsmith", "generate", ".", *(["--check"] if CHECK_ONLY else [])
+    )
+
+
 @nox.session(name="helper-lint", default=True)
 @antsibull_nox.sessions.install_packages(packages=["ruff"])
 def helper_lint(session: nox.Session) -> None:

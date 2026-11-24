@@ -353,6 +353,7 @@ SKELETON_GROUPS = {
 # in the comparison; a file belongs to the largest group that shares it.
 SHARED_FILES = {
     "all": (
+        ".ansible-docsmith.toml.j2",
         ".ansible-lint.j2",
         ".gitattributes.j2",
         ".gitignore.j2",
@@ -383,7 +384,6 @@ SHARED_FILES = {
     ),
     "role_and_collection_default": (
         "FIXME.md.j2",
-        ".ansible-docsmith.toml.j2",
         "extensions/molecule/README.md.j2",
         "extensions/molecule/default/inventory/hosts.yml.j2",
         "extensions/molecule/default/molecule.yml.j2",

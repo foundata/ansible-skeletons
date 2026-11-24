@@ -79,6 +79,12 @@ Among the default sessions:
   and `tests/` apart from `tests/output/`. Add it to CI configurations that
   list sessions explicitly.
 {# end skeleton-variant #}
+- `docs` is a default session while a role has `meta/argument_specs.yml`.
+  [DocSmith](https://foundata.com/en/projects/ansible-docsmith/) validates the
+  argument specs and writes the variable documentation into the marked regions
+  of the READMEs and beside the variables in `defaults/`, formatted by rumdl as
+  `.ansible-docsmith.toml` configures. Without such a role, the session does
+  nothing and says so.
 
 {# skeleton-variant: pytest-runner #}
 Put the collection's own pytest suites below `tests/unit/` so `runtime-check`

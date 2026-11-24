@@ -20,6 +20,11 @@ and the project adheres to
   of the READMEs and of each module's `EXAMPLES`, through the new
   `tests/examples_lint.py`. A finding names the source file and its line.
 
+- Module skeletons: the `docs` session and `.ansible-docsmith.toml`, so that a
+  module collection that ships a role checks its documentation with DocSmith.
+  In every collection skeleton, `docs` is a default session only while a role
+  has `meta/argument_specs.yml`; otherwise it does nothing and says so.
+
 ### Changed
 
 - Release verification checks the remote tag, the forge and that a public clone
