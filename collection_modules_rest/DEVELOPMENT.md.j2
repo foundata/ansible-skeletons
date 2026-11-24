@@ -12,7 +12,6 @@ SPDX-License-Identifier: GPL-3.0-or-later
 - [Unit-test clocks](#test-clocks)
 - [Boundaries](#boundaries)
 - [Troubleshooting](#troubleshooting)
-- [Engine fields](#engine-fields)
 - [Releases](#releases)
 
 ## Prerequisites<a id="prerequisites"></a>
@@ -155,6 +154,9 @@ Its modules share one module utility, one activation scope where the product
 has one, and usually one Molecule scenario.
 {# end skeleton-variant #}
 
+The docstring of the `Field` class in `_engine.py` documents the options of a
+definition's fields, such as the `strmap` kind and readable secrets.
+
 {# skeleton-variant: contract-entry #}
 `tests/unit/plugins/modules/contract_subject.py` names the product resource,
 fake adapters and entry points the shared contract tests run against.
@@ -245,25 +247,6 @@ created.
 A killed Nox invocation can also leave `antsibull-nox-*` directories below
 `TMPDIR`, by default `/var/tmp/nox-<uid>`. Delete them when no Nox invocation of
 yours runs.
-
-## Engine fields<a id="engine-fields"></a>
-
-`Field(kind="strmap")` describes a dictionary of string keys to string values;
-empty strings are values. A write replaces the whole dictionary, and the
-engine compares and diffs it as one field. `maximum_items` bounds declared
-entries. `pattern` validates declared keys only, so an older stored key
-outside that pattern stays readable. The existing `map` kind holds names
-mapped to lists of rights.
-
-`Field(kind="secret", readable=True)` compares a returned secret privately
-on every declaration. `update_password` applies only to write-only secrets
-and is absent from the argument spec when there are none. A readable secret
-keeps `no_log=True` and is excluded from public state, including information
-reads and predictions. Its changed name appears in `changed_fields`; a diff
-uses the fixed marker `<redacted>` for that name, never a value or hash.
-`empty_clears=True` permits an empty declaration to clear the readable secret.
-Without that explicit policy an empty declaration is invalid. Both options
-default to false, preserving write-only secret behavior.
 
 ## Releases<a id="releases"></a>
 

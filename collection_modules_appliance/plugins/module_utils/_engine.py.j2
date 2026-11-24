@@ -120,17 +120,22 @@ class Field:
     field lists no ``choices``, so an explicit null stays unmanaged and the
     module documentation names the allowed values in prose.
 
-    ``strmap`` is a dictionary of string keys to string values, including
-    empty values. Writes replace the whole dictionary; comparisons and diffs
-    use the whole value. ``maximum_items`` bounds declared entries and
-    ``pattern`` validates declared keys only. Stored keys outside the pattern
-    stay readable. ``map`` continues to mean names mapped to lists of rights.
+    ``strmap`` is a dictionary of string keys to string values; empty strings
+    are values. A write replaces the whole dictionary, and the engine compares
+    and diffs it as one field. ``maximum_items`` bounds declared entries.
+    ``pattern`` validates declared keys only, so an older stored key outside
+    the pattern stays readable. ``map`` holds names mapped to lists of rights.
 
-    A ``secret`` is write-only unless ``readable`` is true. A readable secret
-    always compares the returned value privately, regardless of
-    ``update_password``; public objects omit it and diffs show only its name
-    with a fixed marker. ``empty_clears`` explicitly permits an empty declared
-    value to clear a readable secret. Both options default to false.
+    A ``secret`` is write-only unless ``readable`` is true. ``readable`` and
+    ``empty_clears`` default to false, which keeps write-only behavior.
+    ``update_password`` applies only to write-only secrets and is absent from
+    the argument spec when a resource has none. A readable secret compares the
+    returned value privately on every declaration. It keeps ``no_log=True`` and
+    is excluded from public state, information reads and predictions included.
+    When it changes, its name appears in ``changed_fields`` and a diff shows the
+    fixed marker ``<redacted>`` for it, never a value or hash. An empty declared
+    secret is invalid unless ``empty_clears`` permits it to clear a readable
+    secret.
     """
 
     name: str

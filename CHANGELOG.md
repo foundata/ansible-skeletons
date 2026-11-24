@@ -70,6 +70,11 @@ and the project adheres to
   `.yamllint` asks for `{ "a": "b" }` and `{}`, and for comments indented like
   the content around them. ansible-lint offers no fix mode with these rules.
 
+- Module skeletons: `DEVELOPMENT.md` drops its "Engine fields" section. The
+  `strmap` kind and readable secrets are documented in the docstring of the
+  engine's `Field` class, the API they belong to, and `DEVELOPMENT.md` points
+  there.
+
 - All skeletons: `.ansible-lint` enables `foundata-no-flush-handlers`, and the
   `ansible-lint` session requires ansible-lint-foundata 1.2.0 or newer.
 
