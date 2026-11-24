@@ -106,6 +106,10 @@ and the project adheres to
   them, so a role run from the restored state saw its dictionaries in another
   order and could rewrite its files.
 
+- All skeletons: the Podman create playbook names each container it starts by
+  its platform name. It used to print each whole platform at default verbosity,
+  registry credentials included.
+
 - Collection skeletons: the `molecule` session installs `pycdlib`, which the
   libvirt platforms need for their cloud-init seed images.
 

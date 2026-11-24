@@ -124,6 +124,9 @@
         systemd: "{{ '{{' }} item['systemd'] | ansible.builtin.default(omit) {{ '}}' }}"
         volumes: "{{ '{{' }} item['volumes'] | ansible.builtin.default(omit) {{ '}}' }}"
       loop: "{{ '{{' }} podman_platforms {{ '}}' }}"
+      loop_control:
+        # A platform can hold registry credentials; name it only.
+        label: "{{ '{{' }} item['name'] {{ '}}' }}"
       register: __testing_createcontainer_result
 
     - name: "Molecule | Create (Podman) | Print container info"

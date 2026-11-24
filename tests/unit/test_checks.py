@@ -874,6 +874,42 @@ def test_scenario_state_is_persisted_in_its_declared_order(skeleton: str) -> Non
     }
 
 
+def looped_tasks(node: object) -> list[dict[str, Any]]:
+    """The tasks of plays, blocks and task lists that have a loop."""
+    found: list[dict[str, Any]] = []
+    if isinstance(node, list):
+        for item in node:
+            found += looped_tasks(item)
+    elif isinstance(node, dict):
+        if "loop" in node:
+            found.append(node)
+        for key in ("pre_tasks", "tasks", "post_tasks", "block", "rescue", "always"):
+            found += looped_tasks(node.get(key))
+    return found
+
+
+@pytest.mark.parametrize("skeleton", SKELETONS)
+def test_shared_playbook_loops_over_variables_label_their_items(skeleton: str) -> None:
+    # Without a label, Ansible prints each whole item at default verbosity, and
+    # a platform or a state entry can hold a fixture's credentials.
+    playbooks = [name for name in SHARED_FILES["all"] if "/shared/playbooks/" in name]
+    tasks = [
+        task
+        for name in playbooks
+        for task in looped_tasks(
+            yaml.safe_load(shared_path(skeleton, name).read_text(encoding="utf-8"))
+        )
+        if isinstance(task["loop"], str)
+    ]
+    assert len(tasks) > 30
+    unlabeled = [
+        task["name"]
+        for task in tasks
+        if "label" not in (task.get("loop_control") or {})
+    ]
+    assert not unlabeled
+
+
 @pytest.mark.parametrize("skeleton", SKELETONS)
 def test_skeletons_ship_no_repository_tooling(skeleton: str) -> None:
     assert not (ROOT / skeleton / "pyproject.toml").exists()
