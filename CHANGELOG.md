@@ -41,6 +41,29 @@ and the project adheres to
   `.gitignore` no longer lists it. The repository's own `.rumdl.toml` does the
   same.
 
+- All skeletons: Molecule runs started from different directories can test at
+  the same time, for example from a second clone or a Git worktree. Each
+  directory is a workspace: the shared create and destroy playbooks name each
+  container and virtual machine `<platform name>-<workspace>`, label it with
+  Molecule's project directory and set `molecule_instance_name` in the
+  inventory; inventory hosts keep the platform names. The workspace is
+  `MOLECULE_WORKSPACE`, or else eight hexadecimal digits of the SHA-256 of the
+  project directory. Destroy removes only the instances of the current
+  workspace. A libvirt platform's `ssh_port` is optional: without it, create
+  picks a free local port.
+- Role and collection skeletons: the `ee` scenario ends the names of its image
+  and container with the workspace and builds without intermediate images. It
+  no longer removes every dangling image of the host.
+- Collection skeletons: the `molecule` session keeps the state of each scenario
+  in `~/.ansible/tmp/molecule.<workspace>/<scenario>/` and prints the workspace,
+  the state directory and the instance names. A call names one scenario at
+  most.
+- All skeletons: the Molecule README's note on symlinked paths moved from
+  "Requirements" to the troubleshooting part.
+- Checks: the infrastructure tiers name their instances through
+  `MOLECULE_WORKSPACE`, and the libvirt tier's VM gets its SSH port from the
+  scenario.
+
 - All skeletons: `.ansible-lint` enables `foundata-no-flush-handlers`, and the
   `ansible-lint` session requires ansible-lint-foundata 1.2.0 or newer.
 

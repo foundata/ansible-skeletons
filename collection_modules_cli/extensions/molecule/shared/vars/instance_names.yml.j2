@@ -1,0 +1,18 @@
+# Host-side names of the containers and VMs that the create and destroy
+# playbooks manage. Each name is "<platform name>-<workspace>", so runs from
+# different directories never share an instance; inventory hosts keep the
+# platform names. The workspace is MOLECULE_WORKSPACE, which the nox session
+# sets, or else the first eight hexadecimal digits of the SHA-256 of Molecule's
+# project directory.
+#
+# SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+---
+instance_project: "{{ '{{' }} lookup('ansible.builtin.env', 'MOLECULE_PROJECT_DIRECTORY') {{ '}}' }}"
+instance_workspace: >-
+  {{ '{{' }}
+    lookup('ansible.builtin.env', 'MOLECULE_WORKSPACE')
+    | ansible.builtin.default((instance_project | ansible.builtin.hash('sha256'))[:8], true)
+  {{ '}}' }}
+instance_suffix: "-{{ '{{' }} instance_workspace {{ '}}' }}"

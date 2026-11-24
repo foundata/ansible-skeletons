@@ -199,7 +199,9 @@
       - "{{ '{{' }} podman_executable {{ '}}' }}"
       - "--file"
       - "molecule-ee-test.yml"
-      - "--prune-images"
+      # No intermediate images, so nothing is left to prune: a prune would also
+      # remove the images of builds that other directories run at the same time.
+      - "--extra-build-cli-args=--layers=false"
       - "--verbosity"
       - "3" # 3 is the maximum verbosity and needed for build introspection
     chdir: "{{ '{{' }} __testing_state['build_dir_path'] {{ '}}' }}"

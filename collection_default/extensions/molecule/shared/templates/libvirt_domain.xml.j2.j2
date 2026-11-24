@@ -6,14 +6,18 @@ SPDX-License-Identifier: GPL-3.0-or-later
   libvirt domain definition of a Molecule test instance. Rendered per platform
   by the create-libvirt.yml playbook. tpl_platform contains the platform dict
   from molecule.yml; tpl_ephemeral_directory locates this scenario's files.
+  tpl_instance_name names the domain, tpl_project is Molecule's project
+  directory and tpl_ssh_port the forwarded local port.
 
   Networking: passt user networking with a TCP port forward from
-  127.0.0.1:<ssh_port> on the host to port 22 of the instance. This works
+  127.0.0.1:<tpl_ssh_port> on the host to port 22 of the instance. This works
   with a session libvirt daemon and does not need any privileges.
 -->
 {{ '{%' }} set __testing_vm_dir = tpl_ephemeral_directory ~ '/vm/' ~ tpl_platform['name'] {{ '%}' }}
 <domain type='kvm'>
-  <name>{{ '{{' }} tpl_platform['name'] {{ '}}' }}</name>
+  <name>{{ '{{' }} tpl_instance_name {{ '}}' }}</name>
+  <!-- The title names the directory that the instance belongs to. -->
+  <title>Molecule {{ '{{' }} tpl_platform['name'] {{ '}}' }} of {{ '{{' }} tpl_project | ansible.builtin.escape {{ '}}' }}</title>
   <memory unit='MiB'>{{ '{{' }} tpl_platform['memory'] | ansible.builtin.default(2048) {{ '}}' }}</memory>
   <vcpu>{{ '{{' }} tpl_platform['vcpus'] | ansible.builtin.default(2) {{ '}}' }}</vcpu>
   <os>
@@ -58,7 +62,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
     <interface type='user'>
       <backend type='passt'/>
       <portForward proto='tcp' address='127.0.0.1'>
-        <range start='{{ '{{' }} tpl_platform['ssh_port'] {{ '}}' }}' to='22'/>
+        <range start='{{ '{{' }} tpl_ssh_port {{ '}}' }}' to='22'/>
       </portForward>
       <model type='virtio'/>
       <!-- passt advertises a very large MTU (65520) via DHCP. Instances that

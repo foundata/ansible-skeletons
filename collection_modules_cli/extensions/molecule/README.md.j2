@@ -14,10 +14,6 @@ redispatch.
 
 ## Requirements
 
-When product tests refuse symlinked paths, use a short real checkout path such
-as `/var/tmp/<owner-directory>` on disk, never tmpfs. Resolving the short link
-Nox supplies for a long `TMPDIR` exposes the long path again.
-
 The caller supplies an authorized target with Python 3.9+, GNU `timeout`,
 `/usr/bin/env`, the installed collection and `foundata.utils`. The standalone
 process harness also requires a supported ansible-core on that target. Install
@@ -44,6 +40,12 @@ cleanup. Cleanup restores the ordinary baseline values; it cannot delete objects
 because the fixture exposes no deletion command. The caller removes the owned
 state directory and credentials after the run.
 
+The session keeps Molecule's own state per directory it runs from, in
+`~/.ansible/tmp/molecule.<workspace>/default/` below `ANSIBLE_HOME` when that
+is set, and prints that path when it starts. Runs from different directories,
+such as a second clone or a Git worktree, can therefore test at the same time;
+the `molecule` session in `noxfile.py` explains the workspace.
+
 ## Adapt the scenario
 
 Replace the fixture commands and seeded state from product evidence. Keep lost
@@ -57,3 +59,10 @@ product supplies the fault-control and write-receipt paths, cases, expected
 results and private values through stdin. Each case must dispatch exactly one
 write. Extend the invariant in the skeleton when another operation needs a
 different receipt model.
+
+## Troubleshooting<a id="troubleshooting"></a>
+
+When product tests refuse symlinked paths, use a short real path for the
+directory, such as `/var/tmp/<owner-directory>`, on disk and never on tmpfs.
+Resolving the short link Nox supplies for a long `TMPDIR` exposes the long path
+again.

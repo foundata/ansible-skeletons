@@ -24,7 +24,7 @@ CLEANUP_GRACE = 900.0
 """Seconds a stopped infrastructure tier has to destroy its targets."""
 VM_RECORD = "vms.json"
 """The file below a libvirt tier's output that names the VMs it created."""
-VM_NAME = re.compile(r"skeleton-gate-[0-9a-f]{12}-debian")
+VM_NAME = re.compile(r"debian-skeleton-gate-[0-9a-f]{12}")
 """The only form a recorded VM name can take."""
 
 

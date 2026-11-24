@@ -6,9 +6,11 @@
 #
 # Approach: vendor cloud images (qcow2) + cloud-init NoCloud seed ISO + qcow2
 # backing-file overlays, driven via a session libvirt daemon (qemu:///session)
-# with passt user networking and a deterministic SSH port forward per platform.
-# This works without root, without libvirt group membership and without any
-# IP discovery (instances are reachable via 127.0.0.1:<ssh_port>).
+# with passt user networking and an SSH port forward per platform. This works
+# without root, without libvirt group membership and without any IP discovery
+# (instances are reachable via 127.0.0.1:<port>). The port is the platform's
+# "ssh_port", or else a free local port picked here and kept in the inventory
+# and instance config until destroy.
 #
 # SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
@@ -19,6 +21,8 @@
   connection: "local"
   gather_facts: false
   no_log: "{{ '{{' }} molecule_no_log | ansible.builtin.default(false) {{ '}}' }}"
+  vars_files:
+    - "../vars/instance_names.yml"
   vars:
     libvirt_uri: "{{ '{{' }} lookup('ansible.builtin.env', 'MOLECULE_VM_LIBVIRT_URI') | ansible.builtin.default('qemu:///session', true) {{ '}}' }}"
     libvirt_cache_dir: >-
@@ -82,13 +86,11 @@
             that:
               - item['image'] is ansible.builtin.defined
               - item['image'] | ansible.builtin.length > 0
-              - item['ssh_port'] is ansible.builtin.defined
-              - item['ssh_port'] | ansible.builtin.int > 0
+              - (item['ssh_port'] is not ansible.builtin.defined) or (item['ssh_port'] | ansible.builtin.int > 0)
             fail_msg: >-
-              Platform "{{ '{{' }} item['name'] {{ '}}' }}" needs at least the keys
-              "image" (URL of a cloud image with cloud-init, or an absolute
-              local path to one) and "ssh_port"
-              (unique local port for the SSH port forward) in molecule.yml.
+              Platform "{{ '{{' }} item['name'] {{ '}}' }}" needs the key "image" (URL of
+              a cloud image with cloud-init, or an absolute local path to one) in
+              molecule.yml. The optional "ssh_port" must be a port number.
           loop: "{{ '{{' }} libvirt_platforms {{ '}}' }}"
           loop_control:
             label: "{{ '{{' }} item['name'] {{ '}}' }}"
@@ -97,10 +99,27 @@
           ansible.builtin.assert:
             that:
               - >-
-                (libvirt_platforms | ansible.builtin.map(attribute='ssh_port') | ansible.builtin.unique | ansible.builtin.length)
+                (__testing_fixed_ports | ansible.builtin.unique | ansible.builtin.length)
                 ==
-                (libvirt_platforms | ansible.builtin.length)
+                (__testing_fixed_ports | ansible.builtin.length)
             fail_msg: "At least two platforms in molecule.yml share the same ssh_port value."
+          vars:
+            __testing_fixed_ports: >-
+              {{ '{{' }}
+                libvirt_platforms
+                | ansible.builtin.selectattr('ssh_port', 'ansible.builtin.defined')
+                | ansible.builtin.map(attribute='ssh_port')
+                | ansible.builtin.map('ansible.builtin.int')
+                | ansible.builtin.list
+              {{ '}}' }}
+
+        - name: "Molecule | Create (libvirt) | Assert the workspace is usable in domain names"
+          ansible.builtin.assert:
+            that:
+              - instance_workspace is ansible.builtin.match('^[a-z0-9][a-z0-9-]{0,31}$')
+            fail_msg: >-
+              The workspace "{{ '{{' }} instance_workspace {{ '}}' }}" (MOLECULE_WORKSPACE) needs 1 to
+              32 lowercase letters, digits or dashes, starting with a letter or digit.
 
         # virsh on purpose: community.libvirt needs the libvirt-python binding,
         # which has no pre-built wheels. Switch once the binding ships wheels.
@@ -259,6 +278,40 @@
       when:
         - libvirt_platforms | ansible.builtin.length > 0
 
+    - name: "Molecule | Create (libvirt) | Pick free local ports for the SSH port forwards"
+      # The command module is used intentionally: no Ansible module or lookup
+      # reports a free port. The kernel picks ports that no socket uses, and
+      # all sockets stay bound until every port is known, so the ports differ.
+      ansible.builtin.command:
+        argv:
+          - "{{ '{{' }} ansible_playbook_python {{ '}}' }}"
+          - "-c"
+          - >-
+            import socket, sys;
+            sockets = [socket.socket() for _ in range(int(sys.argv[1]))];
+            [listener.bind(('127.0.0.1', 0)) for listener in sockets];
+            print(' '.join(str(listener.getsockname()[1]) for listener in sockets))
+          - "{{ '{{' }} libvirt_platforms | ansible.builtin.length {{ '}}' }}"
+      when:
+        - libvirt_platforms | ansible.builtin.length > 0
+      changed_when:
+        - false
+      register: __testing_free_ports_result
+
+    - name: "Molecule | Create (libvirt) | Assign the SSH port of each instance"
+      ansible.builtin.set_fact:
+        __testing_ssh_ports: >-
+          {{ '{{' }}
+            dict(libvirt_platforms
+                 | ansible.builtin.map(attribute='name')
+                 | ansible.builtin.zip(__testing_free_ports_result['stdout'].split() | ansible.builtin.map('ansible.builtin.int')))
+            | ansible.builtin.combine(libvirt_platforms
+                                      | ansible.builtin.selectattr('ssh_port', 'ansible.builtin.defined')
+                                      | ansible.builtin.items2dict(key_name='name', value_name='ssh_port'))
+          {{ '}}' }}
+      when:
+        - libvirt_platforms | ansible.builtin.length > 0
+
     - name: "Molecule | Create (libvirt) | Ensure per-instance working directories exist"
       ansible.builtin.file:
         path: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/vm/{{ '{{' }} item['name'] {{ '}}' }}"
@@ -358,6 +411,9 @@
       vars:
         tpl_platform: "{{ '{{' }} item {{ '}}' }}"
         tpl_ephemeral_directory: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}"
+        tpl_instance_name: "{{ '{{' }} item['name'] ~ instance_suffix {{ '}}' }}"
+        tpl_project: "{{ '{{' }} instance_project {{ '}}' }}"
+        tpl_ssh_port: "{{ '{{' }} __testing_ssh_ports[item['name']] {{ '}}' }}"
       loop: "{{ '{{' }} libvirt_platforms {{ '}}' }}"
       loop_control:
         label: "{{ '{{' }} item['name'] {{ '}}' }}"
@@ -389,7 +445,7 @@
               - "--connect"
               - "{{ '{{' }} libvirt_uri {{ '}}' }}"
               - "start"
-              - "{{ '{{' }} item['name'] {{ '}}' }}"
+              - "{{ '{{' }} item['name'] ~ instance_suffix {{ '}}' }}"
           changed_when:
             - __testing_start_result is ansible.builtin.success
           failed_when:
@@ -403,7 +459,7 @@
         - name: "Molecule | Create (libvirt) | Wait for the SSH port forwards"
           ansible.builtin.wait_for:
             host: "127.0.0.1"
-            port: "{{ '{{' }} item['ssh_port'] {{ '}}' }}"
+            port: "{{ '{{' }} __testing_ssh_ports[item['name']] {{ '}}' }}"
             timeout: 30
           loop: "{{ '{{' }} libvirt_platforms {{ '}}' }}"
           loop_control:
@@ -421,7 +477,7 @@
               - "30"
               - "ssh"
               - "-p"
-              - "{{ '{{' }} item['ssh_port'] {{ '}}' }}"
+              - "{{ '{{' }} __testing_ssh_ports[item['name']] {{ '}}' }}"
               - "-i"
               - "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/id_ed25519"
               - "-o"
@@ -459,7 +515,7 @@
               - "900"
               - "ssh"
               - "-p"
-              - "{{ '{{' }} item['ssh_port'] {{ '}}' }}"
+              - "{{ '{{' }} __testing_ssh_ports[item['name']] {{ '}}' }}"
               - "-i"
               - "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/id_ed25519"
               - "-o"
@@ -510,12 +566,12 @@
               Debugging hints:
               {{ '{%' }} for platform in libvirt_platforms {{ '%}' }}
               less '{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/vm/{{ '{{' }} platform['name'] {{ '}}' }}/console.log'
-              virsh --connect '{{ '{{' }} libvirt_uri {{ '}}' }}' domifaddr '{{ '{{' }} platform['name'] {{ '}}' }}' --source agent
+              virsh --connect '{{ '{{' }} libvirt_uri {{ '}}' }}' domifaddr '{{ '{{' }} platform['name'] ~ instance_suffix {{ '}}' }}' --source agent
               {{ '{%' }} endfor {{ '%}' }}
               You can manually remove the instance(s) with:
               {{ '{%' }} for platform in libvirt_platforms {{ '%}' }}
-              virsh --connect '{{ '{{' }} libvirt_uri {{ '}}' }}' destroy '{{ '{{' }} platform['name'] {{ '}}' }}'
-              virsh --connect '{{ '{{' }} libvirt_uri {{ '}}' }}' undefine '{{ '{{' }} platform['name'] {{ '}}' }}'
+              virsh --connect '{{ '{{' }} libvirt_uri {{ '}}' }}' destroy '{{ '{{' }} platform['name'] ~ instance_suffix {{ '}}' }}'
+              virsh --connect '{{ '{{' }} libvirt_uri {{ '}}' }}' undefine '{{ '{{' }} platform['name'] ~ instance_suffix {{ '}}' }}'
               {{ '{%' }} endfor {{ '%}' }}
 
         - name: "Molecule | Create (libvirt) | Throw error"
@@ -546,9 +602,9 @@
             + [{'instance': item['name'],
                 'address': '127.0.0.1',
                 'user': 'molecule',
-                'port': item['ssh_port'],
+                'port': __testing_ssh_ports[item['name']],
                 'identity_file': (molecule_ephemeral_directory ~ '/id_ed25519'),
-                'login_cmd': ('ssh -p ' ~ item['ssh_port'] ~ ' -i ' ~ molecule_ephemeral_directory ~ '/id_ed25519 '
+                'login_cmd': ('ssh -p ' ~ __testing_ssh_ports[item['name']] ~ ' -i ' ~ molecule_ephemeral_directory ~ '/id_ed25519 '
                               ~ ssh_common_args ~ ' molecule@127.0.0.1')}]
           {{ '}}' }}
       loop: "{{ '{{' }} libvirt_platforms {{ '}}' }}"
@@ -584,11 +640,12 @@
                   "{{ '{{' }} item['name'] {{ '}}' }}":
                     ansible_connection: "ssh"
                     ansible_host: "127.0.0.1"
-                    ansible_port: {{ '{{' }} item['ssh_port'] {{ '}}' }}
+                    ansible_port: {{ '{{' }} __testing_ssh_ports[item['name']] {{ '}}' }}
                     ansible_user: "molecule"
                     ansible_become: true
                     ansible_ssh_private_key_file: "{{ '{{' }} molecule_ephemeral_directory {{ '}}' }}/id_ed25519"
                     ansible_ssh_common_args: "{{ '{{' }} ssh_common_args {{ '}}' }}"
+                    molecule_instance_name: "{{ '{{' }} item['name'] ~ instance_suffix {{ '}}' }}"
               {{ '{{' }} __testing_inventory_os_group {{ '}}' }}:
                 hosts:
                   "{{ '{{' }} item['name'] {{ '}}' }}": {}

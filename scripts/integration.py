@@ -7,7 +7,6 @@ import json
 import os
 import re
 import shutil
-import socket
 import sys
 import tomllib
 import uuid
@@ -81,30 +80,37 @@ def fixture_tasks(project: Path, molecule: Path, *, collection: bool) -> None:
     write_yaml(molecule / "default/tasks/verify/gate.yml", [uninstall, assertion])
 
 
+# The platform name of a libvirt tier's VM; the scenario appends the workspace.
+VM_PLATFORM = "debian"
+
+
+def workspace(identity: str) -> str:
+    """The workspace of one generated project, the suffix of its instances."""
+    return f"skeleton-gate-{identity}"
+
+
 def vm_name(identity: str) -> str:
-    """Name the libvirt platform of one generated project."""
-    return f"skeleton-gate-{identity}-debian"
+    """Name the libvirt domain of one generated project."""
+    return f"{VM_PLATFORM}-{workspace(identity)}"
 
 
-def configure_scenario(
-    project: Path, molecule: Path, backend: str, identity: str
-) -> None:
-    """Select small, uniquely named platforms in the generated configuration."""
+def configure_scenario(project: Path, molecule: Path, backend: str) -> None:
+    """Select small platforms in the generated configuration.
+
+    The scenario ends the names of its containers and VMs with the workspace
+    that the tier sets, and picks the VM's SSH port itself.
+    """
     config_path = molecule / "default/molecule.yml"
     config = mapping(yaml.safe_load(config_path.read_text(encoding="utf-8")))
     if backend == "libvirt":
-        with socket.socket() as listener:
-            listener.bind(("127.0.0.1", 0))
-            port = listener.getsockname()[1]
         config["platforms"] = [
             {
-                "name": vm_name(identity),
+                "name": VM_PLATFORM,
                 "type": "libvirt",
                 "image": os.environ.get(
                     "SKELETONS_VM_IMAGE",
                     "https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-amd64.qcow2",
                 ),
-                "ssh_port": port,
                 "memory": 2048,
                 "vcpus": 2,
             }
@@ -117,7 +123,6 @@ def configure_scenario(
         for raw in platforms:
             platform = mapping(raw)
             if platform.get("name") in ("molecule-debian13", "molecule-almalinux9"):
-                platform["name"] = f"skeleton-gate-{identity}-{platform['name']}"
                 selected.append(platform)
         if len(selected) != 2:
             raise GateError(
@@ -424,7 +429,8 @@ def tier(
         ):
             molecule = project / relative
             identity = uuid.uuid4().hex[:12]
-            configure_scenario(project, molecule, backend, identity)
+            configure_scenario(project, molecule, backend)
+            env["MOLECULE_WORKSPACE"] = workspace(identity)
             if backend == "libvirt":
                 # Written first: a tier killed outright destroys nothing itself.
                 vms.append(vm_name(identity))

@@ -17,6 +17,8 @@
   connection: "local"
   gather_facts: false
   no_log: "{{ '{{' }} molecule_no_log | ansible.builtin.default(false) {{ '}}' }}"
+  vars_files:
+    - "../vars/instance_names.yml"
   vars:
     podman_executable: "{{ '{{' }} lookup('ansible.builtin.env', 'MOLECULE_PODMAN_EXECUTABLE') | ansible.builtin.default('podman', true) {{ '}}' }}"
     # Platforms handled by this playbook. Backend dispatch: platform entries
@@ -60,6 +62,16 @@
         - (__testing_state is not ansible.builtin.defined) or (__testing_state is not ansible.builtin.mapping)
 
   tasks:
+    - name: "Molecule | Create (Podman) | Assert the workspace is usable in container names"
+      ansible.builtin.assert:
+        that:
+          - instance_workspace is ansible.builtin.match('^[a-z0-9][a-z0-9-]{0,31}$')
+        fail_msg: >-
+          The workspace "{{ '{{' }} instance_workspace {{ '}}' }}" (MOLECULE_WORKSPACE) needs 1 to
+          32 lowercase letters, digits or dashes, starting with a letter or digit.
+      when:
+        - podman_platforms | ansible.builtin.length > 0
+
     - name: "Molecule | Create (Podman) | Log into container registry"
       containers.podman.podman_login:
         executable: "{{ '{{' }} podman_executable {{ '}}' }}"
@@ -84,7 +96,7 @@
 
     - name: "Molecule | Create (Podman) | Create containers running tests on target platforms"
       containers.podman.podman_container:
-        name: "{{ '{{' }} item['name'] {{ '}}' }}"
+        name: "{{ '{{' }} item['name'] ~ instance_suffix {{ '}}' }}"
         state: "started"
         image: "{{ '{{' }} item['image'] {{ '}}' }}"
         # Use specific entry-points like /usr/sbin/init for seamless rootless systemd
@@ -104,6 +116,9 @@
         cap_add: "{{ '{{' }} item['cap_add'] | ansible.builtin.default(omit) {{ '}}' }}"
         cap_drop: "{{ '{{' }} item['cap_drop'] | ansible.builtin.default(omit) {{ '}}' }}"
         executable: "{{ '{{' }} podman_executable {{ '}}' }}"
+        # Finds the instances of a deleted directory, see ../../README.md.
+        label:
+          molecule.project: "{{ '{{' }} instance_project {{ '}}' }}"
         log_driver: "{{ '{{' }} item['log_driver'] | ansible.builtin.default('journald') {{ '}}' }}"
         privileged: "{{ '{{' }} item['privileged'] | ansible.builtin.default(omit) {{ '}}' }}"
         systemd: "{{ '{{' }} item['systemd'] | ansible.builtin.default(omit) {{ '}}' }}"
@@ -187,8 +202,8 @@
             __testing_failcleanhint_msg: |-
               Container creation failed. You can manually remove the container(s) with:
               {{ '{%' }} for container in podman_platforms {{ '%}' }}
-              {{ '{{' }} podman_executable {{ '}}' }} container stop '{{ '{{' }} container['name'] {{ '}}' }}'
-              {{ '{{' }} podman_executable {{ '}}' }} container rm --ignore '{{ '{{' }} container['name'] {{ '}}' }}'
+              {{ '{{' }} podman_executable {{ '}}' }} container stop '{{ '{{' }} container['name'] ~ instance_suffix {{ '}}' }}'
+              {{ '{{' }} podman_executable {{ '}}' }} container rm --ignore '{{ '{{' }} container['name'] ~ instance_suffix {{ '}}' }}'
 
               {{ '{%' }} endfor {{ '%}' }}
               This might help resolve issues if the container is in a stuck state.
@@ -222,7 +237,7 @@
           {{ '{{' }}
             (__testing_instance_config | ansible.builtin.default([]))
             + [{'instance': item['name'],
-                'login_cmd': (podman_executable ~ ' exec -it ' ~ item['name'] ~ ' bash')}]
+                'login_cmd': (podman_executable ~ ' exec -it ' ~ item['name'] ~ instance_suffix ~ ' bash')}]
           {{ '}}' }}
       loop: "{{ '{{' }} podman_platforms {{ '}}' }}"
       loop_control:
@@ -268,6 +283,8 @@
                 hosts:
                   "{{ '{{' }} item['name'] {{ '}}' }}":
                     ansible_connection: "containers.podman.podman"
+                    ansible_host: "{{ '{{' }} item['name'] ~ instance_suffix {{ '}}' }}"
+                    molecule_instance_name: "{{ '{{' }} item['name'] ~ instance_suffix {{ '}}' }}"
               {{ '{{' }} __testing_inventory_os_group {{ '}}' }}:
                 hosts:
                   "{{ '{{' }} item['name'] {{ '}}' }}":

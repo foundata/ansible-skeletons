@@ -1294,8 +1294,11 @@ def check_molecule_contract(rendered: Rendered) -> None:
             "vcpus": 3,
             "extra_disks": [{"serial": "data", "size": "1G"}],
         }
-        (work / "vm" / str(vm["name"])).mkdir(parents=True)
-        platforms = [vm, {"name": "fixture-container", "image": "example"}]
+        # Without ssh_port, create picks a free local port.
+        picked = {"name": "fixture-picked", "type": "libvirt"}
+        for machine in (vm, picked):
+            (work / "vm" / str(machine["name"])).mkdir(parents=True)
+        platforms = [vm, picked, {"name": "fixture-container", "image": "example"}]
         plays = []
         for backend in ("podman", "libvirt", "podman"):
             source = yaml.safe_load(
@@ -1312,14 +1315,18 @@ def check_molecule_contract(rendered: Rendered) -> None:
                 for task in source["tasks"]
                 if task["name"].endswith(
                     (
+                        " | Pick free local ports for the SSH port forwards",
+                        " | Assign the SSH port of each instance",
                         " | Create inventory data, add container to groups",
                         " | Create inventory data, add instances to groups",
                         " | Store inventory data as molecule_inventory.yml",
                     )
                 )
             )
-            if len(tasks) != 3:
+            if len(tasks) != (5 if backend == "libvirt" else 3):
                 raise GateError("Missing inventory composition tasks")
+            if source.get("vars_files") != ["../vars/instance_names.yml"]:
+                raise GateError("The create playbook lost the instance names")
             if backend == "libvirt":
                 templates = [
                     task
@@ -1335,6 +1342,7 @@ def check_molecule_contract(rendered: Rendered) -> None:
                     "hosts": "localhost",
                     "connection": "local",
                     "gather_facts": False,
+                    "vars_files": source["vars_files"],
                     "vars": {
                         **source["vars"],
                         "molecule_ephemeral_directory": str(work),
@@ -1350,16 +1358,36 @@ def check_molecule_contract(rendered: Rendered) -> None:
             run(
                 ["ansible-playbook", "--inventory", "localhost,", str(playbook)],
                 cwd=project,
-                env=rendered.env,
+                env={
+                    **rendered.env,
+                    "MOLECULE_WORKSPACE": "contract",
+                    "MOLECULE_PROJECT_DIRECTORY": str(project),
+                },
             )
         finally:
             playbook.unlink()
         inventory = yaml.safe_load(inventory_path.read_text(encoding="utf-8"))
         hosts = inventory["all"]["children"]["molecule"]["hosts"]
-        if set(hosts) != {"existing", "fixture-container", "fixture-vm"}:
+        if set(hosts) != {
+            "existing",
+            "fixture-container",
+            "fixture-picked",
+            "fixture-vm",
+        }:
             raise GateError("Mixed-backend inventory lost or added hosts")
         if hosts["fixture-vm"]["ansible_port"] != 2244:
             raise GateError("VM inventory lost the SSH port")
+        port = hosts["fixture-picked"]["ansible_port"]
+        if not isinstance(port, int) or port in (0, 2244):
+            raise GateError("VM inventory got no free SSH port of its own")
+        container = hosts["fixture-container"]
+        if (
+            container.get("ansible_host") != "fixture-container-contract"
+            or container.get("molecule_instance_name") != "fixture-container-contract"
+            or hosts["fixture-vm"].get("molecule_instance_name")
+            != "fixture-vm-contract"
+        ):
+            raise GateError("Inventory lost the run's instance names")
         user_data = yaml.safe_load(
             (work / "vm/fixture-vm/user-data").read_text(encoding="utf-8")
         )
@@ -1367,12 +1395,18 @@ def check_molecule_contract(rendered: Rendered) -> None:
             raise GateError("Cloud-init lost the explicit SSH key input")
         domain = ET.parse(work / "vm/fixture-vm/domain.xml").getroot()
         if (
-            domain.findtext("name") != "fixture-vm"
+            domain.findtext("name") != "fixture-vm-contract"
+            or domain.findtext("title") != f"Molecule fixture-vm of {project}"
             or domain.findtext("memory") != "1536"
             or domain.findtext("vcpu") != "3"
             or domain.findtext("devices/disk/serial") != "data"
         ):
             raise GateError("Domain template lost platform settings")
+        forward = ET.parse(work / "vm/fixture-picked/domain.xml").find(
+            "devices/interface/portForward/range"
+        )
+        if forward is None or forward.get("start") != str(port):
+            raise GateError("Domain template lost the picked SSH port")
 
 
 def consumer_smoke(output: Path) -> None:

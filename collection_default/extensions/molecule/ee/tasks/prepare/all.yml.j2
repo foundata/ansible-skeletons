@@ -4,6 +4,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 ---
+# The image and the container carry this directory's workspace, as the instances of
+# the other scenarios do, so that directories can run the scenario at once.
+- name: "Molecule | Prepare (all) | Load the names of this directory's instances"
+  ansible.builtin.include_vars:
+    file: "{{ '{{' }} playbook_dir {{ '}}' }}/../vars/instance_names.yml"
+
 - name: "Molecule | Prepare (all) | Init data used across stages"
   ansible.builtin.include_tasks:
     file: "../tasks/state_update.yml"
@@ -15,9 +21,10 @@
       artifact_ansible_name: "" # technical name like foo.bar
       artifact_path: "" # full absolute path to the built artifact (file if collection, dir if role)
       artifact_fsname: "" # name n the filesystem like foo.bar-1.0.0.tar.gz (collection) or dirname like foobar (role)
-      ee_image_name: "molecule-ee-test"
+      ee_image_name: "molecule-ee-test{{ '{{' }} instance_suffix {{ '}}' }}"
       ee_image_tag: "latest"
-      ee_container_name: "molecule-verify-ee"
+      ee_container_name: "molecule-verify-ee{{ '{{' }} instance_suffix {{ '}}' }}"
+      ee_project: "{{ '{{' }} instance_project {{ '}}' }}"
 
 - name: "Molecule | Prepare (all) | Check for galaxy.yml (collection indicator)"
   ansible.builtin.stat:

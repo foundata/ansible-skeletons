@@ -331,9 +331,9 @@ def test_a_vm_the_tier_removed_itself_is_no_failure(
     "recorded",
     [
         ["work-vm"],
-        ["skeleton-gate-0123456789ab-debian", "work-vm"],
-        ["skeleton-gate-0123456789ab-debian; reboot"],
-        "skeleton-gate-0123456789ab-debian",
+        ["debian-skeleton-gate-0123456789ab", "work-vm"],
+        ["debian-skeleton-gate-0123456789ab; reboot"],
+        "debian-skeleton-gate-0123456789ab",
     ],
 )
 def test_no_other_vm_of_the_session_can_be_named(

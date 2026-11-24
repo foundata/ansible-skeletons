@@ -4,6 +4,10 @@
 # This playbook is only compatible with scenarios using a "driver:" that
 # invokes Podman in molecule.yml.
 #
+# Container names come from this directory's workspace (../vars/instance_names.yml),
+# never from the inventory, so a destroy cannot remove another directory's
+# containers.
+#
 # SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -12,6 +16,8 @@
   hosts: "molecule"
   gather_facts: false
   no_log: "{{ '{{' }} molecule_no_log | ansible.builtin.default(false) {{ '}}' }}"
+  vars_files:
+    - "../vars/instance_names.yml"
   vars:
     podman_executable: "{{ '{{' }} lookup('ansible.builtin.env', 'MOLECULE_PODMAN_EXECUTABLE') | ansible.builtin.default('podman', true) {{ '}}' }}"
   pre_tasks:
@@ -42,7 +48,7 @@
     - name: "Molecule | Destroy (Podman) | Stop container on localhost (best effort)"
       delegate_to: "localhost"
       containers.podman.podman_container:
-        name: "{{ '{{' }} inventory_hostname {{ '}}' }}"
+        name: "{{ '{{' }} inventory_hostname ~ instance_suffix {{ '}}' }}"
         state: "stopped"
         executable: "{{ '{{' }} podman_executable {{ '}}' }}"
       failed_when:
@@ -51,7 +57,7 @@
     - name: "Molecule | Destroy (Podman) | Remove container on localhost"
       delegate_to: "localhost"
       containers.podman.podman_container:
-        name: "{{ '{{' }} inventory_hostname {{ '}}' }}"
+        name: "{{ '{{' }} inventory_hostname ~ instance_suffix {{ '}}' }}"
         state: "absent"
         delete_volumes: true
         executable: "{{ '{{' }} podman_executable {{ '}}' }}"
@@ -104,6 +110,8 @@
   hosts: "localhost"
   gather_facts: false
   no_log: "{{ '{{' }} molecule_no_log | ansible.builtin.default(false) {{ '}}' }}"
+  vars_files:
+    - "../vars/instance_names.yml"
   vars:
     podman_executable: "{{ '{{' }} lookup('ansible.builtin.env', 'MOLECULE_PODMAN_EXECUTABLE') | ansible.builtin.default('podman', true) {{ '}}' }}"
   tasks:
@@ -111,9 +119,9 @@
       # The play above is driven by the inventory, which the create playbook
       # writes only after all instances are up. A create step that fails in
       # between leaves containers no inventory knows about, so they are removed
-      # here by their platform name.
+      # here by their name.
       containers.podman.podman_container:
-        name: "{{ '{{' }} item['name'] {{ '}}' }}"
+        name: "{{ '{{' }} item['name'] ~ instance_suffix {{ '}}' }}"
         state: "absent"
         delete_volumes: true
         executable: "{{ '{{' }} podman_executable {{ '}}' }}"

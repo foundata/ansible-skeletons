@@ -1,4 +1,6 @@
-# Destroy throwaway verification container(s) and EE image(s)
+# Destroy throwaway verification container(s) and EE image(s). Only this
+# directory's own: the build leaves no intermediate images, and dangling images
+# of other builds stay untouched.
 #
 # SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
@@ -38,32 +40,3 @@
         state: "absent"
         executable: "{{ '{{' }} podman_executable {{ '}}' }}"
         force: true
-
-    - name: "Molecule | Destroy (EE) | Find dangling images"
-      # The command or shell module is used intentionally:
-      # The containers.podman.podman_image_info module provides not *easy* way
-      # to get all dangling images.
-      ansible.builtin.command:
-        argv:
-          - "{{ '{{' }} podman_executable {{ '}}' }}"
-          - "images"
-          - "--filter"
-          - "dangling=true"
-          - "--quiet"
-      changed_when:
-        - false
-      failed_when:
-        - false
-      register: __testing_dangling_images
-
-    - name: "Molecule | Destroy (EE) | Remove dangling images (if any)"
-      containers.podman.podman_image:
-        name: "{{ '{{' }} item {{ '}}' }}"
-        state: "absent"
-        executable: "{{ '{{' }} podman_executable {{ '}}' }}"
-        force: true
-      when:
-        - (__testing_dangling_images['stdout_lines'] | ansible.builtin.default([])) | ansible.builtin.length > 0
-      failed_when:
-        - false
-      loop: "{{ '{{' }} __testing_dangling_images['stdout_lines'] | ansible.builtin.default([]) {{ '}}' }}"

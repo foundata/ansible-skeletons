@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Check generated Nox behavior without requiring Nox in the unit environment."""
 
+import hashlib
 import io
 import json
 import os
@@ -529,6 +530,9 @@ platforms:
   - name: "molecule-debian13"
     type: "podman"
   - name: "molecule-debian12"
+provisioner:
+  playbooks:
+    create: "../shared/playbooks/create-dispatch.yml"
 """
 
 
@@ -570,9 +574,12 @@ def test_molecule_session_runs_machines_one_at_a_time(
     scenario = tmp_path / "extensions/molecule/default/molecule.yml"
     scenario.parent.mkdir(parents=True)
     extra = '  - name: "molecule-vm"\n    type: "libvirt"\n' if machines else ""
-    scenario.write_text(SCENARIO + extra, encoding="utf-8")
+    scenario.write_text(
+        SCENARIO.replace("provisioner:", extra + "provisioner:"), encoding="utf-8"
+    )
     monkeypatch.delenv("MOLECULE_SERIAL", raising=False)
     monkeypatch.delenv("MOLECULE_PLATFORM_NAME", raising=False)
+    monkeypatch.delenv("MOLECULE_WORKSPACE", raising=False)
     if serial is not None:
         monkeypatch.setenv("MOLECULE_SERIAL", serial)
     session = MagicMock()
@@ -585,3 +592,134 @@ def test_molecule_session_runs_machines_one_at_a_time(
     )
     assert calls == expected
     session.chdir.assert_called_once_with("extensions")
+
+
+@pytest.mark.parametrize(
+    ("posargs", "expected"),
+    [
+        ([], "default"),
+        (["converge"], "default"),
+        (["-vvv", "test", "--destroy=never"], "default"),
+        (["test", "-s", "ee"], "ee"),
+        (["test", "--scenario-name", "ee"], "ee"),
+        (["test", "--scenario-name=ee"], "ee"),
+        (["test", "-see"], "ee"),
+        (["test", "-s", "ee", "--scenario-name=ee"], "ee"),
+        (["converge", "--", "-s", "other"], "default"),
+        (["test", "--all"], None),
+        (["test", "-s", "default", "-s", "ee"], None),
+        (["test", "-s"], None),
+    ],
+)
+def test_molecule_arguments_name_one_scenario(
+    noxfile: dict[str, object], posargs: list[str], expected: str | None
+) -> None:
+    scenario = cast(Callable[[list[str]], str | None], noxfile["_scenario"])
+    assert scenario(posargs) == expected
+
+
+@pytest.fixture
+def molecule_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, noxfile: dict[str, object]
+) -> Callable[[list[str]], tuple[MagicMock, dict[str, str]]]:
+    """Run the molecule session and return it with the environment it passed."""
+    scenario = tmp_path / "extensions/molecule/default/molecule.yml"
+    scenario.parent.mkdir(parents=True)
+    scenario.write_text(SCENARIO, encoding="utf-8")
+    ee = tmp_path / "extensions/molecule/ee/molecule.yml"
+    ee.parent.mkdir(parents=True)
+    ee.write_text(
+        'driver:\n  options:\n    managed: false\nplatforms:\n  - name: "localhost"\n',
+        encoding="utf-8",
+    )
+    for name in (
+        "MOLECULE_WORKSPACE",
+        "MOLECULE_EPHEMERAL_DIRECTORY",
+        "MOLECULE_SERIAL",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("ANSIBLE_HOME", str(tmp_path / "ansible-home"))
+
+    def run(posargs: list[str]) -> tuple[MagicMock, dict[str, str]]:
+        session = MagicMock()
+        session.posargs = posargs
+        session.error.side_effect = GateError("session error")
+        cast(Callable[[MagicMock], None], noxfile["molecule"])(session)
+        environments = [call.kwargs["env"] for call in session.run.call_args_list]
+        assert environments
+        assert all(env == environments[0] for env in environments)
+        return session, environments[0]
+
+    return run
+
+
+def test_molecule_state_and_names_follow_the_directory(
+    tmp_path: Path,
+    molecule_run: Callable[[list[str]], tuple[MagicMock, dict[str, str]]],
+) -> None:
+    project = str((tmp_path / "extensions").resolve())
+    key = hashlib.sha256(project.encode("utf-8")).hexdigest()[:8]
+    state = tmp_path / "ansible-home/tmp" / f"molecule.{key}"
+    session, env = molecule_run([])
+    assert env["MOLECULE_WORKSPACE"] == key
+    assert env["MOLECULE_EPHEMERAL_DIRECTORY"] == str(state / "default")
+    logged = " ".join(str(call.args[0]) for call in session.log.call_args_list)
+    assert f"molecule-debian13-{key}, molecule-debian12-{key}" in logged
+    assert str(state / "default") in logged
+    # A later call of the debug flow finds the same state and names.
+    _session, later = molecule_run(["converge"])
+    assert later["MOLECULE_WORKSPACE"] == key
+    assert later["MOLECULE_EPHEMERAL_DIRECTORY"] == str(state / "default")
+    session, ee = molecule_run(["test", "--scenario-name", "ee"])
+    assert ee["MOLECULE_EPHEMERAL_DIRECTORY"] == str(state / "ee")
+    logged = " ".join(str(call.args[0]) for call in session.log.call_args_list)
+    assert "Instance names" not in logged
+    # A scenario with a create playbook of its own names its instances itself.
+    own = tmp_path / "extensions/molecule/lab/molecule.yml"
+    own.parent.mkdir(parents=True)
+    own.write_text(
+        'platforms:\n  - name: "product-api"\n'
+        'provisioner:\n  playbooks:\n    create: "create.yml"\n',
+        encoding="utf-8",
+    )
+    session, _lab = molecule_run(["test", "--scenario-name", "lab"])
+    logged = " ".join(str(call.args[0]) for call in session.log.call_args_list)
+    assert "Instance names" not in logged
+
+
+def test_molecule_key_and_state_can_be_set(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    molecule_run: Callable[[list[str]], tuple[MagicMock, dict[str, str]]],
+) -> None:
+    monkeypatch.setenv("MOLECULE_WORKSPACE", "ci-42")
+    _session, env = molecule_run(["converge"])
+    assert env["MOLECULE_WORKSPACE"] == "ci-42"
+    expected = tmp_path / "ansible-home/tmp/molecule.ci-42/default"
+    assert env["MOLECULE_EPHEMERAL_DIRECTORY"] == str(expected)
+    monkeypatch.setenv("MOLECULE_EPHEMERAL_DIRECTORY", str(tmp_path / "state"))
+    _session, env = molecule_run(["converge"])
+    assert env["MOLECULE_EPHEMERAL_DIRECTORY"] == str(tmp_path / "state")
+
+
+@pytest.mark.parametrize(
+    ("key", "posargs"),
+    [
+        ("Upper", []),
+        ("-dash", []),
+        ("a" * 33, []),
+        ("has space", []),
+        (None, ["test", "--all"]),
+        (None, ["test", "-s", "default", "-s", "ee"]),
+    ],
+)
+def test_molecule_refuses_what_cannot_keep_runs_apart(
+    monkeypatch: pytest.MonkeyPatch,
+    molecule_run: Callable[[list[str]], tuple[MagicMock, dict[str, str]]],
+    key: str | None,
+    posargs: list[str],
+) -> None:
+    if key is not None:
+        monkeypatch.setenv("MOLECULE_WORKSPACE", key)
+    with pytest.raises(GateError, match="session error"):
+        molecule_run(posargs)

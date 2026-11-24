@@ -340,6 +340,7 @@ SHARED_FILES = {
         "extensions/molecule/shared/tasks/state_update.yml.j2",
         "extensions/molecule/shared/templates/cloud_init_user_data.yml.j2.j2",
         "extensions/molecule/shared/templates/libvirt_domain.xml.j2.j2",
+        "extensions/molecule/shared/vars/instance_names.yml.j2",
         "requirements.txt.j2",
     ),
     "role_and_collection_default": (
@@ -492,7 +493,7 @@ SHARED_PASSAGES = (
             "Author information",
         )
     ),
-    ("all", "extensions/molecule/README.md.j2", r"^When product tests", r"\n\n"),
+    ("all", "extensions/molecule/README.md.j2", r"^When product tests", r"\n\n|\Z"),
     *(
         ("provisioning_skeletons", "extensions/molecule/README.md.j2", start, end)
         for start, end in (
@@ -506,6 +507,9 @@ SHARED_PASSAGES = (
             ),
             (r"^If an instance does not come up:", r"(?=\n\n\n)"),
             (r"^`molecule login` opens", r"(?=\n\n\n)"),
+            (r"^### Parallel runs", r"^### |\Z"),
+            (r"^### Product tests refuse symlinked paths", r"^### |\Z"),
+            (r"^### Instances of a moved or deleted directory", r"^### |\Z"),
             (r"^### Container: `inotify_init1", r"^### |\Z"),
             (r"^### VMs: Instance-to-instance networking", r"^### |\Z"),
         )

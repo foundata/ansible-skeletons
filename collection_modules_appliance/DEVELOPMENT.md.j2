@@ -73,6 +73,13 @@ While editing, run the sessions of one ansible-core release, such as
 default sessions before a commit.
 {# end skeleton-variant #}
 
+The `molecule` session can run from several directories at the same time, such
+as a second clone or a Git worktree. Each directory's containers, virtual
+machines and Molecule state carry a workspace name of their own, which the
+session prints when it starts; see the
+[Molecule documentation](./extensions/molecule/README.md). Two runs at once from
+one directory are not supported.
+
 Below a deep checkout, nox gives each session a short symbolic link as
 `TMPDIR`, because Unix socket paths are limited in length. A test of code that
 refuses symbolic links in a path resolves `TMPDIR` first.

@@ -7,6 +7,9 @@
 # The cached cloud images below the image cache directory are kept on purpose
 # (they are shared between scenario runs; delete them manually if needed).
 #
+# Domain names come from this directory's workspace (../vars/instance_names.yml),
+# never from the inventory, so a destroy cannot remove another directory's VMs.
+#
 # SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' ~ company_url ~ '>' if company_url | default('') else '') }}
 # SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -15,6 +18,8 @@
   hosts: "molecule"
   gather_facts: false
   no_log: "{{ '{{' }} molecule_no_log | ansible.builtin.default(false) {{ '}}' }}"
+  vars_files:
+    - "../vars/instance_names.yml"
   vars:
     libvirt_uri: "{{ '{{' }} lookup('ansible.builtin.env', 'MOLECULE_VM_LIBVIRT_URI') | ansible.builtin.default('qemu:///session', true) {{ '}}' }}"
   pre_tasks:
@@ -53,7 +58,7 @@
           - "--connect"
           - "{{ '{{' }} libvirt_uri {{ '}}' }}"
           - "destroy"
-          - "{{ '{{' }} inventory_hostname {{ '}}' }}"
+          - "{{ '{{' }} inventory_hostname ~ instance_suffix {{ '}}' }}"
       changed_when:
         - __testing_virsh_destroy_result is ansible.builtin.success
       failed_when:
@@ -69,7 +74,7 @@
           - "--connect"
           - "{{ '{{' }} libvirt_uri {{ '}}' }}"
           - "undefine"
-          - "{{ '{{' }} inventory_hostname {{ '}}' }}"
+          - "{{ '{{' }} inventory_hostname ~ instance_suffix {{ '}}' }}"
       changed_when:
         - __testing_virsh_undefine_result is ansible.builtin.success
       failed_when:
@@ -129,6 +134,8 @@
   hosts: "localhost"
   gather_facts: false
   no_log: "{{ '{{' }} molecule_no_log | ansible.builtin.default(false) {{ '}}' }}"
+  vars_files:
+    - "../vars/instance_names.yml"
   vars:
     libvirt_uri: "{{ '{{' }} lookup('ansible.builtin.env', 'MOLECULE_VM_LIBVIRT_URI') | ansible.builtin.default('qemu:///session', true) {{ '}}' }}"
     libvirt_platforms: >-
@@ -143,7 +150,7 @@
       # The play above is driven by the inventory, which the create playbook
       # writes only after all instances are up. A create step that fails in
       # between leaves running instances no inventory knows about, so they are
-      # removed here by their platform name.
+      # removed here by their name.
       # The command module is used intentionally: community.libvirt would need
       # the libvirt-python binding which has no pre-built wheels.
       ansible.builtin.command:
@@ -152,7 +159,7 @@
           - "--connect"
           - "{{ '{{' }} libvirt_uri {{ '}}' }}"
           - "{{ '{{' }} item[1] {{ '}}' }}"
-          - "{{ '{{' }} item[0]['name'] {{ '}}' }}"
+          - "{{ '{{' }} item[0]['name'] ~ instance_suffix {{ '}}' }}"
       changed_when:
         - __testing_sweep_result is ansible.builtin.success
       failed_when:

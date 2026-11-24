@@ -19,8 +19,10 @@ and are configured in antsibull-nox.toml.
 """
 
 import atexit
+import hashlib
 import json
 import os
+import re
 import shutil
 import signal
 import socket
@@ -151,7 +153,10 @@ REQUIREMENT_FILES = [
 ]
 
 # Absolute: the molecule session changes into "extensions" before it runs.
-MOLECULE_SCENARIO = Path("extensions/molecule/default/molecule.yml").resolve()
+MOLECULE_PROJECT = Path("extensions").resolve()
+MOLECULE_SCENARIO = MOLECULE_PROJECT / "molecule/default/molecule.yml"
+# MOLECULE_WORKSPACE: ends container, image and VM names, see molecule().
+WORKSPACE = re.compile(r"[a-z0-9][a-z0-9-]{0,31}")
 
 
 def _prepare(session: nox.Session) -> dict[str, str]:
@@ -443,12 +448,82 @@ def _platforms() -> list[tuple[str, str]]:
     return [(p["name"], p.get("type", "podman")) for p in data.get("platforms", [])]
 
 
+def _scenario(arguments: list[str]) -> str | None:
+    """The scenario that Molecule arguments name, "default" if they name none.
+
+    None for --all or several scenarios: each scenario needs a state directory
+    of its own, and Molecule takes one for all from the environment.
+    """
+    names = set()
+    remaining = iter(arguments)
+    for argument in remaining:
+        if argument == "--":
+            break
+        if argument == "--all":
+            return None
+        if argument in ("-s", "--scenario-name"):
+            names.add(next(remaining, ""))
+        elif argument.startswith("--scenario-name="):
+            names.add(argument.partition("=")[2])
+        elif argument.startswith("-s") and not argument.startswith("--"):
+            names.add(argument[2:])
+    if len(names) > 1 or "" in names:
+        return None
+    return names.pop() if names else "default"
+
+
+def _instances(scenario: str) -> list[str]:
+    """Platform names of a scenario whose instances the shared create makes.
+
+    A scenario with a create playbook of its own names what it creates itself.
+    """
+    path = MOLECULE_PROJECT / "molecule" / scenario / "molecule.yml"
+    if not path.is_file():
+        return []
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    if ((data.get("driver") or {}).get("options") or {}).get("managed") is False:
+        return []
+    playbooks = (data.get("provisioner") or {}).get("playbooks") or {}
+    if "shared/playbooks/" not in str(playbooks.get("create") or ""):
+        return []
+    return [platform["name"] for platform in data.get("platforms") or []]
+
+
 @nox.session(name="molecule", default=False)
 # pycdlib: cloud-init seed images of the libvirt platforms (iso_create)
 @antsibull_nox.sessions.install_packages(packages=["molecule", "pycdlib"])
 def molecule(session: nox.Session) -> None:
-    """Molecule: full "default" scenario, or any Molecule command after "--"."""
-    env = _prepare(session)
+    """Molecule: full "default" scenario, or any Molecule command after "--".
+
+    Sessions in different directories can run at the same time. Each directory
+    is a workspace: the scenarios name their containers, images and VMs
+    "<platform name>-<workspace>", and the session keeps a scenario's state in
+    ANSIBLE_HOME/tmp/molecule.<workspace>/<scenario>. The workspace is
+    MOLECULE_WORKSPACE, by default eight hexadecimal digits of the SHA-256 of
+    the "extensions" path, so the separate calls of a debug session find their
+    instances again. MOLECULE_EPHEMERAL_DIRECTORY replaces the state directory.
+    Two runs at once from one directory are not supported.
+    """
+    scenario = _scenario(session.posargs)
+    if scenario is None:
+        session.error("Name one scenario per call; each keeps its own state")
+    digest = hashlib.sha256(str(MOLECULE_PROJECT).encode("utf-8")).hexdigest()
+    key = os.environ.get("MOLECULE_WORKSPACE") or digest[:8]
+    if not WORKSPACE.fullmatch(key):
+        session.error("MOLECULE_WORKSPACE: use 1 to 32 of a-z, 0-9 and -")
+    home = Path(os.environ.get("ANSIBLE_HOME", "~/.ansible")).expanduser()
+    state = os.environ.get("MOLECULE_EPHEMERAL_DIRECTORY") or str(
+        home / "tmp" / f"molecule.{key}" / scenario.replace("/", "--")
+    )
+    env = {
+        **_prepare(session),
+        "MOLECULE_WORKSPACE": key,
+        "MOLECULE_EPHEMERAL_DIRECTORY": state,
+    }
+    session.log(f"Molecule workspace {key}, state directory {state}")
+    instances = [f"{name}-{key}" for name in _instances(scenario)]
+    if instances:
+        session.log(f"Instance names: {', '.join(instances)}")
     with session.chdir("extensions"):
         if session.posargs:
             # molecule <arguments as given>

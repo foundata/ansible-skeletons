@@ -349,9 +349,11 @@ and, for libvirt, the cloud image. A check downloads the Galaxy collections
 once, into `galaxy/` below its output, and every later step, including the
 module renders' Molecule scenarios, installs them from there.
 `SKELETONS_VM_IMAGE` can name an absolute path to an existing
-Debian-compatible cloud-init image. Each run uses unique VM and container
-names. Podman tests use a separate disposable storage configuration, including
-the execution-environment build and its image cleanup.
+Debian-compatible cloud-init image. Each run sets a workspace of its own
+(`MOLECULE_WORKSPACE`), which ends its VM and container names, and its VM
+forwards SSH from a port the scenario picks. Podman tests use a separate
+disposable storage configuration, including the execution-environment build and
+its image cleanup.
 
 
 ## Updating dependencies<a id="updating-dependencies"></a>

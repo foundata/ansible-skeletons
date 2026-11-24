@@ -21,6 +21,7 @@ Paths are relative to this directory unless stated otherwise.
   - [Run tests](#usage-testing)
     - [Through nox](#usage-nox)
     - [With Molecule directly](#usage-molecule)
+  - [Parallel runs](#usage-parallel)
   - [Test sequence](#usage-sequence)
 {# skeleton-variant: recovery-contract-toc #}
 {# end skeleton-variant #}
@@ -35,15 +36,13 @@ Paths are relative to this directory unless stated otherwise.
   - [Molecule does not find the scenario](#faq-role-path-detection)
   - [An aborted run left records behind](#faq-leftovers)
   - [Certificate validation fails](#faq-tls)
+  - [Product tests refuse symlinked paths](#faq-symlinks)
+  - [Instances of a moved or deleted directory](#faq-orphans)
   - [Container: `inotify_init1(): Too many open files`](#faq-inotify)
   - [VMs: Instance-to-instance networking](#faq-vm-multi-node)
 
 
 ## Requirements<a id="requirements"></a>
-
-When product tests refuse symlinked paths, use a short real checkout path such
-as `/var/tmp/<owner-directory>` on disk, never tmpfs. Resolving the short link
-Nox supplies for a long `TMPDIR` exposes the long path again.
 
 - [Molecule](https://docs.ansible.com/projects/molecule/installation/). The nox
   session installs it; a direct run needs it in your Python environment.
@@ -113,6 +112,53 @@ molecule cleanup
 
 Give parallel runs their own `ANSIBLE_HOME`, `XDG_CACHE_HOME` and collections
 path, so that they do not share installed collections or caches.
+
+
+### Parallel runs<a id="usage-parallel"></a>
+
+Scenarios started from two different directories can run at the same time. The
+second directory can hold another collection, or be a temporary copy, a second
+clone or a Git worktree of the same one. Two runs at once from a single
+directory are not supported.
+
+Each directory is a workspace of its own. Its name is eight hexadecimal digits
+computed from the directory's path. The name stays the same when you, for
+example, switch Git branches, and it changes when you move or rename the
+directory. Containers and virtual machines are named
+`<platform name>-<workspace>`. Inventory hosts keep the platform names.
+
+{# skeleton-variant: nox-state #}
+The nox session prints the workspace, the state directory and the instance
+names when it starts:
+
+```console
+$ uv run noxfile.py -s molecule -- test --platform-name molecule-debian13 --destroy=never
+nox > Molecule workspace 3f9a1c2e, state directory /home/user/.ansible/tmp/molecule.3f9a1c2e/default
+nox > Instance names: molecule-debian13-3f9a1c2e
+$ podman exec molecule-debian13-3f9a1c2e systemctl is-system-running
+```
+
+It keeps the state of each scenario, such as its inventory and the disks of its
+virtual machines, in `~/.ansible/tmp/molecule.<workspace>/<scenario>/`, below
+`ANSIBLE_HOME` when that is set. `MOLECULE_EPHEMERAL_DIRECTORY` replaces that
+directory for a call.
+
+{# end skeleton-variant #}
+- `MOLECULE_WORKSPACE` sets the name yourself. It takes up to 32 lowercase
+  letters, digits and dashes.
+- `destroy` removes only the instances of the current workspace.
+- A task on the control node that needs the container or virtual machine itself
+  reads its name from the host variable `molecule_instance_name`. A helper
+  resource created there ends its name with `instance_suffix`, which
+  `shared/vars/instance_names.yml` provides.
+- A virtual machine forwards SSH from a free local port that `create` picks. A
+  platform's `ssh_port` fixes the port, and two directories that run that
+  platform at once then collide.
+- Run directly, without nox, Molecule keeps a scenario's state in
+  `~/.ansible/tmp/molecule.<checksum>.<scenario>/`, below `ANSIBLE_HOME` when
+  that is set. The checksum depends only on the name of the directory, so two
+  directories with the same name need their own `ANSIBLE_HOME` or, per
+  scenario, `MOLECULE_EPHEMERAL_DIRECTORY`.
 
 
 ### Test sequence<a id="usage-sequence"></a>
@@ -231,8 +277,6 @@ molecule destroy
 
 Container platforms need [Podman](https://podman.io/docs/installation). Set
 `MOLECULE_PODMAN_EXECUTABLE` to use another Podman binary than `podman`.
-Molecule names each container after its platform, so two runs of a scenario
-at the same time collide.
 
 
 #### VM platforms (`type: "libvirt"`)<a id="usage-owned-vm"></a>
@@ -282,16 +326,16 @@ safely delete the cache; missing images download again.
 | ------------------------------ | ------------------------------------------ | ------- |
 | `MOLECULE_VM_LIBVIRT_URI`      | `qemu:///session`                          | libvirt connection URI |
 | `MOLECULE_VM_CACHE_DIR`        | `~/.cache/ansible-molecule-libvirt/images` | Cloud image cache directory |
-| `MOLECULE_VM_REFRESH_IMAGES`   | (unset)                                    | Set to `1` to download the cached cloud images again |
+| `MOLECULE_VM_REFRESH_IMAGES`   | (unset)                                    | Set to `1` to download the cached cloud images again, while no other run uses them |
 | `MOLECULE_VM_IGNORE_RESOURCES` | (unset)                                    | Set to `1` to skip the memory and disk space guard |
 
 If an instance does not come up:
 
-- Read its boot console log, `vm/<name>/console.log` in Molecule's ephemeral
-  directory (usually `~/.ansible/tmp/molecule.*.default/`).
+- Read its boot console log, `vm/<name>/console.log` in the scenario's
+  [state directory](#usage-parallel).
 - List the domain states: `virsh --connect 'qemu:///session' list --all`
 - Ask the guest agent for the IP address:
-  `virsh --connect 'qemu:///session' domifaddr '<name>' --source agent`
+  `virsh --connect 'qemu:///session' domifaddr '<name>-<workspace>' --source agent`
 - Watch the boot output of each instance in
   [`virt-manager`](https://virt-manager.org/), connected to `qemu:///session`.
 
@@ -304,6 +348,9 @@ with `--destroy="never"`:
 ```bash
 molecule list
 molecule login --host "<name>"
+
+# A container, without Molecule
+podman exec -it "<name>-<workspace>" bash
 ```
 
 
@@ -346,6 +393,38 @@ The control node must trust the endpoint's certificate. Add your private
 certificate authority to the system trust store of the control node. Set
 `MOLECULE_PRODUCT_VALIDATE_CERTS=false` only for a disposable lab endpoint on a
 network you control: the credentials then travel to an unverified peer.
+
+
+### Product tests refuse symlinked paths<a id="faq-symlinks"></a>
+
+When product tests refuse symlinked paths, use a short real path for the
+directory, such as `/var/tmp/<owner-directory>`, on disk and never on tmpfs.
+Resolving the short link Nox supplies for a long `TMPDIR` exposes the long path
+again.
+
+
+### Instances of a moved or deleted directory<a id="faq-orphans"></a>
+
+`molecule destroy` removes only the instances of the directory it runs from. To
+find the instances whose directory was moved or deleted, list them with the
+directory they came from:
+
+```bash
+podman ps --all --filter "label=molecule.project" \
+  --format '{{ '{{' }}.Names{{ '}}' }} {{ '{{' }}index .Labels "molecule.project"{{ '}}' }}'
+virsh --connect 'qemu:///session' list --all --title
+```
+
+Remove each instance whose directory no longer exists by its name, then the
+state directories of its workspace. Images that a scenario builds carry the
+workspace in their name as well; `podman images` lists them.
+
+```bash
+podman rm --force '<platform name>-<workspace>'
+virsh --connect 'qemu:///session' destroy '<platform name>-<workspace>'
+virsh --connect 'qemu:///session' undefine '<platform name>-<workspace>'
+rm -r ~/.ansible/tmp/molecule.<workspace>/
+```
 
 
 ### Container: `inotify_init1(): Too many open files`<a id="faq-inotify"></a>
