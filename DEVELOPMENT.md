@@ -212,8 +212,9 @@ uses them as a consumer would. That catches mistakes such as:
 - A long collection name that pushes a generated line past the YAML or Markdown
   limit.
 - A repository-only file, such as `noxfile.py`, in the built collection archive.
-- A generated project that fails its own checks, or that the linter's autofix
-  would still change.
+- A generated project that fails its own checks, or that a run of its default
+  sessions without `CI=true` changes. Its `ansible-lint` session only reports
+  and must write nothing.
 - An installed module that no longer behaves, a lost reply that does not settle,
   or a credential in verbose output.
 

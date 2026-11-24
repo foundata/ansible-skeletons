@@ -24,7 +24,7 @@ from scripts.common import ROOT, GateError, Lane, isolated_environment, run, uv_
 from scripts.render import MODULE_PROFILES, Rendered, render
 from scripts.smoke import (
     IDENTITIES,
-    check_fix_stability,
+    changed_files,
     check_nox_gate,
     check_tree,
     consumer_smoke,
@@ -40,7 +40,9 @@ from scripts.smoke import (
     pinned_archives,
     pinned_utils_version,
     private_podman_store,
+    project_files,
     require_executed,
+    worktree_changes,
 )
 
 
@@ -176,13 +178,15 @@ def test_nox_constraints_follow_effective_overlay_packages(
     ]
 
 
-def test_nox_gate_isolates_stock_passthrough(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    rendered = Rendered(
-        tmp_path, tmp_path / "role", tmp_path / "collection", {"PATH": "/outer/bin"}
-    )
-    nox_runs = []
+def nox_gate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, problem: str | None = None
+) -> list[list[str]]:
+    """Run check_nox_gate on an empty collection with nox and Git replaced."""
+    collection = tmp_path / "collection"
+    (collection / "roles").mkdir(parents=True)
+    (collection / "galaxy.yml").write_text("---\n", encoding="utf-8")
+    rendered = Rendered(tmp_path, tmp_path / "role", collection, {"PATH": "/outer/bin"})
+    nox_runs: list[list[str]] = []
     config_lints = []
     envdirs: set[Path] = set()
 
@@ -190,6 +194,8 @@ def test_nox_gate_isolates_stock_passthrough(
         if command[0] == "antsibull-nox":
             config_lints.append(command)
             return ""
+        if command[:2] == ["git", "diff"]:
+            return "README.md\n" if problem == "rewrite" else ""
         if command[:2] == ["nox", "--list"]:
             return (
                 "Sessions defined in noxfile.py:\n\n"
@@ -212,19 +218,23 @@ def test_nox_gate_isolates_stock_passthrough(
             envdirs.add(envdir)
             env = kwargs["env"]
             assert isinstance(env, dict)
-            assert env["CI"] == "true"
             if command[1:3] == ["--sessions", "build-import-check"]:
+                assert env["CI"] == "true"
                 assert "PIP_CONSTRAINT" not in env
                 return ""
-            assert command[1:6] == [
-                "--sessions",
-                "docs-check",
-                "ansible-lint",
-                "helper-lint",
-                "docs",
-            ]
             assert env["PIP_CONSTRAINT"] == str(tmp_path / "lint-constraints.txt")
-            return "Verified discovery and execution of 18 foundata rules.\n"
+            if command[1:3] == ["--sessions", "ansible-lint"]:
+                # A plain run, as a developer starts it.
+                assert "CI" not in env
+                if problem == "write":
+                    (collection / "roles/new.yml").write_text("---\n", encoding="utf-8")
+                elif problem == "touch":
+                    os.utime(collection / "galaxy.yml", ns=(0, 0))
+                return "Verified discovery and execution of 18 foundata rules.\n"
+            assert command[1:5] == ["--sessions", "docs-check", "helper-lint", "docs"]
+            # First plain, then with CI=true.
+            assert ("CI" in env) == (len(nox_runs) == 3)
+            return ""
         if command[:3] == [str(tmp_path / "stock-lint/bin/python"), "-m", "nox"]:
             nox_runs.append(command)
             assert "--no-venv" in command
@@ -238,10 +248,38 @@ def test_nox_gate_isolates_stock_passthrough(
     monkeypatch.setattr("scripts.smoke.run", run)
     monkeypatch.setattr("scripts.smoke.lint_constraints", lambda: "")
     check_nox_gate(rendered)
-    assert len(nox_runs) == 3
     assert config_lints == [["antsibull-nox", "lint-config"]]
     assert len(envdirs) == 1
     assert not envdirs.pop().parent.exists()
+    return nox_runs
+
+
+def test_nox_gate_isolates_stock_passthrough(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    *runs, stock = nox_gate(tmp_path, monkeypatch)
+    assert [command[2] for command in runs] == [
+        "ansible-lint",
+        "docs-check",
+        "docs-check",
+        "build-import-check",
+    ]
+    assert stock[3:] == ["--session", "ansible-lint", "--no-venv"]
+
+
+@pytest.mark.parametrize(
+    ("problem", "message"),
+    [
+        ("write", "ansible-lint session wrote files: roles/new.yml"),
+        ("touch", "ansible-lint session wrote files: galaxy.yml"),
+        ("rewrite", "plain nox run changed the fresh render: README.md"),
+    ],
+)
+def test_nox_gate_requires_a_plain_run_to_leave_the_render_alone(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, problem: str, message: str
+) -> None:
+    with pytest.raises(GateError, match=message):
+        nox_gate(tmp_path, monkeypatch, problem)
 
 
 @pytest.mark.parametrize("failure", [None, "verification", "lint"])
@@ -957,6 +995,15 @@ def test_collection_default_lint_configuration() -> None:
         "max-start": 0,
         "max-end": 0,
     }
+    # { "a": "b" } and {}; a comment indented like its content.
+    assert yaml_config["rules"]["braces"] == {
+        "min-spaces-inside": 1,
+        "max-spaces-inside": 1,
+        "min-spaces-inside-empty": 0,
+        "max-spaces-inside-empty": 0,
+    }
+    assert "comments-indentation" not in yaml_config["rules"]
+    assert yaml_config["extends"] == "default"
 
 
 @pytest.mark.parametrize("pins", [0, 1, 2])
@@ -1109,7 +1156,6 @@ def test_downloaded_collections_replace_galaxy(
 
     monkeypatch.setattr("scripts.smoke.run", record)
     monkeypatch.setattr("scripts.smoke.lint_project", lambda *_: None)
-    monkeypatch.setattr("scripts.smoke.check_fix_stability", lambda *_: None)
     monkeypatch.setattr("scripts.smoke.check_nox_gate", lambda _rendered: None)
     rendered = Rendered(
         tmp_path,
@@ -1213,26 +1259,38 @@ def test_pinned_utils_release_satisfies_the_skeleton_dependency(profile: str) ->
     assert pinned_utils_version() in SpecifierSet(match[1])
 
 
-@pytest.mark.parametrize("unstable", [False, True])
-def test_second_fix_must_not_change_yaml(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, unstable: bool
-) -> None:
-    calls = 0
+def test_a_written_file_counts_even_with_its_old_content(tmp_path: Path) -> None:
+    for name in ("galaxy.yml", "roles/run/tasks/main.yml", ".nox/lint/log.txt"):
+        (tmp_path / name).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / name).write_text("---\n", encoding="utf-8")
+    before = project_files(tmp_path)
+    assert sorted(before) == ["galaxy.yml", "roles/run/tasks/main.yml"]
+    # Tool directories are no project files.
+    (tmp_path / ".nox/lint/log.txt").write_text("changed\n", encoding="utf-8")
+    (tmp_path / "__pycache__").mkdir()
+    (tmp_path / "__pycache__/noxfile.pyc").write_bytes(b"")
+    assert changed_files(before, project_files(tmp_path)) == []
+    os.utime(tmp_path / "galaxy.yml", ns=(0, 0))
+    (tmp_path / "roles/run/tasks/main.yml").unlink()
+    (tmp_path / "README.md").touch()
+    assert changed_files(before, project_files(tmp_path)) == [
+        "README.md",
+        "galaxy.yml",
+        "roles/run/tasks/main.yml",
+    ]
 
-    def fix(*args: object, **kwargs: object) -> str:
-        nonlocal calls
-        calls += 1
-        (tmp_path / "main.yml").write_text(
-            f"---\nvalue: {calls if unstable else 1}\n", encoding="utf-8"
-        )
-        return ""
 
-    monkeypatch.setattr("scripts.smoke.run", fix)
-    if unstable:
-        with pytest.raises(GateError, match="Second autofix pass changed YAML"):
-            check_fix_stability(tmp_path, {})
-    else:
-        check_fix_stability(tmp_path, {})
+def test_worktree_changes_are_those_git_shows(tmp_path: Path) -> None:
+    for name in ("galaxy.yml", "README.md", ".gitignore"):
+        (tmp_path / name).write_text("ignored/\n", encoding="utf-8")
+    run(["git", "init", "--quiet"], cwd=tmp_path)
+    run(["git", "add", "."], cwd=tmp_path)
+    assert worktree_changes(tmp_path) == []
+    (tmp_path / "README.md").write_text("changed\n", encoding="utf-8")
+    (tmp_path / "new.yml").touch()
+    (tmp_path / "ignored").mkdir()
+    (tmp_path / "ignored/cache").touch()
+    assert worktree_changes(tmp_path) == ["README.md", "new.yml"]
 
 
 def test_default_sessions_come_from_the_starred_listing() -> None:

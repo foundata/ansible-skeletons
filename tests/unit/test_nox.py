@@ -63,7 +63,10 @@ def noxfile(
     )
     antsibull.sessions = sessions  # type: ignore[attr-defined]
     antsibull.load_antsibull_nox_toml = Mock()  # type: ignore[attr-defined]
-    antsibull.IN_CI = False  # type: ignore[attr-defined]
+    # A parameter is a profile, or a profile and whether CI=true is set.
+    param = getattr(request, "param", "collection_default")
+    profile, in_ci = param if isinstance(param, tuple) else (param, False)
+    antsibull.IN_CI = in_ci  # type: ignore[attr-defined]
     for module in (nox, antsibull, sessions):
         monkeypatch.setitem(sys.modules, module.__name__, module)
     monkeypatch.chdir(tmp_path)
@@ -72,7 +75,6 @@ def noxfile(
     monkeypatch.setenv("TMPDIR", "/tmp")
     # The handler a noxfile installs stays out of the test process.
     monkeypatch.setattr("signal.signal", Mock())
-    profile = getattr(request, "param", "collection_default")
     loaded = runpy.run_path(str(ROOT / profile / "noxfile.py.j2"))
     assert ["ansible-lint-foundata>=1.2.0"] in installed_packages
     return loaded
@@ -556,6 +558,50 @@ def test_optional_extension_runs_in_the_lint_environment(
         assert len(calls) == 3
     else:
         assert len(calls) == 2
+
+
+@pytest.mark.parametrize(
+    "noxfile",
+    [
+        (profile, ci)
+        for profile in (
+            "collection_default",
+            "collection_modules_rest",
+            "collection_modules_appliance",
+            "collection_modules_cli",
+        )
+        for ci in (False, True)
+    ],
+    ids=lambda param: f"{param[0]}-{'ci' if param[1] else 'plain'}",
+    indirect=True,
+)
+@pytest.mark.parametrize("posargs", [[], ["roles"], ["--fix"]])
+def test_ansible_lint_only_reports(
+    noxfile: dict[str, object],
+    lint_session: Callable[[Mock], None],
+    posargs: list[str],
+    request: pytest.FixtureRequest,
+) -> None:
+    session = Mock()
+    session.posargs = posargs
+    session.virtualenv.is_sandboxed = False
+    session.run.return_value = "True\n"
+    lint_session(session)
+    lint = session.run.call_args_list[-1]
+    # Arguments after "--" reach ansible-lint as given; nothing adds --fix, and
+    # only exit status 0 passes, so the 8 of a fix run would fail the session.
+    assert lint.args == (
+        "python",
+        "-m",
+        "ansiblelint",
+        "--offline",
+        "--strict",
+        *posargs,
+    )
+    assert "success_codes" not in lint.kwargs
+    # CI=true reached the noxfile, and the session ignores it.
+    _profile, ci = request.node.callspec.params["noxfile"]
+    assert noxfile["CHECK_ONLY"] is ci
 
 
 @pytest.mark.parametrize(

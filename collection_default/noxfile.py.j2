@@ -6,10 +6,10 @@
 # ///
 """Checks of this collection. ``nox -l`` lists them, DEVELOPMENT.md explains them.
 
-A plain ``nox`` runs the default sessions. They apply the project's own
-rewrites first, such as lint fixes, generated documentation and Markdown
-formatting, and then check. With ``CI=true`` in the environment every session
-only checks and fails on what a rewrite would have changed.
+A plain ``nox`` runs the default sessions. The formatting ones, for import
+order, generated documentation and Markdown, rewrite first and then check. With
+``CI=true`` in the environment they only check and fail on what a rewrite would
+have changed. ``ansible-lint`` only reports, with or without ``CI=true``.
 
 Arguments after ``--`` go to the session's tool unchanged, for example
 ``nox -s molecule -- test --platform-name molecule-debian13``.
@@ -227,9 +227,13 @@ def runtime_check(session: nox.Session) -> None:
 @nox.session(name="ansible-lint", default=True)
 @antsibull_nox.sessions.install_packages(packages=["ansible-lint-foundata>=1.2.0"])
 def ansible_lint(session: nox.Session) -> None:
-    """ansible-lint with the foundata rules; fixes what it can unless CI=true.
+    """ansible-lint with the foundata rules; it only reports.
 
-    Then it lints the YAML examples of the READMEs and modules, never fixing them.
+    ansible-lint refuses its fix mode with this project's .yamllint and says so
+    in every run: its formatter cannot meet the brace and comment rules. Correct
+    the findings by hand.
+
+    Then it lints the YAML examples of the READMEs and modules.
     """
     env = _prepare(session) if session.virtualenv.is_sandboxed else {}
     installed = session.run(
@@ -257,19 +261,15 @@ def ansible_lint(session: nox.Session) -> None:
         )
     else:
         session.error("Could not determine whether ansible-lint-foundata is installed")
-    # ansible-lint --offline --strict [--fix]
-    # Exit status 8 means "fixed something", which is fine in rewrite mode.
-    fix = [] if CHECK_ONLY or "--fix" in session.posargs else ["--fix"]
+    # ansible-lint --offline --strict [arguments after "--"]
     session.run(
         "python",
         "-m",
         "ansiblelint",
         "--offline",
         "--strict",
-        *fix,
         *session.posargs,
         env=env,
-        success_codes=[0] if CHECK_ONLY else [0, 8],
     )
     # The YAML examples of the READMEs and modules, see tests/examples_lint.py.
     # They name the collection's own content, which only the prepared tree has.

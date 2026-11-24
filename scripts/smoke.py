@@ -1503,7 +1503,6 @@ def lint_resources(rendered: Rendered, collections: Path | None = None) -> None:
     )
     for project in (rendered.role, rendered.collection):
         lint_project(project, rendered.env)
-        check_fix_stability(project, rendered.env)
     # The role has no nox; the collection's remaining checks run through its nox.
     run(["reuse", "lint"], cwd=rendered.role, env=rendered.env)
     check_nox_gate(rendered)
@@ -1558,9 +1557,12 @@ def default_sessions(listing: str) -> list[str]:
 
 
 def check_nox_gate(rendered: Rendered) -> None:
-    """Run the generated collection's default nox sessions in check-only mode.
+    """Run the generated collection's default nox sessions, plain and with CI=true.
 
-    Tool versions are pinned to this environment through constraints.
+    The plain run is a developer's: its ansible-lint session must write nothing,
+    and the other sessions, which format before they check, must leave the fresh
+    render as it is. Tool versions are pinned to this environment through
+    constraints.
     """
     constraints = rendered.work / "lint-constraints.txt"
     constraints.write_text(lint_constraints(), encoding="utf-8")
@@ -1581,22 +1583,21 @@ def check_nox_gate(rendered: Rendered) -> None:
     # "lint" group in pyproject.toml and drop this exception.
     unpinned = {"build-import-check"}
     sessions = [name for name in default_sessions(listing) if name not in unpinned]
-    if not sessions:
-        raise GateError("The generated noxfile lists no default session")
-    env = {
-        **rendered.env,
-        "CI": "true",
+    if "ansible-lint" not in sessions:
+        raise GateError("The generated noxfile has no default ansible-lint session")
+    # ansible-lint behaves the same with CI=true: once, plain, is enough.
+    others = [name for name in sessions if name != "ansible-lint"]
+    plain = {
+        **{key: value for key, value in rendered.env.items() if key != "CI"},
         "UV_CONSTRAINT": str(constraints),
         "PIP_CONSTRAINT": str(constraints),
     }
+    env = {**plain, "CI": "true"}
     with (
         runtime_directory() as runtime,
         linked(runtime / NOX_LINK, environment) as link,
     ):
-        command = [
-            "nox",
-            "--sessions",
-            *sessions,
+        options = [
             "--force-python",
             f"{sys.version_info.major}.{sys.version_info.minor}",
             "--default-venv-backend",
@@ -1604,23 +1605,42 @@ def check_nox_gate(rendered: Rendered) -> None:
             "--envdir",
             str(link),
         ]
+        before = project_files(rendered.collection)
         output = run(
-            command,
+            ["nox", "--sessions", "ansible-lint", *options],
             cwd=rendered.collection,
-            env=env,
+            env=plain,
             timeout=1800,
             capture=True,
         )
         print(output, end="")
         if "Verified discovery and execution of 18 foundata rules." not in output:
             raise GateError("Nox session did not verify the adopted foundata rules")
+        written = changed_files(before, project_files(rendered.collection))
+        if written:
+            raise GateError(
+                f"The ansible-lint session wrote files: {', '.join(written)}"
+            )
+        if others:
+            run(
+                ["nox", "--sessions", *others, *options],
+                cwd=rendered.collection,
+                env=plain,
+                timeout=1800,
+            )
+            changed = worktree_changes(rendered.collection)
+            if changed:
+                raise GateError(
+                    f"A plain nox run changed the fresh render: {', '.join(changed)}"
+                )
+            run(
+                ["nox", "--sessions", *others, *options],
+                cwd=rendered.collection,
+                env=env,
+                timeout=1800,
+            )
         run(
-            [
-                "nox",
-                "--sessions",
-                *sorted(unpinned),
-                *command[command.index("--force-python") :],
-            ],
+            ["nox", "--sessions", *sorted(unpinned), *options],
             cwd=rendered.collection,
             env={**rendered.env, "CI": "true"},
             timeout=1800,
@@ -1669,30 +1689,51 @@ def check_nox_gate(rendered: Rendered) -> None:
         raise GateError("Stock-only Nox passthrough did not warn about missing rules")
 
 
-def check_fix_stability(project: Path, env: dict[str, str]) -> None:
-    """Require a second native autofix pass to leave generated YAML unchanged."""
-    command = ["ansible-lint", "--offline", "--fix", "--project-dir", str(project)]
-    # Ansible Lint 26.9 returns 8 when fixes changed files, including layout only.
-    run(command, cwd=project, env=env, allowed_exit_codes=(0, 8))
-    files = {
-        path: path.read_bytes()
-        for path in project.rglob("*")
-        if path.is_file()
-        and path.suffix in (".yml", ".yaml")
-        and not {".cache", ".ansible", ".nox", ".venv"}.intersection(
-            path.relative_to(project).parts
-        )
-    }
-    run(command, cwd=project, env=env)
-    changed = [
-        str(path.relative_to(project))
-        for path, data in files.items()
-        if path.read_bytes() != data
-    ]
-    if changed:
-        raise GateError(
-            f"Second autofix pass changed YAML: {', '.join(sorted(changed))}"
-        )
+# Where sessions and tools keep environments and caches inside a project.
+TOOL_DIRECTORIES = frozenset(
+    (".git", ".nox", ".ansible", ".cache", ".venv", "__pycache__")
+)
+
+
+def project_files(project: Path) -> dict[str, tuple[int, bytes]]:
+    """Each file of a project outside tool directories, with mtime and content."""
+    files = {}
+    for directory, subdirectories, names in os.walk(project):
+        subdirectories[:] = [
+            name for name in subdirectories if name not in TOOL_DIRECTORIES
+        ]
+        for name in names:
+            path = Path(directory, name)
+            content = (
+                os.fsencode(path.readlink()) if path.is_symlink() else path.read_bytes()
+            )
+            files[path.relative_to(project).as_posix()] = (
+                path.lstat().st_mtime_ns,
+                content,
+            )
+    return files
+
+
+def changed_files(
+    before: dict[str, tuple[int, bytes]], after: dict[str, tuple[int, bytes]]
+) -> list[str]:
+    """Files created, removed or written between two snapshots, even unchanged."""
+    return sorted(
+        name
+        for name in before.keys() | after.keys()
+        if before.get(name) != after.get(name)
+    )
+
+
+def worktree_changes(project: Path) -> list[str]:
+    """Files Git shows as changed or new since the project was staged."""
+    changed = run(["git", "diff", "--name-only"], cwd=project, capture=True)
+    added = run(
+        ["git", "ls-files", "--others", "--exclude-standard"],
+        cwd=project,
+        capture=True,
+    )
+    return sorted({*changed.splitlines(), *added.splitlines()})
 
 
 def main() -> int:

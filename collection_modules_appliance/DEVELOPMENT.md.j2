@@ -33,7 +33,7 @@ Run the checks from the collection's Git root. With
 
 {# skeleton-variant: check-commands #}
 ```bash
-uv run noxfile.py                 # fix, then run default checks
+uv run noxfile.py                 # format, then run default checks
 CI=true uv run noxfile.py         # check only
 uv run noxfile.py -l              # list sessions
 uv run noxfile.py -s lint         # Python, plugin YAML and typing
@@ -61,6 +61,10 @@ Among the default sessions:
 
 {# skeleton-variant: deployment-lint #}
 {# end skeleton-variant #}
+- `ansible-lint` only reports, with or without `CI=true`; correct its findings
+  by hand. Its fix mode is not available: ansible-lint refuses it with this
+  project's `.yamllint`, whose brace and comment rules its formatter cannot
+  meet, and says so in every run.
 - `ansible-lint` also checks the examples: each fenced `yaml` or `yml` block of
   `README.md` and the roles' READMEs that holds a list of plays or tasks, and
   each module's `EXAMPLES`. It lists the other blocks, such as variables or

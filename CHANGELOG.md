@@ -61,6 +61,10 @@ and the project adheres to
   "Table of contents" carries `toc` again, and `DEVELOPMENT.md` has a table of
   contents.
 
+- Collection skeletons: the `ansible-lint` session only reports. All skeletons:
+  `.yamllint` asks for `{ "a": "b" }` and `{}`, and for comments indented like
+  the content around them. ansible-lint offers no fix mode with these rules.
+
 - All skeletons: `.ansible-lint` enables `foundata-no-flush-handlers`, and the
   `ansible-lint` session requires ansible-lint-foundata 1.2.0 or newer.
 
