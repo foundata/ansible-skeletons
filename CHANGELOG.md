@@ -96,6 +96,11 @@ and the project adheres to
   only the platform that `--platform-name` or `MOLECULE_PLATFORM_NAME` names.
   It used to list every platform of the scenario.
 
+- Collection skeletons: without `TMPDIR`, the nox sessions keep their temporary
+  files in `/var/tmp/nox-<uid>`, a directory private to the user that every run
+  shares. They used to put the collection copies of `ansible-test` below
+  `/tmp`, often a small tmpfs, where `ansible-test` failed.
+
 - Collection skeletons: the `molecule` session installs `pycdlib`, which the
   libvirt platforms need for their cloud-init seed images.
 

@@ -94,6 +94,11 @@ Below a deep checkout, nox gives each session a short symbolic link as
 `TMPDIR`, because Unix socket paths are limited in length. A test of code that
 refuses symbolic links in a path resolves `TMPDIR` first.
 
+Without `TMPDIR`, the sessions use `/var/tmp/nox-<uid>` instead of `/tmp`, which
+is often a small tmpfs. Every run shares this directory, and only you may use
+it. Nox warns and keeps `/tmp` when the directory has another owner or other
+permissions.
+
 ## Unit-test clocks<a id="test-clocks"></a>
 
 Use the opt-in `fake_clock` fixture when a test's expected outcome depends
@@ -291,6 +296,10 @@ Delete those entries by name, keep the link targets, and remove the directory
 with `rmdir`. Leave symlinked or replaced paths and uncertain creators for
 investigation. Nox itself removes only the unchanged directory its invocation
 created.
+
+A killed Nox invocation can also leave `antsibull-nox-*` directories below
+`TMPDIR`, by default `/var/tmp/nox-<uid>`. Delete them when no Nox invocation of
+yours runs.
 
 ## Engine fields<a id="engine-fields"></a>
 

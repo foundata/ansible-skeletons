@@ -67,8 +67,9 @@ def noxfile(
     for module in (nox, antsibull, sessions):
         monkeypatch.setitem(sys.modules, module.__name__, module)
     monkeypatch.chdir(tmp_path)
-    # Loading shortens an inherited TMPDIR; keep the test process's own.
-    monkeypatch.delenv("TMPDIR", raising=False)
+    # Loading shortens a long TMPDIR and creates a directory below /var/tmp
+    # without one; a short TMPDIR stays as it is.
+    monkeypatch.setenv("TMPDIR", "/tmp")
     # The handler a noxfile installs stays out of the test process.
     monkeypatch.setattr("signal.signal", Mock())
     profile = getattr(request, "param", "collection_default")
@@ -128,6 +129,79 @@ def test_a_deep_temporary_directory_gets_a_short_path(
         assert short_path(str(deep)) == str(deep)
     finally:
         link.parent.chmod(0o700)
+
+
+@pytest.mark.parametrize(
+    "noxfile",
+    [
+        "collection_default",
+        "collection_modules_rest",
+        "collection_modules_appliance",
+        "collection_modules_cli",
+    ],
+    indirect=True,
+)
+def test_sessions_without_tmpdir_share_a_private_directory_below_var_tmp(
+    noxfile: dict[str, object], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    default = cast(FunctionType, noxfile["_default_tmpdir"])
+    assert default.__globals__["SCRATCH"] == Path("/var/tmp")
+    monkeypatch.setitem(default.__globals__, "SCRATCH", tmp_path)
+    expected = tmp_path / f"nox-{os.getuid()}"
+    for _invocation in range(2):
+        monkeypatch.delenv("TMPDIR")
+        default()
+        assert os.environ["TMPDIR"] == str(expected)
+        assert expected.lstat().st_mode & 0o777 == 0o700
+        (expected / "kept").touch()
+    assert [path.name for path in tmp_path.iterdir()] == [expected.name]
+    given = str(tmp_path / ("given-" * 20))
+    monkeypatch.setenv("TMPDIR", given)
+    default()
+    assert os.environ["TMPDIR"] == given
+
+
+@pytest.mark.parametrize(
+    "noxfile",
+    [
+        "collection_default",
+        "collection_modules_rest",
+        "collection_modules_appliance",
+        "collection_modules_cli",
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize("problem", ["symlink", "shared", "file", "foreign", "missing"])
+def test_a_default_tmpdir_that_is_not_private_is_not_used(
+    noxfile: dict[str, object],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    problem: str,
+) -> None:
+    default = cast(FunctionType, noxfile["_default_tmpdir"])
+    scratch = tmp_path / ("missing" if problem == "missing" else "scratch")
+    uid = os.getuid() + (1 if problem == "foreign" else 0)
+    directory = scratch / f"nox-{uid}"
+    if problem != "missing":
+        scratch.mkdir()
+    if problem == "symlink":
+        (tmp_path / "elsewhere").mkdir(mode=0o700)
+        directory.symlink_to(tmp_path / "elsewhere", target_is_directory=True)
+    elif problem == "shared":
+        directory.mkdir()
+        directory.chmod(0o755)
+    elif problem == "file":
+        directory.touch()
+    elif problem == "foreign":
+        # Owned by the real user, not by the user the noxfile believes it runs as.
+        directory.mkdir(mode=0o700)
+        monkeypatch.setattr("os.getuid", lambda: uid)
+    monkeypatch.setitem(default.__globals__, "SCRATCH", scratch)
+    monkeypatch.delenv("TMPDIR")
+    default()
+    assert "TMPDIR" not in os.environ
+    assert f"{directory} is not a private directory" in capsys.readouterr().err
 
 
 def short_invocation(noxfile: dict[str, object]) -> dict[str, Any]:

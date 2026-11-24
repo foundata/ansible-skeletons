@@ -26,6 +26,7 @@ import re
 import shutil
 import signal
 import socket
+import stat
 import sys
 import tarfile
 import tempfile
@@ -62,6 +63,12 @@ nox.options.default_venv_backend = "uv|virtualenv"
 TMPDIR_LIMIT = 64
 """Longest TMPDIR that leaves room for the socket names below it."""
 _SHORT: list[tuple[Path, int, int]] = []
+
+# Without TMPDIR, Python and antsibull-nox use /tmp, often a small tmpfs, for
+# example for the collection copies that ansible-test runs in. The sessions use
+# the user's private directory below /var/tmp instead, nox-<uid>, which every
+# invocation shares; antsibull-nox removes its files there when it ends.
+SCRATCH = Path("/var/tmp")
 
 
 def _leave(_signal: int, _frame: object) -> None:
@@ -135,7 +142,32 @@ def _create_tmp_on_a_short_path(self: nox.Session) -> str:
     return tmpdir
 
 
+def _default_tmpdir() -> None:
+    """Without TMPDIR, set it to the user's private directory below SCRATCH."""
+    if os.environ.get("TMPDIR"):
+        return
+    directory = SCRATCH / f"nox-{os.getuid()}"
+    try:
+        directory.mkdir(mode=0o700, exist_ok=True)
+        metadata = directory.lstat()
+        private = (
+            stat.S_ISDIR(metadata.st_mode)
+            and metadata.st_uid == os.getuid()
+            and not metadata.st_mode & 0o077
+        )
+    except OSError:
+        private = False
+    if not private:
+        print(
+            f"{directory} is not a private directory of yours; using /tmp",
+            file=sys.stderr,
+        )
+        return
+    os.environ["TMPDIR"] = str(directory)
+
+
 nox.Session.create_tmp = _create_tmp_on_a_short_path
+_default_tmpdir()
 if os.environ.get("TMPDIR"):
     os.environ["TMPDIR"] = _short_path(os.environ["TMPDIR"])
 
