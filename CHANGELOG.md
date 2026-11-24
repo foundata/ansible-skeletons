@@ -16,14 +16,9 @@ and the project adheres to
 
 ### Added
 
-- Collection skeletons: the `ansible-lint` session also lints the examples with
-  the project's configuration: each fenced `yaml` or `yml` block of `README.md`
-  and the role READMEs that holds a list of plays or tasks, and each module's
-  `EXAMPLES`. The new `tests/examples_lint.py` extracts them, and a finding
-  names the source file and its line. Two examples it found are fixed: the
-  default skeleton's role README exceeded the line length with long names, and
-  the REST and appliance READMEs broke the play's YAML with a product name in
-  double quotes.
+- Collection skeletons: the `ansible-lint` session also lints the YAML examples
+  of the READMEs and of each module's `EXAMPLES`, through the new
+  `tests/examples_lint.py`. A finding names the source file and its line.
 
 ### Changed
 
@@ -53,36 +48,18 @@ and the project adheres to
   same.
 
 - All skeletons: Molecule runs started from different directories can test at
-  the same time, for example from a second clone or a Git worktree. Each
-  directory is a workspace: the shared create and destroy playbooks name each
-  container and virtual machine `<platform name>-<workspace>`, label it with
-  Molecule's project directory and set `molecule_instance_name` in the
-  inventory; inventory hosts keep the platform names. The workspace is
-  `MOLECULE_WORKSPACE`, or else eight hexadecimal digits of the SHA-256 of the
-  project directory. Destroy removes only the instances of the current
-  workspace. A libvirt platform's `ssh_port` is optional: without it, create
-  picks a free local port.
-- Role and collection skeletons: the `ee` scenario ends the names of its image
-  and container with the workspace and builds without intermediate images. It
-  no longer removes every dangling image of the host.
-- All skeletons: every "Table of contents" heading carries the anchor `toc`
-  again. The collection READMEs had lost it in 4.0.0, and the Molecule READMEs
-  now have it as well.
-- Collection skeletons: `DEVELOPMENT.md` and the CLI skeleton's Molecule README
-  have a table of contents, and every heading written in a template has an
-  explicit anchor, as the Markdown guide asks. New anchors: `troubleshooting`,
-  `test-clocks` and `engine-fields` in `DEVELOPMENT.md`, `role-run` in the
-  default collection README, and the sections of "Collection contract" in the
-  REST and appliance READMEs.
-- Collection skeletons: the `molecule` session keeps the state of each scenario
-  in `~/.ansible/tmp/molecule.<workspace>/<scenario>/` and prints the workspace,
-  the state directory and the instance names. A call names one scenario at
-  most.
-- All skeletons: the Molecule README's note on symlinked paths moved from
-  "Requirements" to the troubleshooting part.
-- Checks: the infrastructure tiers name their instances through
-  `MOLECULE_WORKSPACE`, and the libvirt tier's VM gets its SSH port from the
-  scenario.
+  the same time. Each directory is a workspace (`MOLECULE_WORKSPACE`, derived
+  from its path by default): containers, virtual machines and the `ee` image
+  are named `<platform name>-<workspace>`, and inventory hosts keep the
+  platform names. A libvirt platform's `ssh_port` is optional.
+- Collection skeletons: the `molecule` session keeps each scenario's state in
+  `~/.ansible/tmp/molecule.<workspace>/<scenario>/` and takes one scenario per
+  call.
+- Role and collection skeletons: the `ee` scenario no longer removes every
+  dangling image of the host.
+- All skeletons: every heading written in a template has an explicit anchor,
+  "Table of contents" carries `toc` again, and `DEVELOPMENT.md` has a table of
+  contents.
 
 - All skeletons: `.ansible-lint` enables `foundata-no-flush-handlers`, and the
   `ansible-lint` session requires ansible-lint-foundata 1.2.0 or newer.
@@ -103,23 +80,15 @@ and the project adheres to
   outlive their run state, where nothing could reach them, and `--remove` then
   deleted their Podman stores under them.
 
-- Collection skeletons: the `molecule` session's "Instance names" line lists
-  only the platform that `--platform-name` or `MOLECULE_PLATFORM_NAME` names.
-  It used to list every platform of the scenario.
+- Collection skeletons: without `TMPDIR`, the nox sessions use
+  `/var/tmp/nox-<uid>`. `ansible-test` failed where `/tmp` is a small tmpfs.
 
-- Collection skeletons: without `TMPDIR`, the nox sessions keep their temporary
-  files in `/var/tmp/nox-<uid>`, a directory private to the user that every run
-  shares. They used to put the collection copies of `ansible-test` below
-  `/tmp`, often a small tmpfs, where `ansible-test` failed.
+- All skeletons: the shared Molecule playbooks persist `__testing_state` in its
+  declared key order. Sorted keys made a role run from the restored state
+  rewrite its files.
 
-- All skeletons: the shared Molecule playbooks persist `__testing_state` with
-  its keys in the order the scenario declared them. `to_nice_yaml` used to sort
-  them, so a role run from the restored state saw its dictionaries in another
-  order and could rewrite its files.
-
-- All skeletons: the Podman create playbook names each container it starts by
-  its platform name. It used to print each whole platform at default verbosity,
-  registry credentials included.
+- All skeletons: the Podman create playbook no longer prints whole platform
+  entries, registry credentials included.
 
 - Collection skeletons: the `molecule` session installs `pycdlib`, which the
   libvirt platforms need for their cloud-init seed images.
