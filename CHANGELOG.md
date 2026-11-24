@@ -54,6 +54,9 @@ and the project adheres to
 - Role and collection skeletons: the `ee` scenario ends the names of its image
   and container with the workspace and builds without intermediate images. It
   no longer removes every dangling image of the host.
+- All skeletons: every "Table of contents" heading carries the anchor `toc`
+  again. The collection READMEs had lost it in 4.0.0, and the Molecule READMEs
+  now have it as well.
 - Collection skeletons: the `molecule` session keeps the state of each scenario
   in `~/.ansible/tmp/molecule.<workspace>/<scenario>/` and prints the workspace,
   the state directory and the instance names. A call names one scenario at
