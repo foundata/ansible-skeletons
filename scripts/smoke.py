@@ -177,6 +177,9 @@ def build_collection(rendered: Rendered) -> Path:
         ".github/test.yml",
         ".vscode/settings.json",
         "AGENTS.md",
+        # Standard files that the skeletons leave to other tooling.
+        "CONTRIBUTING.md",
+        "SECURITY.md",
         "stale.tar.gz",
         "tools/inventory/1.0.yml",
         "tools/sentinel.py",

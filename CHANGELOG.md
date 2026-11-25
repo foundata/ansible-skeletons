@@ -87,6 +87,8 @@ and the project adheres to
   review the platforms before a test run.
 - Collection skeletons: checking `repository` in `.releasing.toml` is a step of
   `FIXME.md`; `DEVELOPMENT.md` no longer asks for it.
+- Collection skeletons: `galaxy.yml` keeps `SECURITY.md` out of the built
+  archive, as it does `CONTRIBUTING.md`.
 
 - All skeletons: `.ansible-lint` enables `foundata-no-flush-handlers`, and the
   `ansible-lint` session requires ansible-lint-foundata 1.2.0 or newer.
