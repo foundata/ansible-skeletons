@@ -206,8 +206,25 @@ def copy_test_fixtures(collection: Path, harness: Path, fqcn: str) -> None:
             path.write_text(ast.unparse(tree) + "\n", encoding="utf-8")
 
 
+def check_role_docs(name: str, work: Path, env: dict[str, str]) -> None:
+    """Require a role's entry points and their documentation as ansible-doc shows it.
+
+    The JSON passes the argument spec through unchecked. Only the text view
+    requires what ansible-doc needs, such as a description for each suboption.
+    """
+    try:
+        documents = json.loads(
+            run(["ansible-doc", "-t", "role", "--json", name], work, env)
+        )
+        run(["ansible-doc", "-t", "role", name], work, env)
+    except RuntimeError as error:
+        raise ValueError(f"ansible-doc refused role {name}:\n{error}") from error
+    if not documents.get(name, {}).get("entry_points"):
+        raise ValueError(f"ansible-doc found no entry point of role {name}")
+
+
 def check_docs(collection: Path, fqcn: str, work: Path, env: dict[str, str]) -> None:
-    """Require module documentation and role loading from the retained files."""
+    """Require module and role documentation and role loading from retained files."""
     modules = collection / "plugins/modules"
     expected = {
         fqcn + "." + ".".join(path.relative_to(modules).with_suffix("").parts): path
@@ -229,11 +246,7 @@ def check_docs(collection: Path, fqcn: str, work: Path, env: dict[str, str]) -> 
     roles = sorted(path for path in (collection / "roles").glob("*") if path.is_dir())
     for role in roles:
         name = f"{fqcn}.{role.name}"
-        documents = json.loads(
-            run(["ansible-doc", "-t", "role", "--json", name], work, env)
-        )
-        if name not in documents:
-            raise ValueError(f"ansible-doc omitted role {name}")
+        check_role_docs(name, work, env)
         play = work / "role-syntax.json"
         play.write_text(
             json.dumps(

@@ -59,8 +59,9 @@ Among the default sessions:
 - `runtime-check` installs the built collection in isolation and keeps only
   what ships: `meta/`, `plugins/`, `roles/` and `playbooks/`. It checks Python
 {# skeleton-variant: runtime-scope #}
-  imports, module documentation and the syntax of any roles, then runs the
-  unit tests against that installation. To check the exact archive of a
+  imports, module documentation, and the syntax of any roles and their
+  documentation as `ansible-doc -t role` shows it, then runs the unit tests
+  against that installation. To check the exact archive of a
   [release](#releases):
 
 {# end skeleton-variant #}

@@ -26,6 +26,10 @@ and the project adheres to
   module collection that ships a role checks its documentation with DocSmith.
   In every collection skeleton, `docs` is a default session only while a role
   has `meta/argument_specs.yml`; otherwise it does nothing and says so.
+- Collection skeletons: `runtime-check` loads each role's documentation as
+  `ansible-doc -t role` shows it and fails with the role's name and
+  ansible-doc's message, for example on a suboption without a `description`,
+  which DocSmith and ansible-lint accept.
 
 - Module skeletons: the engine's `tristate` field kind stores `null`, `true` or
   `false` under three words that a definition names in `choices`, such as

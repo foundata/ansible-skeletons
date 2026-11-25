@@ -6,6 +6,7 @@ import ast
 import io
 import json
 import os
+import re
 import runpy
 import shutil
 import subprocess
@@ -268,3 +269,98 @@ def test_unit_runner_requires_executed_runtime_tests(
         assert "unit tests executed no cases" in result.stderr
     elif case == "missing-file":
         assert "data.txt" in result.stdout
+
+
+# What ansible-doc 2.19 to 2.21 print when the text view of a role meets a
+# suboption without a description; the JSON view passes the spec through.
+REFUSED = (
+    "[ERROR]: Error extracting role docs from 'test.subject.first': "
+    "All (sub-)options and return values must have a 'description' field\n"
+)
+
+
+def fake_ansible_doc(monkeypatch: pytest.MonkeyPatch, case: str) -> list[list[str]]:
+    """Answer the checker's commands as ansible-doc would in ``case``."""
+    calls: list[list[str]] = []
+
+    def run(command: list[str], **_options: Any) -> Any:
+        calls.append(command)
+        if command[0] != "ansible-doc":
+            return subprocess.CompletedProcess(command, 0, "", "")
+        name = command[-1]
+        if "--json" in command:
+            if case == "json-failed":
+                return subprocess.CompletedProcess(command, 1, "", "[ERROR]: broken\n")
+            entry_points: dict[str, object] = (
+                {} if case == "no-entry-point" else {"main": {}}
+            )
+            documents = (
+                {} if case == "omitted" else {name: {"entry_points": entry_points}}
+            )
+            return subprocess.CompletedProcess(command, 0, json.dumps(documents), "")
+        if case == "text-refused" and name == "test.subject.first":
+            return subprocess.CompletedProcess(command, 4, "", REFUSED)
+        return subprocess.CompletedProcess(command, 0, f"> ROLE: {name}\n", "")
+
+    monkeypatch.setattr("subprocess.run", run)
+    return calls
+
+
+def role_commands(name: str) -> list[list[str]]:
+    """The two ansible-doc calls the checker makes for one role."""
+    return [
+        ["ansible-doc", "-t", "role", "--json", name],
+        ["ansible-doc", "-t", "role", name],
+    ]
+
+
+@pytest.mark.parametrize(
+    ("case", "message"),
+    [
+        ("pass", None),
+        ("text-refused", "must have a 'description' field"),
+        ("json-failed", "broken"),
+        ("no-entry-point", "no entry point"),
+        ("omitted", "no entry point"),
+    ],
+)
+def test_role_documentation_must_load_as_ansible_doc_shows_it(
+    tmp_path: Path,
+    checker: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+    case: str,
+    message: str | None,
+) -> None:
+    calls = fake_ansible_doc(monkeypatch, case)
+    name = "test.subject.first"
+    if message is None:
+        checker["check_role_docs"](name, tmp_path, {})
+    else:
+        with pytest.raises(ValueError, match=re.escape(message)) as error:
+            checker["check_role_docs"](name, tmp_path, {})
+        assert name in str(error.value)
+    expected = role_commands(name)
+    assert calls == (expected[:1] if case == "json-failed" else expected)
+
+
+def test_every_installed_role_is_documented_and_loaded(
+    tmp_path: Path, checker: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    collection = tmp_path / "installed"
+    for role in ("second", "first"):
+        (collection / "roles" / role).mkdir(parents=True)
+    (collection / "roles/README.md").touch()
+    calls = fake_ansible_doc(monkeypatch, "pass")
+    checker["check_docs"](collection, "test.subject", tmp_path, {})
+    syntax = ["ansible-playbook", "-i", "localhost,", "--syntax-check"]
+    assert calls == [
+        command
+        for role in ("first", "second")
+        for command in (
+            *role_commands(f"test.subject.{role}"),
+            [*syntax, str(tmp_path / "role-syntax.json")],
+        )
+    ]
+    fake_ansible_doc(monkeypatch, "text-refused")
+    with pytest.raises(ValueError, match=r"refused role test\.subject\.first:\n"):
+        checker["check_docs"](collection, "test.subject", tmp_path, {})
