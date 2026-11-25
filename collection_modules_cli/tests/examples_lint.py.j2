@@ -7,17 +7,24 @@ and the EXAMPLES of the modules. A block is linted when it is a list of plays or
 a list of tasks; others, such as variables, inventories or fragments that do not
 parse, are listed and skipped. Each linted block becomes a file named after its
 source and the line that opens it, with the source's line numbers.
+
+An option that a task gives one of the collection's own modules must be one
+that ansible-doc documents for the module, nested options included. Each other
+option fails with its source and line.
 """
 
 from __future__ import annotations
 
 import argparse
 import ast
+import json
 import re
 import shutil
 import subprocess
 import sys
+from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -79,6 +86,10 @@ TASK_KEYWORDS = frozenset(
         "vars",
         "when",
     )
+)
+# Keys of a play or a block that hold tasks.
+TASK_LISTS = frozenset(
+    ("tasks", "pre_tasks", "post_tasks", "handlers", "block", "rescue", "always")
 )
 
 
@@ -188,18 +199,18 @@ def examples(project: Path) -> list[tuple[Path, int, list[str], int]]:
     return found
 
 
-def extract(project: Path, output: Path) -> list[str]:
+def extract(project: Path, output: Path) -> dict[str, str]:
     """Write each example that is a list of plays or tasks below ``output``.
 
-    Returns the written files relative to ``output``, which also receives the
-    project's lint configuration.
+    Returns the written files relative to ``output``, each with its source.
+    ``output`` also receives the project's lint configuration.
     """
     output.mkdir(parents=True)
     for name in CONFIGURATION:
         if (project / name).is_file():
             (output / name).parent.mkdir(exist_ok=True)
             shutil.copyfile(project / name, output / name)
-    written = []
+    written = {}
     for path, opening, lines, first in examples(project):
         source = path.relative_to(project).as_posix()
         found = kind(lines)
@@ -212,8 +223,116 @@ def extract(project: Path, output: Path) -> list[str]:
         (output / found).mkdir(exist_ok=True)
         (output / relative).write_text(numbered(lines, first), encoding="utf-8")
         print(f"{source}:{opening}: linted as {relative}", flush=True)
-        written.append(relative)
+        written[relative] = source
     return written
+
+
+def module_calls(
+    node: yaml.Node, prefix: str
+) -> Iterator[tuple[str, yaml.MappingNode]]:
+    """Each call of a module named ``prefix.*`` in plays or tasks, with its options.
+
+    The options are the module's mapping and the task's ``args``.
+    """
+    if isinstance(node, yaml.SequenceNode):
+        for item in node.value:
+            yield from module_calls(item, prefix)
+    if not isinstance(node, yaml.MappingNode):
+        return
+    keys = {
+        key.value: value
+        for key, value in node.value
+        if isinstance(key, yaml.ScalarNode)
+    }
+    for name, value in keys.items():
+        if name in TASK_LISTS:
+            yield from module_calls(value, prefix)
+        elif name.startswith(f"{prefix}."):
+            for options in (value, keys.get("args")):
+                if isinstance(options, yaml.MappingNode):
+                    yield name, options
+
+
+def unknown_options(
+    options: yaml.MappingNode, documented: dict[str, Any], parent: str = ""
+) -> Iterator[tuple[int, str]]:
+    """The line and name of each option that is not documented, at any depth."""
+    known = {
+        alias: spec
+        for name, spec in documented.items()
+        for alias in (name, *(spec.get("aliases") or ()))
+    }
+    for key, value in options.value:
+        if not isinstance(key, yaml.ScalarNode):
+            continue
+        spec = known.get(key.value)
+        if spec is None:
+            yield key.start_mark.line + 1, f"{parent}{key.value}"
+            continue
+        if not spec.get("suboptions"):
+            continue
+        items = value.value if isinstance(value, yaml.SequenceNode) else [value]
+        for item in items:
+            if isinstance(item, yaml.MappingNode):
+                yield from unknown_options(
+                    item, spec["suboptions"], f"{parent}{key.value}."
+                )
+
+
+def documented_options(modules: set[str]) -> dict[str, dict[str, Any]]:
+    """The options ansible-doc documents for each module it finds."""
+    # ansible-doc --json --type module <modules>
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "ansible.cli.doc",
+            "--json",
+            "--type",
+            "module",
+            *sorted(modules),
+        ],
+        stdout=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
+    if result.returncode:
+        sys.exit(f"ansible-doc failed with exit status {result.returncode}")
+    return {
+        name: (entry.get("doc") or {}).get("options") or {}
+        for name, entry in json.loads(result.stdout).items()
+    }
+
+
+def check_options(project: Path, output: Path, written: dict[str, str]) -> int:
+    """Print each undocumented option of the collection's own modules.
+
+    ansible-lint's args rule would check options too, but it ignores
+    module_defaults and so rejects tasks that take required options from their
+    play. A module ansible-doc does not find is left to ansible-lint.
+    Returns the number of undocumented options.
+    """
+    galaxy = yaml.safe_load((project / "galaxy.yml").read_text(encoding="utf-8"))
+    prefix = f"{galaxy['namespace']}.{galaxy['name']}"
+    calls = [
+        (source, module, options)
+        for relative, source in written.items()
+        for module, options in module_calls(
+            yaml.compose((output / relative).read_text(encoding="utf-8"), Loader),
+            prefix,
+        )
+    ]
+    if not calls:
+        return 0
+    documented = documented_options({module for _source, module, _options in calls})
+    found = 0
+    for source, module, options in calls:
+        if module not in documented:
+            continue
+        for line, name in unknown_options(options, documented[module]):
+            print(f"{source}:{line}: {module} has no option {name}", flush=True)
+            found += 1
+    return found
 
 
 def main() -> None:
@@ -223,8 +342,8 @@ def main() -> None:
     args = parser.parse_args()
     project = Path(__file__).resolve().parents[1]
     output = args.output.resolve()
-    files = extract(project, output)
-    if not files:
+    written = extract(project, output)
+    if not written:
         print("No example is a list of plays or tasks")
         return
     print(
@@ -233,11 +352,12 @@ def main() -> None:
     )
     # ansible-lint --offline --strict <files>, never --fix: these are copies.
     result = subprocess.run(
-        [sys.executable, "-m", "ansiblelint", "--offline", "--strict", *files],
+        [sys.executable, "-m", "ansiblelint", "--offline", "--strict", *written],
         cwd=output,
         check=False,
     )
-    sys.exit(result.returncode)
+    unknown = check_options(project, output, written)
+    sys.exit(result.returncode or int(unknown > 0))
 
 
 if __name__ == "__main__":
