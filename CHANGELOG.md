@@ -51,6 +51,10 @@ and the project adheres to
 - Checks: the appliance skeleton's Molecule scenario runs in the quick check,
   like those of the REST and CLI skeletons.
 
+- The collection skeletons require antsibull-nox 1.11.1 or newer, whose
+  `license-check` accepts a tracked file that is deleted but not staged. The
+  troubleshooting note about it is gone from `DEVELOPMENT.md`.
+
 - `DEVELOPMENT.md` opens its testing section with an overview of the checks and
   explains each by what it answers.
 

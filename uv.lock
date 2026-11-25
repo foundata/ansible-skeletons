@@ -407,7 +407,7 @@ lint = [
     { name = "ansible-lint-foundata", specifier = ">=1.2.0" },
     { name = "antsibull-changelog" },
     { name = "antsibull-docs", specifier = ">=2.28.0" },
-    { name = "antsibull-nox" },
+    { name = "antsibull-nox", specifier = ">=1.11.1" },
     { name = "nox", specifier = ">=2025.2.9" },
 ]
 
@@ -514,7 +514,7 @@ wheels = [
 
 [[package]]
 name = "antsibull-nox"
-version = "1.9.3"
+version = "1.11.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "antsibull-fileutils" },
@@ -524,9 +524,9 @@ dependencies = [
     { name = "pyyaml" },
     { name = "semantic-version" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/44/a3/7eae3e8c1831e05e3133ee6525e8380a05364b40900d669e97696fd4ed45/antsibull_nox-1.9.3.tar.gz", hash = "sha256:a713a35cd1686d16bb350dae214514104e803062c03a6cf968ef5187c461de1e", size = 252391, upload-time = "2026-09-19T16:41:59.108Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/cc/59/cd1cfc0532e6d95caf34e9288ccd2057d7674a8ed8fa7f3745406b82a590/antsibull_nox-1.11.1.tar.gz", hash = "sha256:6f1f49115936fe414cdfdb7afdd9375397dbd38180ab21361d02ef5dd457efb2", size = 293532, upload-time = "2026-11-25T20:44:23.826Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/47/9f/c5e3a5feb4767b90746a1746b4fb9464743b9e47644e540425b06bc8d786/antsibull_nox-1.9.3-py3-none-any.whl", hash = "sha256:68732e03e10540b0e890f26a10978d9978dd5c913c90a0cfcf3b8ca740be474b", size = 178190, upload-time = "2026-09-19T16:41:57.479Z" },
+    { url = "https://files.pythonhosted.org/packages/f9/2c/8592dd2150c2f9a4f10ae8bab55bf7ea2ec4b819ebb1eb000526c80d6e12/antsibull_nox-1.11.1-py3-none-any.whl", hash = "sha256:93c972d476a2f442110262fffafbd0c7cb300f379ddeb61c5e17591f3492613c", size = 221195, upload-time = "2026-11-25T20:44:20.704Z" },
 ]
 
 [[package]]

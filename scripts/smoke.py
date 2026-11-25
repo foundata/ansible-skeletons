@@ -1090,7 +1090,7 @@ def module_identity(
 # session below meets the render's TMPDIR handling under the real nox.
 TMPDIR_PROBE = """\
 # /// script
-# dependencies = ["nox>=2025.02.09", "antsibull-nox"]
+# dependencies = ["nox>=2025.02.09", "antsibull-nox>=1.11.1"]
 # ///
 import os
 import runpy
