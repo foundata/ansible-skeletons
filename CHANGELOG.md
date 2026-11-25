@@ -69,8 +69,10 @@ and the project adheres to
   contents.
 
 - Collection skeletons: the `ansible-lint` session only reports. All skeletons:
-  `.yamllint` asks for `{ "a": "b" }` and `{}`, and for comments indented like
-  the content around them. ansible-lint offers no fix mode with these rules.
+  `.yamllint` asks for `{ "a": "b" }` and `{}`, for comments indented like the
+  content around them, and for no empty values: a module called without
+  arguments gets `{}`, a null is written `null`. ansible-lint offers no fix mode
+  with these rules.
 - Collection skeletons: `.yamllint` ignores the generated
   `changelogs/changelog.yaml` and `changelogs/.plugin-cache.yaml`, as
   `.ansible-lint` does.

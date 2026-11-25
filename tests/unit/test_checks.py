@@ -1008,6 +1008,12 @@ def test_collection_default_lint_configuration() -> None:
         "max-spaces-inside-empty": 0,
     }
     assert "comments-indentation" not in yaml_config["rules"]
+    # A module without arguments gets {}, a null is written null.
+    assert yaml_config["rules"]["empty-values"] == {
+        "forbid-in-block-mappings": True,
+        "forbid-in-flow-mappings": True,
+        "forbid-in-block-sequences": True,
+    }
     assert yaml_config["extends"] == "default"
 
 
