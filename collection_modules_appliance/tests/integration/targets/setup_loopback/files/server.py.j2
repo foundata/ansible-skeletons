@@ -30,7 +30,9 @@ def serve(
 
     The route receives a request handler with the standard HTTP attributes,
     plus reply(status, body, headers) and send_json(status, payload). It owns
-    product authentication and parsing. authorized gates the shutdown route.
+    product authentication and parsing. authorized gates the shutdown route:
+    an accepted shutdown request is answered with status 200 on every method
+    in methods, a refused one with 401.
     The atomic port file is published after the listener binds.
     request_timeout bounds socket inactivity. Requests run serially in daemon
     threads so a handler cannot delay lifetime shutdown. The serving loop ends
