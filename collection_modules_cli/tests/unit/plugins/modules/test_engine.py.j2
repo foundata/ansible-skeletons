@@ -31,9 +31,11 @@ from ansible_collections.{{ namespace }}.\
         Reference,
         Resource,
         build_spec,
+        declared_values,
         fail,
         normalize,
         run_resource,
+        stored_values,
     )
 # isort: on
 # fmt: on
@@ -760,6 +762,114 @@ def test_tristate_declares_null_and_leaves_omission_unmanaged(
     created = run_module(main, label="new", public_images="hide")
     assert created["changed"] and synthetic.rows[2]["public_images"] is False
     assert synthetic.writes == ["update", "update", "create"]
+
+
+HOOK_FIELDS = (
+    Field("text", "str", "Text", limit=10),
+    Field("port", "int", "Port", minimum=1),
+    Field("enabled", "bool", "Enabled"),
+    PUBLIC_IMAGES,
+    Field("password", "secret", "Write-only password"),
+)
+
+
+def test_declared_values_validate_input_and_leave_null_unmanaged() -> None:
+    params = {"text": "", "port": 1, "enabled": False, "public_images": None}
+    assert declared_values(params, HOOK_FIELDS) == {
+        "text": "",
+        "port": 1,
+        "enabled": False,
+    }
+    assert declared_values({"password": "new"}, HOOK_FIELDS) == {"password": "new"}
+    for name, value in (("text", "x" * 11), ("port", 0), ("public_images", "on")):
+        with pytest.raises(ProductError) as refused:
+            declared_values({name: value}, HOOK_FIELDS)
+        assert (refused.value.category, refused.value.code) == (
+            "argument",
+            "invalid_field",
+        )
+        assert refused.value.fields == [name]
+
+
+def test_stored_values_publish_only_the_fields_as_stored() -> None:
+    record = {
+        "id": 7,
+        "text": "x" * 11,
+        "port": 0,
+        "enabled": None,
+        "public_images": False,
+        "password": "SYNTHETIC-stored",
+        "private": "SYNTHETIC-unlisted",
+    }
+    assert stored_values(record, HOOK_FIELDS) == {
+        "text": "x" * 11,
+        "port": 0,
+        "enabled": None,
+        "public_images": "hide",
+    }
+    for name, value in (("port", True), ("enabled", "yes"), ("text", 7)):
+        with pytest.raises(ProductError) as broken:
+            stored_values({**record, name: value}, HOOK_FIELDS)
+        assert (broken.value.category, broken.value.code) == ("response", "schema")
+        assert broken.value.fields == [name]
+    partial = {key: value for key, value in record.items() if key != "port"}
+    with pytest.raises(ProductError) as missing:
+        stored_values(partial, HOOK_FIELDS)
+    assert missing.value.fields == ["port"]
+    with pytest.raises(ProductError):
+        stored_values([record], HOOK_FIELDS)  # type: ignore[arg-type]
+
+
+def test_a_hook_calls_the_value_helpers_explicitly(
+    synthetic: SyntheticClient, run_module: RunModule
+) -> None:
+    fields = HOOK_FIELDS[:3]
+
+    class Hooked(_binding.Binding):
+        result_key = "synthetic"
+        compatibility_id = "synthetic"
+        identity_options = ("label",)
+
+        def identify(self) -> str:
+            return str(self.params["label"])
+
+        def declared(self) -> dict[str, Any]:
+            return declared_values(self.params, fields)
+
+        def lookup(self) -> dict[str, Any] | None:
+            rows = self.client.list(SYNTHETIC)
+            return next((row for row in rows if row["label"] == self.key), None)
+
+        def managed(self, record: dict[str, Any]) -> dict[str, Any]:
+            values = stored_values({"text": "", **record}, fields)
+            return {"id": record["id"], "label": record["label"], **values}
+
+        def write(self) -> None:
+            self.client.update(SYNTHETIC, self.record["id"], dict(self.delta))
+
+    def main() -> None:
+        spec = build_spec(replace(SYNTHETIC, fields=fields))
+        module = AnsibleModule(argument_spec=spec, supports_check_mode=True)
+        Hooked(module).execute()
+
+    key = synthetic.add(port=8, enabled=None, private="SYNTHETIC-unlisted")
+    del synthetic.rows[key]["text"]
+    kept = run_module(main, label="example", text=None, port=8)
+    assert not kept.get("failed") and not kept["changed"]
+    assert kept["synthetic"] == {
+        "id": key,
+        "label": "example",
+        "text": "",
+        "port": 8,
+        "enabled": None,
+    }
+    changed = run_module(main, label="example", text="new", enabled=False)
+    assert changed["changed_fields"] == ["enabled", "text"]
+    assert "private" not in changed["synthetic"]
+    assert synthetic.rows[key]["enabled"] is False
+    refused = run_module(main, label="example", text="x" * 11)
+    assert refused["failed"] and refused["error_code"] == "invalid_field"
+    assert refused["fields"] == ["text"] and synthetic.writes == ["update"]
 
 
 READABLE = Field(

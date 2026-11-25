@@ -24,11 +24,15 @@ until independent read-back establishes the outcome. No blind write retry.
 
 A definition's size bounds and integer ranges apply to input values only; a
 stored object of any size is read, compared, deleted and reported as is.
+
+A hook-based resource applies the same field rules by calling
+``declared_values`` and ``stored_values`` from its own hooks.
 """
 
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any, Callable, NoReturn
 
@@ -428,6 +432,46 @@ def normalize(field: Field, raw: Any, *, input_value: bool = False) -> Any:
     raise invalid
 
 
+def declared_values(params: dict[str, Any], fields: Iterable[Field]) -> dict[str, Any]:
+    """The declared values of ``fields``, each validated as input.
+
+    For a hook's ``declared``: an omitted or null option stays unmanaged, and
+    any other value passes ``normalize`` as a declaration, which refuses it with
+    ``argument``/``invalid_field`` naming the field. Checks that need the
+    client, such as resolving a reference, stay in the hook.
+    """
+    return {
+        field.name: normalize(field, params[field.name], input_value=True)
+        for field in fields
+        if params.get(field.name) is not None
+    }
+
+
+def stored_values(record: dict[str, Any], fields: Iterable[Field]) -> dict[str, Any]:
+    """The public values of ``fields`` in a stored record, each validated as stored.
+
+    For a hook's ``managed`` or ``public``: only these fields leave the record,
+    secrets never, and each value passes ``normalize`` as a stored value, so
+    size bounds do not apply and a null stays readable. A malformed value or a
+    missing field raises ``response``/``schema`` naming the field; a product
+    that leaves out empty values fills them in first. The record holds public
+    values: decoding wire values, resolving references and merging a full
+    record stay with the client and the hook. A ``tristate`` value comes back
+    as its word; a hook that writes one sends its stored value from
+    ``TRISTATE``.
+    """
+    if not isinstance(record, dict):
+        raise ProductError(category="response", code="schema")
+    public: dict[str, Any] = {}
+    for field in fields:
+        if field.kind == "secret":
+            continue
+        if field.name not in record:
+            raise ProductError(category="response", code="schema", fields=[field.name])
+        public[field.name] = normalize(field, record[field.name])
+    return public
+
+
 def equal(field: Field, current: Any, desired: Any) -> bool:
     if field.kind in ("set", "names"):
         return (
@@ -645,11 +689,7 @@ class Engine(Binding):
 
     def declared(self) -> dict[str, Any]:
         fields = self.resource.fields
-        want = {
-            field.name: normalize(field, self.params[field.name], input_value=True)
-            for field in fields
-            if field.implied is None and self.params.get(field.name) is not None
-        }
+        want = declared_values(self.params, (f for f in fields if f.implied is None))
         implied = {f.name: f.implied for f in fields if f.implied is not None}
         return want if self.absent else {**want, **implied}
 

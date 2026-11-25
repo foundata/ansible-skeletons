@@ -32,6 +32,11 @@ and the project adheres to
   `inherit`, `show` and `hide`, for a setting whose stored null inherits a wider
   default. A declaration picks a word; an omission stays unmanaged.
 
+- Module skeletons: the engine's `declared_values` and `stored_values` apply
+  the rules of `Field`s for a hook-based resource. Its `declared` and `managed`
+  hooks call them to validate the declared options and to project a stored
+  record onto its public fields, without repeating those checks.
+
 ### Changed
 
 - Release verification checks the remote tag, the forge and that a public clone
