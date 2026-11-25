@@ -4,9 +4,10 @@
 
 The examples are the fenced yaml or yml blocks of README.md and roles/*/README.md
 and the EXAMPLES of the modules. A block is linted when it is a list of plays or
-a list of tasks; others, such as variables, inventories or fragments that do not
-parse, are listed and skipped. Each linted block becomes a file named after its
-source and the line that opens it, with the source's line numbers.
+a list of tasks; others, such as variables or inventories, are listed and
+skipped. A block that is not valid YAML fails with its source and line. Each
+linted block becomes a file named after its source and the line that opens it,
+with the source's line numbers.
 
 An option that a task gives one of the collection's own modules must be one
 that ansible-doc documents for the module, nested options included. Each other
@@ -153,11 +154,14 @@ def is_task(item: dict[object, object]) -> bool:
 
 
 def kind(lines: list[str]) -> str | None:
-    """Return "playbooks" for a list of plays, "tasks" for a list of tasks."""
-    try:
-        data = yaml.load("\n".join(lines), Loader=Loader)
-    except yaml.YAMLError:
+    """Return "playbooks" for a list of plays, "tasks" for a list of tasks.
+
+    Raises yaml.YAMLError for lines that are not valid YAML.
+    """
+    documents = list(yaml.load_all("\n".join(lines), Loader=Loader))
+    if len(documents) != 1:
         return None
+    data = documents[0]
     if not isinstance(data, list) or not data:
         return None
     if not all(isinstance(item, dict) for item in data):
@@ -199,11 +203,12 @@ def examples(project: Path) -> list[tuple[Path, int, list[str], int]]:
     return found
 
 
-def extract(project: Path, output: Path) -> dict[str, str]:
+def extract(project: Path, output: Path) -> tuple[dict[str, str], int]:
     """Write each example that is a list of plays or tasks below ``output``.
 
-    Returns the written files relative to ``output``, each with its source.
-    ``output`` also receives the project's lint configuration.
+    Returns the written files relative to ``output``, each with its source, and
+    the number of examples that are not valid YAML. ``output`` also receives the
+    project's lint configuration.
     """
     output.mkdir(parents=True)
     for name in CONFIGURATION:
@@ -211,9 +216,18 @@ def extract(project: Path, output: Path) -> dict[str, str]:
             (output / name).parent.mkdir(exist_ok=True)
             shutil.copyfile(project / name, output / name)
     written = {}
+    invalid = 0
     for path, opening, lines, first in examples(project):
         source = path.relative_to(project).as_posix()
-        found = kind(lines)
+        try:
+            found = kind(lines)
+        except yaml.YAMLError as error:
+            mark = getattr(error, "problem_mark", None)
+            line = first + mark.line if mark else opening
+            problem = getattr(error, "problem", None) or error
+            print(f"{source}:{line}: not valid YAML: {problem}", flush=True)
+            invalid += 1
+            continue
         if found is None:
             print(
                 f"{source}:{opening}: skipped, not a list of plays or tasks", flush=True
@@ -224,7 +238,7 @@ def extract(project: Path, output: Path) -> dict[str, str]:
         (output / relative).write_text(numbered(lines, first), encoding="utf-8")
         print(f"{source}:{opening}: linted as {relative}", flush=True)
         written[relative] = source
-    return written
+    return written, invalid
 
 
 def module_calls(
@@ -342,10 +356,10 @@ def main() -> None:
     args = parser.parse_args()
     project = Path(__file__).resolve().parents[1]
     output = args.output.resolve()
-    written = extract(project, output)
+    written, invalid = extract(project, output)
     if not written:
         print("No example is a list of plays or tasks")
-        return
+        sys.exit(int(invalid > 0))
     print(
         "Findings name the example's file; their line numbers are the source's",
         flush=True,
@@ -357,7 +371,7 @@ def main() -> None:
         check=False,
     )
     unknown = check_options(project, output, written)
-    sys.exit(result.returncode or int(unknown > 0))
+    sys.exit(result.returncode or int(invalid + unknown > 0))
 
 
 if __name__ == "__main__":

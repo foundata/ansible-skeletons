@@ -20,7 +20,7 @@ and the project adheres to
   of the READMEs and of each module's `EXAMPLES`, through the new
   `tests/examples_lint.py`. A finding names the source file and its line. An
   option that `ansible-doc` does not document for one of the collection's own
-  modules fails.
+  modules fails, and so does a block that is not valid YAML.
 
 - Module skeletons: the `docs` session and `.ansible-docsmith.toml`, so that a
   module collection that ships a role checks its documentation with DocSmith.

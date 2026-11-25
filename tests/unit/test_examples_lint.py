@@ -47,10 +47,10 @@ EOF
 
    ````yaml
    - name: "Indented"
-     ansible.builtin.debug:
-       msg: "y"
-   ```
-   still inside
+     first: 1
+     text: |
+       ```
+       still inside
    ````
 
 ```yaml``` is inline code, not a fence.
@@ -69,10 +69,10 @@ def test_markdown_blocks_follow_fences(helper: dict[str, Any]) -> None:
             24,
             [
                 '- name: "Indented"',
-                "  ansible.builtin.debug:",
-                '    msg: "y"',
-                "```",
-                "still inside",
+                "  first: 1",
+                "  text: |",
+                "    ```",
+                "    still inside",
             ],
         ),
         (34, ["unclosed: true"]),
@@ -102,7 +102,6 @@ def test_markdown_blocks_follow_fences(helper: dict[str, Any]) -> None:
         ('platforms:\n  - name: "molecule-debian13"\n    image: "debian:13"', None),
         ('- src: "https://example.com/role.git"\n  version: "main"', None),
         ('- "one"\n- "two"', None),
-        ('- name: "<task name>"\n  <module>: {{ value }}', None),
         ("[]", None),
         ("", None),
         ('- name: "One"\n---\n- name: "Two"', None),
@@ -112,6 +111,20 @@ def test_only_plays_and_tasks_are_linted(
     helper: dict[str, Any], text: str, expected: str | None
 ) -> None:
     assert helper["kind"](text.splitlines()) == expected
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        '- name: "<task name>"\n  <module>: {{ value }}',
+        '- name: "Task"\n  ansible.builtin.debug:\n    msg: "x"\n   bad: 1',
+        'key: "unclosed',
+        "- one\n two: 2",
+    ],
+)
+def test_invalid_yaml_is_not_classified(helper: dict[str, Any], text: str) -> None:
+    with pytest.raises(yaml.YAMLError):
+        helper["kind"](text.splitlines())
 
 
 MODULE = '''\
@@ -189,7 +202,8 @@ def test_examples_are_extracted_with_the_lint_configuration(
 ) -> None:
     root = project(tmp_path / "collection")
     output = tmp_path / "examples"
-    written = helper["extract"](root, output)
+    written, invalid = helper["extract"](root, output)
+    assert invalid == 0
     assert written == {
         "playbooks/README.md-3.yml": "README.md",
         "tasks/README.md-9.yml": "README.md",
@@ -359,7 +373,7 @@ def test_modules_without_documentation_are_left_to_ansible_lint(
 ) -> None:
     root = project(tmp_path / "collection")
     output = tmp_path / "examples"
-    written = helper["extract"](root, output)
+    written, _invalid = helper["extract"](root, output)
 
     def run(command: list[str], **_options: Any) -> Any:
         return subprocess.CompletedProcess(command, 0, "{}")
@@ -380,6 +394,86 @@ def test_a_failing_ansible_doc_stops_the_check(
         helper["documented_options"]({"ns.coll.example"})
 
 
+INVALID_README = """\
+# Invalid
+
+```yaml
+- name: "Task"
+  ansible.builtin.debug:
+    msg: "x"
+   bad: 1
+```
+
+```yaml
+key: "unclosed
+```
+"""
+
+INVALID_MODULE = '''\
+EXAMPLES = r"""
+- name: "<task name>"
+  <module>: {{ value }}
+"""
+'''
+
+
+@pytest.mark.parametrize("status", [0, 2])
+def test_examples_that_are_not_yaml_fail_with_their_line(
+    helper: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    status: int,
+) -> None:
+    root = project(tmp_path / "collection")
+    (root / "roles/run/README.md").write_text(INVALID_README, encoding="utf-8")
+    (root / "plugins/modules/nested/example.py").write_text(
+        INVALID_MODULE, encoding="utf-8"
+    )
+    output = tmp_path / "examples"
+    calls: list[list[str]] = []
+
+    def run(command: list[str], **_options: Any) -> Any:
+        calls.append(command)
+        return subprocess.CompletedProcess(command, status)
+
+    main = helper["main"]
+    monkeypatch.setitem(main.__globals__, "__file__", str(root / "tests/x.py"))
+    monkeypatch.setattr("subprocess.run", run)
+    monkeypatch.setattr("sys.argv", ["examples_lint.py", str(output)])
+    with pytest.raises(SystemExit) as stopped:
+        main()
+    assert stopped.value.code == (status or 1)
+    printed = capsys.readouterr().out
+    assert "roles/run/README.md:7: not valid YAML: " in printed
+    assert "roles/run/README.md:11: not valid YAML: " in printed
+    assert "plugins/modules/nested/example.py:3: not valid YAML: " in printed
+    assert "README.md:24: skipped, not a list of plays or tasks" in printed
+    # The valid examples of README.md are still linted.
+    [command] = calls
+    assert command[5:] == ["playbooks/README.md-3.yml", "tasks/README.md-9.yml"]
+
+
+def test_an_invalid_example_fails_without_a_lint(
+    helper: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "README.md").write_text(INVALID_README, encoding="utf-8")
+    main = helper["main"]
+    monkeypatch.setitem(main.__globals__, "__file__", str(tmp_path / "tests/x.py"))
+    monkeypatch.setattr("subprocess.run", None)
+    monkeypatch.setattr("sys.argv", ["examples_lint.py", str(tmp_path / "out")])
+    with pytest.raises(SystemExit) as stopped:
+        main()
+    assert stopped.value.code == 1
+    printed = capsys.readouterr().out
+    assert "README.md:7: not valid YAML: " in printed
+    assert "No example is a list of plays or tasks" in printed
+
+
 def test_a_project_without_examples_runs_no_lint(
     helper: dict[str, Any],
     tmp_path: Path,
@@ -392,5 +486,7 @@ def test_a_project_without_examples_runs_no_lint(
     monkeypatch.setitem(main.__globals__, "__file__", str(tmp_path / "tests/x.py"))
     monkeypatch.setattr("subprocess.run", None)
     monkeypatch.setattr("sys.argv", ["examples_lint.py", str(tmp_path / "out")])
-    main()
+    with pytest.raises(SystemExit) as stopped:
+        main()
+    assert stopped.value.code == 0
     assert "No example is a list of plays or tasks" in capsys.readouterr().out
