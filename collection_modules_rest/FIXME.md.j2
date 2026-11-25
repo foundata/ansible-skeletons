@@ -15,8 +15,7 @@ Complete these steps in order before publishing a product collection.
 3. Replace the fixture definition, modules and tests with a researched resource.
    Bind it in `tests/unit/plugins/modules/contract_subject.py`. Keep the
    [invariant files](./DEVELOPMENT.md#boundaries) unchanged, including
-   `test_contract.py`, `test_engine.py`, `test_activation.py` and
-   `test_lifecycle.py`.
+   `test_contract.py`, `test_engine.py` and `test_lifecycle.py`.
    The subject declares valid identities, creation arguments, a mutable field
    and capability flags with skip reasons. Engine invariants use their own
    synthetic definition and fake; do not add fields or guards to the product.
@@ -28,9 +27,11 @@ Complete these steps in order before publishing a product collection.
    The fixture uses REST with integer identifiers, by-name 404 absence,
    native JSON and immediate writes. Replace the client, fake transport and
    fake server from product evidence; keep the skeleton-owned lifecycle base.
-4. The shared `_activation.py` is unused here. Add a scope-named apply module
-   only where saved and active state differ, with compare and apply probes on
-   its `run()` or a subclass of its `Activation`.
+4. Delete `_activation.py` and its unit test `test_activation.py` unless saved
+   and active state differ, and name a module of your own where the "Unit-test
+   clocks" section of `DEVELOPMENT.md` names them. Where they differ, keep both
+   unchanged and add a scope-named apply module with compare and apply probes
+   on its `run()` or a subclass of its `Activation`.
 {# end skeleton-variant #}
 5. Copy `plugins/module_utils/_fixture_nested.py` for each resource that a flat
    definition cannot express. Edit its hooks and their contracts, never the

@@ -448,7 +448,8 @@ def test_rest_fixture_has_no_activation_surface() -> None:
     assert (root / "plugins/module_utils/_activation.py.j2").is_file()
     assert not list(root.glob("**/*apply*"))
     assert (
-        "only where saved and active state differ" in (root / "FIXME.md.j2").read_text()
+        "Delete `_activation.py` and its unit test `test_activation.py` unless saved"
+        in (root / "FIXME.md.j2").read_text()
     )
 
 

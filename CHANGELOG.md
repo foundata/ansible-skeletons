@@ -96,6 +96,10 @@ and the project adheres to
   accepts any top-level result key with a scalar value, such as `activated`,
   and its proof reports each expected key. A list or a mapping is still refused.
 
+- REST skeleton: `_activation.py` and its unit test are no longer invariant,
+  because nothing in a REST render imports them. `FIXME.md` says to delete both
+  unless saved and active state differ.
+
 - All skeletons: `.ansible-lint` enables `foundata-no-flush-handlers`, and the
   `ansible-lint` session requires ansible-lint-foundata 1.2.0 or newer.
 

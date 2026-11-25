@@ -818,6 +818,17 @@ def test_shared_invariants_are_protected_or_explained() -> None:
             assert skeletons <= covered, f"{name} has no shared group: {skeletons}"
 
 
+def test_rest_activation_files_are_removable() -> None:
+    """REST ships the activation workflow without listing it as invariant."""
+    activation = {
+        "plugins/module_utils/_activation.py.j2",
+        "tests/unit/plugins/modules/test_activation.py.j2",
+    }
+    assert not activation & boundary_invariants("collection_modules_rest")
+    for skeleton in ("collection_modules_appliance", "collection_modules_cli"):
+        assert activation <= boundary_invariants(skeleton), skeleton
+
+
 def test_invariant_variant_regions_stay_declared() -> None:
     found = set()
     for skeleton in SKELETON_GROUPS["module_skeletons"]:
@@ -1591,6 +1602,13 @@ def test_helper_local_formatting_is_stable(helper_project: str, tmp_path: Path) 
     load_helper_session(helper_project, check_only=True)(HelperSession())
 
 
+# Regions in which the REST and appliance guides differ: the appliance's own
+# invariants, and the lists that leave out REST's removable activation files.
+HTTP_DEVELOPMENT_VARIANTS = frozenset(
+    ("appliance-invariants", "utility-invariants", "unit-invariants")
+)
+
+
 def test_http_development_keeps_shared_variant_contents() -> None:
     """CLI differences must not weaken the existing HTTP document comparison."""
     texts = []
@@ -1598,7 +1616,7 @@ def test_http_development_keeps_shared_variant_contents() -> None:
         path = ROOT / skeleton / "DEVELOPMENT.md.j2"
         text = VARIANT_REGION.sub(
             lambda region: (
-                "" if region["name"] == "appliance-invariants" else region.group()
+                "" if region["name"] in HTTP_DEVELOPMENT_VARIANTS else region.group()
             ),
             path.read_text(encoding="utf-8"),
         )

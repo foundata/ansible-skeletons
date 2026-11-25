@@ -15,8 +15,7 @@ Complete these steps in order before publishing a product collection.
 3. Replace the fixture definition, modules and tests with a researched resource.
    Bind it in `tests/unit/plugins/modules/contract_subject.py`. Keep the
    [invariant files](./DEVELOPMENT.md#boundaries) unchanged, including
-   `test_contract.py`, `test_engine.py`, `test_activation.py` and
-   `test_lifecycle.py`.
+   `test_contract.py`, `test_engine.py` and `test_lifecycle.py`.
    The subject declares valid identities, creation arguments, a mutable field
    and capability flags with skip reasons. Engine invariants use their own
    synthetic definition and fake; do not add fields or guards to the product.
