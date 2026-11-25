@@ -586,7 +586,10 @@ def _instances(scenario: str, platform: str | None) -> list[str]:
 
 @nox.session(name="molecule", default=False)
 # pycdlib: cloud-init seed images of the libvirt platforms (iso_create)
-@antsibull_nox.sessions.install_packages(packages=["molecule", "pycdlib"])
+# ansible-builder: execution environment images of an ee scenario
+@antsibull_nox.sessions.install_packages(
+    packages=["molecule", "pycdlib", "ansible-builder"]
+)
 def molecule(session: nox.Session) -> None:
     """Molecule: full "default" scenario, or any Molecule command after "--".
 

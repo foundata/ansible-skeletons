@@ -31,12 +31,17 @@ def noxfile(
     installed_packages: list[object] = []
     # The keyword arguments of each nox.session declaration, by session name.
     declared: dict[str, dict[str, object]] = {}
+    # The packages each session installs. Python evaluates the decorator
+    # expressions top down, so nox.session names the session before
+    # install_packages lists its packages.
+    packages: dict[str, object] = {}
 
     def decorator(
         **kwargs: object,
     ) -> Callable[[Callable[[Mock], None]], Callable[[Mock], None]]:
         if "packages" in kwargs:
             installed_packages.append(kwargs["packages"])
+            packages[next(reversed(declared))] = kwargs["packages"]
         if "name" in kwargs:
             declared[str(kwargs["name"])] = kwargs
         if kwargs.get("name") == "runtime-check":
@@ -59,6 +64,7 @@ def noxfile(
     nox.options = SimpleNamespace()  # type: ignore[attr-defined]
     nox.session = decorator  # type: ignore[attr-defined]
     nox.declared = declared  # type: ignore[attr-defined]
+    nox.packages = packages  # type: ignore[attr-defined]
     nox.Session = Session  # type: ignore[attr-defined]
     antsibull = ModuleType("antsibull_nox")
     sessions = ModuleType("antsibull_nox.sessions")
@@ -791,6 +797,25 @@ def test_failed_collection_preparation_is_not_a_stock_fallback(
         lint_session(session)
     session.run.assert_not_called()
     session.warn.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "noxfile",
+    [
+        "collection_default",
+        "collection_modules_rest",
+        "collection_modules_appliance",
+        "collection_modules_cli",
+    ],
+    indirect=True,
+)
+def test_molecule_session_installs_the_tools_its_scenarios_call(
+    noxfile: dict[str, object],
+) -> None:
+    # The libvirt platforms build seed images with pycdlib, and the ee scenario
+    # calls ansible-builder, which the session's PATH must hold.
+    packages = cast(Any, noxfile["nox"]).packages
+    assert packages["molecule"] == ["molecule", "pycdlib", "ansible-builder"]
 
 
 SCENARIO = """---

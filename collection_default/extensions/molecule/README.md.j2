@@ -96,8 +96,12 @@ Virtual machine platforms need:
 
 ### Scenario `ee`<a id="requirements-scenario-ee"></a>
 
+{# skeleton-variant: ee-requirements #}
 The `ee` scenario needs [Podman](https://podman.io/docs/installation) and
-`ansible-builder`:
+`ansible-builder`. The `molecule` nox session installs `ansible-builder` in its
+own environment. A direct `molecule` call needs it in Molecule's Python
+environment:
+{# end skeleton-variant #}
 
 ```bash
 pip install "ansible-builder"

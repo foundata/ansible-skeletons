@@ -340,8 +340,10 @@ other quick steps continue.
 The `ee` tier runs Molecule in the role's root, and the collection's scenario
 through its nox session as a maintainer calls it,
 `uv run noxfile.py -s molecule -- test --scenario-name ee`, which starts
-Molecule inside `extensions/`. The session installs its tools in the versions
-of `uv.lock`.
+Molecule inside `extensions/`. The session installs its tools, `ansible-builder`
+among them, in the versions of `uv.lock`, and the tier keeps Python
+environments, its own included, off the session's `PATH`. The role's scenario
+calls the tier's `ansible-builder`.
 
 For an infrastructure-only iteration:
 

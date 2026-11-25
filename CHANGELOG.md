@@ -151,6 +151,9 @@ and the project adheres to
   from the parent of Molecule's project directory when that directory is
   `extensions/`, where the `molecule` nox session starts Molecule. Its prepare
   step stopped with "Cannot determine project type".
+- Collection skeletons: the `molecule` session installs `ansible-builder`. The
+  `ee` scenario run through it failed with "No such file or directory:
+  'ansible-builder'" unless the command was on `PATH`.
 
 - CLI skeleton: the contract test of an expired write repeats once with a
   longer deadline when the commands before the write use up the first one, as

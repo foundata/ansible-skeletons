@@ -99,7 +99,13 @@ def test_the_ee_tier_runs_the_collection_through_its_nox_session(
     rendered = Rendered(
         work=tmp_path / "work", role=role, collection=collection, env={}
     )
-    tier(backend, output, runtime, rendered, {"MOLECULE_GLOB": "glob"}, None)
+    # The tier's own tools, such as ansible-builder, live in a Python environment.
+    tools = tmp_path / "tools"
+    (tools / "bin").mkdir(parents=True)
+    (tools / "pyvenv.cfg").touch()
+    path = os.pathsep.join((str(tools / "bin"), "/usr/bin"))
+    environment = {"MOLECULE_GLOB": "glob", "PATH": path}
+    tier(backend, output, runtime, rendered, environment, None)
 
     scenario = "ee" if backend == "ee" else "default"
     nox = backend == "ee"
@@ -116,6 +122,9 @@ def test_the_ee_tier_runs_the_collection_through_its_nox_session(
         assert env["MOLECULE_WORKSPACE"].startswith("skeleton-gate-")
         assert ("MOLECULE_GLOB" in env) is not (nox and cwd == collection)
         assert ("UV_CONSTRAINT" in env) is (nox and cwd == collection)
+        # The session provides its tools itself; a direct Molecule run uses
+        # the tier's.
+        assert env["PATH"] == ("/usr/bin" if nox and cwd == collection else path)
     if nox:
         constraints = (output / "nox-constraints.txt").read_text()
         assert f"pytest=={pytest.__version__}" in constraints.splitlines()

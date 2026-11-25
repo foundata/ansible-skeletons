@@ -372,11 +372,20 @@ def nox_environment(env: dict[str, str], output: Path) -> dict[str, str]:
 
     The session's tools are pinned to this environment's versions. Without
     ``MOLECULE_GLOB``, Molecule finds the scenarios as a maintainer's run does.
+    ``PATH`` loses the directories of Python environments, the tier's own
+    included, so that the session has to provide the tools its scenarios call,
+    such as ``ansible-builder``.
     """
     constraints = output / "nox-constraints.txt"
     constraints.write_text(lint_constraints(), encoding="utf-8")
+    path = [
+        entry
+        for entry in env.get("PATH", os.defpath).split(os.pathsep)
+        if not (Path(entry).parent / "pyvenv.cfg").is_file()
+    ]
     return {
         **{key: value for key, value in env.items() if key != "MOLECULE_GLOB"},
+        "PATH": os.pathsep.join(path),
         "UV_CONSTRAINT": str(constraints),
         "PIP_CONSTRAINT": str(constraints),
     }
