@@ -92,6 +92,10 @@ and the project adheres to
 - Collection skeletons: `galaxy.yml` keeps `SECURITY.md` out of the built
   archive, as it does `CONTRIBUTING.md`.
 
+- REST and appliance skeletons: `expect` of the lost-reply harness `loss.py`
+  accepts any top-level result key with a scalar value, such as `activated`,
+  and its proof reports each expected key. A list or a mapping is still refused.
+
 - All skeletons: `.ansible-lint` enables `foundata-no-flush-handlers`, and the
   `ansible-lint` session requires ansible-lint-foundata 1.2.0 or newer.
 

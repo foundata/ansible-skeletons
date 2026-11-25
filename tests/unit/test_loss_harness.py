@@ -93,7 +93,7 @@ def main():
                     "outcome": "changed",
                     "error_category": "verification",
                     "error_code": "secret_unknown",
-                    "msg": "SYNTHETIC-not-reported",
+                    "msg": "SYNTHETIC-lost-secret",
                 }))
                 sys.exit(1)
         if STORE.get(path) != params["value"]:
@@ -282,8 +282,10 @@ def test_a_keyword_selects_the_writes_of_a_method_that_also_reads(
         ("drop", [1]),
         ("drop", [True]),
         ("expect", {}),
-        ("expect", {"msg": "x"}),
+        ("expect", ["changed"]),
         ("expect", {"changed": [True]}),
+        ("expect", {"fields": ["value"]}),
+        ("expect", {"result": {"changed": True}}),
         ("calls", []),
         ("calls", [""]),
         ("calls", "/items/a/0"),
@@ -326,6 +328,26 @@ def test_an_expected_result_replaces_the_observed_success(harness: Path) -> None
     assert wrong.returncode != 0 and "Expected outcome 'unknown'" in wrong.stderr
     unexpected = lose(harness, identity={"name": "u"}, params={**params, "name": "u"})
     assert unexpected.returncode != 0
+
+
+def test_an_expected_result_may_name_any_top_level_key(harness: Path) -> None:
+    params = {"name": "k", "value": "1", "secret": True}
+    expect = {"failed": True, "msg": "SYNTHETIC-lost-secret"}
+    result = proof(
+        lose(
+            harness, identity={"name": "k"}, params=params, expect=expect, rerun="none"
+        )
+    )
+    assert result["result"]["msg"] == "SYNTHETIC-lost-secret"
+    assert result["result"]["error_code"] == "secret_unknown"
+    wrong = lose(
+        harness,
+        identity={"name": "m"},
+        params={**params, "name": "m"},
+        expect={**expect, "msg": "other"},
+        rerun="none",
+    )
+    assert wrong.returncode != 0 and "Expected msg 'other'" in wrong.stderr
 
 
 def test_listed_positions_drop_only_those_writes(harness: Path) -> None:

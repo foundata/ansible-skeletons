@@ -26,10 +26,11 @@ Input is one JSON object:
   write, as ``<module_utils module>.<class>.<method>``, for a product whose
   writes leave through another transport.
 - ``expect`` (default none): the result a lost reply must give instead of an
-  observed success, as values of ``failed`` (default false), ``changed``,
-  ``verified``, ``outcome``, ``error_category``, ``error_code`` and
-  ``operation``; for example the failure of a lost write that sends a secret
-  no read-back can prove.
+  observed success, as top-level result keys, each with a scalar value; for
+  example the failure of a lost write that sends a secret no read-back can
+  prove. ``failed`` defaults to false. The proof reports ``failed``,
+  ``changed``, ``verified``, ``outcome``, ``error_category``, ``error_code``,
+  ``operation`` and every expected key.
 - ``calls`` (default none): the counted writes in order, each as its leading
   string arguments joined by a space, up to the one that starts with
   ``route``, without a query; ``["POST /api/users"]`` for
@@ -141,13 +142,12 @@ def options(request: dict[str, Any]) -> dict[str, Any]:
     if expect is not None and (
         not isinstance(expect, dict)
         or not expect
-        or set(expect) - set(REPORTED)
         or not all(
-            value is None or isinstance(value, (bool, int, str))
+            value is None or isinstance(value, (bool, int, float, str))
             for value in expect.values()
         )
     ):
-        raise ValueError("expect must map reported result keys to JSON scalars")
+        raise ValueError("expect must map top-level result keys to JSON scalars")
     if chosen["rerun"] not in ("unchanged", "none"):
         raise ValueError("rerun must be unchanged or none")
     if not isinstance(chosen["route"], str):
@@ -260,7 +260,13 @@ def main() -> None:
                 "rerun": chosen["rerun"],
                 **({"calls": seen} if chosen["calls"] is not None else {}),
                 **(
-                    {"result": {key: result[key] for key in REPORTED if key in result}}
+                    {
+                        "result": {
+                            key: result[key]
+                            for key in dict.fromkeys((*REPORTED, *chosen["expect"]))
+                            if key in result
+                        }
+                    }
                     if chosen["expect"] is not None
                     else {}
                 ),
