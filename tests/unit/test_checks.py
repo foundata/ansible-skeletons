@@ -987,9 +987,13 @@ def test_collection_default_lint_configuration() -> None:
         "changelogs/changelog.yaml",
         "changelogs/.plugin-cache.yaml",
     ]
-    yaml_config = yaml.safe_load(
-        (ROOT / "collection_default/.yamllint.j2").read_text(encoding="utf-8")
-    )
+    yaml_config = source_yaml(ROOT / "collection_default/.yamllint.j2")
+    # Generator-owned in a collection; a role has neither file.
+    assert yaml_config["ignore"] == [
+        "changelogs/changelog.yaml",
+        "changelogs/.plugin-cache.yaml",
+    ]
+    assert "ignore" not in source_yaml(ROOT / "role_default/.yamllint.j2")
     assert yaml_config["rules"]["empty-lines"] == {
         "max": 2,
         "max-start": 0,

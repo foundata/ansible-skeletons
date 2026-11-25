@@ -7,6 +7,13 @@
 ---
 extends: "default"
 
+{# skeleton-variant: changelog-ignore #}
+# Generator-owned output is validated by the changelog session.
+ignore:
+  - "changelogs/changelog.yaml"
+  - "changelogs/.plugin-cache.yaml"
+
+{# end skeleton-variant #}
 rules:
   document-start:
     present: true

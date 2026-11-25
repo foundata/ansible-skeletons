@@ -71,6 +71,9 @@ and the project adheres to
 - Collection skeletons: the `ansible-lint` session only reports. All skeletons:
   `.yamllint` asks for `{ "a": "b" }` and `{}`, and for comments indented like
   the content around them. ansible-lint offers no fix mode with these rules.
+- Collection skeletons: `.yamllint` ignores the generated
+  `changelogs/changelog.yaml` and `changelogs/.plugin-cache.yaml`, as
+  `.ansible-lint` does.
 
 - Module skeletons: `DEVELOPMENT.md` drops its "Engine fields" section. The
   `strmap` kind and readable secrets are documented in the docstring of the
