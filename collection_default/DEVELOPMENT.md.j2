@@ -5,6 +5,13 @@ SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' 
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
+{% filter replace("\n", " ") | trim | wordwrap(width=80, break_long_words=False, break_on_hyphens=False) %}
+This guide is the entry point for changing and testing the `{{ namespace }}.{{ collection_name }}` collection.
+{# skeleton-variant: development-sources #}
+Role usage and supported platforms are documented in [`README.md`](./README.md) and the role READMEs under [`roles/`](./roles/).
+{# end skeleton-variant #}
+{% endfilter %}{{ '' }}
+
 ## Table of contents<a id="toc"></a>
 
 - [Prerequisites](#prerequisites)

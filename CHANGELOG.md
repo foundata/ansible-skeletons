@@ -107,6 +107,8 @@ and the project adheres to
   `FIXME.md`; `DEVELOPMENT.md` no longer asks for it.
 - Collection skeletons: `galaxy.yml` keeps `SECURITY.md` out of the built
   archive, as it does `CONTRIBUTING.md`.
+- Collection skeletons: `DEVELOPMENT.md` opens with a paragraph that names the
+  collection and says what its `README.md` documents.
 
 - REST and appliance skeletons: `expect` of the lost-reply harness `loss.py`
   accepts any top-level result key with a scalar value, such as `activated`,

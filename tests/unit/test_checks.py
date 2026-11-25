@@ -520,6 +520,12 @@ SHARED_PASSAGES = (
         )
         for section in ("Dependencies", "Compatibility", "External requirements")
     ),
+    (
+        "collections",
+        "DEVELOPMENT.md.j2",
+        r"^\{% filter .*\n(?=This guide is the entry point)",
+        r"\n\n",
+    ),
     *(
         ("collections", "DEVELOPMENT.md.j2", rf"^## {section}.*\n", r"^## |\Z")
         for section in ("Prerequisites", "Checks", "Troubleshooting", "Releases")
@@ -584,6 +590,7 @@ def test_shared_document_passages_are_identical(
 @pytest.mark.parametrize(
     "name",
     (
+        "development-sources",
         "check-platforms",
         "check-commands",
         "runtime-scope",
