@@ -591,6 +591,7 @@ def test_shared_document_passages_are_identical(
         "helper-scope",
         "pytest-runner",
         "check-iteration",
+        "check-platform-selection",
         "release-qualification",
     ),
 )

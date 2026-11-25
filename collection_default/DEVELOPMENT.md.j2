@@ -24,6 +24,9 @@ SPDX-License-Identifier: GPL-3.0-or-later
   virtual machines and the execution environment scenario.
 {# end skeleton-variant #}
 
+Use an Ansible version matching [`meta/runtime.yml`](./meta/runtime.yml).
+Collection dependencies are declared in [`galaxy.yml`](./galaxy.yml).
+
 ## Checks<a id="checks"></a>
 
 Run the checks from the collection's Git root. With
@@ -118,6 +121,15 @@ is often a small tmpfs. Every run shares this directory, and only you may use
 it. Nox warns and keeps `/tmp` when the directory has another owner or other
 permissions.
 
+{# skeleton-variant: check-platform-selection #}
+Review the platform selection in
+[`extensions/molecule/default/molecule.yml`](./extensions/molecule/default/molecule.yml)
+before running tests. Use the
+[testing instructions](./extensions/molecule/README.md#usage-testing) for
+individual platforms, the execution-environment scenario, and retaining
+instances for debugging. Tests create and remove containers or virtual machines.
+
+{# end skeleton-variant #}
 ## Troubleshooting<a id="troubleshooting"></a>
 
 To recover a short-path directory left by a killed Nox invocation, find it as
@@ -138,6 +150,12 @@ A killed Nox invocation can also leave `antsibull-nox-*` directories below
 `TMPDIR`, by default `/var/tmp/nox-<uid>`. Delete them when no Nox invocation of
 yours runs.
 
+{# skeleton-variant: molecule-faq #}
+See the [Molecule troubleshooting guide](./extensions/molecule/README.md#faq)
+for role-path detection, air-gapped environments, container limits, and VM
+networking.
+
+{# end skeleton-variant #}
 ## Releases<a id="releases"></a>
 
 Each change users notice adds a fragment to `changelogs/fragments/`;
@@ -156,7 +174,14 @@ python -m pip install -r requirements-dev.txt
 building the archive. Set `repository` in `.releasing.toml` before the first
 release.
 
+Antsibull's configuration is in
+[`changelogs/config.yaml`](./changelogs/config.yaml). Release metadata comes
+from [`galaxy.yml`](./galaxy.yml) and [`.releasing.toml`](./.releasing.toml).
+
+Maintainers use foundata's
+[Ansible collection release procedure](https://github.com/foundata/releasing/blob/main/docs/ansible-collections.md).
+It covers release preparation, building from the committed revision, publication
+to Ansible Galaxy, and verification. Publishing requires the maintainer's Galaxy
+and GitHub credentials.
 {# skeleton-variant: release-qualification #}
-FIXME Describe what a release of this collection consists of and the steps to
-make one.
 {# end skeleton-variant #}

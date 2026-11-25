@@ -25,6 +25,9 @@ SPDX-License-Identifier: GPL-3.0-or-later
   [Molecule scenario](./extensions/molecule/README.md).
 {# end skeleton-variant #}
 
+Use an Ansible version matching [`meta/runtime.yml`](./meta/runtime.yml).
+Collection dependencies are declared in [`galaxy.yml`](./galaxy.yml).
+
 ## Checks<a id="checks"></a>
 
 Run the checks from the collection's Git root. With
@@ -118,6 +121,8 @@ is often a small tmpfs. Every run shares this directory, and only you may use
 it. Nox warns and keeps `/tmp` when the directory has another owner or other
 permissions.
 
+{# skeleton-variant: check-platform-selection #}
+{# end skeleton-variant #}
 ## Unit-test clocks<a id="test-clocks"></a>
 
 Use the opt-in `fake_clock` fixture when a test's expected outcome depends
@@ -250,6 +255,12 @@ A killed Nox invocation can also leave `antsibull-nox-*` directories below
 `TMPDIR`, by default `/var/tmp/nox-<uid>`. Delete them when no Nox invocation of
 yours runs.
 
+{# skeleton-variant: molecule-faq #}
+See the [Molecule troubleshooting guide](./extensions/molecule/README.md#faq)
+for role-path detection, leftover records, certificate validation, container
+limits, and VM networking.
+
+{# end skeleton-variant #}
 ## Releases<a id="releases"></a>
 
 Each change users notice adds a fragment to `changelogs/fragments/`;
@@ -268,7 +279,17 @@ python -m pip install -r requirements-dev.txt
 building the archive. Set `repository` in `.releasing.toml` before the first
 release.
 
+Antsibull's configuration is in
+[`changelogs/config.yaml`](./changelogs/config.yaml). Release metadata comes
+from [`galaxy.yml`](./galaxy.yml) and [`.releasing.toml`](./.releasing.toml).
+
+Maintainers use foundata's
+[Ansible collection release procedure](https://github.com/foundata/releasing/blob/main/docs/ansible-collections.md).
+It covers release preparation, building from the committed revision, publication
+to Ansible Galaxy, and verification. Publishing requires the maintainer's Galaxy
+and GitHub credentials.
 {# skeleton-variant: release-qualification #}
-FIXME Describe what a release of this collection consists of, its product
-qualification and the steps to make one.
+
+FIXME Describe the product qualification that a release of this collection
+needs.
 {# end skeleton-variant #}

@@ -79,6 +79,12 @@ and the project adheres to
   `strmap` kind and readable secrets are documented in the docstring of the
   engine's `Field` class, the API they belong to, and `DEVELOPMENT.md` points
   there.
+- Collection skeletons: `DEVELOPMENT.md` says where the Ansible version, the
+  dependencies and the release metadata are declared, and links the release
+  procedure of `releasing` in place of a release FIXME; the module skeletons'
+  FIXME asks only for the product qualification. `collection_default` and the
+  HTTP module skeletons link the Molecule FAQ, and `collection_default` asks to
+  review the platforms before a test run.
 
 - All skeletons: `.ansible-lint` enables `foundata-no-flush-handlers`, and the
   `ansible-lint` session requires ansible-lint-foundata 1.2.0 or newer.
