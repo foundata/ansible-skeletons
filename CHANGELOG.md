@@ -27,6 +27,11 @@ and the project adheres to
   In every collection skeleton, `docs` is a default session only while a role
   has `meta/argument_specs.yml`; otherwise it does nothing and says so.
 
+- Module skeletons: the engine's `tristate` field kind stores `null`, `true` or
+  `false` under three words that a definition names in `choices`, such as
+  `inherit`, `show` and `hide`, for a setting whose stored null inherits a wider
+  default. A declaration picks a word; an omission stays unmanaged.
+
 ### Changed
 
 - Release verification checks the remote tag, the forge and that a public clone

@@ -126,6 +126,16 @@ class Field:
     ``pattern`` validates declared keys only, so an older stored key outside
     the pattern stays readable. ``map`` holds names mapped to lists of rights.
 
+    ``tristate`` stores ``null``, ``true`` or ``false`` and names them by the
+    three words of ``choices``, in that order, such as ``("inherit", "show",
+    "hide")`` for a setting whose stored null inherits a wider default. A
+    nullable ``bool`` cannot declare that null, because a declared null leaves
+    a field unmanaged. The option accepts only the words: an omission leaves
+    the field unmanaged, and the argument spec's choices refuse an explicit
+    null. A stored value reads as its word, so comparison, diff,
+    ``changed_fields``, ``created`` and ``implied`` use the words, and a write
+    sends the stored value; the client decodes and encodes only stored values.
+
     A ``secret`` is write-only unless ``readable`` is true. ``readable`` and
     ``empty_clears`` default to false, which keeps write-only behavior.
     ``update_password`` applies only to write-only secrets and is absent from
@@ -159,6 +169,10 @@ class Field:
     input_only: bool = False
     readable: bool = False
     empty_clears: bool = False
+
+
+TRISTATE = (None, True, False)
+"""Stored values of a ``tristate`` field, in the order of its ``choices``."""
 
 
 @dataclass(frozen=True)
@@ -209,7 +223,8 @@ def build_spec(resource: Resource) -> dict[str, Any]:
             identities as text. Also if ``minimum`` or ``maximum`` is set on
             a kind other than ``int``, or ``input_only`` on a kind other than
             ``str``, ``choice``, ``set`` and ``names``. ``readable`` applies
-            only to secrets; ``empty_clears`` requires a readable secret.
+            only to secrets; ``empty_clears`` requires a readable secret. A
+            ``tristate`` field names three distinct words in ``choices``.
     """
     spec = api_argument_spec()
     for key in resource.keys:
@@ -231,6 +246,11 @@ def build_spec(resource: Resource) -> dict[str, Any]:
             raise ValueError("minimum and maximum bound an int field")
         if field.input_only and field.kind not in ("str", "choice", "set", "names"):
             raise ValueError("input_only applies to str, choice, set and names")
+        if field.kind == "tristate" and not (
+            len(set(field.choices)) == len(field.choices) == len(TRISTATE)
+            and all(field.choices)
+        ):
+            raise ValueError("a tristate field names three distinct words in choices")
         if field.implied is not None:
             continue
         kind = {
@@ -241,6 +261,7 @@ def build_spec(resource: Resource) -> dict[str, Any]:
             "ref": "str",
             "choice": "str",
             "secret": "str",
+            "tristate": "str",
         }.get(field.kind, field.kind)
         spec[field.name] = {"type": kind}
         if kind == "list":
@@ -315,6 +336,15 @@ def normalize(field: Field, raw: Any, *, input_value: bool = False) -> Any:
         code="invalid_field" if input_value else "schema",
         fields=[field.name],
     )
+    if field.kind == "tristate":
+        if input_value:
+            if not isinstance(raw, str) or raw not in field.choices:
+                raise invalid
+            return raw
+        for word, stored in zip(field.choices, TRISTATE):
+            if raw is stored:
+                return word
+        raise invalid
     if raw is None and not input_value:
         return "" if field.kind == "ref" else None
     checked = input_value or not field.input_only
@@ -591,6 +621,8 @@ class Engine(Binding):
                     }
                 else:
                     value = [self.reference_id(field, name) for name in value]
+            if field.kind == "tristate":
+                value = TRISTATE[field.choices.index(value)]
             body[wire] = self.client.encode(field, value)
         return body
 

@@ -685,6 +685,83 @@ def test_string_map_replaces_compares_predicts_and_clears(
     ]
 
 
+PUBLIC_IMAGES = Field(
+    "public_images",
+    "tristate",
+    "Inherit the wider default, or show or hide public images",
+    choices=("inherit", "show", "hide"),
+)
+
+
+def test_tristate_words_name_the_stored_values() -> None:
+    spec = build_spec(replace(SYNTHETIC, fields=(PUBLIC_IMAGES,)))
+    assert spec["public_images"] == {
+        "type": "str",
+        "choices": ["inherit", "show", "hide"],
+    }
+    for word, stored in zip(PUBLIC_IMAGES.choices, (None, True, False)):
+        assert normalize(PUBLIC_IMAGES, word, input_value=True) == word
+        assert normalize(PUBLIC_IMAGES, stored) == word
+    for value in ("other", True, None, 1):
+        with pytest.raises(ProductError) as refused:
+            normalize(PUBLIC_IMAGES, value, input_value=True)
+        assert (refused.value.category, refused.value.code) == (
+            "argument",
+            "invalid_field",
+        )
+    for value in ("show", 1, 0, ""):
+        with pytest.raises(ProductError) as broken:
+            normalize(PUBLIC_IMAGES, value)
+        assert (broken.value.category, broken.value.code) == ("response", "schema")
+    assert normalize(Field("enabled", "bool", "Enabled"), None) is None
+
+
+@pytest.mark.parametrize(
+    "choices", [("show", "hide"), ("inherit", "show", "show"), ("", "show", "hide")]
+)
+def test_a_tristate_field_needs_three_distinct_words(choices: tuple[str, ...]) -> None:
+    field = replace(PUBLIC_IMAGES, choices=choices)
+    with pytest.raises(ValueError, match="three distinct words"):
+        build_spec(replace(SYNTHETIC, fields=(field,)))
+
+
+def test_tristate_declares_null_and_leaves_omission_unmanaged(
+    synthetic: SyntheticClient, run_module: RunModule
+) -> None:
+    main = entry(replace(SYNTHETIC, fields=(PUBLIC_IMAGES,)))
+    key = synthetic.add(public_images=False)
+    kept = run_module(main, label="example")
+    assert not kept.get("failed") and not kept["changed"]
+    assert kept["synthetic"]["public_images"] == "hide"
+    refused = run_module(main, label="example", public_images=None)
+    assert refused["failed"] and "must be one of" in refused["msg"]
+    predicted = run_module(
+        main,
+        label="example",
+        public_images="inherit",
+        _ansible_check_mode=True,
+        _ansible_diff=True,
+    )
+    assert predicted["diff"] == {
+        "before": {"public_images": "hide"},
+        "after": {"public_images": "inherit"},
+    }
+    assert predicted["synthetic"]["public_images"] == "inherit"
+    assert predicted["verified"] == "predicted" and not synthetic.writes
+    inherited = run_module(main, label="example", public_images="inherit")
+    assert inherited["changed"] and inherited["changed_fields"] == ["public_images"]
+    assert inherited["synthetic"]["public_images"] == "inherit"
+    assert synthetic.rows[key]["public_images"] is None
+    for args in ({}, {"public_images": "inherit"}):
+        kept = run_module(main, label="example", **args)
+        assert not kept["changed"] and kept["synthetic"]["public_images"] == "inherit"
+    shown = run_module(main, label="example", public_images="show")
+    assert shown["changed"] and synthetic.rows[key]["public_images"] is True
+    created = run_module(main, label="new", public_images="hide")
+    assert created["changed"] and synthetic.rows[2]["public_images"] is False
+    assert synthetic.writes == ["update", "update", "create"]
+
+
 READABLE = Field(
     "access_secret",
     "secret",
