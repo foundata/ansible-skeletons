@@ -36,6 +36,24 @@
     path: "{{ '{{' }} __testing_state['project_dir_path'] {{ '}}' }}/meta/main.yml"
   register: __testing_rolemeta_stat
 
+# A collection's nox session starts Molecule inside extensions/, so Molecule's
+# project directory is then a subdirectory of the collection root.
+- name: "Molecule | Prepare (all) | Check the parent directory for galaxy.yml (collection indicator)"
+  ansible.builtin.stat:
+    path: "{{ '{{' }} __testing_state['project_dir_path'] | ansible.builtin.dirname {{ '}}' }}/galaxy.yml"
+  register: __testing_parent_galaxyyml_stat
+
+- name: "Molecule | Prepare (all) | Use the parent directory as the collection root"
+  ansible.builtin.include_tasks:
+    file: "../tasks/state_update.yml"
+  vars:
+    __testing_state_update:
+      project_dir_path: "{{ '{{' }} __testing_state['project_dir_path'] | ansible.builtin.dirname {{ '}}' }}"
+  when:
+    - not __testing_galaxyyml_stat['stat']['exists']
+    - not __testing_rolemeta_stat['stat']['exists']
+    - __testing_parent_galaxyyml_stat['stat']['exists']
+
 - name: "Molecule | Prepare (all) | Determine project type"
   ansible.builtin.include_tasks:
     file: "../tasks/state_update.yml"
@@ -48,6 +66,8 @@
           collection
         {{ '{%-' }} elif __testing_rolemeta_stat['stat']['exists'] {{ '-%}' }}
           role
+        {{ '{%-' }} elif __testing_parent_galaxyyml_stat['stat']['exists'] {{ '-%}' }}
+          collection
         {{ '{%-' }} else {{ '-%}' }}
           unknown
         {{ '{%-' }} endif {{ '-%}' }}
@@ -56,7 +76,8 @@
   ansible.builtin.fail:
     msg: >
       Cannot determine project type. Expected either galaxy.yml (collection) or
-      meta/main.yml (role) in {{ '{{' }} __testing_state['project_dir_path'] {{ '}}' }}.
+      meta/main.yml (role) in {{ '{{' }} __testing_state['project_dir_path'] {{ '}}' }},
+      or galaxy.yml in its parent directory.
   when:
     - __testing_state['project_type'] == "unknown"
 

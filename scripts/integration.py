@@ -36,7 +36,7 @@ from scripts.controller import (
     temporary_environment,
 )
 from scripts.render import Rendered, example_metadata, render
-from scripts.smoke import pinned_archives
+from scripts.smoke import lint_constraints, pinned_archives
 
 
 def mapping(value: object) -> dict[str, object]:
@@ -355,9 +355,31 @@ def lint_molecule(molecule: Path, rendered: Rendered) -> None:
     )
 
 
-def molecule_command(action: str, scenario: str) -> list[str]:
-    """Use the same scenario selection for execution and documented examples."""
-    return ["molecule", action, "--scenario-name", scenario]
+def molecule_command(action: str, scenario: str, *, nox: bool = False) -> list[str]:
+    """Use the same scenario selection for execution and documented examples.
+
+    With ``nox``, a collection's ``molecule`` session runs the command, as a
+    maintainer calls it; the session starts Molecule inside ``extensions/``.
+    """
+    command = [action, "--scenario-name", scenario]
+    if nox:
+        return ["uv", "run", "noxfile.py", "-s", "molecule", "--", *command]
+    return ["molecule", *command]
+
+
+def nox_environment(env: dict[str, str], output: Path) -> dict[str, str]:
+    """The tier's environment for a collection's nox session.
+
+    The session's tools are pinned to this environment's versions. Without
+    ``MOLECULE_GLOB``, Molecule finds the scenarios as a maintainer's run does.
+    """
+    constraints = output / "nox-constraints.txt"
+    constraints.write_text(lint_constraints(), encoding="utf-8")
+    return {
+        **{key: value for key, value in env.items() if key != "MOLECULE_GLOB"},
+        "UV_CONSTRAINT": str(constraints),
+        "PIP_CONSTRAINT": str(constraints),
+    }
 
 
 def integration(backend: str, output: Path, collections: Path | None = None) -> None:
@@ -441,6 +463,9 @@ def tier(
                     molecule / "ee/tasks/verify/zz-gate-negative.yml",
                 )
             scenario = "ee" if backend == "ee" else "default"
+            # The ee tier tests the collection through its nox session, which
+            # starts Molecule inside extensions/ rather than in the root.
+            nox = backend == "ee" and project == rendered.collection
             # Both standalone and collection roles resolve from the generated
             # source during infrastructure tests. The smoke gate separately
             # tests the collection installed from its built archive.
@@ -455,22 +480,28 @@ def tier(
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.symlink_to(project, target_is_directory=True)
             lint_molecule(molecule, rendered)
+            command_env = nox_environment(env, output) if nox else env
             try:
                 run(
-                    molecule_command("test", scenario),
+                    molecule_command("test", scenario, nox=nox),
                     cwd=project,
-                    env=env,
+                    env=command_env,
                     timeout=5400,
                 )
             finally:
                 run(
-                    molecule_command("destroy", scenario),
+                    molecule_command("destroy", scenario, nox=nox),
                     cwd=project,
-                    env=env,
+                    env=command_env,
                     timeout=600,
                 )
             evidence.append(
-                {"project": project.name, "scenario": scenario, "status": "passed"}
+                {
+                    "project": project.name,
+                    "scenario": scenario,
+                    "command": molecule_command("test", scenario, nox=nox),
+                    "status": "passed",
+                }
             )
     finally:
         if backend in ("podman", "ee"):

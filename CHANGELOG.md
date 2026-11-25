@@ -145,6 +145,11 @@ and the project adheres to
 - All skeletons: the Podman create playbook no longer prints whole platform
   entries, registry credentials included.
 
+- Role and collection skeletons: the `ee` scenario takes the collection root
+  from the parent of Molecule's project directory when that directory is
+  `extensions/`, where the `molecule` nox session starts Molecule. Its prepare
+  step stopped with "Cannot determine project type".
+
 - CLI skeleton: the contract test of an expired write repeats once with a
   longer deadline when the commands before the write use up the first one, as
   load can make them. It failed although the module correctly reported that

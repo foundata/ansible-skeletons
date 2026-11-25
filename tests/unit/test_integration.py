@@ -23,7 +23,13 @@ from scripts.controller import (
     runtime_directory,
     temporary_environment,
 )
-from scripts.integration import molecule_command, podman_environment, reset_podman
+from scripts.integration import (
+    molecule_command,
+    podman_environment,
+    reset_podman,
+    tier,
+)
+from scripts.render import Rendered
 
 
 @pytest.mark.parametrize(
@@ -40,6 +46,84 @@ def test_documented_ee_command_matches_execution(readme: str) -> None:
         if line.startswith("molecule test ") and '"ee"' in line
     ]
     assert commands == [molecule_command("test", "ee")]
+
+
+def test_nox_command_is_the_documented_session_call() -> None:
+    # DEVELOPMENT.md documents the session; arguments after "--" go to Molecule.
+    documented = "uv run noxfile.py -s molecule"
+    development = (ROOT / "collection_default/DEVELOPMENT.md.j2").read_text()
+    assert documented in development.splitlines()
+    for action in ("test", "destroy"):
+        assert molecule_command(action, "ee", nox=True) == [
+            *documented.split(),
+            "--",
+            *molecule_command(action, "ee")[1:],
+        ]
+
+
+@pytest.mark.parametrize("backend", ["podman", "ee"])
+def test_the_ee_tier_runs_the_collection_through_its_nox_session(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, backend: str
+) -> None:
+    role = tmp_path / "roles/example"
+    collection = tmp_path / "collections/example_ns/example_name"
+    (role / "molecule/ee/tasks/verify").mkdir(parents=True)
+    collection.mkdir(parents=True)
+    (collection / "galaxy.yml").touch()
+    runtime, output = tmp_path / "runtime", tmp_path / "output"
+    runtime.mkdir()
+    output.mkdir()
+    calls: list[tuple[list[str], Path | None, dict[str, str]]] = []
+
+    def run(
+        command: list[str],
+        *,
+        cwd: Path | None = None,
+        env: dict[str, str] | None = None,
+        **kwargs: object,
+    ) -> str:
+        calls.append((command, cwd, dict(env or {})))
+        return ""
+
+    def ignore(*args: object) -> None:
+        return None
+
+    monkeypatch.setattr("scripts.integration.run", run)
+    for name in ("configure_scenario", "lint_molecule", "reset_podman"):
+        monkeypatch.setattr(f"scripts.integration.{name}", ignore)
+    monkeypatch.setattr("scripts.integration.check_podman_paths", ignore)
+    monkeypatch.setattr(
+        "scripts.integration.podman_environment",
+        lambda output, runtime, env: {**env, "CONTAINERS_STORAGE_CONF": "private"},
+    )
+    rendered = Rendered(
+        work=tmp_path / "work", role=role, collection=collection, env={}
+    )
+    tier(backend, output, runtime, rendered, {"MOLECULE_GLOB": "glob"}, None)
+
+    scenario = "ee" if backend == "ee" else "default"
+    nox = backend == "ee"
+    molecule = [call for call in calls if "--scenario-name" in call[0]]
+    assert [(command, cwd) for command, cwd, _env in molecule] == [
+        (molecule_command("test", scenario), role),
+        (molecule_command("destroy", scenario), role),
+        (molecule_command("test", scenario, nox=nox), collection),
+        (molecule_command("destroy", scenario, nox=nox), collection),
+    ]
+    for _command, cwd, env in molecule:
+        # The nox session keeps the tier's isolation and pinned tool versions.
+        assert env["CONTAINERS_STORAGE_CONF"] == "private"
+        assert env["MOLECULE_WORKSPACE"].startswith("skeleton-gate-")
+        assert ("MOLECULE_GLOB" in env) is not (nox and cwd == collection)
+        assert ("UV_CONSTRAINT" in env) is (nox and cwd == collection)
+    if nox:
+        constraints = (output / "nox-constraints.txt").read_text()
+        assert f"pytest=={pytest.__version__}" in constraints.splitlines()
+    evidence = json.loads((output / "integration.json").read_text())["results"]
+    assert [result["command"] for result in evidence] == [
+        molecule[0][0],
+        molecule[2][0],
+    ]
 
 
 Store = tuple[Path, Path, dict[str, str]]
