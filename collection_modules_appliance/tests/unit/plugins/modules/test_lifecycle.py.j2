@@ -692,6 +692,76 @@ def test_verdict_message_overrides_the_class_default(
     assert not result["changed"] and result["outcome"] == "unchanged"
 
 
+@pytest.mark.parametrize(
+    "error",
+    [
+        errors.ApiError(
+            "SYNTHETIC-private", category="product", code="conflict", status=409
+        ),
+        errors.TransportTimeout(code="socket_timeout"),
+        Failure(
+            category="verification",
+            code="not_persisted",
+            fields=["value"],
+            message="The base verdict's own message",
+        ),
+    ],
+    ids=["client", "timeout", "verdict"],
+)
+def test_a_failure_from_an_error_changes_only_the_public_message(
+    run_module: RunModule, error: errors.ApiError
+) -> None:
+    retold = Failure.from_error(error, message="The retold message")
+
+    def action(subject: Synthetic) -> dict[str, Any]:
+        raise retold
+
+    result = run_module(action_main(action), name="a")
+    assert result["msg"] == "The retold message"
+    assert (
+        result["error_category"],
+        result["error_code"],
+        result["http_status"],
+    ) == (error.category, error.code, error.status)
+    assert result.get("fields") == (getattr(error, "fields", None) or None)
+    assert "SYNTHETIC-private" not in json.dumps(result)
+
+
+@pytest.mark.parametrize("raised", [False, True])
+@pytest.mark.parametrize(
+    "existing,code", [(False, "missing_after_write"), (True, "not_persisted")]
+)
+def test_a_hook_gives_the_base_verdict_its_text_only_by_raising(
+    store: Store, run_module: RunModule, raised: bool, existing: bool, code: str
+) -> None:
+    text = "The product keeps the previous value"
+
+    class Explained(Synthetic):
+        def verify(self, record: Any, desired: dict[str, Any], absent: bool) -> None:
+            if not raised:
+                # An assignment on the instance has no effect.
+                self.message = text
+                super().verify(record, desired, absent)
+                return
+            try:
+                super().verify(record, desired, absent)
+            except Failure as failure:
+                raise Failure.from_error(failure, message=text) from None
+
+    def entry() -> None:
+        module = AnsibleModule(argument_spec=spec(), supports_check_mode=True)
+        Explained(module).execute()
+
+    if existing:
+        store.rows["a"] = {"name": "a", "value": "1"}
+    store.drop = True
+    result = run_module(entry, name="a", value="2")
+    assert result["failed"] and result["error_code"] == code
+    assert result["msg"] == (text if raised else Synthetic.message)
+    assert result.get("fields") == (["value"] if existing else None)
+    assert result["operation"] == "verify" and result["outcome"] == "unknown"
+
+
 def test_client_error_text_cannot_override_the_public_message(
     run_module: RunModule,
 ) -> None:

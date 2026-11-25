@@ -109,6 +109,10 @@ def test_virtual_timeout_preserves_a_confirmed_write(
     assert writes == ["apply"]
     assert fake_clock.now == elapsed
     assert result["error_code"] == error_code
+    assert result["msg"] == (
+        "Activating the synthetic state failed;"
+        " see operation, error_category and error_code"
+    )
 
 
 def test_sleep_and_work_share_the_real_deadline(fake_clock: Clock) -> None:

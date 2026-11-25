@@ -15,12 +15,23 @@ from typing import Any
 
 import pytest
 
+from ansible_collections.foundata.utils.plugins.module_utils import errors
+
+# isort: split
 # Preserve wrapping for maximum-length Galaxy identities.
 # fmt: off
 # isort: off
 from ansible_collections.{{ namespace }}.\
     {{ collection_name }}.plugins.module_utils import (
         _compat,
+    )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._binding import (
+        Binding,
+    )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._lifecycle import (
+        Failure,
     )
 # isort: on
 # fmt: on
@@ -473,6 +484,54 @@ def test_compatibility_exclusion_precedes_write_or_prediction(
         _ansible_check_mode=check,
     )
     assert result["failed"] and result["error_code"] == "ineligible"
+    assert not result["changed"] and not adapter.records("writes.jsonl")
+
+
+@pytest.mark.parametrize("message", [None, "SYNTHETIC retold message"])
+def test_public_message_comes_from_the_failure_or_the_class(
+    writer: Subject,
+    fake: Any,
+    run_module: RunModule,
+    monkeypatch: pytest.MonkeyPatch,
+    message: str | None,
+) -> None:
+    """A message assigned on the instance never reaches the result.
+
+    The text comes from a raised Failure or the class; a failure retold with
+    ``Failure.from_error`` keeps its category and code.
+    """
+    subject = writer
+    adapter = subject.adapter(fake)
+    monkeypatch.setattr(
+        _compat,
+        "EXCLUSIONS",
+        {subject.name: ((adapter.version, "Synthetic excluded build"),)},
+    )
+    check = Binding.compatibility
+    seen: list[tuple[type[Binding], errors.ApiError]] = []
+
+    def compatibility(self: Binding, operation: str) -> None:
+        self.message = "SYNTHETIC instance message"
+        try:
+            check(self, operation)
+        except errors.ApiError as failure:
+            seen.append((type(self), failure))
+            if message is None:
+                raise
+            raise Failure.from_error(failure, message=message) from None
+
+    monkeypatch.setattr(Binding, "compatibility", compatibility)
+    result = public(
+        run_module(subject.writer, **adapter.arguments, **adapter.change), adapter
+    )
+    assert len(seen) == 1
+    cls, failure = seen[0]
+    own = failure.message if isinstance(failure, Failure) else None
+    assert result["msg"] == (message or own or cls.message)
+    assert (result["error_category"], result["error_code"]) == (
+        "compatibility",
+        "ineligible",
+    )
     assert not result["changed"] and not adapter.records("writes.jsonl")
 
 

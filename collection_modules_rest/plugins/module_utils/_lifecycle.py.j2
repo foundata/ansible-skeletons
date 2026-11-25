@@ -62,10 +62,14 @@ unknown (``secret_unknown``). In a staged change, each stage says whether its
 write sends such a field, so a lost reply to a stage that sends none settles
 by its read-back alone.
 
-Hooks may raise ``Failure(message=...)`` with a local public verdict message,
-which takes precedence over the class setting ``message``. Client exception
-text remains private. ``message`` remains a class setting on the lifecycle;
-hooks do not assign it on the instance.
+The public text of a failure is the ``message`` of the :class:`Failure` that
+ends the run, or else the class setting ``message``. The base reads the
+setting from the class, so assigning it on the instance has no effect. A hook
+that needs another text raises ``Failure(message=...)``; to give another text
+to an error it caught, such as a client error or the verdict that the base's
+``verify`` raises, it raises ``Failure.from_error(error, message=...)``,
+which keeps the category, code, HTTP status and fields. Client exception
+text remains private.
 
 Failures go through the binding's error schema with ``operation``,
 ``outcome`` (``unchanged``, ``unknown`` or ``changed``), the identity
@@ -192,19 +196,40 @@ class Failure(errors.ApiError):
     """A verdict from the base or a hook, with an optional public message.
 
     ``message`` is trusted local text, never a response body or exception text.
+    ``status``, an HTTP status or ``None``, reaches the failure's
+    ``http_status`` as an ``ApiError``'s does.
     """
 
     def __init__(
         self,
         *,
         category: str,
-        code: str,
+        code: str | None,
         fields: list[str] | None = None,
         message: str | None = None,
+        status: int | None = None,
     ) -> None:
-        super().__init__("Lifecycle verdict", category=category, code=code)
+        super().__init__(
+            "Lifecycle verdict", category=category, code=code, status=status
+        )
         self.fields = fields or []
         self.message = message
+
+    @classmethod
+    def from_error(cls, error: errors.ApiError, *, message: str) -> Failure:
+        """``error`` with another public message and nothing else changed.
+
+        Category, code, HTTP status and fields stay those of ``error``, which
+        may be a client's error or a :class:`Failure` such as a base verdict.
+        A hook raises the result in place of the error it caught.
+        """
+        return cls(
+            category=error.category,
+            code=error.code,
+            fields=list(getattr(error, "fields", None) or []),
+            message=message,
+            status=error.status,
+        )
 
 
 class Lifecycle:
@@ -223,6 +248,8 @@ class Lifecycle:
     """Operation name for the compatibility check, without the state."""
 
     message = "Operation failed; see error_category and error_code"
+    """Public text of a failure whose Failure carries none; read from the class."""
+
     state_option = "state"
     """Option whose value ``absent`` requests deletion; empty for none."""
 
@@ -447,6 +474,12 @@ class Lifecycle:
         return result
 
     def verify(self, record: Any, desired: dict[str, Any], absent: bool) -> None:
+        """Refuse a read-back that misses the declared state with a Failure.
+
+        An override that needs another public text for this verdict calls the
+        base, catches its :class:`Failure` and raises
+        ``Failure.from_error(failure, message=...)`` instead.
+        """
         if absent:
             if record is not None:
                 raise Failure(category="verification", code="still_present")
@@ -618,7 +651,7 @@ class Lifecycle:
             schema=self.schema,
             msg=failure.message
             if isinstance(failure, Failure) and failure.message is not None
-            else self.message,
+            else type(self).message,
             changed=self.attempted,
             outcome="changed"
             if self.confirmed

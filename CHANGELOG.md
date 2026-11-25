@@ -87,6 +87,12 @@ and the project adheres to
   `changelogs/changelog.yaml` and `changelogs/.plugin-cache.yaml`, as
   `.ansible-lint` does.
 
+- Module skeletons: the lifecycle base reads the failure text `message` from the
+  class only. A hook that assigned it on the instance raises
+  `Failure.from_error(error, message=...)` instead, which keeps the category,
+  code, HTTP status and fields of a caught error or base verdict. `Failure`
+  takes an optional `status`.
+
 - Module skeletons: `DEVELOPMENT.md` drops its "Engine fields" section. The
   `strmap` kind and readable secrets are documented in the docstring of the
   engine's `Field` class, the API they belong to, and `DEVELOPMENT.md` points

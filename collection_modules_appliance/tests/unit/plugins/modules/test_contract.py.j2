@@ -11,6 +11,9 @@ from typing import Any, Callable
 import pytest
 from ansible.module_utils.basic import AnsibleModule
 
+from ansible_collections.foundata.utils.plugins.module_utils import errors
+
+# isort: split
 # Preserve wrapping for maximum-length Galaxy identities.
 # fmt: off
 # isort: off
@@ -35,6 +38,10 @@ from ansible_collections.{{ namespace }}.\
 from ansible_collections.{{ namespace }}.\
     {{ collection_name }}.plugins.module_utils._binding import (
         Binding,
+    )
+from ansible_collections.{{ namespace }}.\
+    {{ collection_name }}.plugins.module_utils._lifecycle import (
+        Failure,
     )
 # isort: on
 # fmt: on
@@ -266,6 +273,45 @@ def test_status_classification_needs_no_json(
     result = run_module(subject.main, **arguments())
     assert (result["error_category"], result["error_code"]) == (category, code)
     assert not fake.writes()
+
+
+@pytest.mark.parametrize("message", [None, "SYNTHETIC retold message"])
+def test_public_message_comes_from_the_failure_or_the_class(
+    fake: Any,
+    run_module: RunModule,
+    monkeypatch: pytest.MonkeyPatch,
+    message: str | None,
+) -> None:
+    """A message assigned on the instance never reaches the result.
+
+    The text comes from a raised Failure or the class; a failure retold with
+    ``Failure.from_error`` keeps its HTTP status.
+    """
+    check = Binding.compatibility
+    seen: list[tuple[type[Binding], errors.ApiError]] = []
+
+    def compatibility(self: Binding, operation: str) -> None:
+        self.message = "SYNTHETIC instance message"
+        try:
+            check(self, operation)
+        except errors.ApiError as failure:
+            seen.append((type(self), failure))
+            if message is None:
+                raise
+            raise Failure.from_error(failure, message=message) from None
+
+    monkeypatch.setattr(Binding, "compatibility", compatibility)
+    subject.fault(fake, subject.VERSION_PATH, 401)
+    result = run_module(subject.main, **arguments())
+    assert len(seen) == 1
+    cls, failure = seen[0]
+    own = failure.message if isinstance(failure, Failure) else None
+    assert result["msg"] == (message or own or cls.message)
+    assert (result["error_category"], result["error_code"]) == (
+        "auth",
+        "unauthenticated",
+    )
+    assert result["http_status"] == 401 and not fake.writes()
 
 
 @pytest.mark.parametrize("state", ["present", "absent"])

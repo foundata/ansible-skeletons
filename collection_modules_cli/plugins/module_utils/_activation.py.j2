@@ -320,12 +320,20 @@ def run(
     owned: bool = False,
     apply_unverifiable: bool = False,
 ) -> None:
-    """Compare, apply when needed or asked, verify, and exit the module."""
-    activation = Supplied(module, compare, apply)
+    """Compare, apply when needed or asked, verify, and exit the module.
+
+    The public text of a failure names ``label``; it is the class setting
+    ``message`` of the activation this builds.
+    """
+
+    class Labelled(Supplied):
+        message = (
+            f"Activating the {label} failed;"
+            " see operation, error_category and error_code"
+        )
+
+    activation = Labelled(module, compare, apply)
     activation.compatibility_id = operation_id
-    activation.message = (
-        f"Activating the {label} failed; see operation, error_category and error_code"
-    )
     activation.name_pattern = name_pattern
     activation.settle_seconds = settle_seconds
     activation.owned = owned
