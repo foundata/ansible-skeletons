@@ -85,6 +85,8 @@ and the project adheres to
   FIXME asks only for the product qualification. `collection_default` and the
   HTTP module skeletons link the Molecule FAQ, and `collection_default` asks to
   review the platforms before a test run.
+- Collection skeletons: checking `repository` in `.releasing.toml` is a step of
+  `FIXME.md`; `DEVELOPMENT.md` no longer asks for it.
 
 - All skeletons: `.ansible-lint` enables `foundata-no-flush-handlers`, and the
   `ansible-lint` session requires ansible-lint-foundata 1.2.0 or newer.
