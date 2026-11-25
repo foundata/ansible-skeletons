@@ -339,13 +339,27 @@ def test_expiry_keeps_uncertainty_and_terminates_child(
     adapter = subject.adapter(fake)
     before = adapter.selected()
     adapter.control(update=mode)
-    result = public(
-        run_module(subject.writer, **adapter.arguments, **adapter.change, deadline=3.0),
-        adapter,
-    )
+    # Under load, the commands before the write can spend the short deadline.
+    # That expiry starts no write and is unchanged; one longer run follows.
+    for deadline in (3.0, 10.0):
+        result = public(
+            run_module(
+                subject.writer, **adapter.arguments, **adapter.change, deadline=deadline
+            ),
+            adapter,
+        )
+        writes = adapter.records("writes.jsonl")
+        if writes or result.get("outcome") != "unchanged":
+            break
+        assert result["failed"] and not result["changed"]
+        assert result["error_code"] == "deadline_exceeded"
+        assert adapter.selected() == before
+        assert not any(
+            adapter.contract.write_command.matches(call["argv"])
+            for call in adapter.records("calls.jsonl")
+        )
     assert result["failed"] and result["changed"] and result["outcome"] == "unknown"
     assert result["error_code"] == "deadline_exceeded"
-    writes = adapter.records("writes.jsonl")
     assert len(writes) == 1 and not Path(f"/proc/{writes[0]['pid']}").exists()
     after = (
         before
