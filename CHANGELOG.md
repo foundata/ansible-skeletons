@@ -16,160 +16,97 @@ and the project adheres to
 
 ### Added
 
-- Collection skeletons: the `ansible-lint` session also lints the YAML examples
-  of the READMEs and of each module's `EXAMPLES`, through the new
-  `tests/examples_lint.py`. A finding names the source file and its line. An
-  option that `ansible-doc` does not document for one of the collection's own
-  modules fails, and so does a block that is not valid YAML.
-
-- Module skeletons: the `docs` session and `.ansible-docsmith.toml`, so that a
-  module collection that ships a role checks its documentation with DocSmith.
-  In every collection skeleton, `docs` is a default session only while a role
-  has `meta/argument_specs.yml`; otherwise it does nothing and says so.
-- Collection skeletons: `runtime-check` loads each role's documentation as
-  `ansible-doc -t role` shows it and fails with the role's name and
-  ansible-doc's message, for example on a suboption without a `description`,
-  which DocSmith and ansible-lint accept.
-
+- Collection skeletons: the `ansible-lint` session lints the YAML examples of
+  the READMEs and of each module's `EXAMPLES` through `tests/examples_lint.py`,
+  including the option names of the collection's own modules.
+- Collection skeletons: `runtime-check` fails on role documentation that
+  `ansible-doc -t role` refuses.
+- Module skeletons: the `docs` session and `.ansible-docsmith.toml`. In every
+  collection skeleton, `docs` is a default session only while a role has
+  `meta/argument_specs.yml`.
 - Module skeletons: the engine's `tristate` field kind stores `null`, `true` or
-  `false` under three words that a definition names in `choices`, such as
-  `inherit`, `show` and `hide`, for a setting whose stored null inherits a wider
-  default. A declaration picks a word; an omission stays unmanaged.
-
-- Module skeletons: the engine's `declared_values` and `stored_values` apply
-  the rules of `Field`s for a hook-based resource. Its `declared` and `managed`
-  hooks call them to validate the declared options and to project a stored
-  record onto its public fields, without repeating those checks.
+  `false` under three words named in `choices`, such as `inherit`, `show` and
+  `hide`.
+- Module skeletons: the engine's `declared_values` and `stored_values` validate
+  the declared options of a hook-based resource and project its stored record
+  by the rules of its `Field`s.
 
 ### Changed
 
-- Release verification checks the remote tag, the forge and that a public clone
-  holds the commit the gate tested, then renders, builds and installs each
-  collection skeleton from it. It no longer repeats the gate's tests on the same
-  commit, so it needs no Galaxy and takes less time.
-
-- Checks: the appliance skeleton's Molecule scenario runs in the quick check,
-  like those of the REST and CLI skeletons.
-
-- The collection skeletons require antsibull-nox 1.11.1 or newer, whose
-  `license-check` accepts a tracked file that is deleted but not staged. The
-  troubleshooting note about it is gone from `DEVELOPMENT.md`.
-
-- `DEVELOPMENT.md` opens its testing section with an overview of the checks and
-  explains each by what it answers.
-
-- `DEVELOPMENT.md` says how to wrap template text for maximum-length names, and
-  that a tool minimum in a template changes together with `pyproject.toml` and
-  the lock.
-
+- Release verification renders, builds and installs each collection skeleton
+  from a public clone of the tagged commit. It no longer repeats the gate's
+  tests and needs no Galaxy.
+- Checks: the quick check runs the appliance skeleton's Molecule scenario.
+- Collection skeletons: antsibull-nox 1.11.1 or newer is required, and the
+  `license-check` troubleshooting note is gone from `DEVELOPMENT.md`.
+- `DEVELOPMENT.md` opens its testing section with an overview of the checks. It
+  says how to wrap template text for maximum-length names, and that a tool
+  minimum in a template changes together with `pyproject.toml` and the lock.
 - All skeletons: `.rumdl.toml` accepts a tight list with an item that holds a
-  code block or a further paragraph, as the Markdown guide's configuration
-  does. rumdl 0.3 reports such a list under `MD076` otherwise, which fails
-  the `markdown` session of a rendered collection. The repository's own
-  `.rumdl.toml` does the same.
-- All skeletons: `.rumdl.toml` switches off rumdl's cache, as the Markdown
-  guide's configuration does, so rumdl writes no `.rumdl_cache/` directory and
-  `.gitignore` no longer lists it. The repository's own `.rumdl.toml` does the
-  same.
-
+  code block or a further paragraph (`MD076`) and switches off rumdl's cache;
+  `.gitignore` no longer lists `.rumdl_cache/`.
 - All skeletons: Molecule runs started from different directories can test at
-  the same time. Each directory is a workspace (`MOLECULE_WORKSPACE`, derived
-  from its path by default): containers, virtual machines and the `ee` image
-  are named `<platform name>-<workspace>`, and inventory hosts keep the
-  platform names. A libvirt platform's `ssh_port` is optional.
+  the same time. Instances and the `ee` image are named
+  `<platform name>-<workspace>` (`MOLECULE_WORKSPACE`, derived from the path by
+  default). A libvirt platform's `ssh_port` is optional.
 - Collection skeletons: the `molecule` session keeps each scenario's state in
   `~/.ansible/tmp/molecule.<workspace>/<scenario>/` and takes one scenario per
   call.
 - Role and collection skeletons: the `ee` scenario no longer removes every
   dangling image of the host.
 - All skeletons: every heading written in a template has an explicit anchor,
-  "Table of contents" carries `toc` again, and `DEVELOPMENT.md` has a table of
-  contents.
-
-- Collection skeletons: the `ansible-lint` session only reports. All skeletons:
-  `.yamllint` asks for `{ "a": "b" }` and `{}`, for comments indented like the
-  content around them, and for no empty values: a module called without
-  arguments gets `{}`, a null is written `null`. ansible-lint offers no fix mode
-  with these rules.
-- Collection skeletons: `.yamllint` ignores the generated
-  `changelogs/changelog.yaml` and `changelogs/.plugin-cache.yaml`, as
-  `.ansible-lint` does.
-
-- Module skeletons: the lifecycle base reads the failure text `message` from the
-  class only. A hook that assigned it on the instance raises
-  `Failure.from_error(error, message=...)` instead, which keeps the category,
-  code, HTTP status and fields of a caught error or base verdict. `Failure`
-  takes an optional `status`.
-
-- Module skeletons: `DEVELOPMENT.md` drops its "Engine fields" section. The
-  `strmap` kind and readable secrets are documented in the docstring of the
-  engine's `Field` class, the API they belong to, and `DEVELOPMENT.md` points
-  there.
-- Collection skeletons: `DEVELOPMENT.md` says where the Ansible version, the
-  dependencies and the release metadata are declared, and links the release
-  procedure of `releasing` in place of a release FIXME; the module skeletons'
-  FIXME asks only for the product qualification. `collection_default` and the
-  HTTP module skeletons link the Molecule FAQ, and `collection_default` asks to
-  review the platforms before a test run.
-- Collection skeletons: checking `repository` in `.releasing.toml` is a step of
-  `FIXME.md`; `DEVELOPMENT.md` no longer asks for it.
-- Collection skeletons: `galaxy.yml` keeps `SECURITY.md` out of the built
-  archive, as it does `CONTRIBUTING.md`.
-- Collection skeletons: `DEVELOPMENT.md` opens with a paragraph that names the
-  collection and says what its `README.md` documents.
-
-- REST and appliance skeletons: `expect` of the lost-reply harness `loss.py`
-  accepts any top-level result key with a scalar value, such as `activated`,
-  and its proof reports each expected key. A list or a mapping is still refused.
-
-- REST skeleton: `_activation.py` and its unit test are no longer invariant,
-  because nothing in a REST render imports them. `FIXME.md` says to delete both
-  unless saved and active state differ.
-
+  and `DEVELOPMENT.md` has a table of contents.
+- Collection skeletons: the `ansible-lint` session only reports; it has no fix
+  mode.
 - All skeletons: `.ansible-lint` enables `foundata-no-flush-handlers`, and the
   `ansible-lint` session requires ansible-lint-foundata 1.2.0 or newer.
+- All skeletons: `.yamllint` asks for `{ "a": "b" }` and `{}`, for comments
+  indented like the content around them, and for no empty values: `{}` for a
+  module called without arguments, `null` for a null.
+- Collection skeletons: `.yamllint` ignores the generated
+  `changelogs/changelog.yaml` and `changelogs/.plugin-cache.yaml`.
+- Module skeletons: the lifecycle base reads the failure text `message` from the
+  class only. A hook raises `Failure.from_error(error, message=...)` instead of
+  assigning it on the instance. `Failure` takes an optional `status`.
+- Module skeletons: the docstring of the engine's `Field` class documents the
+  `strmap` kind and readable secrets; `DEVELOPMENT.md` drops its "Engine
+  fields" section.
+- Collection skeletons: `DEVELOPMENT.md` opens by naming the collection, says
+  where the Ansible version, the dependencies and the release metadata are
+  declared, and links the release procedure of `releasing`. `FIXME.md` carries
+  the check of `repository` in `.releasing.toml`.
+- collection_default and the HTTP module skeletons: `DEVELOPMENT.md` links the
+  Molecule FAQ.
+- Collection skeletons: `galaxy.yml` keeps `SECURITY.md` out of the built
+  archive.
+- REST and appliance skeletons: `expect` of the lost-reply harness `loss.py`
+  accepts any top-level result key with a scalar value, such as `activated`.
+- REST skeleton: `_activation.py` and its unit test are no longer invariant.
+  `FIXME.md` says to delete both unless saved and active state differ.
 
 ### Fixed
 
-- Release gate: `kill` stops the check and its steps, and the gate continues
-  with `--resume`. It used to die alone and leave them writing into its
-  evidence.
-
+- Release gate: `kill` stops the check and its steps too, and the gate
+  continues with `--resume`.
 - Release gate and checks: Ctrl-C, `kill` and a timeout let an infrastructure
-  tier finish its cleanup. A stop reaches a tier more than once, and the repeat
-  used to end the cleanup; Ctrl-C on the gate also killed the tier after 15
-  seconds.
-
+  tier finish its cleanup.
 - Checks: a failed or stopped step removes the containers it left running, and
-  `--resume` and `--remove` remove those of a killed check. Containers used to
-  outlive their run state, where nothing could reach them, and `--remove` then
-  deleted their Podman stores under them.
-
+  `--resume` and `--remove` remove those of a killed check.
 - Collection skeletons: without `TMPDIR`, the nox sessions use
   `/var/tmp/nox-<uid>`. `ansible-test` failed where `/tmp` is a small tmpfs.
-
 - All skeletons: the shared Molecule playbooks persist `__testing_state` in its
-  declared key order. Sorted keys made a role run from the restored state
-  rewrite its files.
-
+  declared key order, so a role run from the restored state no longer rewrites
+  its files.
 - All skeletons: the Podman create playbook no longer prints whole platform
   entries, registry credentials included.
-
-- Role and collection skeletons: the `ee` scenario takes the collection root
-  from the parent of Molecule's project directory when that directory is
-  `extensions/`, where the `molecule` nox session starts Molecule. Its prepare
-  step stopped with "Cannot determine project type".
-- Collection skeletons: the `molecule` session installs `ansible-builder`. The
-  `ee` scenario run through it failed with "No such file or directory:
-  'ansible-builder'" unless the command was on `PATH`.
-
-- CLI skeleton: the contract test of an expired write repeats once with a
-  longer deadline when the commands before the write use up the first one, as
-  load can make them. It failed although the module correctly reported that
-  nothing changed.
-
+- Role and collection skeletons: the `ee` scenario finds the collection root
+  when Molecule starts in `extensions/`, as the `molecule` nox session does.
+- Collection skeletons: the `molecule` session installs `ansible-builder`,
+  which the `ee` scenario needs.
 - Collection skeletons: the `molecule` session installs `pycdlib`, which the
   libvirt platforms need for their cloud-init seed images.
+- CLI skeleton: the contract test of an expired write repeats once with a
+  longer deadline when load uses up the first one.
 
 
 ## [4.1.1] - 2026-11-06
@@ -209,17 +146,14 @@ and the project adheres to
   a fixed diff marker. `empty_clears=True` permits an empty declaration to clear
   the secret. These fields always compare, independently of `update_password`.
   The REST fixture exercises both options through `access_secret`.
-
 - All three module variants: the engine's `strmap` field kind holds string
   keys and string values, including empty values, with whole-value replacement,
   comparison and diff. Declared keys follow `pattern` and entries are bounded
   by `maximum_items`; stored keys outside the pattern stay readable. The REST
   fixture exercises the kind through its `variables` field.
-
 - All three module variants: the shared lifecycle tests prove that a lost reply
   to a creation storing the object and its secret in one request settles by
   read-back.
-
 - `collection_modules_cli` for products administered through a command line on
   the managed host. It shares the lifecycle and check scaffolding, with an
   existing-only hook fixture, real information and planning modules, bounded
@@ -234,28 +168,22 @@ and the project adheres to
 
 - `collection_modules` is now `collection_modules_rest`. Render
   `collection_modules_rest` wherever you rendered `collection_modules`.
-
 - All skeletons: shared guide checks cover generic documentation across
   variants. Module `FIXME.md` checklists provide one ordered fixture replacement
   path, and shorter guides retain their contracts and testing requirements.
-
 - All skeletons: the Molecule README explains the short real checkout path
   needed by product tests that refuse symlinks and gives a disk-backed
   location below `/var/tmp/`.
-
 - Both HTTP module variants: the loopback server module docstring states
   that threaded connections run product routes one at a time under a lock.
-
 - collection_default and all three module variants: nox allocates a private
   short-path directory per invocation and removes only its own unchanged
   directory. Explicit orphan recovery replaces the PID-based link sweep
   described in the 3.1.0 Fixed entry.
-
 - collection_default and all three module variants: `helper-lint` includes
   collection Python below `tests/`, excluding ansible-test's `unit/`,
   `integration/` and `output/` trees. Development guidance puts pytest suites
   below `tests/unit/` so ansible-test runs them.
-
 - collection_modules_cli: the invariant contract keeps compatibility refusal,
   real information entries, literal argv and pre-dispatch validation, prepared
   host identity, effective environments, evidence-derived outcomes and no
@@ -267,10 +195,8 @@ and the project adheres to
 ### Removed
 
 - `collection_modules`; render `collection_modules_rest` instead.
-
 - Collection READMEs: the `toc` anchor of the table of contents; link to
   `#table-of-contents` instead.
-
 - The `skeleton_revision` render input. No template has read it since 2.10.0,
   and passing it has no effect.
 
