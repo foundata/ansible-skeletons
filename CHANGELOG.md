@@ -37,8 +37,8 @@ and the project adheres to
   from a public clone of the tagged commit. It no longer repeats the gate's
   tests and needs no Galaxy.
 - Checks: the quick check runs the appliance skeleton's Molecule scenario.
-- Collection skeletons: antsibull-nox 1.11.1 or newer is required, and the
-  `license-check` troubleshooting note is gone from `DEVELOPMENT.md`.
+- Collection skeletons: antsibull-nox 1.11.1 or newer is required. Its
+  `license-check` accepts a tracked file that is deleted but not staged.
 - `DEVELOPMENT.md` opens its testing section with an overview of the checks. It
   says how to wrap template text for maximum-length names, and that a tool
   minimum in a template changes together with `pyproject.toml` and the lock.
