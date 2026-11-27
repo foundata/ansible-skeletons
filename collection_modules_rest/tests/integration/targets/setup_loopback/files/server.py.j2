@@ -32,7 +32,8 @@ def serve(
     plus reply(status, body, headers) and send_json(status, payload). It owns
     product authentication and parsing. authorized gates the shutdown route:
     an accepted shutdown request is answered with status 200 on every method
-    in methods, a refused one with 401.
+    in methods, a refused one with 401. authorized receives the handler, so a
+    shutdown that accepts one method checks handler.command there.
     The atomic port file is published after the listener binds.
     request_timeout bounds socket inactivity. Requests run serially in daemon
     threads so a handler cannot delay lifetime shutdown. The serving loop ends
