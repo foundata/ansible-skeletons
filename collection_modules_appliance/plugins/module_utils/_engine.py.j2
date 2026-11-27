@@ -228,7 +228,8 @@ def build_spec(resource: Resource) -> dict[str, Any]:
             a kind other than ``int``, or ``input_only`` on a kind other than
             ``str``, ``choice``, ``set`` and ``names``. ``readable`` applies
             only to secrets; ``empty_clears`` requires a readable secret. A
-            ``tristate`` field names three distinct words in ``choices``.
+            ``tristate`` field names three distinct words in ``choices``, and
+            its ``created`` and ``implied`` are among them.
     """
     spec = api_argument_spec()
     for key in resource.keys:
@@ -255,6 +256,13 @@ def build_spec(resource: Resource) -> dict[str, Any]:
             and all(field.choices)
         ):
             raise ValueError("a tristate field names three distinct words in choices")
+        if field.kind == "tristate" and any(
+            value is not None and value not in field.choices
+            for value in (field.created, field.implied)
+        ):
+            raise ValueError(
+                "a tristate field's created and implied are words of its choices"
+            )
         if field.implied is not None:
             continue
         kind = {
@@ -459,6 +467,8 @@ def stored_values(record: dict[str, Any], fields: Iterable[Field]) -> dict[str, 
     record stay with the client and the hook. A ``tristate`` value comes back
     as its word; a hook that writes one sends its stored value from
     ``TRISTATE``.
+    A readable secret stays out as well: a hook that compares one adds it to
+    ``managed`` itself and keeps it out of ``public``, ``predict`` and the diff.
     """
     if not isinstance(record, dict):
         raise ProductError(category="response", code="schema")

@@ -26,7 +26,7 @@ and the project adheres to
   `meta/argument_specs.yml`.
 - Module skeletons: the engine's `tristate` field kind stores `null`, `true` or
   `false` under three words named in `choices`, such as `inherit`, `show` and
-  `hide`.
+  `hide`. The option accepts only the words and refuses an explicit null.
 - Module skeletons: the engine's `declared_values` and `stored_values` validate
   the declared options of a hook-based resource and project its stored record
   by the rules of its `Field`s.

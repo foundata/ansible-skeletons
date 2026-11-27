@@ -727,6 +727,25 @@ def test_a_tristate_field_needs_three_distinct_words(choices: tuple[str, ...]) -
         build_spec(replace(SYNTHETIC, fields=(field,)))
 
 
+@pytest.mark.parametrize(
+    "field",
+    [
+        replace(PUBLIC_IMAGES, created=True),
+        replace(PUBLIC_IMAGES, created="other"),
+        replace(PUBLIC_IMAGES, implied=False),
+        replace(PUBLIC_IMAGES, implied="other"),
+    ],
+)
+def test_a_tristate_field_takes_created_and_implied_as_words(field: Field) -> None:
+    with pytest.raises(ValueError, match="words of its choices"):
+        build_spec(replace(SYNTHETIC, fields=(field,)))
+    for valid in (
+        replace(PUBLIC_IMAGES, created="hide"),
+        replace(PUBLIC_IMAGES, implied="inherit"),
+    ):
+        build_spec(replace(SYNTHETIC, fields=(valid,)))
+
+
 def test_tristate_declares_null_and_leaves_omission_unmanaged(
     synthetic: SyntheticClient, run_module: RunModule
 ) -> None:
