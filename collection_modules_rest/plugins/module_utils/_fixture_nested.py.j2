@@ -12,11 +12,12 @@ the base's parameter names: Ruff and mypy pass a renamed one, and only
 ansible-test sanity's pylint (``arguments-renamed``) and ``test_lifecycle.py``,
 which checks every lifecycle class below ``plugins/module_utils/``, report it.
 Keep per-instance state in ``__init__`` after the base's, never in mutable
-class attributes. For primitive values, ``declared`` and ``managed`` can reuse
-the engine's ``Field`` and ``normalize()``, which check declared and stored
-values with the right error categories, including an integer range
-(``minimum``, ``maximum``) and ``choices`` or a ``pattern`` that bind input
-only (``input_only``); write by hand only what the product needs beyond them.
+class attributes. For primitive values, ``declared`` and ``managed`` can call
+the engine's ``declared_values`` and ``stored_values`` with ``Field``
+definitions, which check declared and stored values with the right error
+categories, including an integer range (``minimum``, ``maximum``) and
+``choices`` or a ``pattern`` that bind input only (``input_only``); write by
+hand only what the product needs beyond them.
 ``FixtureNestedInfo`` is the information read that goes with the resource;
 copy it along when the resource needs one.
 """
