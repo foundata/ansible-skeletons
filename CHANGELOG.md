@@ -83,6 +83,10 @@ and the project adheres to
   accepts any top-level result key with a scalar value, such as `activated`.
 - REST skeleton: `_activation.py` and its unit test are no longer invariant.
   `FIXME.md` says to delete both unless saved and active state differ.
+- Module skeletons: `README.md` is rewritten for its readers. It gains
+  "Requirements" and "Getting started", and "How the modules behave" replaces
+  the contract section with new anchors (`#module-behavior`, `#behavior-*`).
+  "Dependencies" keeps its anchor as a subsection of "Requirements".
 
 ### Fixed
 

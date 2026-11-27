@@ -5,20 +5,38 @@ SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' 
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
-Resource modules for {{ product | mandatory('Missing required variable: product') }}.
+{# skeleton-variant: http-readme-1 #}
+{% filter wordwrap(width=80, break_long_words=False, break_on_hyphens=False) %}
+The `{{ namespace }}.{{ collection_name }}` Ansible collection manages the configuration of an existing {{ product | mandatory('Missing required variable: product') }} installation through its REST API. Each module brings one kind of record into the state you declare and reports what it found or changed.
+{% endfilter %}{{ '' }}
 
-FIXME The examples use an invented fixture. Replace this paragraph after
-qualifying the first product resource.
+The collection does not install or bootstrap the product and does not create
+API credentials.
+{# end skeleton-variant #}
+
+FIXME In two or three sentences: what can a reader manage with this collection,
+and what stays their job? The examples below use an invented fixture; replace
+them after you have qualified the first product resource.
 
 
 ## Table of contents<a id="toc"></a>
 
 - [Included content](#content)
-- [Dependencies](#dependencies)
-- [Collection contract](#collection-contract)
+- [Requirements](#requirements)
+  - [Dependencies](#dependencies)
+- [Getting started](#getting-started)
 - [Usage](#usage)
-{# skeleton-variant: http-readme-1 #}
+  - [FIXME Name the administration task](#usage-fixture)
+  - [FIXME Name the nested resource task](#usage-fixture-nested)
+- [How the modules behave](#module-behavior)
+  - [What a module manages](#behavior-ownership)
+  - [How a module finds a record](#behavior-identity)
+  - [When a change takes effect](#behavior-activation)
+{# skeleton-variant: http-readme-2 #}
 {# end skeleton-variant #}
+  - [Check mode and diff mode](#behavior-check-diff)
+  - [What a failed task reports](#behavior-failures)
+  - [Product versions](#behavior-versions)
 - [Compatibility](#compatibility)
 - [Versioning and deprecation](#versioning-deprecation)
 - [Licensing, copyright](#licensing-copyright)
@@ -27,102 +45,55 @@ qualifying the first product resource.
 
 ## Included content<a id="content"></a>
 
-<!-- BEGIN MODULE TABLE -->
-|        Module         | Purpose |
-| --------------------- | ------- |
-| `fixture`             | Converge one saved record |
-| `fixture_info`        | Read its public saved state |
-| `fixture_nested`      | Manage a nested resource through lifecycle hooks |
-| `fixture_nested_info` | Read its public state |
-{# skeleton-variant: http-readme-2 #}
+|        Module         | What it does |
+| --------------------- | ------------ |
+{# skeleton-variant: http-readme-3 #}
+| `fixture`             | Creates, changes or deletes one record |
+| `fixture_info`        | Reads one record without changing it |
+| `fixture_nested`      | Creates, changes or deletes a record with nested settings |
+| `fixture_nested_info` | Reads that record without changing it |
 {# end skeleton-variant #}
-<!-- END MODULE TABLE -->
 
-This table is maintained by hand. Module documentation is authoritative:
-`ansible-doc {{ namespace }}.{{ collection_name }}.fixture`.
+Each module documents its options, return values and own rules:
+
+```sh
+ansible-doc {{ namespace }}.{{ collection_name }}.fixture
+```
 
 
-## Dependencies<a id="dependencies"></a>
+## Requirements<a id="requirements"></a>
+
+You prepare the following before the first task:
+
+- A running installation of the product whose API the Ansible control node, or
+  another host you delegate to, can reach.
+- An API key and secret for the automation, stored in Ansible Vault or another
+  secret store.
+- Trust in the API's TLS certificate on the host that runs the modules.
+- ansible-core {{ min_ansible_version | default('2.19.0') }} or newer on the
+  control node, and Python 3.9 or newer on the host that runs the modules.
+- FIXME List the product's other requirements, such as the privileges of the
+  automation account.
+
+{# skeleton-variant: http-readme-4 #}
+{# end skeleton-variant #}
+### Dependencies<a id="dependencies"></a>
 
 See `dependencies` in [`galaxy.yml`](./galaxy.yml).
 
-The fixture uses `foundata.utils >=1.0.0`. Python packages that the execution
-host needs are listed in [`requirements.txt`](./requirements.txt); the fixture
-needs none.
+`ansible-galaxy collection install` installs these collections together with
+this one. The fixture uses `foundata.utils >=1.0.0`. Python packages the
+modules need beyond ansible-core are listed in
+[`requirements.txt`](./requirements.txt); the fixture needs none.
 
 
-## Collection contract<a id="collection-contract"></a>
+## Getting started<a id="getting-started"></a>
 
-### Execution<a id="execution"></a>
-
-Modules run on the execution host against an existing API endpoint. Use
-`connection: local` or an authorized delegate. Installation, bootstrap,
-credentials and TLS trust are caller prerequisites.
-
-{# skeleton-variant: http-readme-3 #}
-{# end skeleton-variant #}
-### Identity<a id="identity"></a>
-
-{# skeleton-variant: http-readme-4 #}
-Names match ignoring case; the server assigns integer identifiers. A rename
-creates another record. The by-name route's documented 404 proves absence.
-{# end skeleton-variant #}
-
-### Ownership<a id="ownership"></a>
-
-Only declared fields are managed. Omitted and null options stay unmanaged;
 {# skeleton-variant: http-readme-5 #}
-empty values clear fields. Parent names resolve before writes. Passwords are
-write-only, set on creation unless `update_password: always` requests rotation.
-The readable `access_secret` compares privately on every declaration, and an
-empty string clears it. Public state omits it; diffs use a fixed marker.
-Deletion refuses referenced records. Coordinate
+The modules talk to the API over HTTPS, so they run on the control node
+(`connection: local`) and not on the product's host. Set the connection options
+once for the whole play with `module_defaults`:
 {# end skeleton-variant #}
-writers, including inventory aliases that address the same endpoint.
-
-### Activation<a id="activation"></a>
-
-{# skeleton-variant: http-readme-6 #}
-REST writes take effect immediately. No apply module is provided.
-{# end skeleton-variant #}
-
-### Check and diff mode<a id="check-diff-mode"></a>
-
-Check mode performs reads with zero writes. It returns `verified: predicted`
-where a write would follow and `verified: observed` where nothing would
-change; the info module always reports observed state. Predicted creations
-have no identifier. Diffs contain public managed fields only, on request.
-
-### Failures<a id="failures"></a>
-
-A failure reports:
-
-- `error_category` and `error_code`.
-- `http_status` and the `operation`.
-- The identity under its option names.
-- `changed`, and `outcome`: `unchanged`, `changed` or `unknown`.
-
-After a lost response, a module reads the record back by its identity; it
-never retries a creation blindly. Results and errors exclude secrets,
-including secrets returned in listings.
-
-### Version check<a id="version-check"></a>
-
-FIXME: Keep one of the next two sentences to match `_binding.py`.
-A read-only probe precedes writes.
-Every module checks the product version before its first request, including
-unchanged and read-only runs.
-
-An untested product series produces one warning and the module proceeds.
-Operations known to fail on a particular product build fail before they write.
-
-
-## Usage<a id="usage"></a>
-
-`ansible-doc {{ namespace }}.{{ collection_name }}.<module>`
-shows a module's options, return values and own rules. The examples are tasks of
-this play, run on the control node against an inventory host that defines the
-endpoint's variables:
 
 ```yaml
 ---
@@ -136,22 +107,59 @@ endpoint's variables:
       url: "{% raw %}{{ product_url }}{% endraw %}"
       api_key: "{% raw %}{{ product_api_key }}{% endraw %}"
       api_secret: "{% raw %}{{ product_api_secret }}{% endraw %}"
-  tasks: [] # the tasks of the section
+  tasks:
+{# skeleton-variant: http-readme-6 #}
+    - name: "Save the record"
+      {{ namespace }}.{{ collection_name }}.fixture:
+        name: "example"
+        value: "ready"
+      register: "__record"
+{# end skeleton-variant #}
 ```
+
+{# skeleton-variant: http-readme-7 #}
+The first run creates the record and reports `changed: true`. A second run
+finds it as declared and reports `changed: false`. In both cases the result
+holds the record as the product stores it, without secrets:
+
+```yaml
+__record:
+  changed: true
+  changed_fields: []
+  verified: "observed"
+  fixture:
+    name: "example"
+    id: 7
+    value: "ready"
+    # further public fields of the record
+```
+
+`verified: observed` means the module read the record back after writing it.
+[How the modules behave](#module-behavior) explains the other values.
+{# end skeleton-variant #}
+
+
+## Usage<a id="usage"></a>
+
+Each section covers one administration task and shows the tasks to put into
+the play from [Getting started](#getting-started).
 
 ### FIXME Name the administration task<a id="usage-fixture"></a>
 
-{# skeleton-variant: http-readme-7 #}
-The fixture tasks save a record.
-{# end skeleton-variant #}
-FIXME Replace this example with a product task.
+FIXME One or two sentences: what does the reader achieve here, and what must
+exist beforehand? Then replace the example with a product task.
 
 ```yaml
+{# skeleton-variant: http-readme-8 #}
 - name: "Save the record"
   {{ namespace }}.{{ collection_name }}.fixture:
     name: "example"
     value: "ready"
-{# skeleton-variant: http-readme-8 #}
+
+- name: "Read it back"
+  {{ namespace }}.{{ collection_name }}.fixture_info:
+    name: "example"
+  register: "__record"
 {# end skeleton-variant #}
 ```
 
@@ -161,8 +169,9 @@ Modules: `fixture`, `fixture_info`.
 
 ### FIXME Name the nested resource task<a id="usage-fixture-nested"></a>
 
-This example manages a nested resource through lifecycle hooks. FIXME Replace
-it with a qualified product resource.
+FIXME Replace this example with a qualified product resource. The fixture
+manages a record with nested settings, of which you declare only the ones you
+want to manage.
 
 ```yaml
 - name: "Manage one nested resource"
@@ -174,14 +183,131 @@ it with a qualified product resource.
 ```
 
 Modules: `fixture_nested`, `fixture_nested_info`.
+
+
+## How the modules behave<a id="module-behavior"></a>
+
+All modules of the collection follow the same rules. The table gives each rule
+in one line; the sections below add the details you need when a run surprises
+you.
+
+|      Topic       | Rule |
+| ---------------- | ---- |
+| Managed options  | A module changes only the options you set. |
 {# skeleton-variant: http-readme-10 #}
+| Finding a record | A record is found by its `name`; a changed name is another record. |
+| Taking effect    | A write is active as soon as the task ends. |
+{# end skeleton-variant #}
+| Check mode       | Check mode reads and predicts; it never writes. |
+| Failures         | A failed task says whether it changed anything. |
+{# skeleton-variant: http-readme-11 #}
+| Lost replies     | A module never sends a creation twice. |
+{# end skeleton-variant #}
+| Product versions | An untested product series warns; a known-bad build fails before writing. |
+
+### What a module manages<a id="behavior-ownership"></a>
+
+A module changes only the options you set in the task. An option you leave out,
+or set to `null`, keeps whatever value the product has. To clear a field, set
+it to an empty value, such as `""` or `[]`.
+
+{# skeleton-variant: http-readme-12 #}
+A password is write-only: the API never returns it, so a module cannot tell
+whether it changed. The module therefore sets it when it creates the record and
+leaves it alone afterwards, unless you ask for a rotation with
+`update_password: always`. The `access_secret` is different, because the API
+can read it: the module compares it on every run and changes it when it
+differs. An empty string clears it. Neither value appears in a result or a
+diff.
+
+Deleting a record that another record still refers to fails. Delete or change
+the referring record first.
 {# end skeleton-variant #}
 
-## Compatibility<a id="compatibility"></a>
+Two writers on the same endpoint can overwrite each other. Let one play at a
+time write to an installation. This includes inventory hosts that are aliases
+of the same endpoint.
 
-The controller needs ansible-core {{ min_ansible_version | default('2.19.0') }}
-or newer. Execution hosts need Python 3.9+, API access and the endpoint's CA
-trust.
+### How a module finds a record<a id="behavior-identity"></a>
+
+{# skeleton-variant: http-readme-13 #}
+A module finds a record by its `name`, ignoring case. The product assigns the
+numeric `id`; you never pass it. Changing `name` in a task therefore does not
+rename a record: it creates a second one.
+
+A parent you name in `parent` must exist exactly once. The module looks it up
+before it writes anything and fails with `error_category: reference` when no
+parent or more than one parent has that name.
+{# end skeleton-variant #}
+
+### When a change takes effect<a id="behavior-activation"></a>
+
+{# skeleton-variant: http-readme-14 #}
+A write through the REST API is active immediately. The collection has no
+separate apply step.
+{# end skeleton-variant #}
+
+{# skeleton-variant: http-readme-15 #}
+{# end skeleton-variant #}
+### Check mode and diff mode<a id="behavior-check-diff"></a>
+
+{# skeleton-variant: http-readme-16 #}
+In check mode (`--check`) a module reads the current state and predicts the
+result, but sends no write. The `verified` value in the result tells you what
+the reported state is based on:
+
+- `observed`: the module read this state from the product. Nothing would
+  change, or the module ran outside check mode and read the record back.
+- `predicted`: check mode skipped a write. The state shown is what the module
+  expects after it. A predicted new record has no `id`, because the product
+  has not assigned one.
+- `unverifiable`: the module wrote a write-only password, which it cannot read
+  back.
+
+The `_info` modules always report observed state.
+
+With `--diff`, the result shows the managed options before and after, without
+secrets.
+{# end skeleton-variant #}
+
+### What a failed task reports<a id="behavior-failures"></a>
+
+A failed task carries these values next to `msg`, so that a play or a person
+can decide what to do:
+
+|             Value              | Meaning |
+| ------------------------------ | ------- |
+| `error_category`, `error_code` | What kind of failure it was, as fixed words |
+| `http_status`, `operation`     | The API's status code and the step that failed |
+| `name`                         | The record the task addressed |
+| `changed`, `outcome`           | Whether the product changed: `unchanged`, `changed` or `unknown` |
+
+{# skeleton-variant: http-readme-17 #}
+`outcome: unknown` means the module could not find out, for example because
+the connection broke after it sent a password. Check the record before you run
+the task again.
+{# end skeleton-variant #}
+
+When the reply to a write is lost, the module reads the record back by its name
+to see whether the write arrived. It never sends a creation a second time on
+its own.
+
+Results and error messages never contain secrets, also not secrets that the API
+returns in a listing.
+
+### Product versions<a id="behavior-versions"></a>
+
+FIXME Keep one of the next two sentences, to match `_binding.py`.
+A module reads the product version before its first write.
+Every module reads the product version before its first request, also on runs
+that change nothing.
+
+On a product series this release was not tested with, the module warns once
+and continues. An operation known to fail on a particular product build fails
+before it writes. [Compatibility](#compatibility) lists the tested series.
+
+
+## Compatibility<a id="compatibility"></a>
 
 | Collection release | Product series (tested release) | ansible-core |
 | ------------------ | ------------------------------- | ------------ |

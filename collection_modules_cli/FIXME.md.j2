@@ -55,10 +55,19 @@ fields and required checks used below.
 15. The HTTP inventory extractor is dropped. Add a CLI inventory extractor only
     when a versioned product interface supplies the source, and retain source
     revision and extraction hashes beside its development output.
-16. Update the README's execution, ownership, compatibility and usage
-    statements. Replace its fixture qualification with the product builds and
+16. Update the README: its lead, the module table,
+    [how the modules behave](./README.md#module-behavior) and the usage
+    sections. Replace its fixture qualification with the product builds and
     locators tested. Check `tests/config.yml`, run the checks in
     [DEVELOPMENT.md](./DEVELOPMENT.md#checks) and resolve failures. Adapt the
     changelog.
+
+    When the collection also ships a role, name it first under "Included
+    content" in a subsection of its own, with a link to the role's README, and
+    put the module table into a subsection "Modules". Add a section "How the
+    role and the modules fit together" after it: what the role sets up, what the
+    modules manage, what you do between the two, and one play for each. The
+    role's variables, tags and deployment rules stay in the role's README.
+
 17. Replace every remaining `FIXME` in all files (e.g., via
     `grep "FIXME" -r ./`), then remove this checklist.

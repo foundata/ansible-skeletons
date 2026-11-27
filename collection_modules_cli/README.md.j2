@@ -5,100 +5,95 @@ SPDX-FileCopyrightText: {{ company | default('FIXME your organization') ~ (' <' 
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
-Command-line resource modules for
-{{ product | mandatory('Missing required variable: product') }}.
-FIXME The examples use an invented fixture. Replace this sentence after
-qualifying the first product resource.
+{% filter wordwrap(width=80, break_long_words=False, break_on_hyphens=False) %}
+The `{{ namespace }}.{{ collection_name }}` Ansible collection manages the configuration of an installed {{ product | mandatory('Missing required variable: product') }} through its command line. The modules run on the host where the product is installed, call its command and bring one object into the state you declare.
+{% endfilter %}{{ '' }}
+
+The collection does not install the product and does not create its
+credential. The modules change objects that exist; they do not create or
+delete them.
+
+FIXME In two or three sentences: what can a reader manage with this collection,
+and what stays their job? The examples below use an invented fixture; replace
+them after you have qualified the first product resource. A product resource
+that creates or deletes needs its own fixtures and contract cases before you
+ship it, and the second paragraph changes with it.
+
 
 ## Table of contents<a id="toc"></a>
 
 - [Included content](#content)
-- [Execution and prerequisites](#execution-prerequisites)
-- [Dependencies](#dependencies)
-- [Resource contract](#resource-contract)
+- [Requirements](#requirements)
+  - [Dependencies](#dependencies)
+- [Getting started](#getting-started)
 - [Usage](#usage)
+  - [FIXME Name the administration task](#usage-fixture)
+  - [Preview a change](#usage-fixture-plan)
+- [How the modules behave](#module-behavior)
+  - [What a module manages](#behavior-ownership)
+  - [How a module finds an object](#behavior-identity)
+  - [How a module runs the command](#behavior-execution)
+  - [Check mode, plans and diff mode](#behavior-check-diff)
+  - [What a failed task reports](#behavior-failures)
+  - [Product versions](#behavior-versions)
 - [Compatibility](#compatibility)
 - [Versioning and deprecation](#versioning-deprecation)
 - [Licensing, copyright](#licensing-copyright)
 - [Author information](#author-information)
 
+
 ## Included content<a id="content"></a>
 
-|     Module     | Purpose |
-| -------------- | ------- |
-| `fixture`      | Update an existing object through lifecycle hooks |
-| `fixture_info` | Read public state through the command line |
-| `fixture_plan` | Predict a declaration with real reads and no writer |
+|     Module     | What it does |
+| -------------- | ------------ |
+| `fixture`      | Changes the settings of one existing object |
+| `fixture_info` | Reads one object without changing it |
+| `fixture_plan` | Reports what `fixture` would change, without changing it |
 
-Use this variant for products whose supported administration interface is a
-command line on the managed host. The fixture demonstrates an existing-only
-resource. Products that create or delete need fixtures and contract cases for
-those operations before shipping them.
+Each module documents its options, return values and own rules:
 
-## Execution and prerequisites<a id="execution-prerequisites"></a>
+```sh
+ansible-doc {{ namespace }}.{{ collection_name }}.fixture
+```
 
-Ansible runs the modules on the managed host, or on an authorized delegate. The
-caller supplies the installed product, credential, interpreter and trusted
-locator. The fixture needs Python 3.9+, GNU `timeout`, `/usr/bin/env`, and a
-seeded private directory. The `custom` locator accepts one absolute program path
-under the declared Python interpreter. It verifies the numeric module UID and
-probes the application UID through the same prefix before writing. Use `become`
-to establish the user.
 
-Commands stay in the foreground and run under one shared deadline, including
-reads and identity probes. The locator clears the application's environment with
-`env -i`, fixes its locale and rejects inherited loader overrides. It supports
-neither container entry nor a user-switching wrapper. Product-specific locators
-need their own qualification of identity, environment, deadline and cleanup.
+## Requirements<a id="requirements"></a>
 
-## Dependencies<a id="dependencies"></a>
+You prepare the following on each managed host before the first task:
+
+- The product, installed and set up.
+- The credential the product asks for, stored in Ansible Vault or another
+  secret store.
+- Python 3.9 or newer, GNU `timeout` and `/usr/bin/env`.
+- The user the product's command runs as. The modules do not switch users; the
+  play uses `become` for that.
+- FIXME The fixture also needs a seeded private directory. Replace this item
+  with what the product needs.
+
+The control node needs ansible-core
+{{ min_ansible_version | default('2.19.0') }} or newer.
+
+### Dependencies<a id="dependencies"></a>
 
 See `dependencies` in [`galaxy.yml`](./galaxy.yml).
 
-The collection requires the shared utility dependency listed there. Python
-packages that the execution host needs are listed in
+`ansible-galaxy collection install` installs these collections together with
+this one. Python packages the modules need beyond ansible-core are listed in
 [`requirements.txt`](./requirements.txt).
 
-## Resource contract<a id="resource-contract"></a>
 
-The selector is `(app, key)` and `expected_id` asserts the opaque object
-identity. The module refuses a missing mutable target in normal and check mode.
-Only declared non-null fields are managed. `false`, zero and the empty string
-are values. Other composite identities and unmanaged data remain untouched.
+## Getting started<a id="getting-started"></a>
 
-The fixture checks expected identity while holding its state-file lock. This
-conditional update is fixture behavior. Native identity and concurrency
-guarantees belong to the product and must be qualified independently. The
-fixture directory is exclusively owned by the test run.
-
-Check mode performs reads and reports `verified: predicted` where an update
-would follow. Repeats report `verified: observed` and `changed: false`.
-Information reads return actual state; plans always report `changed: false` and
-describe the proposed state with `would_change`. Diff output contains public
-changed fields only.
-
-A write is dispatched at most once. Lost replies and nonzero statuses, including
-an immediate 124, are reconciled by independent readback. Unavailable evidence
-leaves `outcome: unknown`; observed partial effects report `outcome: changed`.
-Actual deadline expiry terminates the foreground process group and leaves
-uncertainty about effects. Errors carry fixed public codes and
-`http_status: null`; raw streams and credentials remain private. Secrets travel
-on stdin under `no_log`.
-
-The shared compatibility policy probes before a write or prediction, warns once
-for an untested series and refuses recorded exclusions. FIXME Set supported
-series and exclusions from product evidence.
-
-## Usage<a id="usage"></a>
-
-Set execution defaults for the target host. The `api` action group is the shared
-collection configuration name for these options.
+The modules run on the managed host, as ordinary Ansible modules do. Tell them
+once per play how to call the product's command, with `module_defaults`:
 
 ```yaml
 ---
-- name: "Update an existing product object"
+- name: {{ ('Configure ' ~ product | default('Example Product')) | to_json(ensure_ascii=False) }}
   hosts: "product_hosts"
   gather_facts: false
+  become: true
+  become_user: "product"
   module_defaults:
     group/{{ namespace }}.{{ collection_name }}.api:
       credential: "{% raw %}{{ product_credential }}{% endraw %}"
@@ -110,23 +105,213 @@ collection configuration name for these options.
         chdir: "/var/lib/fixture/owned-state"
         user: "1000"
   tasks:
-    - name: "Set public values"
+    - name: "Set the quota"
       {{ namespace }}.{{ collection_name }}.fixture:
         app: "alpha"
         key: "quota"
         expected_id: "090d190b-c80a-4917-8532-6b62a2836d0c"
-        enabled: false
-        limit: 0
-        label: ""
+        limit: 50
+      register: "__quota"
 ```
+
+`exec` names the program to run: an absolute interpreter path, the absolute
+path of the program, its working directory and the numeric UID the play runs
+as. `app` and `key` select the object. `expected_id` is the identity you expect
+it to have; the module refuses to write when it finds another object there.
+
+The first run changes the limit and reports `changed: true`. A second run finds
+it as declared and reports `changed: false`. In both cases the result holds the
+object as the product stores it:
+
+```yaml
+__quota:
+  changed: true
+  changed_fields:
+    - "limit"
+  verified: "observed"
+  fixture:
+    app: "alpha"
+    key: "quota"
+    id: "090d190b-c80a-4917-8532-6b62a2836d0c"
+    enabled: true
+    limit: 50
+    label: ""
+```
+
+
+## Usage<a id="usage"></a>
+
+Each section covers one administration task and shows the tasks to put into
+the play from [Getting started](#getting-started).
+
+### FIXME Name the administration task<a id="usage-fixture"></a>
+
+FIXME One or two sentences: what does the reader achieve here, and what must
+exist beforehand? Then replace the example with a product task.
+
+```yaml
+- name: "Set public values"
+  {{ namespace }}.{{ collection_name }}.fixture:
+    app: "alpha"
+    key: "quota"
+    expected_id: "090d190b-c80a-4917-8532-6b62a2836d0c"
+    enabled: false
+    limit: 0
+    label: ""
+```
+
+`false`, `0` and `""` are values the module sets. Leave an option out to keep
+what the product has.
+
+Modules: `fixture`, `fixture_info`.
+
+### Preview a change<a id="usage-fixture-plan"></a>
+
+`fixture_plan` takes the options of `fixture`, reads the current state and
+reports in `would_change` whether the declaration differs from it. It never
+writes and always reports `changed: false`, so you can use it in a normal run,
+for example to stop a play before a change you did not expect:
+
+```yaml
+- name: "See what the next task would do"
+  {{ namespace }}.{{ collection_name }}.fixture_plan:
+    app: "alpha"
+    key: "quota"
+    expected_id: "090d190b-c80a-4917-8532-6b62a2836d0c"
+    limit: 50
+  register: "__plan"
+```
+
+Modules: `fixture_plan`.
+
+
+## How the modules behave<a id="module-behavior"></a>
+
+All modules of the collection follow the same rules. The table gives each rule
+in one line; the sections below add the details you need when a run surprises
+you.
+
+|       Topic       | Rule |
+| ----------------- | ---- |
+| Managed options   | A module changes only the options you set. |
+| Finding an object | `app` and `key` select it; `expected_id` must match what is there. |
+| Missing objects   | A module fails when the object does not exist. It does not create it. |
+| Running a command | One foreground command at a time, in a clean environment, under one deadline. |
+| Check mode        | Check mode reads and predicts; it never writes. |
+| Failures          | A failed task says whether it changed anything. |
+| Lost replies      | A module never sends a write twice. |
+| Product versions  | An untested product series warns; a known-bad build fails before writing. |
+
+### What a module manages<a id="behavior-ownership"></a>
+
+A module changes only the options you set in the task. An option you leave out,
+or set to `null`, keeps whatever value the product has. `false`, `0` and the
+empty string are values: the module sets them.
+
+Other objects and settings of the product stay untouched, also those of the
+same `app`.
+
+FIXME The fixture guards its update with a lock on its state file. Say here
+what the product guarantees when two writers change the same object at once.
+
+### How a module finds an object<a id="behavior-identity"></a>
+
+`app` and `key` together select one object. `expected_id` is the identity you
+expect this object to have. When the product reports another identity, someone
+has replaced the object since you wrote the task, and the module refuses to
+write.
+
+The object must exist. `fixture` fails when it is missing, in normal runs and
+in check mode. `fixture_info` returns `fixture: null` when the product reports
+that the object does not exist. A read that fails or returns incomplete output
+never counts as "does not exist"; the task fails instead.
+
+### How a module runs the command<a id="behavior-execution"></a>
+
+A module runs the product's program as a foreground command and waits for it.
+All commands of one task share one time budget, `deadline`, which is 5 seconds
+unless you set it: the reads and identity checks, the write and the read after
+it. When the budget runs out, the module ends the command and its child
+processes.
+
+The command gets an empty environment and a fixed locale, so variables of the
+Ansible session do not reach the product. The credential travels on standard
+input, not on the command line. Before a write the module checks that it runs
+under the UID you named in `exec.user` and that the program does as well.
+
+The `custom` kind of `exec` accepts one absolute program path under an absolute
+Python interpreter. It does not enter containers and does not wrap the command
+in `sudo` or `su`.
+
+FIXME Describe the product's own `exec` kinds here once you have qualified
+their identity checks, environment, deadline and cleanup.
+
+### Check mode, plans and diff mode<a id="behavior-check-diff"></a>
+
+In check mode (`--check`) a module reads the current state and predicts the
+result, but sends no write. The `verified` value in the result tells you what
+the reported state is based on:
+
+- `observed`: the module read this state from the product. Nothing would
+  change, or the module ran outside check mode and read the object back.
+- `predicted`: the state shown is what the module expects after a write that
+  check mode skipped, or that `fixture_plan` describes.
+
+`fixture_info` always reports observed state.
+
+With `--diff`, `fixture` shows the options that change, before and after,
+without secrets.
+
+### What a failed task reports<a id="behavior-failures"></a>
+
+A failed task carries these values next to `msg`, so that a play or a person
+can decide what to do:
+
+|             Value              | Meaning |
+| ------------------------------ | ------- |
+| `error_category`, `error_code` | What kind of failure it was, as fixed words |
+| `operation`                    | The step that failed |
+| `app`, `key`                   | The object the task addressed |
+| `changed`, `outcome`           | Whether the product's state changed: `unchanged`, `changed` or `unknown` |
+
+The failure also carries `http_status`, which is always `null` here because
+the modules send no HTTP request.
+
+A module sends a write once. When the command fails, times out or returns
+nothing usable, the module reads the object again to find out what happened:
+
+- The read shows part of the change: `outcome: changed`.
+- The read is not possible: `outcome: unknown`. Check the object before you run
+  the task again.
+
+A command that ran into the deadline was ended from outside, so it may have
+done part of its work.
+
+Results and error messages contain neither the credential nor the raw output
+of the command.
+
+### Product versions<a id="behavior-versions"></a>
+
+A module reads the product version before a write or a prediction. On a
+product series this release was not tested with, the module warns once and
+continues. An operation known to fail on a particular product build fails
+before it writes. [Compatibility](#compatibility) lists the tested series.
+
+FIXME Set the supported series and the known-bad builds from product evidence.
+
 
 ## Compatibility<a id="compatibility"></a>
 
-The controller needs ansible-core
-{{ min_ansible_version | default('2.19.0') }} or newer.
-Execution hosts need Python 3.9 or newer. The tests use invented fixture series
-1.0, release 1.0.0. FIXME Replace this qualification with the product builds and
-locators actually tested.
+| Collection release | Product series (tested release) | ansible-core |
+| ------------------ | ------------------------------- | ------------ |
+{% set initial_version = version | default('1.0.0') %}
+{% set core_floor = min_ansible_version | default('2.19.0') %}
+| {{ initial_version.ljust(18) }} | Invented fixture 1.0 (1.0.0)    | {{ ('>=' ~ core_floor).ljust(12) }} |
+
+FIXME Replace the fixture row with the product builds and `exec` kinds you
+tested, and this paragraph with what that testing covers. The fixture tests
+make no support claim for a real product; see [development](./DEVELOPMENT.md).
+
 
 ## Versioning and deprecation<a id="versioning-deprecation"></a>
 
