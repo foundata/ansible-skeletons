@@ -14,6 +14,11 @@ and the project adheres to
 
 ## [Unreleased]
 
+- Nothing worth mentioning right now.
+
+
+## [5.0.0] - 2026-11-27
+
 ### Added
 
 - Collection skeletons: the `ansible-lint` session lints the YAML examples of
@@ -842,7 +847,8 @@ and the project adheres to
 - All functionality and files, `role_default`
 
 
-[unreleased]: https://github.com/foundata/ansible-skeletons/compare/v4.1.1...HEAD
+[unreleased]: https://github.com/foundata/ansible-skeletons/compare/v5.0.0...HEAD
+[5.0.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v5.0.0
 [4.1.1]: https://github.com/foundata/ansible-skeletons/releases/tag/v4.1.1
 [4.1.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v4.1.0
 [4.0.0]: https://github.com/foundata/ansible-skeletons/releases/tag/v4.0.0
